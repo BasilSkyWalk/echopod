@@ -403,6 +403,16 @@ HalToneResult hal_audio_test_tone(void)
     return HAL_TONE_PLAYED;
 }
 
+HalToneDetail hal_audio_tone_detail(void)
+{
+    return (HalToneDetail){.stage = 0, .pending = 0};
+}
+
+HalBootClocks hal_system_boot_clocks(void)
+{
+    return (HalBootClocks){.mode = 0, .clock_select = 0, .pclk_select = 0};
+}
+
 HalToneResult hal_audio_dma_tone_start(void)
 {
     fake.dma_tone_running = true;

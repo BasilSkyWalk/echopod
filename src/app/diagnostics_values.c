@@ -21,6 +21,36 @@ const char *diagnostics_tone_result_text(HalToneResult result)
     return "";
 }
 
+static void append_hex(StringBuilder *builder, uint32_t value, int digits)
+{
+    static const char DIGITS[] = "0123456789ABCDEF";
+    for (int digit = digits - 1; digit >= 0; digit--) {
+        string_builder_append_char(builder, DIGITS[(value >> (4 * digit)) & 0xFu]);
+    }
+}
+
+void diagnostics_tone_text(HalToneResult result, HalToneDetail detail, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append(&builder, diagnostics_tone_result_text(result));
+    if (result == HAL_TONE_NO_DAC && detail.stage != 0) {
+        string_builder_append(&builder, " s");
+        string_builder_append_unsigned(&builder, detail.stage);
+        string_builder_append_char(&builder, ' ');
+        append_hex(&builder, detail.pending, 2);
+    }
+}
+
+void diagnostics_boot_clocks_text(HalBootClocks clocks, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    append_hex(&builder, clocks.mode, 4);
+    string_builder_append_char(&builder, ' ');
+    append_hex(&builder, clocks.clock_select, 4);
+    string_builder_append_char(&builder, ' ');
+    append_hex(&builder, clocks.pclk_select, 4);
+}
+
 void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
@@ -28,7 +58,7 @@ void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
         return;
     }
     if (view.result != HAL_TONE_PLAYED) {
-        string_builder_append(&builder, diagnostics_tone_result_text(view.result));
+        diagnostics_tone_text(view.result, view.detail, text, capacity);
         return;
     }
     if (view.status.running) {

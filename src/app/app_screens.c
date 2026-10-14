@@ -129,10 +129,25 @@ static ScreenAction play_test_tone(void *context)
     return screen_action_none();
 }
 
+static char tone_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char boot_clocks_text[DIAGNOSTICS_VALUE_CAPACITY];
+
 static const char *tone_value(const void *context)
 {
     const ToneOption *tone = context;
-    return tone->tried ? diagnostics_tone_result_text(tone->result) : "";
+    if (!tone->tried) {
+        return "";
+    }
+    diagnostics_tone_text(tone->result, hal_audio_tone_detail(), tone_text, sizeof tone_text);
+    return tone_text;
+}
+
+static const char *boot_clocks_value(const void *context)
+{
+    (void)context;
+    diagnostics_boot_clocks_text(hal_system_boot_clocks(), boot_clocks_text,
+                                 sizeof boot_clocks_text);
+    return boot_clocks_text;
 }
 
 static ScreenAction toggle_dma_tone(void *context)
@@ -157,7 +172,8 @@ static const char *dma_tone_value(const void *context)
     DmaToneView view = {.tried = tone->tried,
                         .stopped = tone->stopped,
                         .result = tone->result,
-                        .status = hal_audio_dma_tone_status()};
+                        .status = hal_audio_dma_tone_status(),
+                        .detail = hal_audio_tone_detail()};
     diagnostics_dma_tone_text(view, dma_tone_text, sizeof dma_tone_text);
     return dma_tone_text;
 }
@@ -283,6 +299,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                .select = toggle_dma_tone,
                                                .context = &screens->dma_tone,
                                                .value = dma_tone_value};
+    screens->diagnostics_items[9] = (MenuItem){
+        .label = "Boot clocks", .select = NULL, .context = NULL, .value = boot_clocks_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

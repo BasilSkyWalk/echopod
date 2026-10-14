@@ -302,6 +302,11 @@ void hal_audio_set_output(HalAudioOutput output)
 
 static bool dma_tone_running;
 
+HalToneDetail hal_audio_tone_detail(void)
+{
+    return (HalToneDetail){.stage = 0, .pending = 0};
+}
+
 HalToneResult hal_audio_dma_tone_start(void)
 {
     dma_tone_running = true;

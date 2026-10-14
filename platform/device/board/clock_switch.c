@@ -119,6 +119,20 @@ static bool run_from_pll(uint32_t mhz)
     return true;
 }
 
+static HalBootClocks boot_clocks;
+
+void board_clock_record_boot(void)
+{
+    boot_clocks = (HalBootClocks){.mode = register_read(CRU_MODE),
+                                  .clock_select = register_read(CRU_CLOCK_SELECT),
+                                  .pclk_select = register_read(CRU_PCLK_SELECT)};
+}
+
+HalBootClocks hal_system_boot_clocks(void)
+{
+    return boot_clocks;
+}
+
 uint32_t board_pclk_hz(void)
 {
     PllSetting setting;

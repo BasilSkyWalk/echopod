@@ -95,6 +95,15 @@ enum {
     ACODEC_SETTLE_MS = 5
 };
 
+typedef enum I2cStage {
+    I2C_STAGE_NONE,
+    I2C_STAGE_START,
+    I2C_STAGE_SEND,
+    I2C_STAGE_NAK,
+    I2C_STAGE_STOP,
+    I2C_STAGE_RECEIVE
+} I2cStage;
+
 static const uint32_t SOC_AUDIO_GATES[] = {0x0E, 0x10, 0x11, 0x12, 0x13, 0x82, 0x83, 0x96};
 static const uint8_t ACODEC_44100[4] = {0x06, 0x24, 0x19, 0x03};
 static const GpioPin I2C_PINS[] = {{2, 10}, {2, 11}};
@@ -104,22 +113,38 @@ static const GpioPin DAC_PINS[] = {
     [DAC_PIN_RESET] = {2, 1}, [DAC_PIN_AMP] = {1, 4},
 };
 
-static bool wait_pending(uint32_t bits)
+static HalToneDetail detail;
+
+static void note_failure(I2cStage stage)
+{
+    if (detail.stage == 0) {
+        detail =
+            (HalToneDetail){.stage = (uint8_t)stage, .pending = (uint8_t)register_read(I2C_IPD)};
+    }
+}
+
+static bool wait_pending(uint32_t bits, I2cStage stage)
 {
     uint32_t start = hal_clock_milliseconds();
     while ((register_read(I2C_IPD) & bits) == 0) {
         if (hal_clock_milliseconds() - start >= I2C_TIMEOUT_MS) {
+            note_failure(stage);
             return false;
         }
     }
     return true;
 }
 
+HalToneDetail hal_audio_tone_detail(void)
+{
+    return detail;
+}
+
 static bool i2c_start(uint32_t mode)
 {
     register_write(I2C_IPD, I2C_ALL_PENDING);
     register_write(I2C_CON, I2C_ENABLE | mode | I2C_START);
-    if (!wait_pending(I2C_START_DONE)) {
+    if (!wait_pending(I2C_START_DONE, I2C_STAGE_START)) {
         return false;
     }
     register_write(I2C_IPD, I2C_START_DONE);
@@ -131,7 +156,7 @@ static bool i2c_stop(void)
 {
     register_write(I2C_IPD, I2C_ALL_PENDING);
     register_write(I2C_CON, I2C_ENABLE | I2C_STOP);
-    bool stopped = wait_pending(I2C_STOP_DONE);
+    bool stopped = wait_pending(I2C_STOP_DONE, I2C_STAGE_STOP);
     register_write(I2C_IPD, I2C_ALL_PENDING);
     register_write(I2C_CON, 0);
     return stopped;
@@ -152,7 +177,11 @@ static bool i2c_send(const uint8_t *bytes, uint32_t count)
     }
     register_write(I2C_IPD, I2C_ALL_PENDING);
     register_write(I2C_MTXCNT, count);
-    bool sent = wait_pending(I2C_TX_DONE | I2C_NAK) && (register_read(I2C_IPD) & I2C_NAK) == 0;
+    bool sent = wait_pending(I2C_TX_DONE | I2C_NAK, I2C_STAGE_SEND);
+    if (sent && (register_read(I2C_IPD) & I2C_NAK) != 0) {
+        note_failure(I2C_STAGE_NAK);
+        sent = false;
+    }
     return i2c_stop() && sent;
 }
 
@@ -193,7 +222,7 @@ static bool dac_read(void *context, uint8_t address, uint32_t map, uint8_t *valu
     register_write(I2C_IPD, I2C_ALL_PENDING);
     register_write(I2C_CON, register_read(I2C_CON) | I2C_NAK_LAST);
     register_write(I2C_MRXCNT, 1);
-    bool received = wait_pending(I2C_RX_DONE);
+    bool received = wait_pending(I2C_RX_DONE, I2C_STAGE_RECEIVE);
     *value = (uint8_t)register_read(I2C_RXDATA);
     return i2c_stop() && received;
 }
@@ -361,6 +390,7 @@ static void use_dac_pins_as_gpio(void)
 
 static HalToneResult start_audio_path(uint32_t divider, uint32_t interrupts, bool transfer)
 {
+    detail = (HalToneDetail){.stage = I2C_STAGE_NONE, .pending = 0};
     cru_gate(GATE_GPIO1, true);
     use_dac_pins_as_gpio();
     dac_power_pins(&BUS);

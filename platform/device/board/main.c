@@ -33,6 +33,7 @@ static void check_usb(void)
 
 void board_main(void)
 {
+    board_clock_record_boot();
     board_clock_start();
     board_input_start();
     board_display_start();
