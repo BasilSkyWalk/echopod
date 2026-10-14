@@ -1,0 +1,74 @@
+# Echo Mini firmware — roadmap
+
+Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (works on hardware) · `blocked`
+
+## Phases
+
+| Phase | Work | Estimate | Device | Status |
+|---|---|---|---|---|
+| 0 | Recon of ReChord, architecture proposal | — | no | done |
+| 0.5 | Repo setup, toolchains, cross-build check on macOS | 0.5–1 d | no | done, except the ReChord cross-build (blocked, see NOTES) |
+| 1a | SDL simulator, HAL, frame-time counter, memory-budget enforcement | 2–3 d | no | done |
+| 1b | UI toolkit: screen stack, lists, marquee, bitmap fonts from TTF | 3–5 d | no | todo |
+| 1c | PC indexer, DB format, browse screens | 4–6 d | no | todo |
+| 1d | Simulator playback: queue, shuffle/repeat, gapless, resume | 3–4 d | no | todo |
+| 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | todo |
+| 1f | Cover Flow and cover export script | 4–6 d | no | todo |
+| 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | todo |
+| 3 | Device gaps: PLL, IRQs/SysTick, DMA audio, FAT writes, battery, backlight PWM, key timing, sleep | 3–8 wk | yes | todo |
+| 4 | Our app on the device; memory and Cover Flow tuning | 1–2 wk | yes | todo |
+
+## Features
+
+### MVP
+
+| Feature | Status | Notes |
+|---|---|---|
+| FLAC / MP3 / WAV playback | todo | ReChord decoders are host-tested; not audible on the device yet |
+| ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
+| Gapless | todo | ReChord's player design is host-tested |
+| Resume after power-off | todo | Needs FS writes on the device |
+| Library DB from SD scan | todo | |
+| Browse: Artist / Album Artist / Album / Genre / Folder / All Songs | todo | |
+| Now Playing: art, info, progress, seek | todo | |
+| Queue, shuffle, repeat | todo | ReChord has only a FIFO queue |
+| Volume and button mapping, lock/hold | todo | No hold switch documented; key repeat and long-press missing |
+| Settings: brightness, screen timeout, sleep timer, gain, output | todo | Brightness needs PWM; output needs jack/route control |
+| Battery, charging, power management | todo | No driver yet |
+| USB mass storage | todo | Works in ReChord (full speed, SD read-only) |
+
+### Ours
+
+| Feature | Status | Notes |
+|---|---|---|
+| Cover Flow album browser | todo | Strip renderer + mip cover cache |
+| Album favorites | todo | |
+| Configurable home screen | todo | |
+| M3U playlists | todo | |
+
+### Later
+
+| Feature | Status | Notes |
+|---|---|---|
+| Parametric EQ | todo | ReChord's DSP chain has an EQ module (host-tested) |
+| ReplayGain | todo | ReChord's player supports track/album (host-tested) |
+| Lyrics (.lrc) | todo | |
+| USB DAC mode | todo | |
+| Bluetooth | todo | Only leaked SDK binaries |
+
+## Platform
+
+| Piece | Status | Notes |
+|---|---|---|
+| Simulator (SDL2, 320×170 RGB565 at 3×, keyboard keys) | sim | Frame stats in the window title; `--headless --frames N --screenshot` for automated checks |
+| HAL: display, input, clock | sim | fs, audio and power interfaces come with their features |
+| Key gestures: press, long press, repeat | sim | Tested in `core` |
+| Strip renderer (no full framebuffer) | sim | 320×34 strips |
+| Quality gates in ctest: no comments, clang-format, Cortex-M3 RAM/heap audit | done | |
+
+## Tools
+
+| Tool | Status |
+|---|---|
+| Library indexer (Python) | todo |
+| Cover exporter (raw RGB565 thumbnails + index) | todo |
