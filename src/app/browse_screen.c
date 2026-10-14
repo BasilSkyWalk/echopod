@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "hal/clock.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/list_navigation.h"
@@ -30,7 +31,7 @@ static void load_row(BrowseScreen *browse, int row, uint32_t position)
     BrowseText text = {rows->labels[row], BROWSE_LABEL_CAPACITY, rows->details[row],
                        BROWSE_DETAIL_CAPACITY};
     BrowseItem item;
-    const Library *library = browse->pool->library;
+    const Library *library = browse->pool->config.library;
     if (!browse_item(library, browse->query, position, &item) ||
         !browse_item_text(library, browse->query, item, text)) {
         rows->labels[row][0] = '\0';
@@ -81,13 +82,28 @@ static const char *row_detail(const void *context, int index)
     return detail[0] != '\0' ? detail : NULL;
 }
 
+static ScreenAction play_from(BrowseScreen *browse, int index)
+{
+    BrowsePoolConfig *config = &browse->pool->config;
+    uint32_t seed = hal_clock_microseconds();
+    if (!player_play_list(config->player, browse->query, (uint32_t)index, seed)) {
+        return screen_action_none();
+    }
+    return screen_action_push(config->now_playing);
+}
+
 static ScreenAction select_row(void *context, int index)
 {
     BrowseScreen *browse = context;
     BrowseItem item;
     BrowseQuery child;
-    if (!browse_item(browse->pool->library, browse->query, (uint32_t)index, &item) ||
-        !browse_child(browse->query, item, &child)) {
+    if (!browse_item(browse->pool->config.library, browse->query, (uint32_t)index, &item)) {
+        return screen_action_none();
+    }
+    if (item.kind == BROWSE_ITEM_TRACK) {
+        return play_from(browse, index);
+    }
+    if (!browse_child(browse->query, item, &child)) {
         return screen_action_none();
     }
     Screen *next = browse_pool_open(browse->pool, browse->level + 1, child);
@@ -128,7 +144,7 @@ static void draw_empty(Canvas *canvas, const Theme *theme, Rect content)
 static void draw(void *context, Canvas *canvas)
 {
     const BrowseScreen *browse = context;
-    const Theme *theme = browse->pool->theme;
+    const Theme *theme = browse->pool->config.theme;
     Rect content = theme_content_area(theme);
     header_draw(canvas, theme, browse->title);
     if (browse->count == 0) {
@@ -138,10 +154,9 @@ static void draw(void *context, Canvas *canvas)
     list_view_draw(&browse->list, canvas, content, browse->now_ms);
 }
 
-void browse_pool_init(BrowsePool *pool, const Library *library, const Theme *theme)
+void browse_pool_init(BrowsePool *pool, BrowsePoolConfig config)
 {
-    pool->library = library;
-    pool->theme = theme;
+    pool->config = config;
     pool->rows.level = NO_LEVEL;
 }
 
@@ -154,11 +169,11 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     browse->pool = pool;
     browse->level = level;
     browse->query = query;
-    browse->count = browse_count(pool->library, query);
-    browse_title(pool->library, query, browse->title, sizeof browse->title);
+    browse->count = browse_count(pool->config.library, query);
+    browse_title(pool->config.library, query, browse->title, sizeof browse->title);
     browse->model = (ListModel){
         .context = browse, .count = row_count, .label = row_label, .detail = row_detail};
-    list_view_init(&browse->list, &browse->model, pool->theme, 0);
+    list_view_init(&browse->list, &browse->model, pool->config.theme, 0);
     browse->screen = (Screen){
         .title = browse->title,
         .context = browse,

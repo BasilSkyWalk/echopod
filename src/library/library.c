@@ -1,5 +1,6 @@
 #include "library/library.h"
 
+#include "core/hash.h"
 #include "core/utf8.h"
 
 enum {
@@ -235,4 +236,21 @@ bool library_read_string(const Library *library, uint32_t offset, char *buffer, 
     }
     buffer[terminated_length(buffer, wanted)] = '\0';
     return true;
+}
+
+static uint32_t hash_word(uint32_t hash, uint32_t value)
+{
+    uint8_t bytes[4] = {(uint8_t)value, (uint8_t)(value >> 8), (uint8_t)(value >> 16),
+                        (uint8_t)(value >> 24)};
+    return hash_update(hash, bytes, sizeof bytes);
+}
+
+uint32_t library_fingerprint(const Library *library)
+{
+    uint32_t hash = HASH_START;
+    for (int section = 0; section < LIBRARY_SECTION_COUNT; section++) {
+        hash = hash_word(hash, library->sections[section].offset);
+        hash = hash_word(hash, library->sections[section].count);
+    }
+    return hash;
 }

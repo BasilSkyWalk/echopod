@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "library/library_browse.h"
+#include "player.h"
 #include "ui/list_view.h"
 #include "ui/screen.h"
 #include "ui/theme.h"
@@ -37,12 +38,18 @@ typedef struct BrowseScreen {
     uint32_t now_ms;
 } BrowseScreen;
 
-struct BrowsePool {
+typedef struct BrowsePoolConfig {
     const Library *library;
     const Theme *theme;
+    Player *player;
+    Screen *now_playing;
+} BrowsePoolConfig;
+
+struct BrowsePool {
+    BrowsePoolConfig config;
     BrowseRows rows;
     BrowseScreen screens[BROWSE_DEPTH];
 };
 
-void browse_pool_init(BrowsePool *pool, const Library *library, const Theme *theme);
+void browse_pool_init(BrowsePool *pool, BrowsePoolConfig config);
 Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query);

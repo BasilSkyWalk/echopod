@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "app_internal.h"
 #include "app_screens.h"
 #include "core/key_tracker.h"
 #include "default_theme.h"
@@ -11,6 +12,7 @@
 #include "hal/display.h"
 #include "hal/input.h"
 #include "library_store.h"
+#include "player.h"
 #include "ui/screen_stack.h"
 
 enum {
@@ -40,6 +42,7 @@ typedef struct AppState {
     FrameStats frame_stats;
     ScreenStack stack;
     LibraryStore library;
+    Player player;
     AppScreens screens;
     AppOptions options;
 } AppState;
@@ -120,7 +123,15 @@ void app_start(void)
     frame_stats_reset(&app.frame_stats);
     app.options = (AppOptions){.show_frame_time = false};
     library_store_open(&app.library);
-    Screen *root = app_screens_init(&app.screens, &app.options, &DEFAULT_THEME, &app.library);
+    player_init(&app.player, &app.library.library);
+    player_restore(&app.player);
+    AppScreensContext context = {
+        .options = &app.options,
+        .theme = &DEFAULT_THEME,
+        .store = &app.library,
+        .player = &app.player,
+    };
+    Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);
 }
 
@@ -131,6 +142,7 @@ void app_step(void)
     read_input();
     key_tracker_update(&app.keys, now_ms);
     dispatch_key_events(now_ms);
+    player_update(&app.player, now_ms);
     update_screen(now_ms);
     render_frame();
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
@@ -149,4 +161,14 @@ const char *app_screen_title(void)
 int app_screen_depth(void)
 {
     return screen_stack_depth(&app.stack);
+}
+
+void app_stop(void)
+{
+    player_save(&app.player);
+}
+
+PlayerStatus app_player_status(void)
+{
+    return player_status(&app.player);
 }

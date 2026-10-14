@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "app/app.h"
+#include "app_internal.h"
 #include "check.h"
 #include "fake_hal.h"
 #include "fixture_library.h"
@@ -16,8 +17,13 @@ enum {
     MUSIC_ARTISTS_INDEX = 1,
     MUSIC_ALBUMS_INDEX = 3,
     MUSIC_FOLDERS_INDEX = 5,
-    BJORK_POSITION = 3
+    BJORK_POSITION = 3,
+    HOME_SETTINGS_INDEX = 2,
+    SETTINGS_REPEAT_INDEX = 1
 };
+
+static const char HELLS_BELLS_PATH[] = "/AC DC/Back In Black/1-01 - Hells Bells.flac";
+static const char SHOOT_TO_THRILL_PATH[] = "/AC DC/Back In Black/1-02 - Shoot to Thrill.flac";
 
 static uint32_t now_ms;
 
@@ -191,6 +197,70 @@ static void without_a_library_the_lists_explain_what_is_missing(void)
     CHECK(title_is("No library"));
 }
 
+static bool playing_path_is(const char *expected)
+{
+    return strcmp(expected, fake_hal_audio_playing_path()) == 0;
+}
+
+static void play_first_album_track(void)
+{
+    open_music_entry(MUSIC_ALBUMS_INDEX);
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+}
+
+static void selecting_a_track_plays_it_and_shows_now_playing(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    CHECK(title_is("Now Playing"));
+    CHECK(playing_path_is(HELLS_BELLS_PATH));
+}
+
+static void now_playing_keys_control_the_player(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    uint8_t volume = fake_hal_audio_volume();
+    tap(KEY_VOLUME_UP);
+    CHECK_EQUAL(volume + 1, fake_hal_audio_volume());
+    tap(KEY_PLAY);
+    CHECK_EQUAL(PLAYER_PAUSED, app_player_status().state);
+    tap(KEY_MENU);
+    CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
+}
+
+static void the_home_menu_opens_now_playing(void)
+{
+    start_app_with_library();
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Now Playing"));
+}
+
+static void settings_cycle_shuffle_and_repeat(void)
+{
+    start_app_with_library();
+    move_down(HOME_SETTINGS_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    tap(KEY_PLAY);
+    CHECK_EQUAL(SHUFFLE_SONGS, app_player_status().shuffle);
+    move_down(SETTINGS_REPEAT_INDEX);
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(REPEAT_ALL, app_player_status().repeat);
+}
+
+static void stopping_the_app_saves_the_session(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    int writes = fake_hal_write_count();
+    app_stop();
+    CHECK_EQUAL(writes + 1, fake_hal_write_count());
+}
+
 static void each_step_records_its_duration(void)
 {
     start_app();
@@ -213,6 +283,11 @@ int main(void)
         TEST_CASE(back_returns_to_the_previous_list),
         TEST_CASE(folders_can_be_browsed_down_to_an_album),
         TEST_CASE(without_a_library_the_lists_explain_what_is_missing),
+        TEST_CASE(selecting_a_track_plays_it_and_shows_now_playing),
+        TEST_CASE(now_playing_keys_control_the_player),
+        TEST_CASE(the_home_menu_opens_now_playing),
+        TEST_CASE(settings_cycle_shuffle_and_repeat),
+        TEST_CASE(stopping_the_app_saves_the_session),
         TEST_CASE(each_step_records_its_duration),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

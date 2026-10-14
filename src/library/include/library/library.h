@@ -90,3 +90,4 @@ bool library_read_folder(const Library *library, uint32_t index, LibraryFolder *
 bool library_read_index(const Library *library, LibrarySection section, uint32_t position,
                         uint16_t *value);
 bool library_read_string(const Library *library, uint32_t offset, char *buffer, size_t capacity);
+uint32_t library_fingerprint(const Library *library);

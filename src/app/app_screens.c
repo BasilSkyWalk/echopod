@@ -1,5 +1,7 @@
 #include "app_screens.h"
 
+#include "hal/clock.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -101,13 +103,61 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
                       .value = NULL};
 }
 
-static void build_music(AppScreens *screens, const Theme *theme, const LibraryStore *store)
+static void build_music(AppScreens *screens, AppScreensContext context)
 {
-    browse_pool_init(&screens->browse, &store->library, theme);
+    BrowsePoolConfig browse = {
+        .library = &context.store->library,
+        .theme = context.theme,
+        .player = context.player,
+        .now_playing = &screens->now_playing.screen,
+    };
+    browse_pool_init(&screens->browse, browse);
     for (int index = 0; index < MUSIC_ITEM_COUNT; index++) {
-        screens->music_items[index] = music_item(screens, store, index);
+        screens->music_items[index] = music_item(screens, context.store, index);
     }
-    build_menu(&screens->music, "Music", screens->music_items, MUSIC_ITEM_COUNT, theme);
+    build_menu(&screens->music, "Music", screens->music_items, MUSIC_ITEM_COUNT, context.theme);
+}
+
+static const char *const SHUFFLE_VALUES[SHUFFLE_MODE_COUNT] = {"Off", "Songs", "Albums"};
+static const char *const REPEAT_VALUES[REPEAT_MODE_COUNT] = {"Off", "One", "All"};
+
+static ScreenAction cycle_shuffle(void *context)
+{
+    Player *player = context;
+    ShuffleMode next = (ShuffleMode)((player_status(player).shuffle + 1) % SHUFFLE_MODE_COUNT);
+    player_set_shuffle(player, next, hal_clock_microseconds());
+    return screen_action_none();
+}
+
+static const char *shuffle_value(const void *context)
+{
+    return SHUFFLE_VALUES[player_status(context).shuffle];
+}
+
+static ScreenAction cycle_repeat(void *context)
+{
+    Player *player = context;
+    player_set_repeat(player, (RepeatMode)((player_status(player).repeat + 1) % REPEAT_MODE_COUNT));
+    return screen_action_none();
+}
+
+static const char *repeat_value(const void *context)
+{
+    return REPEAT_VALUES[player_status(context).repeat];
+}
+
+static void build_settings(AppScreens *screens, AppScreensContext context)
+{
+    screens->settings_items[0] = (MenuItem){.label = "Shuffle",
+                                            .select = cycle_shuffle,
+                                            .context = context.player,
+                                            .value = shuffle_value};
+    screens->settings_items[1] = (MenuItem){.label = "Repeat",
+                                            .select = cycle_repeat,
+                                            .context = context.player,
+                                            .value = repeat_value};
+    build_menu(&screens->settings, "Settings", screens->settings_items, SETTINGS_ITEM_COUNT,
+               context.theme);
 }
 
 static void build_diagnostics(AppScreens *screens, AppOptions *options, const Theme *theme)
@@ -132,23 +182,27 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
 static void build_home(AppScreens *screens, const Theme *theme)
 {
     screens->home_items[0] = open_item("Music", &screens->music.screen);
-    screens->home_items[1] = open_item("Now Playing", &screens->coming_soon.screen);
-    screens->home_items[2] = open_item("Settings", &screens->coming_soon.screen);
+    screens->home_items[1] = open_item("Now Playing", &screens->now_playing.screen);
+    screens->home_items[2] = open_item("Settings", &screens->settings.screen);
     screens->home_items[3] = open_item("Diagnostics", &screens->diagnostics.screen);
     build_menu(&screens->home, "Echo Mini", screens->home_items, HOME_ITEM_COUNT, theme);
 }
 
-Screen *app_screens_init(AppScreens *screens, AppOptions *options, const Theme *theme,
-                         const LibraryStore *store)
+Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
 {
+    const Theme *theme = context.theme;
     MessageConfig coming_soon = {
         .title = "Coming soon", .message = "This part is not built yet", .theme = theme};
     MessageConfig no_library = {
         .title = "No library", .message = "Run the PC indexer to build one", .theme = theme};
+    NowPlayingConfig now_playing = {
+        .player = context.player, .library = &context.store->library, .theme = theme};
     message_screen_init(&screens->coming_soon, coming_soon);
     message_screen_init(&screens->no_library, no_library);
-    build_music(screens, theme, store);
-    build_diagnostics(screens, options, theme);
+    now_playing_screen_init(&screens->now_playing, now_playing);
+    build_music(screens, context);
+    build_settings(screens, context);
+    build_diagnostics(screens, context.options, theme);
     build_home(screens, theme);
     return &screens->home.screen;
 }

@@ -177,6 +177,28 @@ static void indices_out_of_range_are_refused(void)
     CHECK(!library_read_index(library, LIBRARY_TRACKS, 0, &value));
 }
 
+static uint32_t fingerprint_with_track_count(uint8_t track_count)
+{
+    fixture_library_open(&fixture);
+    fixture.bytes[TRACKS_OFFSET_FIELD + 4] = track_count;
+    Library library;
+    library_open(&library, memory_source(&fixture.memory), fixture.size);
+    return library_fingerprint(&library);
+}
+
+static void the_fingerprint_is_stable_for_the_same_library(void)
+{
+    uint32_t first = fingerprint_with_track_count(FIXTURE_TRACKS);
+    CHECK(first != 0);
+    CHECK_EQUAL(first, fingerprint_with_track_count(FIXTURE_TRACKS));
+}
+
+static void the_fingerprint_changes_when_the_library_changes(void)
+{
+    uint32_t original = fingerprint_with_track_count(FIXTURE_TRACKS);
+    CHECK(original != fingerprint_with_track_count(FIXTURE_TRACKS - 1));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -193,6 +215,8 @@ int main(void)
         TEST_CASE(the_title_order_starts_with_the_first_title),
         TEST_CASE(short_buffers_cut_strings_at_a_character_boundary),
         TEST_CASE(indices_out_of_range_are_refused),
+        TEST_CASE(the_fingerprint_is_stable_for_the_same_library),
+        TEST_CASE(the_fingerprint_changes_when_the_library_changes),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

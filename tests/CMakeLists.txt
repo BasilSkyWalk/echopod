@@ -16,6 +16,8 @@ echo_add_unit_test(NAME test_key_tracker SOURCES core/test_key_tracker.c LIBRARI
 echo_add_unit_test(NAME test_utf8 SOURCES core/test_utf8.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_string_builder SOURCES core/test_string_builder.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_format SOURCES core/test_format.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_random SOURCES core/test_random.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_hash SOURCES core/test_hash.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_color SOURCES gfx/test_color.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_rect SOURCES gfx/test_rect.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_canvas SOURCES gfx/test_canvas.c LIBRARIES echo_gfx)
@@ -30,6 +32,13 @@ target_compile_definitions(echo_library_fixtures PRIVATE
     ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
 target_link_libraries(echo_library_fixtures PUBLIC echo_library PRIVATE echo_options)
+
+foreach(playback_test play_queue resume_state)
+    echo_add_unit_test(NAME test_${playback_test}
+        SOURCES playback/test_${playback_test}.c
+        LIBRARIES echo_playback echo_library_fixtures
+    )
+endforeach()
 
 foreach(library_test block_cache library library_browse)
     echo_add_unit_test(NAME test_${library_test}
@@ -61,6 +70,16 @@ endforeach()
 echo_add_unit_test(NAME test_app
     SOURCES app/test_app.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_player
+    SOURCES app/test_player.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_now_playing_screen
+    SOURCES app/test_now_playing_screen.c app/fake_hal.c
+    LIBRARIES echo_app
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_test_pattern_screen

@@ -1,0 +1,31 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "dr_flac.h"
+#include "dr_mp3.h"
+#include "dr_wav.h"
+
+typedef enum SimCodec {
+    SIM_CODEC_NONE,
+    SIM_CODEC_FLAC,
+    SIM_CODEC_MP3,
+    SIM_CODEC_WAV
+} SimCodec;
+
+typedef struct SimDecoder {
+    SimCodec codec;
+    drflac *flac;
+    drmp3 mp3;
+    drwav wav;
+    uint32_t sample_rate;
+    uint32_t channels;
+    uint64_t total_frames;
+    uint64_t frame;
+} SimDecoder;
+
+bool sim_decoder_open(SimDecoder *decoder, const char *host_path);
+uint64_t sim_decoder_read_stereo(SimDecoder *decoder, float *frames, uint64_t count);
+bool sim_decoder_seek(SimDecoder *decoder, uint64_t frame);
+void sim_decoder_close(SimDecoder *decoder);

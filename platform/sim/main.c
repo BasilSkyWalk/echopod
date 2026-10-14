@@ -6,6 +6,7 @@
 #include "app/app.h"
 #include "core/deadline.h"
 #include "hal/clock.h"
+#include "sim_audio.h"
 #include "sim_clock.h"
 #include "sim_display.h"
 #include "sim_input.h"
@@ -59,7 +60,8 @@ static bool prepare_session(int argument_count, char **arguments, SimSession *se
 
 static bool start_sdl(const SimOptions *options)
 {
-    Uint32 subsystems = options->headless ? SDL_INIT_TIMER : SDL_INIT_VIDEO | SDL_INIT_TIMER;
+    Uint32 subsystems =
+        options->headless ? SDL_INIT_TIMER : SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO;
     if (SDL_Init(subsystems) != 0) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
@@ -132,8 +134,10 @@ static void finish_frame(SimSession *session, uint32_t frame_started_ms, uint32_
 {
     if (session->options.headless) {
         sim_clock_advance(FRAME_PERIOD_MS);
+        sim_audio_tick(FRAME_PERIOD_MS);
         return;
     }
+    sim_audio_tick(hal_clock_milliseconds() - frame_started_ms);
     if (deadline_reached(frame_started_ms, *next_title_ms)) {
         refresh_title();
         *next_title_ms = frame_started_ms + TITLE_REFRESH_MS;
@@ -156,6 +160,7 @@ static void run(SimSession *session)
 static int finish(const SimOptions *options)
 {
     int status = EXIT_SUCCESS;
+    app_stop();
     if (options->screenshot_path != NULL && !sim_display_save_bmp(options->screenshot_path)) {
         SDL_Log("could not save %s: %s", options->screenshot_path, SDL_GetError());
         status = EXIT_FAILURE;
@@ -164,6 +169,7 @@ static int finish(const SimOptions *options)
     format_frame_stats(stats_text, sizeof stats_text);
     printf("%s: %s\n", app_screen_title(), stats_text);
     sim_display_close();
+    sim_audio_stop();
     sim_storage_close_all();
     SDL_Quit();
     return status;
@@ -182,6 +188,7 @@ int main(int argument_count, char **arguments)
         return EXIT_FAILURE;
     }
     sim_storage_configure(session.options.card_directory, session.options.system_directory);
+    sim_audio_start(session.options.headless);
     app_start();
     run(&session);
     return finish(&session.options);

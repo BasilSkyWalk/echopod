@@ -28,7 +28,7 @@ void sim_storage_configure(const char *card_directory, const char *system_direct
     storage.system_directory = system_directory;
 }
 
-static bool host_path(const char *path, char *buffer, size_t capacity)
+bool sim_storage_host_path(const char *path, char *buffer, size_t capacity)
 {
     size_t prefix_length = sizeof SYSTEM_PREFIX - 1;
     int written = -1;
@@ -73,7 +73,7 @@ bool hal_file_open(HalFile *file, const char *path)
     char resolved[PATH_CAPACITY];
     int slot = free_slot();
     *file = (HalFile){.handle = -1, .size = 0};
-    if (slot < 0 || !host_path(path, resolved, sizeof resolved)) {
+    if (slot < 0 || !sim_storage_host_path(path, resolved, sizeof resolved)) {
         return false;
     }
     FILE *handle = fopen(resolved, "rb");
@@ -107,6 +107,32 @@ void hal_file_close(HalFile *file)
         storage.files[file->handle] = NULL;
     }
     file->handle = -1;
+}
+
+static bool is_system_path(const char *path)
+{
+    return storage.system_directory != NULL &&
+           strncmp(path, SYSTEM_PREFIX, sizeof SYSTEM_PREFIX - 1) == 0;
+}
+
+bool hal_file_write(const char *path, const void *bytes, uint32_t length)
+{
+    char resolved[PATH_CAPACITY];
+    char temporary[PATH_CAPACITY];
+    if (!is_system_path(path) || !sim_storage_host_path(path, resolved, sizeof resolved)) {
+        return false;
+    }
+    int written_length = snprintf(temporary, sizeof temporary, "%s.tmp", resolved);
+    if (written_length <= 0 || (size_t)written_length >= sizeof temporary) {
+        return false;
+    }
+    FILE *handle = fopen(temporary, "wb");
+    if (handle == NULL) {
+        return false;
+    }
+    bool written = fwrite(bytes, 1, length, handle) == length;
+    written = fclose(handle) == 0 && written;
+    return written && rename(temporary, resolved) == 0;
 }
 
 void sim_storage_close_all(void)

@@ -1,5 +1,6 @@
 #include "fake_hal.h"
 
+#include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
@@ -9,8 +10,28 @@
 
 enum {
     TRANSITION_CAPACITY = 16,
-    FILE_CAPACITY = 4
+    FILE_CAPACITY = 4,
+    WRITTEN_CAPACITY = 256,
+    PATH_CAPACITY = 260
 };
+
+typedef struct FakeAudio {
+    HalAudioStatus status;
+    char playing_path[PATH_CAPACITY];
+    uint32_t play_start_ms;
+    int play_count;
+    char queued_path[PATH_CAPACITY];
+    bool has_queued;
+    uint32_t queued_token;
+    int seek_count;
+    uint32_t last_seek_ms;
+    uint8_t volume;
+} FakeAudio;
+
+typedef struct WrittenFile {
+    char path[PATH_CAPACITY];
+    uint8_t bytes[WRITTEN_CAPACITY];
+} WrittenFile;
 
 typedef struct FakeFile {
     const char *path;
@@ -30,6 +51,9 @@ typedef struct FakeHal {
     int next_transition;
     FakeFile files[FILE_CAPACITY];
     int file_count;
+    FakeAudio audio;
+    WrittenFile written[FILE_CAPACITY];
+    int write_count;
 } FakeHal;
 
 static FakeHal fake;
@@ -143,4 +167,159 @@ bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
 void hal_file_close(HalFile *file)
 {
     file->handle = -1;
+}
+
+static void copy_path(char *target, const char *source)
+{
+    strncpy(target, source, PATH_CAPACITY - 1);
+    target[PATH_CAPACITY - 1] = '\0';
+}
+
+const char *fake_hal_audio_playing_path(void)
+{
+    return fake.audio.playing_path;
+}
+
+uint32_t fake_hal_audio_play_start(void)
+{
+    return fake.audio.play_start_ms;
+}
+
+int fake_hal_audio_play_count(void)
+{
+    return fake.audio.play_count;
+}
+
+const char *fake_hal_audio_queued_path(void)
+{
+    return fake.audio.has_queued ? fake.audio.queued_path : NULL;
+}
+
+void fake_hal_audio_finish_track(void)
+{
+    if (!fake.audio.has_queued) {
+        fake.audio.status.state = HAL_AUDIO_STOPPED;
+        return;
+    }
+    fake.audio.status.token = fake.audio.queued_token;
+    fake.audio.status.position_ms = 0;
+    copy_path(fake.audio.playing_path, fake.audio.queued_path);
+    fake.audio.has_queued = false;
+}
+
+void fake_hal_audio_fail_track(void)
+{
+    fake.audio.status.state = HAL_AUDIO_STOPPED;
+    fake.audio.status.failed = true;
+}
+
+void fake_hal_audio_set_position(uint32_t position_ms)
+{
+    fake.audio.status.position_ms = position_ms;
+}
+
+int fake_hal_audio_seek_count(void)
+{
+    return fake.audio.seek_count;
+}
+
+uint32_t fake_hal_audio_last_seek(void)
+{
+    return fake.audio.last_seek_ms;
+}
+
+uint8_t fake_hal_audio_volume(void)
+{
+    return fake.audio.volume;
+}
+
+int fake_hal_audio_state(void)
+{
+    return (int)fake.audio.status.state;
+}
+
+int fake_hal_write_count(void)
+{
+    return fake.write_count;
+}
+
+bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
+{
+    copy_path(fake.audio.playing_path, path);
+    fake.audio.play_start_ms = start_ms;
+    fake.audio.play_count++;
+    fake.audio.status = (HalAudioStatus){
+        .state = HAL_AUDIO_PLAYING, .token = token, .position_ms = start_ms, .failed = false};
+    return true;
+}
+
+void hal_audio_queue_next(const char *path, uint32_t token)
+{
+    fake.audio.has_queued = path != NULL;
+    if (path != NULL) {
+        copy_path(fake.audio.queued_path, path);
+        fake.audio.queued_token = token;
+    }
+}
+
+void hal_audio_pause(void)
+{
+    fake.audio.status.state = HAL_AUDIO_PAUSED;
+}
+
+void hal_audio_resume(void)
+{
+    fake.audio.status.state = HAL_AUDIO_PLAYING;
+}
+
+void hal_audio_seek(uint32_t position_ms)
+{
+    fake.audio.seek_count++;
+    fake.audio.last_seek_ms = position_ms;
+    fake.audio.status.position_ms = position_ms;
+}
+
+void hal_audio_set_volume(uint8_t level)
+{
+    fake.audio.volume = level;
+}
+
+HalAudioStatus hal_audio_status(void)
+{
+    return fake.audio.status;
+}
+
+static WrittenFile *written_slot(const char *path)
+{
+    for (int index = 0; index < FILE_CAPACITY; index++) {
+        if (strcmp(fake.written[index].path, path) == 0 || fake.written[index].path[0] == '\0') {
+            return &fake.written[index];
+        }
+    }
+    return NULL;
+}
+
+static void register_written(const char *path, uint32_t length)
+{
+    WrittenFile *slot = written_slot(path);
+    for (int index = 0; index < fake.file_count; index++) {
+        if (strcmp(fake.files[index].path, path) == 0) {
+            fake.files[index].size = length;
+            return;
+        }
+    }
+    fake_hal_add_file(slot->path, slot->bytes, length);
+}
+
+bool hal_file_write(const char *path, const void *bytes, uint32_t length)
+{
+    WrittenFile *slot = written_slot(path);
+    if (slot == NULL || length > WRITTEN_CAPACITY) {
+        return false;
+    }
+    copy_path(slot->path, path);
+    memcpy(slot->bytes, bytes, length);
+    register_written(path, length);
+    fake.write_count++;
+    return true;
 }

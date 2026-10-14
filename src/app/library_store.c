@@ -1,5 +1,7 @@
 #include "library_store.h"
 
+#include <stddef.h>
+
 static const char LIBRARY_PATH[] = "/.echo/library.db";
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
@@ -11,6 +13,7 @@ static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t len
 bool library_store_open(LibraryStore *store)
 {
     store->available = false;
+    store->library = (Library){.source = {.read = NULL, .context = NULL}};
     if (!hal_file_open(&store->file, LIBRARY_PATH)) {
         return false;
     }

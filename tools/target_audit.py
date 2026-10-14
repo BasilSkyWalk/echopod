@@ -47,10 +47,15 @@ def include_flags(compiler, source_root):
     return flags
 
 
+def module_directory(source, source_root):
+    return source_root / source.relative_to(source_root).parts[0]
+
+
 def compile_object(compiler, flags, source, source_root, output_directory):
     name = "_".join(source.relative_to(source_root).with_suffix(".o").parts)
     output = output_directory / name
-    subprocess.run([compiler, *TARGET_FLAGS, *flags, "-c", str(source), "-o", str(output)],
+    private = ["-iquote", str(module_directory(source, source_root))]
+    subprocess.run([compiler, *TARGET_FLAGS, *flags, *private, "-c", str(source), "-o", str(output)],
                    check=True)
     return output
 
@@ -106,7 +111,11 @@ def report(flash_by_module, ram_by_module, heap_users, budget_bytes):
 def main():
     arguments = parse_arguments()
     with tempfile.TemporaryDirectory() as output_directory:
-        flash_by_module, ram_by_module, heap_users = audit(arguments, Path(output_directory))
+        try:
+            flash_by_module, ram_by_module, heap_users = audit(arguments, Path(output_directory))
+        except subprocess.CalledProcessError as failure:
+            print(f"cross-compile failed: {' '.join(failure.cmd[-3:])}")
+            return 1
     passed = report(flash_by_module, ram_by_module, heap_users, arguments.budget_bytes)
     return 0 if passed else 1
 
