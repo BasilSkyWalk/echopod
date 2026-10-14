@@ -27,6 +27,24 @@ static void no_arguments_give_a_windowed_run_at_default_scale(void)
     CHECK(options.key_script == NULL);
     CHECK(options.card_directory == NULL);
     CHECK(options.system_directory == NULL);
+    CHECK_EQUAL(SIM_DEFAULT_BATTERY_PERCENT, options.battery_percent);
+    CHECK(!options.battery_charging);
+}
+
+static void the_battery_level_and_charging_are_read(void)
+{
+    char *given[] = {"--battery", "12", "--charging"};
+    SimOptions options;
+    CHECK(parse(given, 3, &options));
+    CHECK_EQUAL(12, options.battery_percent);
+    CHECK(options.battery_charging);
+}
+
+static void a_battery_level_above_full_is_rejected(void)
+{
+    char *given[] = {"--battery", "101"};
+    SimOptions options;
+    CHECK(!parse(given, 2, &options));
 }
 
 static void storage_directories_are_read(void)
@@ -101,6 +119,8 @@ int main(void)
         TEST_CASE(every_option_is_read),
         TEST_CASE(a_key_script_is_read),
         TEST_CASE(storage_directories_are_read),
+        TEST_CASE(the_battery_level_and_charging_are_read),
+        TEST_CASE(a_battery_level_above_full_is_rejected),
         TEST_CASE(an_unknown_option_is_rejected),
         TEST_CASE(an_option_missing_its_value_is_rejected),
         TEST_CASE(non_numeric_values_are_rejected),

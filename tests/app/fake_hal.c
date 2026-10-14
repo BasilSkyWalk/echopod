@@ -4,14 +4,15 @@
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
+#include "hal/power.h"
 #include "hal/storage.h"
 
 #include <string.h>
 
 enum {
     TRANSITION_CAPACITY = 16,
-    FILE_CAPACITY = 4,
-    WRITTEN_CAPACITY = 256,
+    FILE_CAPACITY = 8,
+    WRITTEN_CAPACITY = 1100,
     PATH_CAPACITY = 260
 };
 
@@ -26,6 +27,8 @@ typedef struct FakeAudio {
     int seek_count;
     uint32_t last_seek_ms;
     uint8_t volume;
+    HalAudioGain gain;
+    HalAudioOutput output;
 } FakeAudio;
 
 typedef struct WrittenFile {
@@ -43,6 +46,10 @@ typedef struct FakeHal {
     uint16_t panel[HAL_DISPLAY_HEIGHT][HAL_DISPLAY_WIDTH];
     long pixels_written;
     int present_count;
+    bool display_on;
+    uint8_t brightness;
+    HalBattery battery;
+    int power_off_count;
     uint32_t now_ms;
     uint32_t now_us;
     uint32_t microseconds_per_read;
@@ -115,6 +122,46 @@ void hal_display_write(int x, int y, int width, int height, const uint16_t *pixe
 void hal_display_present(void)
 {
     fake.present_count++;
+}
+
+void hal_display_set_power(bool on)
+{
+    fake.display_on = on;
+}
+
+void hal_display_set_brightness(uint8_t level)
+{
+    fake.brightness = level;
+}
+
+bool fake_hal_display_on(void)
+{
+    return fake.display_on;
+}
+
+uint8_t fake_hal_display_brightness(void)
+{
+    return fake.brightness;
+}
+
+void fake_hal_set_battery(HalBattery battery)
+{
+    fake.battery = battery;
+}
+
+HalBattery hal_power_battery(void)
+{
+    return fake.battery;
+}
+
+void hal_power_off(void)
+{
+    fake.power_off_count++;
+}
+
+int fake_hal_power_off_count(void)
+{
+    return fake.power_off_count;
 }
 
 bool hal_input_next_transition(HalKeyTransition *transition)
@@ -284,6 +331,26 @@ void hal_audio_set_volume(uint8_t level)
     fake.audio.volume = level;
 }
 
+void hal_audio_set_gain(HalAudioGain gain)
+{
+    fake.audio.gain = gain;
+}
+
+void hal_audio_set_output(HalAudioOutput output)
+{
+    fake.audio.output = output;
+}
+
+int fake_hal_audio_gain(void)
+{
+    return (int)fake.audio.gain;
+}
+
+int fake_hal_audio_output(void)
+{
+    return (int)fake.audio.output;
+}
+
 HalAudioStatus hal_audio_status(void)
 {
     return fake.audio.status;
@@ -322,4 +389,16 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length)
     register_written(path, length);
     fake.write_count++;
     return true;
+}
+
+const uint8_t *fake_hal_file_bytes(const char *path, uint32_t *size)
+{
+    for (int index = 0; index < fake.file_count; index++) {
+        if (strcmp(fake.files[index].path, path) == 0) {
+            *size = fake.files[index].size;
+            return fake.files[index].bytes;
+        }
+    }
+    *size = 0;
+    return NULL;
 }

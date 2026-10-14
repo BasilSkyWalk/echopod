@@ -126,3 +126,16 @@ bool favorites_decode(const uint8_t *bytes, uint32_t length, Favorites *favorite
     favorites->count = count;
     return true;
 }
+
+uint16_t favorites_collect_albums(const Favorites *favorites, const Library *library,
+                                  uint16_t *albums, uint16_t capacity)
+{
+    uint16_t found = 0;
+    uint32_t album_count = library_count(library, LIBRARY_ALBUMS);
+    for (uint32_t album = 0; album < album_count && found < capacity; album++) {
+        if (favorites_contains(favorites, library_album_key(library, album))) {
+            albums[found++] = (uint16_t)album;
+        }
+    }
+    return found;
+}

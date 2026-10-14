@@ -1,4 +1,5 @@
 #include "check.h"
+#include "fixture_library.h"
 #include "library/favorites.h"
 
 enum {
@@ -84,6 +85,41 @@ static void a_corrupted_file_is_rejected(void)
     CHECK(!favorites_decode(bytes, 3, &decoded));
 }
 
+static FixtureLibrary fixture;
+
+static void favorite_albums_are_collected_in_album_order(void)
+{
+    Library *library = fixture_library_open(&fixture);
+    Favorites *list = empty_favorites();
+    favorites_toggle(list, library_album_key(library, 3));
+    favorites_toggle(list, library_album_key(library, 1));
+    uint16_t albums[FIXTURE_ALBUMS];
+    CHECK_EQUAL(2, favorites_collect_albums(list, library, albums, FIXTURE_ALBUMS));
+    CHECK_EQUAL(1, albums[0]);
+    CHECK_EQUAL(3, albums[1]);
+}
+
+static void collecting_stops_at_the_capacity(void)
+{
+    Library *library = fixture_library_open(&fixture);
+    Favorites *list = empty_favorites();
+    for (uint32_t album = 0; album < FIXTURE_ALBUMS; album++) {
+        favorites_toggle(list, library_album_key(library, album));
+    }
+    uint16_t albums[2];
+    CHECK_EQUAL(2, favorites_collect_albums(list, library, albums, 2));
+    CHECK_EQUAL(1, albums[1]);
+}
+
+static void albums_that_left_the_library_are_not_collected(void)
+{
+    Library *library = fixture_library_open(&fixture);
+    Favorites *list = empty_favorites();
+    favorites_toggle(list, 0x12345678u);
+    uint16_t albums[FIXTURE_ALBUMS];
+    CHECK_EQUAL(0, favorites_collect_albums(list, library, albums, FIXTURE_ALBUMS));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -93,6 +129,9 @@ int main(void)
         TEST_CASE(favorites_survive_a_round_trip),
         TEST_CASE(an_empty_list_survives_a_round_trip),
         TEST_CASE(a_corrupted_file_is_rejected),
+        TEST_CASE(favorite_albums_are_collected_in_album_order),
+        TEST_CASE(collecting_stops_at_the_capacity),
+        TEST_CASE(albums_that_left_the_library_are_not_collected),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

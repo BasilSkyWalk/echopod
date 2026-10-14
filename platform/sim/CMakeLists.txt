@@ -15,6 +15,7 @@ add_executable(echo_sim
     sim_decoder.c
     sim_display.c
     sim_input.c
+    sim_power.c
     sim_storage.c
 )
 target_compile_definitions(echo_sim PRIVATE SDL_MAIN_HANDLED)

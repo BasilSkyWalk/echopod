@@ -6,7 +6,9 @@
 
 enum {
     BITS_PER_PIXEL = 16,
-    PANEL_ROW_BYTES = HAL_DISPLAY_WIDTH * 2
+    PANEL_ROW_BYTES = HAL_DISPLAY_WIDTH * 2,
+    FULL_INTENSITY = 255,
+    DIMMEST_LEVEL_OFFSET = 2
 };
 
 typedef struct SimDisplay {
@@ -14,9 +16,11 @@ typedef struct SimDisplay {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture;
+    bool powered;
+    uint8_t brightness;
 } SimDisplay;
 
-static SimDisplay display;
+static SimDisplay display = {.powered = true, .brightness = HAL_DISPLAY_BRIGHTNESS_MAX};
 
 static bool area_fits_panel(int x, int y, int width, int height)
 {
@@ -54,7 +58,7 @@ void sim_display_close(void)
     if (display.window != NULL) {
         SDL_DestroyWindow(display.window);
     }
-    display = (SimDisplay){0};
+    display = (SimDisplay){.powered = true, .brightness = HAL_DISPLAY_BRIGHTNESS_MAX};
 }
 
 void sim_display_set_title(const char *title)
@@ -94,13 +98,44 @@ void hal_display_write(int x, int y, int width, int height, const uint16_t *pixe
     }
 }
 
+static Uint8 brightness_intensity(uint8_t level)
+{
+    int span = HAL_DISPLAY_BRIGHTNESS_MAX + DIMMEST_LEVEL_OFFSET;
+    return (Uint8)(FULL_INTENSITY * (level + DIMMEST_LEVEL_OFFSET) / span);
+}
+
+static void show_panel(void)
+{
+    if (display.texture == NULL) {
+        return;
+    }
+    SDL_SetRenderDrawColor(display.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+    SDL_RenderClear(display.renderer);
+    if (display.powered) {
+        Uint8 intensity = brightness_intensity(display.brightness);
+        SDL_SetTextureColorMod(display.texture, intensity, intensity, intensity);
+        SDL_RenderCopy(display.renderer, display.texture, NULL, NULL);
+    }
+    SDL_RenderPresent(display.renderer);
+}
+
 void hal_display_present(void)
 {
     if (display.texture == NULL) {
         return;
     }
     SDL_UpdateTexture(display.texture, NULL, display.panel, PANEL_ROW_BYTES);
-    SDL_RenderClear(display.renderer);
-    SDL_RenderCopy(display.renderer, display.texture, NULL, NULL);
-    SDL_RenderPresent(display.renderer);
+    show_panel();
+}
+
+void hal_display_set_power(bool on)
+{
+    display.powered = on;
+    show_panel();
+}
+
+void hal_display_set_brightness(uint8_t level)
+{
+    display.brightness = level;
+    show_panel();
 }

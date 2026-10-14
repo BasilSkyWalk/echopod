@@ -29,6 +29,7 @@ const Theme TEST_THEME = {
             .padding = 1,
             .scrollbar_width = 2,
             .detail_gap = 1,
+            .status_icon_size = 2,
         },
     .marquee = {.pause_ms = 1000, .speed_px_per_s = 30, .gap_px = 8},
 };

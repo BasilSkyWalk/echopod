@@ -5,6 +5,7 @@
 #include "core/format.h"
 #include "core/string_builder.h"
 #include "ui/header.h"
+#include "ui/icons.h"
 #include "ui/label.h"
 #include "ui/marquee.h"
 
@@ -20,8 +21,6 @@ enum {
     SMALL_LINE_HEIGHT = 18,
     ICON_SIZE = 10,
     ICON_GAP = 8,
-    PAUSE_BAR_WIDTH = 3,
-    PAUSE_BAR_GAP = 4,
     TIME_CAPACITY = 16,
     STATUS_CAPACITY = 64
 };
@@ -322,36 +321,19 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
     draw_right_aligned(canvas, style, area, remaining);
 }
 
-static void draw_play_icon(Canvas *canvas, Point origin, Color color)
-{
-    for (int row = 0; row < ICON_SIZE; row++) {
-        int reach = row < ICON_SIZE / 2 ? row : ICON_SIZE - 1 - row;
-        canvas_fill_rect(canvas, (Rect){origin.x, origin.y + row, 2 * reach + 1, 1}, color);
-    }
-}
-
-static void draw_pause_icon(Canvas *canvas, Point origin, Color color)
-{
-    canvas_fill_rect(canvas, (Rect){origin.x, origin.y, PAUSE_BAR_WIDTH, ICON_SIZE}, color);
-    canvas_fill_rect(
-        canvas,
-        (Rect){origin.x + PAUSE_BAR_WIDTH + PAUSE_BAR_GAP, origin.y, PAUSE_BAR_WIDTH, ICON_SIZE},
-        color);
-}
-
 static void draw_state_icon(const NowPlayingScreen *now_playing, Canvas *canvas, Point origin)
 {
     Color color = now_playing->config.theme->colors.text;
+    Rect area = {origin.x, origin.y, ICON_SIZE, ICON_SIZE};
     switch (now_playing->status.state) {
     case PLAYER_PLAYING:
-        draw_play_icon(canvas, origin, color);
+        icon_draw_play(canvas, area, color);
         return;
     case PLAYER_PAUSED:
-        draw_pause_icon(canvas, origin, color);
+        icon_draw_pause(canvas, area, color);
         return;
     case PLAYER_IDLE:
-        canvas_fill_rect(canvas, (Rect){origin.x, origin.y + 1, ICON_SIZE - 2, ICON_SIZE - 2},
-                         color);
+        icon_draw_stop(canvas, area, color);
         return;
     }
 }

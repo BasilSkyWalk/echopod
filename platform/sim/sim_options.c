@@ -90,6 +90,23 @@ static bool read_system_directory(ArgumentCursor *cursor, SimOptions *options)
     return options->system_directory != NULL;
 }
 
+static bool read_battery(ArgumentCursor *cursor, SimOptions *options)
+{
+    unsigned long percent = 0;
+    if (!parse_number(next_value(cursor), 0, SIM_FULL_BATTERY_PERCENT, &percent)) {
+        return false;
+    }
+    options->battery_percent = (uint8_t)percent;
+    return true;
+}
+
+static bool read_charging(ArgumentCursor *cursor, SimOptions *options)
+{
+    (void)cursor;
+    options->battery_charging = true;
+    return true;
+}
+
 static const OptionSpec OPTION_SPECS[] = {
     {"--scale", read_scale},
     {"--frames", read_frames},
@@ -98,6 +115,8 @@ static const OptionSpec OPTION_SPECS[] = {
     {"--keys", read_keys},
     {"--card", read_card},
     {"--system-dir", read_system_directory},
+    {"--battery", read_battery},
+    {"--charging", read_charging},
 };
 
 static bool read_option(ArgumentCursor *cursor, SimOptions *options)
@@ -113,7 +132,8 @@ static bool read_option(ArgumentCursor *cursor, SimOptions *options)
 
 bool sim_options_parse(int argument_count, char **arguments, SimOptions *options)
 {
-    *options = (SimOptions){.scale = SIM_DEFAULT_SCALE};
+    *options =
+        (SimOptions){.scale = SIM_DEFAULT_SCALE, .battery_percent = SIM_DEFAULT_BATTERY_PERCENT};
     ArgumentCursor cursor = {.count = argument_count, .arguments = arguments, .index = 1};
     for (; cursor.index < argument_count; cursor.index++) {
         if (!read_option(&cursor, options)) {

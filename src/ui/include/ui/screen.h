@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "core/key_tracker.h"
@@ -22,6 +23,7 @@ typedef struct ScreenAction {
 struct Screen {
     const char *title;
     void *context;
+    bool full_screen;
     void (*enter)(void *context, uint32_t now_ms);
     ScreenAction (*handle_key)(void *context, KeyEvent event, uint32_t now_ms);
     void (*update)(void *context, uint32_t now_ms);

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "core/key.h"
+#include "hal/power.h"
 
 void fake_hal_reset(void);
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size);
@@ -25,3 +26,10 @@ int fake_hal_audio_state(void);
 int fake_hal_write_count(void);
 long fake_hal_pixels_written(void);
 int fake_hal_present_count(void);
+bool fake_hal_display_on(void);
+uint8_t fake_hal_display_brightness(void);
+void fake_hal_set_battery(HalBattery battery);
+int fake_hal_power_off_count(void);
+int fake_hal_audio_gain(void);
+int fake_hal_audio_output(void);
+const uint8_t *fake_hal_file_bytes(const char *path, uint32_t *size);

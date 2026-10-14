@@ -35,6 +35,7 @@ const Theme DEFAULT_THEME = {
             .padding = 10,
             .scrollbar_width = 3,
             .detail_gap = 8,
+            .status_icon_size = 10,
         },
     .marquee = {.pause_ms = 1200, .speed_px_per_s = 40, .gap_px = 32},
 };

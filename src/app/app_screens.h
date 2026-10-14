@@ -3,19 +3,25 @@
 #include <stdbool.h>
 
 #include "browse_screen.h"
+#include "core/power_policy.h"
+#include "favorites_store.h"
 #include "library_store.h"
 #include "player.h"
 #include "screens/font_sample_screen.h"
 #include "screens/now_playing_screen.h"
 #include "screens/test_pattern_screen.h"
+#include "settings/settings.h"
+#include "settings_screens.h"
+#include "settings_store.h"
 #include "ui/menu_screen.h"
 #include "ui/message_screen.h"
+#include "ui/toast.h"
 
 enum {
     HOME_ITEM_COUNT = 4,
     MUSIC_ITEM_COUNT = 9,
-    SETTINGS_ITEM_COUNT = 2,
-    DIAGNOSTICS_ITEM_COUNT = 4
+    DIAGNOSTICS_ITEM_COUNT = 4,
+    START_PATH_CAPACITY = 2
 };
 
 typedef struct AppOptions {
@@ -27,12 +33,13 @@ typedef struct BrowseEntry {
     const LibraryStore *store;
     Screen *unavailable;
     BrowseQuery query;
+    bool favorites;
 } BrowseEntry;
 
 typedef struct AppScreens {
     MenuScreen home;
     MenuScreen music;
-    MenuScreen settings;
+    SettingsScreens settings;
     MenuScreen diagnostics;
     MenuScreen long_names;
     MessageScreen coming_soon;
@@ -44,7 +51,6 @@ typedef struct AppScreens {
     FontSampleScreen font_sample;
     MenuItem home_items[HOME_ITEM_COUNT];
     MenuItem music_items[MUSIC_ITEM_COUNT];
-    MenuItem settings_items[SETTINGS_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];
 } AppScreens;
 
@@ -53,6 +59,11 @@ typedef struct AppScreensContext {
     const Theme *theme;
     const LibraryStore *store;
     Player *player;
+    SettingsStore *settings;
+    FavoritesStore *favorites;
+    PowerPolicy *power;
+    Toast *toast;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);
+int app_screens_start_path(AppScreens *screens, StartScreen start, Screen **path);

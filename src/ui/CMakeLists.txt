@@ -1,6 +1,7 @@
 add_library(echo_ui STATIC
     choice_screen.c
     header.c
+    icons.c
     label.c
     list_navigation.c
     list_view.c
@@ -10,6 +11,7 @@ add_library(echo_ui STATIC
     navigation.c
     screen.c
     screen_stack.c
+    status_bar.c
     theme.c
     toast.c
 )

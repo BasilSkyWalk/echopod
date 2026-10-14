@@ -5,15 +5,21 @@
 #include "app_internal.h"
 #include "app_screens.h"
 #include "core/key_tracker.h"
+#include "core/power_policy.h"
 #include "default_theme.h"
+#include "favorites_store.h"
 #include "frame_overlay.h"
 #include "gfx/strip_renderer.h"
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
+#include "hal/power.h"
 #include "library_store.h"
 #include "player.h"
+#include "settings_store.h"
 #include "ui/screen_stack.h"
+#include "ui/status_bar.h"
+#include "ui/toast.h"
 
 enum {
     STRIP_HEIGHT = 34
@@ -43,8 +49,15 @@ typedef struct AppState {
     ScreenStack stack;
     LibraryStore library;
     Player player;
+    SettingsStore settings;
+    FavoritesStore favorites;
+    PowerPolicy power;
+    Toast toast;
+    StatusBarState status_bar;
     AppScreens screens;
     AppOptions options;
+    bool display_on;
+    bool powered_off;
 } AppState;
 
 static AppState app;
@@ -67,13 +80,64 @@ static void read_input(void)
     }
 }
 
+static void set_display(bool on)
+{
+    app.display_on = on;
+    hal_display_set_power(on);
+}
+
+static void save_settings(void)
+{
+    settings_store_capture(&app.settings, player_status(&app.player));
+    settings_store_save(&app.settings);
+}
+
+static void save_session(void)
+{
+    player_save(&app.player);
+    save_settings();
+}
+
+static void shut_down(void)
+{
+    save_session();
+    set_display(false);
+    app.powered_off = true;
+    hal_power_off();
+}
+
+static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
+{
+    Screen *screen = top_screen();
+    ScreenAction action = screen->handle_key(screen->context, event, now_ms);
+    screen_stack_apply(&app.stack, action, now_ms);
+}
+
 static void dispatch_key_events(uint32_t now_ms)
 {
     KeyEvent event;
-    while (key_tracker_next_event(&app.keys, &event)) {
-        Screen *screen = top_screen();
-        ScreenAction action = screen->handle_key(screen->context, event, now_ms);
-        screen_stack_apply(&app.stack, action, now_ms);
+    while (!app.powered_off && key_tracker_next_event(&app.keys, &event)) {
+        PowerKeyOutcome outcome = power_policy_key(&app.power, event, now_ms);
+        if (outcome.shutdown) {
+            shut_down();
+        } else if (!outcome.consumed) {
+            dispatch_to_screen(event, now_ms);
+        }
+    }
+}
+
+static void update_power(uint32_t now_ms)
+{
+    if (power_policy_update(&app.power, now_ms)) {
+        shut_down();
+        return;
+    }
+    if (app.power.display_on == app.display_on) {
+        return;
+    }
+    set_display(app.power.display_on);
+    if (!app.display_on) {
+        save_settings();
     }
 }
 
@@ -90,6 +154,10 @@ static void draw_frame(void *context, Canvas *canvas)
     const AppState *state = context;
     Screen *screen = screen_stack_top(&state->stack);
     screen->draw(screen->context, canvas);
+    if (!screen->full_screen) {
+        status_bar_draw(canvas, &DEFAULT_THEME, state->status_bar);
+    }
+    toast_draw(&state->toast, canvas, &DEFAULT_THEME);
     if (state->options.show_frame_time) {
         frame_overlay_draw(canvas, &DEFAULT_THEME, &state->frame_stats);
     }
@@ -101,8 +169,33 @@ static void write_to_display(void *context, Rect area, const Color *pixels)
     hal_display_write(area.x, area.y, area.width, area.height, pixels);
 }
 
+static StatusPlayback playback_of(PlayerState state)
+{
+    switch (state) {
+    case PLAYER_PLAYING:
+        return STATUS_PLAYBACK_PLAYING;
+    case PLAYER_PAUSED:
+        return STATUS_PLAYBACK_PAUSED;
+    case PLAYER_IDLE:
+        return STATUS_PLAYBACK_NONE;
+    }
+    return STATUS_PLAYBACK_NONE;
+}
+
+static StatusBarState current_status_bar(void)
+{
+    HalBattery battery = hal_power_battery();
+    return (StatusBarState){
+        .playback = playback_of(player_status(&app.player).state),
+        .battery_known = battery.known,
+        .battery_percent = battery.percent,
+        .charging = battery.charging,
+    };
+}
+
 static void render_frame(void)
 {
+    app.status_bar = current_status_bar();
     StripRenderer renderer = {
         .strip_pixels = strip_pixels,
         .screen_width = HAL_DISPLAY_WIDTH,
@@ -116,35 +209,84 @@ static void render_frame(void)
     hal_display_present();
 }
 
+static void start_playback(void)
+{
+    library_store_open(&app.library);
+    player_init(&app.player, &app.library.library);
+    settings_store_restore_playback(&app.settings, &app.player, hal_clock_microseconds());
+    player_restore(&app.player);
+    favorites_store_load(&app.favorites, &app.library.library);
+}
+
+static void start_hardware(uint32_t now_ms)
+{
+    power_policy_init(&app.power, settings_screen_timeout_ms(&app.settings.settings), now_ms);
+    settings_store_apply_hardware(&app.settings.settings);
+    set_display(true);
+}
+
+static void open_start_screen(uint32_t now_ms)
+{
+    Screen *path[START_PATH_CAPACITY];
+    int count = app_screens_start_path(&app.screens, app.settings.settings.start_screen, path);
+    for (int index = 0; index < count; index++) {
+        screen_stack_apply(&app.stack, screen_action_push(path[index]), now_ms);
+    }
+}
+
+static void start_screens(uint32_t now_ms)
+{
+    AppScreensContext context = {
+        .options = &app.options,
+        .theme = &DEFAULT_THEME,
+        .store = &app.library,
+        .player = &app.player,
+        .settings = &app.settings,
+        .favorites = &app.favorites,
+        .power = &app.power,
+        .toast = &app.toast,
+    };
+    Screen *root = app_screens_init(&app.screens, context);
+    screen_stack_init(&app.stack, root, now_ms);
+    open_start_screen(now_ms);
+}
+
 void app_start(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
     key_tracker_init(&app.keys, &KEY_CONFIG);
     frame_stats_reset(&app.frame_stats);
     app.options = (AppOptions){.show_frame_time = false};
-    library_store_open(&app.library);
-    player_init(&app.player, &app.library.library);
-    player_restore(&app.player);
-    AppScreensContext context = {
-        .options = &app.options,
-        .theme = &DEFAULT_THEME,
-        .store = &app.library,
-        .player = &app.player,
-    };
-    Screen *root = app_screens_init(&app.screens, context);
-    screen_stack_init(&app.stack, root, now_ms);
+    app.toast = (Toast){.visible = false};
+    app.powered_off = false;
+    settings_store_load(&app.settings);
+    start_playback();
+    start_hardware(now_ms);
+    start_screens(now_ms);
 }
 
 void app_step(void)
 {
+    if (app.powered_off) {
+        return;
+    }
     uint32_t started_us = hal_clock_microseconds();
     uint32_t now_ms = hal_clock_milliseconds();
     read_input();
     key_tracker_update(&app.keys, now_ms);
     dispatch_key_events(now_ms);
-    player_update(&app.player, now_ms);
+    if (!app.powered_off) {
+        player_update(&app.player, now_ms);
+        update_power(now_ms);
+    }
+    if (app.powered_off) {
+        return;
+    }
+    toast_update(&app.toast, now_ms);
     update_screen(now_ms);
-    render_frame();
+    if (app.display_on) {
+        render_frame();
+    }
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
 }
 
@@ -165,10 +307,17 @@ int app_screen_depth(void)
 
 void app_stop(void)
 {
-    player_save(&app.player);
+    if (!app.powered_off) {
+        save_session();
+    }
 }
 
 PlayerStatus app_player_status(void)
 {
     return player_status(&app.player);
+}
+
+const char *app_toast_text(void)
+{
+    return app.toast.visible ? app.toast.text : NULL;
 }

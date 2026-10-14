@@ -35,6 +35,7 @@ typedef struct ThemeMetrics {
     int padding;
     int scrollbar_width;
     int detail_gap;
+    int status_icon_size;
 } ThemeMetrics;
 
 typedef struct Theme {

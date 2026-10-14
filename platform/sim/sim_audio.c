@@ -36,6 +36,8 @@ typedef struct SimAudio {
     HalAudioState state;
     bool failed;
     float gain;
+    HalAudioGain analog_gain;
+    HalAudioOutput output;
 } SimAudio;
 
 static SimAudio audio;
@@ -281,6 +283,20 @@ void hal_audio_set_volume(uint8_t level)
     float decibels = (float)level - (float)HAL_AUDIO_VOLUME_MAX;
     lock();
     audio.gain = level == 0 ? 0.0f : powf(10.0f, decibels / DECIBELS_PER_FACTOR_OF_TEN);
+    unlock();
+}
+
+void hal_audio_set_gain(HalAudioGain gain)
+{
+    lock();
+    audio.analog_gain = gain;
+    unlock();
+}
+
+void hal_audio_set_output(HalAudioOutput output)
+{
+    lock();
+    audio.output = output;
     unlock();
 }
 

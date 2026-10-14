@@ -64,7 +64,7 @@ target_include_directories(echo_ui_fixtures PUBLIC gfx ui)
 target_link_libraries(echo_ui_fixtures PUBLIC echo_ui PRIVATE echo_options)
 
 foreach(ui_test theme_layout list_view list_navigation header menu_screen message_screen
-        choice_screen toast)
+        choice_screen toast status_bar)
     echo_add_unit_test(NAME test_${ui_test}
         SOURCES ui/test_${ui_test}.c
         LIBRARIES echo_ui_fixtures
@@ -78,6 +78,11 @@ echo_add_unit_test(NAME test_app
 )
 echo_add_unit_test(NAME test_player
     SOURCES app/test_player.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_stores
+    SOURCES app/test_stores.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )

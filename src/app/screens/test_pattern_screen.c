@@ -151,6 +151,7 @@ Screen *test_pattern_screen_init(TestPatternScreen *pattern)
     pattern->screen = (Screen){
         .title = "Key test",
         .context = pattern,
+        .full_screen = true,
         .enter = enter,
         .handle_key = handle_key,
         .update = update,
