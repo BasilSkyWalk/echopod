@@ -75,7 +75,7 @@ static void put_le32(uint8_t *bytes, uint32_t value)
 
 void msc_init(Msc *msc, const MscLun *luns, uint8_t count)
 {
-    *msc = (Msc){.lun_count = count};
+    *msc = (Msc){.lun_count = count, .stats = {.last_failed_lba = UINT32_MAX}};
     for (uint8_t index = 0; index < count && index < MSC_MAX_LUNS; index++) {
         msc->luns[index] = luns[index];
     }
@@ -85,6 +85,11 @@ void msc_reset(Msc *msc)
 {
     msc->phase = MSC_PHASE_COMMAND;
     msc->source = MSC_SOURCE_NONE;
+}
+
+MscStats msc_stats(const Msc *msc)
+{
+    return msc->stats;
 }
 
 bool msc_ejected(const Msc *msc, uint8_t lun)
@@ -275,6 +280,7 @@ static void execute(Msc *msc, const uint8_t *block)
 
 static void begin_command(Msc *msc, const uint8_t *cbw)
 {
+    msc->stats.commands++;
     msc->tag = le32(cbw + 4);
     msc->expected = le32(cbw + 8);
     msc->lun = cbw[CBW_LUN] & 0x0F;
@@ -314,9 +320,13 @@ static void store_out_byte(Msc *msc, uint8_t value)
     sector[msc->sector_offset++] = value;
     if (msc->sector_offset == MSC_SECTOR_SIZE) {
         const MscLun *lun = &msc->luns[msc->lun];
-        if (!lun->write(lun->context, msc->lba, 1, msc->sector)) {
+        if (lun->write(lun->context, msc->lba, 1, msc->sector)) {
+            msc->stats.sectors_written++;
+        } else {
             set_sense(msc, SENSE_MEDIUM_ERROR, CODE_WRITE_ERROR);
             msc->source = MSC_SOURCE_NONE;
+            msc->stats.write_failures++;
+            msc->stats.last_failed_lba = msc->lba;
         }
         msc->lba++;
         msc->sector_offset = 0;
@@ -345,10 +355,15 @@ void msc_receive(Msc *msc, const uint8_t *packet, uint32_t length)
 static uint8_t sector_byte(Msc *msc)
 {
     const MscLun *lun = &msc->luns[msc->lun];
-    if (msc->sector_offset == 0 && !lun->read(lun->context, msc->lba, 1, msc->sector)) {
-        set_sense(msc, SENSE_MEDIUM_ERROR, CODE_UNRECOVERED_READ);
-        msc->source = MSC_SOURCE_NONE;
-        return 0;
+    if (msc->sector_offset == 0) {
+        if (!lun->read(lun->context, msc->lba, 1, msc->sector)) {
+            set_sense(msc, SENSE_MEDIUM_ERROR, CODE_UNRECOVERED_READ);
+            msc->source = MSC_SOURCE_NONE;
+            msc->stats.read_failures++;
+            msc->stats.last_failed_lba = msc->lba;
+            return 0;
+        }
+        msc->stats.sectors_read++;
     }
     uint8_t value = ((const uint8_t *)msc->sector)[msc->sector_offset++];
     if (msc->sector_offset == MSC_SECTOR_SIZE) {

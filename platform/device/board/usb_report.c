@@ -11,18 +11,18 @@ enum {
     HEX_DIGITS = 8
 };
 
-static void append_hex(StringBuilder *builder, uint32_t value)
+void usb_report_append_hex(StringBuilder *builder, uint32_t value, int digits)
 {
     static const char DIGITS[] = "0123456789ABCDEF";
-    for (int index = 0; index < HEX_DIGITS; index++) {
-        string_builder_append_char(builder, DIGITS[(value >> (28 - 4 * index)) & 0xFu]);
+    for (int index = digits - 1; index >= 0; index--) {
+        string_builder_append_char(builder, DIGITS[(value >> (4 * index)) & 0xFu]);
     }
 }
 
 static void append_field(StringBuilder *builder, const char *label, uint32_t value)
 {
     string_builder_append(builder, label);
-    append_hex(builder, value);
+    usb_report_append_hex(builder, value, HEX_DIGITS);
     string_builder_append_char(builder, ' ');
 }
 

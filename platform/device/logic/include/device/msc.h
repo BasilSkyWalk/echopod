@@ -34,6 +34,15 @@ typedef enum MscSource {
     MSC_SOURCE_NONE
 } MscSource;
 
+typedef struct MscStats {
+    uint32_t commands;
+    uint32_t sectors_read;
+    uint32_t sectors_written;
+    uint32_t read_failures;
+    uint32_t write_failures;
+    uint32_t last_failed_lba;
+} MscStats;
+
 typedef struct Msc {
     MscLun luns[MSC_MAX_LUNS];
     uint8_t lun_count;
@@ -51,6 +60,7 @@ typedef struct Msc {
     uint8_t sense_code;
     uint8_t ejected;
     bool data_out;
+    MscStats stats;
     uint8_t response[MSC_RESPONSE_CAPACITY];
     uint32_t response_length;
     uint32_t sector[MSC_SECTOR_SIZE / 4];
@@ -61,3 +71,4 @@ void msc_reset(Msc *msc);
 void msc_receive(Msc *msc, const uint8_t *packet, uint32_t length);
 bool msc_next_in(Msc *msc, uint8_t *packet, uint32_t *length);
 bool msc_ejected(const Msc *msc, uint8_t lun);
+MscStats msc_stats(const Msc *msc);

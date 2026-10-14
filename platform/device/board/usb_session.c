@@ -3,15 +3,20 @@
 #include <stddef.h>
 
 #include "app/app.h"
+#include "core/string_builder.h"
 #include "device/block_device.h"
 #include "emmc.h"
 #include "hal/clock.h"
+#include "mmc.h"
 #include "sd.h"
 #include "usb.h"
+#include "usb_report.h"
 
 enum {
     HOST_TIMEOUT_MS = 3000,
     LAST_REPLY_TIMEOUT_MS = 200,
+    COUNTER_REFRESH_MS = 1000,
+    COUNTER_TEXT_CAPACITY = 48,
     SERIAL_DIGITS = 8,
     INTERNAL_LUN = 0,
     CARD_LUN = 1,
@@ -67,10 +72,54 @@ static void finish_last_reply(void)
     }
 }
 
+static void append_count(StringBuilder *builder, char label, uint32_t value)
+{
+    string_builder_append_char(builder, label);
+    string_builder_append_unsigned(builder, value);
+    string_builder_append_char(builder, ' ');
+}
+
+static void show_counters(MscStats stats)
+{
+    MmcFailure failure = mmc_last_failure();
+    char title[COUNTER_TEXT_CAPACITY];
+    char message[COUNTER_TEXT_CAPACITY];
+    StringBuilder top = string_builder_make(title, sizeof title);
+    string_builder_append(&top, "USB ");
+    append_count(&top, 'R', stats.sectors_read);
+    append_count(&top, 'W', stats.sectors_written);
+    StringBuilder line = string_builder_make(message, sizeof message);
+    append_count(&line, 'r', stats.read_failures);
+    append_count(&line, 'w', stats.write_failures);
+    string_builder_append_char(&line, '@');
+    usb_report_append_hex(&line, stats.last_failed_lba, 5);
+    string_builder_append_char(&line, ' ');
+    append_count(&line, 'm', (uint32_t)failure.step);
+    usb_report_append_hex(&line, failure.status, 4);
+    string_builder_append_char(&line, ' ');
+    usb_report_append_hex(&line, failure.interrupts, 4);
+    string_builder_append_char(&line, ' ');
+    append_count(&line, 'd', emmc_fifo_depth_words());
+    app_show_notice(title, message);
+}
+
+static bool stats_changed(MscStats now, MscStats shown)
+{
+    return now.commands != shown.commands || now.write_failures != shown.write_failures ||
+           now.read_failures != shown.read_failures;
+}
+
 static UsbSessionEnd serve(void)
 {
+    MscStats shown = msc_stats(&msc);
+    uint32_t refreshed = hal_clock_milliseconds();
     while (usb_vbus_present()) {
-        hal_clock_milliseconds();
+        uint32_t now = hal_clock_milliseconds();
+        if (now - refreshed >= COUNTER_REFRESH_MS && stats_changed(msc_stats(&msc), shown)) {
+            shown = msc_stats(&msc);
+            show_counters(shown);
+            refreshed = hal_clock_milliseconds();
+        }
         usb_poll(&port);
         if (msc_ejected(&msc, INTERNAL_LUN)) {
             finish_last_reply();

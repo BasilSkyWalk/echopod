@@ -75,9 +75,22 @@ enum {
     POWER_ON_US = 600
 };
 
+static MmcFailure last_failure;
+
 static uint32_t read_register(const MmcHost *host, uint32_t offset)
 {
     return register_read(host->base + offset);
+}
+
+void mmc_note_failure(const MmcHost *host, MmcStep step)
+{
+    last_failure = (MmcFailure){step, read_register(host, MMC_RINTSTS),
+                                read_register(host, MMC_STATUS), last_failure.count + 1};
+}
+
+MmcFailure mmc_last_failure(void)
+{
+    return last_failure;
 }
 
 static void write_register(const MmcHost *host, uint32_t offset, uint32_t value)
@@ -245,21 +258,32 @@ static bool drain_fifo(const MmcHost *host, uint32_t *words)
     return true;
 }
 
+static bool failed(const MmcHost *host, MmcStep step);
+
 bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32_t *words)
 {
     if (!prepare_data(host)) {
-        return false;
+        return failed(host, MMC_STEP_BUSY_BEFORE);
     }
     write_register(host, MMC_BLKSIZ, BLOCK_BYTES);
     write_register(host, MMC_BYTCNT, BLOCK_BYTES);
     write_register(host, MMC_RINTSTS, INT_ALL);
     write_register(host, MMC_CMDARG, address);
     write_register(host, MMC_CMD, CMD_BASE | CMD_DATA_READ | index);
-    bool ok = wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS) && drain_fifo(host, words) &&
-              wait_any(host, MMC_RINTSTS, INT_DATA_FINISHED, DATA_TIMEOUT_MS) &&
-              (read_register(host, MMC_RINTSTS) & INT_DATA_FAILED) == 0;
+    if (!wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS)) {
+        return failed(host, MMC_STEP_COMMAND_START);
+    }
+    if (!drain_fifo(host, words)) {
+        return failed(host, MMC_STEP_FIFO);
+    }
+    if (!wait_any(host, MMC_RINTSTS, INT_DATA_FINISHED, DATA_TIMEOUT_MS)) {
+        return failed(host, MMC_STEP_DATA_WAIT);
+    }
+    if ((read_register(host, MMC_RINTSTS) & INT_DATA_FAILED) != 0) {
+        return failed(host, MMC_STEP_DATA_ERROR);
+    }
     write_register(host, MMC_RINTSTS, INT_ALL);
-    return ok;
+    return true;
 }
 
 static bool fill_fifo(const MmcHost *host, const uint32_t *words)
@@ -282,19 +306,38 @@ static bool fill_fifo(const MmcHost *host, const uint32_t *words)
     return true;
 }
 
+static bool failed(const MmcHost *host, MmcStep step)
+{
+    mmc_note_failure(host, step);
+    write_register(host, MMC_RINTSTS, INT_ALL);
+    return false;
+}
+
 bool mmc_write_block(const MmcHost *host, uint8_t index, uint32_t address, const uint32_t *words)
 {
     if (!prepare_data(host)) {
-        return false;
+        return failed(host, MMC_STEP_BUSY_BEFORE);
     }
     write_register(host, MMC_BLKSIZ, BLOCK_BYTES);
     write_register(host, MMC_BYTCNT, BLOCK_BYTES);
     write_register(host, MMC_RINTSTS, INT_ALL);
     write_register(host, MMC_CMDARG, address);
     write_register(host, MMC_CMD, CMD_BASE | CMD_DATA_READ | CMD_WRITE | index);
-    bool ok = wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS) && fill_fifo(host, words) &&
-              wait_any(host, MMC_RINTSTS, INT_DATA_FINISHED, DATA_TIMEOUT_MS) &&
-              (read_register(host, MMC_RINTSTS) & INT_DATA_FAILED) == 0;
+    if (!wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS)) {
+        return failed(host, MMC_STEP_COMMAND_START);
+    }
+    if (!fill_fifo(host, words)) {
+        return failed(host, MMC_STEP_FIFO);
+    }
+    if (!wait_any(host, MMC_RINTSTS, INT_DATA_FINISHED, DATA_TIMEOUT_MS)) {
+        return failed(host, MMC_STEP_DATA_WAIT);
+    }
+    if ((read_register(host, MMC_RINTSTS) & INT_DATA_FAILED) != 0) {
+        return failed(host, MMC_STEP_DATA_ERROR);
+    }
     write_register(host, MMC_RINTSTS, INT_ALL);
-    return ok && wait_clear(host, MMC_STATUS, STATUS_CARD_BUSY, BUSY_TIMEOUT_MS);
+    if (!wait_clear(host, MMC_STATUS, STATUS_CARD_BUSY, BUSY_TIMEOUT_MS)) {
+        return failed(host, MMC_STEP_BUSY_AFTER);
+    }
+    return true;
 }

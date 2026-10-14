@@ -169,12 +169,20 @@ bool emmc_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
     }
     for (uint32_t index = 0; index < count; index++) {
         if (!mmc_write_block(&EMMC_HOST, CMD_WRITE_BLOCK, lba + index,
-                             words + index * (BLOCK_LENGTH / 4)) ||
-            !wait_for_transfer_state()) {
+                             words + index * (BLOCK_LENGTH / 4))) {
+            return false;
+        }
+        if (!wait_for_transfer_state()) {
+            mmc_note_failure(&EMMC_HOST, MMC_STEP_TRANSFER_STATE);
             return false;
         }
     }
     return true;
+}
+
+uint32_t emmc_fifo_depth_words(void)
+{
+    return emmc_fifo_depth;
 }
 
 BlockDevice emmc_device(void)

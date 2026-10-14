@@ -30,9 +30,14 @@ static bool ram_read(void *context, uint32_t lba, uint32_t count, void *buffer)
     return true;
 }
 
+static uint32_t failing_write_lba = UINT32_MAX;
+
 static bool ram_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
 {
     RamDisk *disk = context;
+    if (lba == failing_write_lba) {
+        return false;
+    }
     memcpy(disk->bytes + lba * 512, buffer, count * 512);
     return true;
 }
@@ -40,6 +45,7 @@ static bool ram_write(void *context, uint32_t lba, uint32_t count, const void *b
 static Msc *started(void)
 {
     static Msc msc;
+    failing_write_lba = UINT32_MAX;
     for (uint32_t index = 0; index < sizeof writable_disk.bytes; index++) {
         writable_disk.bytes[index] = (uint8_t)(index * 7 + 1);
         read_only_disk.bytes[index] = (uint8_t)(index * 3 + 2);
@@ -356,6 +362,44 @@ static void a_write_sent_as_device_to_host_is_a_phase_error(void)
     check_csw(exchange, 2, 512);
 }
 
+static void counters_record_commands_sectors_and_failures(void)
+{
+    uint8_t block[10];
+    uint8_t bytes[1024] = {0};
+    Msc *msc = started();
+    read_10_block(block, 0x28, 0, 2);
+    send_command(msc, 1024, true, 0, block, 10);
+    collect(msc);
+    failing_write_lba = 7;
+    read_10_block(block, 0x2A, 6, 2);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 1, 1024);
+    MscStats stats = msc_stats(msc);
+    CHECK_EQUAL(2, stats.commands);
+    CHECK_EQUAL(2, stats.sectors_read);
+    CHECK_EQUAL(1, stats.sectors_written);
+    CHECK_EQUAL(0, stats.read_failures);
+    CHECK_EQUAL(1, stats.write_failures);
+    CHECK_EQUAL(7, stats.last_failed_lba);
+}
+
+static void a_failed_write_skips_the_rest_of_the_command(void)
+{
+    uint8_t block[10];
+    uint8_t bytes[1536];
+    memset(bytes, 0x3C, sizeof bytes);
+    Msc *msc = started();
+    failing_write_lba = 11;
+    read_10_block(block, 0x2A, 10, 3);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    collect(msc);
+    CHECK_EQUAL(0x3C, writable_disk.bytes[10 * 512]);
+    CHECK(writable_disk.bytes[12 * 512] != 0x3C);
+    CHECK_EQUAL(1, msc_stats(msc).write_failures);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -377,6 +421,8 @@ int main(void)
         TEST_CASE(a_start_without_eject_changes_nothing),
         TEST_CASE(an_invalid_command_block_is_ignored),
         TEST_CASE(a_reset_drops_a_transfer_in_progress),
+        TEST_CASE(counters_record_commands_sectors_and_failures),
+        TEST_CASE(a_failed_write_skips_the_rest_of_the_command),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
