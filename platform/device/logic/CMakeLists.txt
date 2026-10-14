@@ -1,7 +1,9 @@
 add_library(echo_device_logic STATIC
     emmc_layout.c
+    exfat.c
     fat.c
     fat_layout.c
+    fat_names.c
     image_crc.c
     key_ladder.c
     key_scanner.c

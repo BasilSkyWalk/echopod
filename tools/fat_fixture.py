@@ -14,6 +14,7 @@ MANY_FILES = 120
 IMAGES = {
     "fat32_mbr": {"megabytes": 64, "layout": "mbr", "format": "MS-DOS FAT32"},
     "fat16_superfloppy": {"megabytes": 16, "layout": "superfloppy", "format": "16"},
+    "exfat_mbr": {"megabytes": 64, "layout": "mbr", "format": "ExFAT"},
 }
 
 
@@ -94,20 +95,30 @@ def build_image(name, settings, output_directory):
     print(f"wrote {output}: {len(data):,} bytes")
 
 
+def selected_images(names):
+    return {name: IMAGES[name] for name in names} if names else IMAGES
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Make FAT card images with macOS's own tools, stored as sparse sector lists")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("names", nargs="*", metavar="NAME",
+                        help=f"images to make, from {', '.join(IMAGES)}; all when none are named")
     return parser.parse_args()
 
 
 def main():
     arguments = parse_arguments()
+    unknown = [name for name in arguments.names if name not in IMAGES]
+    if unknown:
+        print(f"error: unknown image {', '.join(unknown)}", file=sys.stderr)
+        return 1
     if mount_point().exists():
         print(f"error: {mount_point()} is already mounted", file=sys.stderr)
         return 1
     arguments.output.mkdir(parents=True, exist_ok=True)
-    for name, settings in IMAGES.items():
+    for name, settings in selected_images(arguments.names).items():
         build_image(name, settings, arguments.output)
     return 0
 

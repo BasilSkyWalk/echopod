@@ -1,5 +1,7 @@
 #include "fat_layout.h"
 
+#include <stddef.h>
+
 #define FAT32_CLUSTER_MASK 0x0FFFFFFFu
 
 enum {
@@ -9,7 +11,9 @@ enum {
     FIRST_CLUSTER = 2,
     FAT16_MINIMUM_CLUSTERS = 4085,
     FAT32_MINIMUM_CLUSTERS = 65525,
-    DIRECTORY_ENTRY_SIZE = 32
+    DIRECTORY_ENTRY_SIZE = 32,
+    EXFAT_SECTOR_SHIFT = 9,
+    EXFAT_MAXIMUM_CLUSTER_SHIFT = 16
 };
 
 uint16_t fat_le16(const uint8_t *bytes)
@@ -35,6 +39,17 @@ bool fat_read_sector(FatVolume *volume, uint32_t lba)
     volume->sector_lba = lba;
     volume->sector_valid = volume->device.read(volume->device.context, lba, 1, volume->sector);
     return volume->sector_valid;
+}
+
+static bool is_exfat_boot_sector(const uint8_t *sector)
+{
+    static const char NAME[] = "EXFAT   ";
+    for (int index = 0; index < 8; index++) {
+        if (sector[3 + index] != (uint8_t)NAME[index]) {
+            return false;
+        }
+    }
+    return fat_le16(sector + SIGNATURE_OFFSET) == BOOT_SIGNATURE;
 }
 
 static bool is_boot_sector(const uint8_t *sector)
@@ -87,6 +102,30 @@ static bool read_layout(FatVolume *volume, const uint8_t *boot)
            (volume->type == FAT_TYPE_32 || root_entries != 0);
 }
 
+static bool read_exfat_layout(FatVolume *volume, const uint8_t *boot)
+{
+    volume->type = FAT_TYPE_EXFAT;
+    volume->fat_start = volume->volume_start + fat_le32(boot + 80);
+    volume->data_start = volume->volume_start + fat_le32(boot + 88);
+    volume->cluster_count = fat_le32(boot + 92);
+    volume->root_cluster = fat_le32(boot + 96);
+    volume->cluster_shift = boot[109];
+    return boot[108] == EXFAT_SECTOR_SHIFT &&
+           volume->cluster_shift <= EXFAT_MAXIMUM_CLUSTER_SHIFT && volume->cluster_count >= 1 &&
+           volume->root_cluster >= FIRST_CLUSTER;
+}
+
+static bool is_volume(const uint8_t *sector)
+{
+    return is_boot_sector(sector) || is_exfat_boot_sector(sector);
+}
+
+static bool read_any_layout(FatVolume *volume)
+{
+    const uint8_t *boot = fat_cached_sector(volume);
+    return is_exfat_boot_sector(boot) ? read_exfat_layout(volume, boot) : read_layout(volume, boot);
+}
+
 bool fat_mount(FatVolume *volume, BlockDevice device)
 {
     *volume = (FatVolume){.device = device};
@@ -94,14 +133,14 @@ bool fat_mount(FatVolume *volume, BlockDevice device)
     if (!fat_read_sector(volume, 0)) {
         return false;
     }
-    if (!is_boot_sector(fat_cached_sector(volume))) {
+    if (!is_volume(fat_cached_sector(volume))) {
         if (!partition_start(fat_cached_sector(volume), &start) ||
-            !fat_read_sector(volume, start) || !is_boot_sector(fat_cached_sector(volume))) {
+            !fat_read_sector(volume, start) || !is_volume(fat_cached_sector(volume))) {
             return false;
         }
     }
     volume->volume_start = start;
-    return read_layout(volume, fat_cached_sector(volume));
+    return read_any_layout(volume);
 }
 
 static bool read_fat_sector(FatVolume *volume, uint32_t lba)
@@ -117,13 +156,17 @@ static bool read_fat_sector(FatVolume *volume, uint32_t lba)
 
 static bool next_cluster(FatVolume *volume, uint32_t cluster, uint32_t *next)
 {
-    uint32_t entry_size = volume->type == FAT_TYPE_32 ? 4u : 2u;
+    uint32_t entry_size = volume->type == FAT_TYPE_16 ? 2u : 4u;
     uint32_t offset = cluster * entry_size;
     if (!read_fat_sector(volume, volume->fat_start + offset / FAT_SECTOR_SIZE)) {
         return false;
     }
     const uint8_t *bytes = (const uint8_t *)volume->fat_sector + offset % FAT_SECTOR_SIZE;
-    *next = volume->type == FAT_TYPE_32 ? fat_le32(bytes) & FAT32_CLUSTER_MASK : fat_le16(bytes);
+    if (volume->type == FAT_TYPE_16) {
+        *next = fat_le16(bytes);
+    } else {
+        *next = fat_le32(bytes) & (volume->type == FAT_TYPE_32 ? FAT32_CLUSTER_MASK : UINT32_MAX);
+    }
     return *next >= FIRST_CLUSTER && *next < volume->cluster_count + FIRST_CLUSTER;
 }
 
@@ -135,6 +178,11 @@ static bool cluster_at(FatVolume *volume, FatFile *file, uint32_t index, uint32_
     }
     if (index >= volume->cluster_count) {
         return false;
+    }
+    if (file->contiguous) {
+        *cluster = file->first_cluster + index;
+        return file->first_cluster >= FIRST_CLUSTER &&
+               *cluster < volume->cluster_count + FIRST_CLUSTER;
     }
     while (file->cursor_index < index) {
         if (!next_cluster(volume, file->cursor_cluster, &file->cursor_cluster)) {
@@ -169,6 +217,18 @@ bool fat_file_sector(FatVolume *volume, FatFile *file, uint32_t sector_index, ui
 
 FatFile fat_root_directory(const FatVolume *volume)
 {
-    uint32_t first = volume->type == FAT_TYPE_32 ? volume->root_cluster : 0;
+    uint32_t first = volume->type == FAT_TYPE_16 ? 0 : volume->root_cluster;
     return (FatFile){.first_cluster = first, .size = UINT32_MAX, .directory = true};
+}
+
+const uint8_t *fat_read_entry(FatVolume *volume, FatFile *directory, uint32_t index)
+{
+    uint32_t offset = index * DIRECTORY_ENTRY_SIZE;
+    uint32_t lba = 0;
+    if (offset >= directory->size ||
+        !fat_file_sector(volume, directory, offset / FAT_SECTOR_SIZE, &lba) ||
+        !fat_read_sector(volume, lba)) {
+        return NULL;
+    }
+    return fat_cached_sector(volume) + offset % FAT_SECTOR_SIZE;
 }

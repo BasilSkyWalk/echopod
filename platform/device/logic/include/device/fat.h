@@ -12,7 +12,8 @@ enum {
 
 typedef enum FatType {
     FAT_TYPE_16 = 16,
-    FAT_TYPE_32 = 32
+    FAT_TYPE_32 = 32,
+    FAT_TYPE_EXFAT = 64
 } FatType;
 
 typedef struct FatFile {
@@ -21,6 +22,7 @@ typedef struct FatFile {
     uint32_t cursor_index;
     uint32_t cursor_cluster;
     bool directory;
+    bool contiguous;
 } FatFile;
 
 typedef struct FatVolume {

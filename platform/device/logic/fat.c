@@ -2,8 +2,9 @@
 
 #include <stddef.h>
 
-#include "core/utf8.h"
+#include "exfat.h"
 #include "fat_layout.h"
+#include "fat_names.h"
 
 enum {
     ENTRY_SIZE = 32,
@@ -33,17 +34,6 @@ typedef struct LongName {
     uint8_t expected;
     uint8_t entries;
 } LongName;
-
-static const uint8_t *read_entry(FatVolume *volume, FatFile *directory, uint32_t index)
-{
-    uint32_t offset = index * ENTRY_SIZE;
-    uint32_t lba = 0;
-    if (!fat_file_sector(volume, directory, offset / FAT_SECTOR_SIZE, &lba) ||
-        !fat_read_sector(volume, lba)) {
-        return NULL;
-    }
-    return fat_cached_sector(volume) + offset % FAT_SECTOR_SIZE;
-}
 
 static void collect_long_name(FatVolume *volume, LongName *name, const uint8_t *entry)
 {
@@ -77,44 +67,11 @@ static bool long_name_applies(const LongName *name, const uint8_t *entry)
     return name->valid && name->expected == 0 && name->checksum == short_name_checksum(entry);
 }
 
-static uint32_t fold(uint32_t code_point)
-{
-    return code_point >= 'a' && code_point <= 'z' ? code_point - 'a' + 'A' : code_point;
-}
-
-static bool next_utf16(const uint16_t *units, size_t limit, size_t *index, uint32_t *code_point)
-{
-    if (*index >= limit || units[*index] == 0 || units[*index] == 0xFFFF) {
-        return false;
-    }
-    uint32_t first = units[(*index)++];
-    if (first >= 0xD800 && first < 0xDC00 && *index < limit) {
-        uint32_t second = units[*index];
-        if (second >= 0xDC00 && second < 0xE000) {
-            (*index)++;
-            *code_point = 0x10000 + ((first - 0xD800) << 10) + (second - 0xDC00);
-            return true;
-        }
-    }
-    *code_point = first;
-    return true;
-}
-
 static bool matches_long_name(const FatVolume *volume, const LongName *long_name, const char *name,
                               size_t length)
 {
     size_t limit = (size_t)long_name->entries * CHARACTERS_PER_ENTRY;
-    const char *cursor = name;
-    size_t unit = 0;
-    while (cursor < name + length) {
-        uint32_t wanted = utf8_next(&cursor);
-        uint32_t found = 0;
-        if (!next_utf16(volume->long_name, limit, &unit, &found) || fold(wanted) != fold(found)) {
-            return false;
-        }
-    }
-    uint32_t extra = 0;
-    return !next_utf16(volume->long_name, limit, &unit, &extra);
+    return fat_name_matches(volume->long_name, limit, name, length);
 }
 
 static size_t trimmed_length(const uint8_t *text, size_t length)
@@ -153,7 +110,7 @@ static bool matches_short_name(const uint8_t *entry, const char *name, size_t le
         return false;
     }
     for (size_t index = 0; index < length; index++) {
-        if (fold((uint8_t)text[index]) != fold((uint8_t)name[index])) {
+        if (fat_fold((uint8_t)text[index]) != fat_fold((uint8_t)name[index])) {
             return false;
         }
     }
@@ -178,12 +135,12 @@ static bool entry_matches(FatVolume *volume, const LongName *long_name, const ui
     return matches_short_name(entry, name, length);
 }
 
-static bool find_entry(FatVolume *volume, FatFile *directory, const char *name, size_t length,
-                       FatFile *found)
+static bool find_fat_entry(FatVolume *volume, FatFile *directory, const char *name, size_t length,
+                           FatFile *found)
 {
     LongName long_name = {.valid = false};
     for (uint32_t index = 0; index < MAXIMUM_DIRECTORY_ENTRIES; index++) {
-        const uint8_t *entry = read_entry(volume, directory, index);
+        const uint8_t *entry = fat_read_entry(volume, directory, index);
         if (entry == NULL || entry[0] == ENTRY_END) {
             return false;
         }
@@ -200,6 +157,15 @@ static bool find_entry(FatVolume *volume, FatFile *directory, const char *name, 
         }
     }
     return false;
+}
+
+static bool find_entry(FatVolume *volume, FatFile *directory, const char *name, size_t length,
+                       FatFile *found)
+{
+    if (volume->type == FAT_TYPE_EXFAT) {
+        return exfat_find_entry(volume, directory, name, length, found);
+    }
+    return find_fat_entry(volume, directory, name, length, found);
 }
 
 static size_t component_length(const char *path)

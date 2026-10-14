@@ -226,6 +226,63 @@ static void a_folder_whose_clusters_loop_ends_the_search(void)
     free(bytes);
 }
 
+static void the_exfat_card_mounts_from_its_mbr_partition(void)
+{
+    Card *card = mounted("exfat_mbr");
+    CHECK_EQUAL(FAT_TYPE_EXFAT, card->volume.type);
+    CHECK_EQUAL(63, card->volume.volume_start);
+    sparse_card_free(&card->sparse);
+}
+
+static void exfat_files_read_back_their_bytes(void)
+{
+    Card *card = mounted("exfat_mbr");
+    check_file(card, "/.echo/library.db", 1, 3000);
+    check_file(card, "/README.TXT", 2, 100);
+    check_file(card, "/notes.txt", 3, 700);
+    check_file(card, INTRO_PATH, 4, 9000);
+    check_file(card, LONG_NAME_PATH, 5, 20000);
+    check_file(card, EMOJI_PATH, 6, 1500);
+    sparse_card_free(&card->sparse);
+}
+
+static void an_exfat_folder_with_a_cluster_chain_is_searched_to_its_end(void)
+{
+    Card *card = mounted("exfat_mbr");
+    check_file(card, "/Many/file number 000.txt", 100, 64);
+    check_file(card, "/Many/file number 119.txt", 219, 64);
+    sparse_card_free(&card->sparse);
+}
+
+static void exfat_reads_at_offsets_cross_cluster_boundaries(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    uint8_t bytes[5000];
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    CHECK(fat_read(&card->volume, &file, 4000, bytes, 5000));
+    check_pattern(bytes, 5, 4000, 5000);
+    CHECK(fat_read(&card->volume, &file, 4095, bytes, 2));
+    check_pattern(bytes, 5, 4095, 2);
+    CHECK(!fat_read(&card->volume, &file, 19990, bytes, 11));
+    sparse_card_free(&card->sparse);
+}
+
+static void exfat_names_match_like_fat_names(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    check_file(card, "/readme.txt", 2, 100);
+    CHECK(fat_open(&card->volume, "/Music/Empty.wav", &file));
+    CHECK_EQUAL(0, file.size);
+    check_missing(card, "/Music/Nope.flac");
+    check_missing(card, "/Music");
+    check_missing(card, "/README.TXT/inside");
+    check_missing(card, "/Music/Sigur Ro\xcc\x81s/\xc3\x81g\xc3\xa6tis byrjun/01 Intro.flac");
+    check_missing(card, "/Many/file number 120.txt");
+    sparse_card_free(&card->sparse);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -242,6 +299,11 @@ int main(void)
         TEST_CASE(fat16_files_read_back_from_the_root_and_subfolders),
         TEST_CASE(a_blank_device_does_not_mount),
         TEST_CASE(a_folder_whose_clusters_loop_ends_the_search),
+        TEST_CASE(the_exfat_card_mounts_from_its_mbr_partition),
+        TEST_CASE(exfat_files_read_back_their_bytes),
+        TEST_CASE(an_exfat_folder_with_a_cluster_chain_is_searched_to_its_end),
+        TEST_CASE(exfat_reads_at_offsets_cross_cluster_boundaries),
+        TEST_CASE(exfat_names_match_like_fat_names),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
