@@ -68,8 +68,8 @@ typedef struct Msc {
     uint8_t lun;
     uint32_t lba;
     uint32_t sector_offset;
-    uint8_t sense_key;
-    uint8_t sense_code;
+    uint8_t sense_key[MSC_MAX_LUNS];
+    uint8_t sense_code[MSC_MAX_LUNS];
     uint8_t ejected;
     bool data_out;
     MscStats stats;

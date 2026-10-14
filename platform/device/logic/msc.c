@@ -111,7 +111,7 @@ static bool is_routine(uint8_t opcode)
 
 static void remember(Msc *msc)
 {
-    if (is_routine(msc->opcode)) {
+    if (msc->lun != 0 || is_routine(msc->opcode)) {
         return;
     }
     msc->history[msc->history_next] = (MscHistoryEntry){msc->opcode, msc->lun, msc->status};
@@ -128,8 +128,10 @@ bool msc_ejected(const Msc *msc, uint8_t lun)
 
 static void set_sense(Msc *msc, uint8_t key, uint8_t code)
 {
-    msc->sense_key = key;
-    msc->sense_code = code;
+    if (msc->lun < MSC_MAX_LUNS) {
+        msc->sense_key[msc->lun] = key;
+        msc->sense_code[msc->lun] = code;
+    }
     if (key != SENSE_NONE) {
         msc->status = STATUS_FAILED;
     }
@@ -174,11 +176,11 @@ static void request_sense(Msc *msc)
         msc->response[index] = 0;
     }
     msc->response[0] = 0x70;
-    msc->response[2] = msc->sense_key;
+    msc->response[2] = msc->sense_key[msc->lun];
     msc->response[7] = 10;
-    msc->response[12] = msc->sense_code;
-    msc->sense_key = SENSE_NONE;
-    msc->sense_code = 0;
+    msc->response[12] = msc->sense_code[msc->lun];
+    msc->sense_key[msc->lun] = SENSE_NONE;
+    msc->sense_code[msc->lun] = 0;
     respond(msc, 18);
 }
 

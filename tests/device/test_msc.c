@@ -119,10 +119,10 @@ static void check_csw(const Exchange *exchange, uint8_t status, uint32_t residue
     CHECK_EQUAL(status, exchange->csw[12]);
 }
 
-static Exchange *sense(Msc *msc)
+static Exchange *sense(Msc *msc, uint8_t lun)
 {
     static const uint8_t block[6] = {0x03, 0, 0, 0, 18, 0};
-    send_command(msc, 18, true, 0, block, 6);
+    send_command(msc, 18, true, lun, block, 6);
     return collect(msc);
 }
 
@@ -178,7 +178,7 @@ static void an_absent_lun_is_not_ready_with_medium_not_present(void)
     msc->luns[1].present = false;
     send_command(msc, 0, false, 1, block, 6);
     check_csw(collect(msc), 1, 0);
-    Exchange *exchange = sense(msc);
+    Exchange *exchange = sense(msc, 1);
     CHECK_EQUAL(0x70, exchange->data[0]);
     CHECK_EQUAL(0x02, exchange->data[2]);
     CHECK_EQUAL(0x3A, exchange->data[12]);
@@ -235,7 +235,7 @@ static void writing_a_read_only_lun_is_refused_without_changing_it(void)
     send_data(msc, bytes, sizeof bytes);
     check_csw(collect(msc), 1, 512);
     CHECK_EQUAL(before, read_only_disk.bytes[5 * 512]);
-    Exchange *exchange = sense(msc);
+    Exchange *exchange = sense(msc, 1);
     CHECK_EQUAL(0x07, exchange->data[2]);
     CHECK_EQUAL(0x27, exchange->data[12]);
 }
@@ -261,7 +261,7 @@ static void a_read_past_the_end_fails_with_an_out_of_range_sense(void)
     Exchange *exchange = collect(msc);
     CHECK_EQUAL(1024, exchange->length);
     check_csw(exchange, 1, 1024);
-    CHECK_EQUAL(0x21, sense(msc)->data[12]);
+    CHECK_EQUAL(0x21, sense(msc, 0)->data[12]);
 }
 
 static void an_unknown_command_fails_with_an_illegal_request(void)
@@ -272,7 +272,7 @@ static void an_unknown_command_fails_with_an_illegal_request(void)
     Exchange *exchange = collect(msc);
     CHECK_EQUAL(32, exchange->length);
     check_csw(exchange, 1, 32);
-    Exchange *sensed = sense(msc);
+    Exchange *sensed = sense(msc, 0);
     CHECK_EQUAL(0x05, sensed->data[2]);
     CHECK_EQUAL(0x20, sensed->data[12]);
 }
@@ -407,7 +407,7 @@ static void inquiry_for_a_vital_product_data_page_is_an_invalid_field(void)
     send_command(msc, 255, true, 0, block, 6);
     Exchange *exchange = collect(msc);
     check_csw(exchange, 1, 255);
-    Exchange *sensed = sense(msc);
+    Exchange *sensed = sense(msc, 0);
     CHECK_EQUAL(0x05, sensed->data[2]);
     CHECK_EQUAL(0x24, sensed->data[12]);
 }
@@ -426,14 +426,13 @@ static void history_keeps_the_last_commands_other_than_reads_writes_and_ready_ch
     collect(msc);
     send_command(msc, 512, true, 0, read, 10);
     collect(msc);
-    send_command(msc, 4, true, 1, mode, 6);
+    send_command(msc, 4, true, 0, mode, 6);
     collect(msc);
     MscHistory history = msc_history(msc);
     CHECK_EQUAL(2, history.count);
     CHECK_EQUAL(0x12, history.entries[0].opcode);
     CHECK_EQUAL(0, history.entries[0].status);
     CHECK_EQUAL(0x1A, history.entries[1].opcode);
-    CHECK_EQUAL(1, history.entries[1].lun);
 }
 
 static void history_holds_the_most_recent_entries(void)
@@ -451,6 +450,34 @@ static void history_holds_the_most_recent_entries(void)
     CHECK_EQUAL(MSC_HISTORY_CAPACITY, history.count);
     CHECK_EQUAL(0x12, history.entries[MSC_HISTORY_CAPACITY - 1].opcode);
     CHECK_EQUAL(0x1A, history.entries[0].opcode);
+}
+
+static void each_lun_keeps_its_own_sense(void)
+{
+    static const uint8_t ready[6] = {0x00};
+    Msc *msc = started();
+    msc->luns[1].present = false;
+    send_command(msc, 0, false, 1, ready, 6);
+    check_csw(collect(msc), 1, 0);
+    CHECK_EQUAL(0x00, sense(msc, 0)->data[2]);
+    CHECK_EQUAL(0x00, sense(msc, 0)->data[12]);
+    Exchange *absent = sense(msc, 1);
+    CHECK_EQUAL(0x02, absent->data[2]);
+    CHECK_EQUAL(0x3A, absent->data[12]);
+}
+
+static void history_records_only_the_first_lun(void)
+{
+    static const uint8_t sense_block[6] = {0x03, 0, 0, 0, 18, 0};
+    static const uint8_t inquiry[6] = {0x12, 0, 0, 0, 36, 0};
+    Msc *msc = started();
+    send_command(msc, 18, true, 1, sense_block, 6);
+    collect(msc);
+    send_command(msc, 36, true, 0, inquiry, 6);
+    collect(msc);
+    MscHistory history = msc_history(msc);
+    CHECK_EQUAL(1, history.count);
+    CHECK_EQUAL(0x12, history.entries[0].opcode);
 }
 
 int main(void)
@@ -479,6 +506,8 @@ int main(void)
         TEST_CASE(inquiry_for_a_vital_product_data_page_is_an_invalid_field),
         TEST_CASE(history_keeps_the_last_commands_other_than_reads_writes_and_ready_checks),
         TEST_CASE(history_holds_the_most_recent_entries),
+        TEST_CASE(each_lun_keeps_its_own_sense),
+        TEST_CASE(history_records_only_the_first_lun),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
