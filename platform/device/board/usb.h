@@ -10,7 +10,6 @@ typedef enum UsbConnectStep {
     USB_CONNECT_OK,
     USB_CONNECT_AHB_IDLE,
     USB_CONNECT_SOFT_RESET,
-    USB_CONNECT_FIFO_DEPTH,
     USB_CONNECT_FLUSH
 } UsbConnectStep;
 
@@ -20,6 +19,8 @@ typedef struct UsbProbe {
     uint32_t hardware_3;
     uint32_t hardware_4;
     uint32_t interrupts;
+    uint32_t rx_fifo_size;
+    uint32_t tx_fifo_size;
 } UsbProbe;
 
 typedef struct UsbPort {

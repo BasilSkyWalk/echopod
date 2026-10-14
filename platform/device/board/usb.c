@@ -80,6 +80,7 @@
 #define SHARED_MINIMUM_DEPTH 0x220u
 #define DEDICATED_MINIMUM_DEPTH 0x240u
 #define TX_SPACE_MASK 0xFFFFu
+#define TX_QUEUE_MASK 0x00FF0000u
 #define GRF_VBUS 0xE8u
 #define GRF_VBUS_PRESENT (1u << 1)
 #define INT_ALL 0xFFFFFFFFu
@@ -229,18 +230,18 @@ static UsbConnectStep reset_core(void)
     return USB_CONNECT_OK;
 }
 
-static bool size_fifos(UsbPort *port)
+static void size_fifos(UsbPort *port)
 {
     uint32_t depth = read_register(GHWCFG3) >> HWCFG3_DEPTH_SHIFT;
     port->dedicated_fifos = (read_register(GHWCFG4) & HWCFG4_DEDICATED_FIFOS) != 0;
-    write_register(GRXFSIZ, SHARED_RX_SIZE);
-    if (port->dedicated_fifos) {
+    if (port->dedicated_fifos && depth >= DEDICATED_MINIMUM_DEPTH) {
+        write_register(GRXFSIZ, SHARED_RX_SIZE);
         write_register(GNPTXFSIZ, DEDICATED_TX0_SIZE);
         write_register(DIEPTXF1, DEDICATED_TX1_SIZE);
-        return depth >= DEDICATED_MINIMUM_DEPTH;
+    } else if (!port->dedicated_fifos && depth >= SHARED_MINIMUM_DEPTH) {
+        write_register(GRXFSIZ, SHARED_RX_SIZE);
+        write_register(GNPTXFSIZ, SHARED_TX_SIZE);
     }
-    write_register(GNPTXFSIZ, SHARED_TX_SIZE);
-    return depth >= SHARED_MINIMUM_DEPTH;
 }
 
 static bool flush_fifos(void)
@@ -276,16 +277,15 @@ static UsbConnectStep prepare_core(UsbPort *port)
     if (step != USB_CONNECT_OK) {
         return step;
     }
-    if (!size_fifos(port)) {
-        return USB_CONNECT_FIFO_DEPTH;
-    }
+    size_fifos(port);
     return flush_fifos() ? USB_CONNECT_OK : USB_CONNECT_FLUSH;
 }
 
 UsbProbe usb_probe(void)
 {
-    return (UsbProbe){read_register(GSNPSID), read_register(GOTGCTL), read_register(GHWCFG3),
-                      read_register(GHWCFG4), read_register(GINTSTS)};
+    return (UsbProbe){read_register(GSNPSID),  read_register(GOTGCTL), read_register(GHWCFG3),
+                      read_register(GHWCFG4),  read_register(GINTSTS), read_register(GRXFSIZ),
+                      read_register(GNPTXFSIZ)};
 }
 
 bool usb_connect(UsbPort *port)
@@ -314,9 +314,12 @@ static void arm_bulk_out(void)
 
 static uint32_t tx_space(const UsbPort *port, uint32_t endpoint)
 {
-    uint32_t status = port->dedicated_fifos ? read_register(in_control(endpoint) + 0x18u)
-                                            : read_register(GNPTXSTS);
-    return status & TX_SPACE_MASK;
+    if (port->dedicated_fifos) {
+        return read_register(in_control(endpoint) + 0x18u) & TX_SPACE_MASK;
+    }
+    uint32_t status = read_register(GNPTXSTS);
+    bool queue_has_room = (status & TX_QUEUE_MASK) != 0;
+    return queue_has_room ? status & TX_SPACE_MASK : 0;
 }
 
 static bool send(const UsbPort *port, uint32_t endpoint, const uint8_t *bytes, uint32_t length)

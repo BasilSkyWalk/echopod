@@ -40,8 +40,11 @@ static void show(const char *title, const char *label_a, uint32_t value_a, const
 void usb_report_show(const UsbReport *report)
 {
     uint32_t step = (uint32_t)report->connect_step | (report->internal_ready ? 0x10u : 0u);
-    show("USB 1/3: no computer", "ID ", report->after_power_up.core_id, "OTG ",
+    show("USB 1/4: no computer", "ID ", report->after_power_up.core_id, "OTG ",
          report->after_power_up.otg_control);
-    show("USB 2/3", "STEP ", step, "CFG4 ", report->after_power_up.hardware_4);
-    show("USB 3/3", "INT ", report->after_wait.interrupts, "OTG ", report->after_wait.otg_control);
+    show("USB 2/4", "STEP ", step, "CFG3 ", report->after_power_up.hardware_3);
+    show("USB 3/4", "INT ", report->after_wait.interrupts, "CFG4 ",
+         report->after_power_up.hardware_4);
+    show("USB 4/4", "RXF ", report->after_wait.rx_fifo_size, "TXF ",
+         report->after_wait.tx_fifo_size);
 }
