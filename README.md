@@ -44,21 +44,28 @@ The indexer only reads the music folder. On the device, the database goes in `/.
 | `--headless` | No window |
 | `--screenshot FILE.bmp` | Save the last frame on exit |
 | `--card DIR` | Use DIR as the card root (read only) |
-| `--system-dir DIR` | Read `/.echo/` (the library database) from DIR |
+| `--system-dir DIR` | Read and write `/.echo/` (library database, resume, settings, favorites) in DIR |
+| `--battery N` | Report N % battery in the header (default 80) |
+| `--charging` | Report the battery as charging |
 | `--keys LIST` | Play a key script, e.g. `down,down,play,back:long` (`up`, `down`, `play`, `menu`, `back`, `power`, each optionally `:long`) |
 
 Headless runs use a virtual clock, so scripted screenshots are deterministic.
 
 ### Navigation
 
-| Button | In lists | On Now Playing |
-|---|---|---|
-| Volume up / down | Previous / next item (wraps on a single press, not while held) | Volume |
-| Play | Select (a song plays the list from that song) | Play / pause |
-| Menu | | Next track; hold for previous |
-| Back | Back; hold to go home | Back; hold to go home |
+| Button | In lists | On Now Playing | While seeking |
+|---|---|---|---|
+| Volume up / down | Previous / next item (wraps on a single press, not while held) | Volume | Back / forward 5 s per press, 15 s while held |
+| Play | Select (a song plays the list from that song); hold on an album to add or remove it from Favorites | Play / pause; hold to seek | Jump to the chosen time |
+| Menu | | Next track; hold for previous | |
+| Back | Back; hold to go home | Back; hold to go home | Cancel |
+| Power | Lock or unlock; hold to turn off | Same | Same |
 
-Settings has Shuffle (Off / Songs / Albums) and Repeat (Off / One / All). Playback resumes, paused, where it left off.
+The screen turns off after the screen timeout. Any key wakes it and does nothing else. While locked, only Power works.
+
+Settings: Shuffle (Off / Songs / Albums), Repeat (Off / One / All), Sleep timer, Screen timeout, Brightness, Gain, Output and Start screen. They're saved in `/.echo/settings.bin`, and favorites in `/.echo/favorites.bin`. Without `--system-dir` the simulator can't save, and says so. Playback resumes, paused, where it left off.
+
+Music → Playlists lists the M3U playlists the indexer found. Music → Favorites lists your favorite albums.
 
 ## Layout
 

@@ -9,25 +9,28 @@ platform/sim        platform/device (later)
         \                  /
          implement  hal  (interfaces only)
                      |
-                    app          composition root: theme, screens, player, main step
-              /   /   |     \      \
-            ui  fonts playback  hal
-             \   |      |
-              gfx    library
-                \      |
-                  core
+                    app          composition root: theme, screens, player, stores, main step
+           /     /       \        \
+         ui   fonts    settings   hal
+           \   /           |
+            gfx        playback
+              \            |
+               \        library
+                \         |
+                   core
 ```
 
 | Layer | Path | May depend on | Purpose |
 |---|---|---|---|
-| core | `src/core` | nothing | Pure logic: deadlines, key gestures, frame stats, UTF-8, string building, formatting; later the library, queue and settings |
+| core | `src/core` | nothing | Pure logic: deadlines, key gestures, frame stats, UTF-8, string building, formatting, hashing, seeded random, the power policy |
 | gfx | `src/gfx` | core | RGB565 colors and blending, rectangles, clipped canvases, strip rendering, 4-bit anti-aliased text |
 | fonts | `src/fonts` | gfx | Generated glyph tables (see Generated code) |
-| ui | `src/ui` | core, gfx | Screen interface and stack, navigation intents, list view, menus, messages, header, labels, marquee, theme type |
-| library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader and browse queries (see `docs/library-format.md`) |
+| ui | `src/ui` | core, gfx | Screen interface and stack, navigation intents, list view, menus, choice screens, messages, toasts, header and status icons, labels, marquee, theme type |
+| library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader, browse queries and the favorites set (see `docs/library-format.md`) |
 | playback | `src/playback` | core, library | Play queue (list order, songs shuffle, album shuffle, repeat, gapless look-ahead) and the resume file format |
-| hal | `src/hal` | core (types only) | Hardware interfaces: display, input, clock, files, audio, and later power |
-| app | `src/app` | core, gfx, fonts, ui, library, playback, hal | Default theme, screen tree, library store, player controller, browse and Now Playing screens, frame overlay, the main step |
+| settings | `src/settings` | core, playback | The settings values, their defaults and option tables, and the settings file format |
+| hal | `src/hal` | core (types only) | Hardware interfaces: display (with power and brightness), input, clock, files, audio (with gain and output), power (battery, power off) |
+| app | `src/app` | core, gfx, fonts, ui, library, playback, settings, hal | Default theme, screen tree, library, settings and favorites stores, player controller, browse, Settings and Now Playing screens, frame overlay, the main step |
 | platform | `platform/*` | app, hal, OS/SDK | Implements hal and owns `main()` |
 
 The CMake targets enforce these rules. Each module exposes only its own `include/<module>/` directory, and a module can only include headers from targets it links. Anything in a module's own directory, outside `include/`, is private.
@@ -37,6 +40,22 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 - A `Screen` is a title plus callbacks: `enter`, `handle_key`, `update` and `draw`. `handle_key` returns a `ScreenAction` (none, push, pop, or pop to root), and the app applies it to the `ScreenStack`. Screens never reach into the stack themselves.
 - Raw key transitions come from `hal`. `core/key_tracker` turns them into gestures (press, long press, repeat), and `ui/navigation` maps gestures to intents (previous, next, select, back, home). Remapping buttons is a change in one place.
 - Screen instances are static and owned by the app's `AppScreens`. There is no heap.
+- A long Play is `NAVIGATION_OPTIONS`. Lists hand it to their `hold` action; in browse lists it toggles an album's favorite.
+- Settings is a menu whose rows show their current value. Every row opens the same `ChoiceScreen`, re-initialized from a table of `SettingChoice` entries (title, options, current, choose), and the current option gets a ✓.
+
+## Power
+
+- `core/power_policy` decides what keys mean for power: Power locks or unlocks, a long Power asks for shutdown, any key wakes a screen that timed out and is then consumed, and a locked player ignores every other key. It also owns the screen timeout and the sleep timer.
+- The app runs each key event through the policy before the screen sees it. When the policy turns the display on or off, the app calls `hal_display_set_power` and stops rendering while the screen is off. Settings are saved each time the screen goes off.
+- Shutdown (long Power, or the sleep timer running out) saves the resume file and settings, turns the screen off and calls `hal_power_off()`. The simulator then quits; the device cuts power.
+
+## Settings and favorites
+
+- `app/settings_store` loads `/.echo/settings.bin` (defaults if it's missing or invalid), applies brightness, gain and output through the HAL, and only writes when the encoded bytes changed.
+- At start-up the saved volume, shuffle and repeat go to the player first, and then a valid resume file overrides them. The current volume, shuffle and repeat are copied back into the settings before every save.
+- The start screen setting pushes the matching path at start-up (for example Home → Music → Albums), so Back still leads home.
+- `app/favorites_store` loads and saves `/.echo/favorites.bin` and toggles albums by key. Music → Favorites is a browse screen over the Albums view that only shows the positions of favorite albums, collected in album order whenever it's entered or changed. Favorite albums show ★ before their year.
+- Toasts are app-owned. Screens get a pointer to the one `Toast` and show short messages such as "Added to Favorites". The app draws the toast on top of every screen.
 
 ## Library
 
@@ -54,7 +73,7 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 
 ## Rendering
 
-The panel keeps its own image memory, so we never hold a full framebuffer. The strip renderer clears a 320×34 buffer, asks the current screen to draw into it, pushes it to the display, and moves on to the next strip. Drawing uses screen coordinates and clips to the strip. Lists skip rows outside the strip, and glyphs outside the clip are culled. This saves ~85 KB of RAM compared with a full framebuffer.
+The panel keeps its own image memory, so we never hold a full framebuffer. The strip renderer clears a 320×34 buffer, asks the current screen to draw into it, pushes it to the display, and moves on to the next strip. After the screen, the app draws the status icons (play state on the left of the header, battery on the right, both inside the header insets), the toast and the frame overlay. Screens marked `full_screen` (the key test) get no status icons. Drawing uses screen coordinates and clips to the strip. Lists skip rows outside the strip, and glyphs outside the clip are culled. This saves ~85 KB of RAM compared with a full framebuffer.
 
 ## Generated code
 
@@ -123,12 +142,19 @@ Host builds run under UndefinedBehaviorSanitizer. AddressSanitizer is opt-in (`E
 
 ## Simulator storage
 
-`--card DIR` maps the card root `/` to a host folder, which is only ever read. `--system-dir DIR` maps `/.echo/` to a separate folder, so the database and resume file can live in `build/` without touching your music folder. Writes are refused outside `--system-dir`:
+`--card DIR` maps the card root `/` to a host folder, which is only ever read. `--system-dir DIR` maps `/.echo/` to a separate folder, so the database, resume file, settings and favorites can live in `build/` without touching your music folder. Writes are refused outside `--system-dir`:
 
 ```sh
 .venv/bin/python tools/library_index.py --music ~/Music --output build/library/library.db
 build/dev/platform/sim/echo_sim --card ~/Music --system-dir build/library
 ```
+
+## Simulator power and display
+
+- `hal_display_set_power(false)` blanks the window. Brightness dims the window (level 1 is about a quarter of full), but screenshots hold the undimmed panel.
+- The battery is fixed: 80 % by default, or `--battery N` and `--charging`.
+- Gain and output are stored but don't change the sound.
+- `hal_power_off()` ends the run loop, and the simulator exits normally.
 
 ## Simulator automation
 
