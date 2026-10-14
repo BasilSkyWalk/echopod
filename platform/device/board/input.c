@@ -66,3 +66,15 @@ bool hal_input_next_transition(HalKeyTransition *transition)
     board_input_poll();
     return key_scanner_next(&scanner, transition);
 }
+
+void board_wait_for_key(void)
+{
+    HalKeyTransition transition;
+    while (hal_input_next_transition(&transition)) {
+    }
+    for (;;) {
+        if (hal_input_next_transition(&transition) && transition.pressed) {
+            return;
+        }
+    }
+}

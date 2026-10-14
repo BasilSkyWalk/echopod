@@ -4,6 +4,7 @@
 #include "board.h"
 #include "update.h"
 #include "usb.h"
+#include "usb_report.h"
 #include "usb_session.h"
 
 static bool usb_handled;
@@ -16,6 +17,8 @@ static void check_usb(void)
         UsbSessionEnd end = usb_session_run();
         if (end == USB_SESSION_EJECTED || end == USB_SESSION_UNPLUGGED) {
             update_after_usb();
+        } else {
+            usb_report_show(usb_session_report());
         }
         app_wake();
     } else if (!vbus) {

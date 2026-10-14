@@ -3,11 +3,11 @@
 #include <stddef.h>
 
 #include "app/app.h"
+#include "board.h"
 #include "core/string_builder.h"
 #include "device/fat.h"
 #include "device/updater.h"
 #include "emmc.h"
-#include "hal/input.h"
 
 enum {
     MESSAGE_CAPACITY = 64,
@@ -47,18 +47,6 @@ static void report(void *context, uint32_t done, uint32_t total)
     }
 }
 
-static void wait_for_key(void)
-{
-    HalKeyTransition transition;
-    while (hal_input_next_transition(&transition)) {
-    }
-    for (;;) {
-        if (hal_input_next_transition(&transition) && transition.pressed) {
-            return;
-        }
-    }
-}
-
 static bool open_update(UpdateStorage *storage)
 {
     EmmcInfo info;
@@ -82,7 +70,7 @@ static void install(const UpdateFile *update, const UpdateStorage *storage)
     } else {
         app_show_notice("Update failed", "Copy HIFIEC90.IMG again and retry before turning off.");
     }
-    wait_for_key();
+    board_wait_for_key();
 }
 
 void update_after_usb(void)
@@ -99,6 +87,6 @@ void update_after_usb(void)
     } else if (check == UPDATE_INVALID) {
         app_show_notice("Update not installed",
                         "HIFIEC90.IMG isn't a valid image for this player.");
-        wait_for_key();
+        board_wait_for_key();
     }
 }

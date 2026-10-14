@@ -9,6 +9,7 @@
 #include "registers.h"
 
 #define USB_BASE 0x60080000u
+#define GOTGCTL 0x000u
 #define GOTGINT 0x004u
 #define GAHBCFG 0x008u
 #define GRSTCTL 0x010u
@@ -18,6 +19,7 @@
 #define GRXFSIZ 0x024u
 #define GNPTXFSIZ 0x028u
 #define GNPTXSTS 0x02Cu
+#define GSNPSID 0x040u
 #define GHWCFG3 0x04Cu
 #define GHWCFG4 0x050u
 #define DIEPTXF1 0x104u
@@ -206,25 +208,25 @@ void usb_power_down(void)
     cru_gate(GATE_USB_B, false);
 }
 
-static bool reset_core(void)
+static UsbConnectStep reset_core(void)
 {
     set_bits(DCTL, DCTL_SOFT_DISCONNECT);
     uint32_t start = hal_clock_milliseconds();
     while ((read_register(GRSTCTL) & GRSTCTL_AHB_IDLE) == 0) {
         if (hal_clock_milliseconds() - start > RESET_TIMEOUT_MS) {
-            return false;
+            return USB_CONNECT_AHB_IDLE;
         }
     }
     write_register(GRSTCTL, GRSTCTL_SOFT_RESET);
     if (!wait_clear(GRSTCTL, GRSTCTL_SOFT_RESET, RESET_TIMEOUT_MS)) {
-        return false;
+        return USB_CONNECT_SOFT_RESET;
     }
     write_register(PCGCCTL, 0xF);
     board_delay_ms(CLOCK_GATE_MS);
     write_register(PCGCCTL, 0);
     set_bits(GAHBCFG, GAHBCFG_TX_EMPTY_LEVEL);
     write_register(DCFG, (read_register(DCFG) & ~DCFG_CLEARED_BITS) | DCFG_FULL_SPEED);
-    return true;
+    return USB_CONNECT_OK;
 }
 
 static bool size_fifos(UsbPort *port)
@@ -268,9 +270,28 @@ static void reset_endpoint_zero(void)
     write_register(GINTMSK, GINTMSK_VALUE);
 }
 
+static UsbConnectStep prepare_core(UsbPort *port)
+{
+    UsbConnectStep step = reset_core();
+    if (step != USB_CONNECT_OK) {
+        return step;
+    }
+    if (!size_fifos(port)) {
+        return USB_CONNECT_FIFO_DEPTH;
+    }
+    return flush_fifos() ? USB_CONNECT_OK : USB_CONNECT_FLUSH;
+}
+
+UsbProbe usb_probe(void)
+{
+    return (UsbProbe){read_register(GSNPSID), read_register(GOTGCTL), read_register(GHWCFG3),
+                      read_register(GHWCFG4), read_register(GINTSTS)};
+}
+
 bool usb_connect(UsbPort *port)
 {
-    if (!reset_core() || !size_fifos(port) || !flush_fifos()) {
+    port->connect_step = prepare_core(port);
+    if (port->connect_step != USB_CONNECT_OK) {
         return false;
     }
     reset_endpoint_zero();

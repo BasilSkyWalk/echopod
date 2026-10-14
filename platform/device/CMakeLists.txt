@@ -15,6 +15,7 @@ add_executable(echo_device
     board/storage.c
     board/update.c
     board/usb.c
+    board/usb_report.c
     board/usb_session.c
 )
 set(ECHO_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/echo_device.ld)

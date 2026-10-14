@@ -19,6 +19,7 @@ enum {
 };
 
 static EmmcInfo internal;
+static UsbReport report;
 static UsbPort port;
 static Msc msc;
 
@@ -50,6 +51,7 @@ static void prepare_luns(void)
          internal_ready, "Internal storage"},
         {sd_read, card_write, NULL, sd_sector_count(), false, card_ready, "SD card"},
     };
+    report.internal_ready = internal_ready;
     msc_init(&msc, luns, LUN_COUNT);
     char serial[SERIAL_DIGITS + 1];
     serial_text(internal.serial, serial);
@@ -80,8 +82,11 @@ static UsbSessionEnd serve(void)
 
 UsbSessionEnd usb_session_run(void)
 {
+    app_show_notice("USB", "Cable detected. Starting...");
+    report = (UsbReport){.internal_ready = false};
     prepare_luns();
     usb_power_up();
+    report.after_power_up = usb_probe();
     UsbSessionEnd end = USB_SESSION_FAILED;
     if (usb_connect(&port)) {
         end = USB_SESSION_NO_HOST;
@@ -90,6 +95,13 @@ UsbSessionEnd usb_session_run(void)
             end = serve();
         }
     }
+    report.connect_step = port.connect_step;
+    report.after_wait = usb_probe();
     usb_power_down();
     return end;
+}
+
+const UsbReport *usb_session_report(void)
+{
+    return &report;
 }

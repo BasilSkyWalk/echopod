@@ -6,7 +6,24 @@
 #include "device/msc.h"
 #include "device/usb_device.h"
 
+typedef enum UsbConnectStep {
+    USB_CONNECT_OK,
+    USB_CONNECT_AHB_IDLE,
+    USB_CONNECT_SOFT_RESET,
+    USB_CONNECT_FIFO_DEPTH,
+    USB_CONNECT_FLUSH
+} UsbConnectStep;
+
+typedef struct UsbProbe {
+    uint32_t core_id;
+    uint32_t otg_control;
+    uint32_t hardware_3;
+    uint32_t hardware_4;
+    uint32_t interrupts;
+} UsbProbe;
+
 typedef struct UsbPort {
+    UsbConnectStep connect_step;
     bool dedicated_fifos;
     bool configured;
     bool in_busy;
@@ -23,4 +40,5 @@ void usb_power_down(void);
 bool usb_connect(UsbPort *port);
 bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms);
 void usb_poll(UsbPort *port);
+UsbProbe usb_probe(void);
 bool usb_reply_pending(const UsbPort *port);
