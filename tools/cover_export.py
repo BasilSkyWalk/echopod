@@ -62,8 +62,11 @@ def cover_pixels(image, size):
 
 
 def embedded_pictures(path):
-    from mutagen import File
-    audio = File(path)
+    from mutagen import File, MutagenError
+    try:
+        audio = File(path)
+    except (MutagenError, OSError):
+        return []
     if audio is None:
         return []
     pictures = [(picture.type, picture.data) for picture in getattr(audio, "pictures", [])]
@@ -74,7 +77,10 @@ def embedded_pictures(path):
 
 
 def folder_image(folder):
-    candidates = sorted(path for path in folder.iterdir() if path.is_file())
+    try:
+        candidates = sorted(path for path in folder.iterdir() if path.is_file())
+    except OSError:
+        return None
     for stem in FOLDER_IMAGE_STEMS:
         for path in candidates:
             if path.stem.lower() == stem and path.suffix.lower() in FOLDER_IMAGE_SUFFIXES:
@@ -83,14 +89,14 @@ def folder_image(folder):
 
 
 def find_art(root, relative_paths):
-    fallback = None
-    for relative in relative_paths:
-        for picture_type, data in embedded_pictures(root / relative):
-            if picture_type == FRONT_COVER:
-                return data
-            fallback = data if fallback is None else fallback
-    if fallback is not None:
-        return fallback
+    if not relative_paths:
+        return None
+    pictures = embedded_pictures(root / relative_paths[0])
+    for picture_type, data in pictures:
+        if picture_type == FRONT_COVER:
+            return data
+    if pictures:
+        return pictures[0][1]
     for folder in dict.fromkeys((root / relative).parent for relative in relative_paths):
         data = folder_image(folder)
         if data is not None:
@@ -105,6 +111,39 @@ def album_sources(model):
         sources.append(AlbumSource(album_key(artist, album.title), album.title, artist))
     for track, album_index in zip(model.tracks, model.track_albums):
         sources[album_index].paths.append(track.path)
+    return sources
+
+
+def string_at(data, strings_offset, offset):
+    start = strings_offset + offset
+    return data[start:data.index(b"\x00", start)].decode("utf-8")
+
+
+def section(data, index):
+    entry = library_index.SECTION_ENTRY.unpack_from(data, 8 + index * library_index.SECTION_ENTRY.size)
+    return entry[0], entry[1]
+
+
+def album_sources_from_library(data):
+    if data[:4] != b"EMDB":
+        raise ValueError("not an Echo Mini library")
+    tracks_offset, track_count = section(data, 0)
+    albums_offset, album_count = section(data, 1)
+    album_artists_offset, _ = section(data, 3)
+    strings_offset, _ = section(data, 9)
+    paths = [string_at(data, strings_offset,
+                       library_index.TRACK_RECORD.unpack_from(
+                           data, tracks_offset + index * library_index.TRACK_RECORD.size)[1])
+             for index in range(track_count)]
+    sources = []
+    for index in range(album_count):
+        title, album_artist, _, _, first, count, _ = library_index.ALBUM_RECORD.unpack_from(
+            data, albums_offset + index * library_index.ALBUM_RECORD.size)
+        name = library_index.GROUP_RECORD.unpack_from(
+            data, album_artists_offset + album_artist * library_index.GROUP_RECORD.size)[0]
+        artist = string_at(data, strings_offset, name)
+        album = string_at(data, strings_offset, title)
+        sources.append(AlbumSource(album_key(artist, album), album, artist, paths[first:first + count]))
     return sources
 
 
@@ -150,20 +189,29 @@ def collect_images(root, sources):
     return images, missing
 
 
-def parse_arguments():
+def parse_arguments(argv):
     parser = argparse.ArgumentParser(description="Export album covers for the Echo Mini")
     parser.add_argument("--music", type=Path, required=True, help="music root (read only)")
+    parser.add_argument("--library", type=Path,
+                        help="an existing library.db for this music root, to skip the tag scan")
     parser.add_argument("--output", type=Path, required=True, help="covers.bin to write")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    arguments = parse_arguments()
-    root = arguments.music.resolve()
+def scanned_sources(root):
     tracks, playlists, failures = library_index.scan(root)
     for failure in failures:
         print(f"skipped {failure}", file=sys.stderr)
-    sources = album_sources(library_index.build_library(tracks, playlists))
+    return album_sources(library_index.build_library(tracks, playlists))
+
+
+def main(argv=None):
+    arguments = parse_arguments(argv)
+    root = arguments.music.resolve()
+    if arguments.library is not None:
+        sources = album_sources_from_library(arguments.library.read_bytes())
+    else:
+        sources = scanned_sources(root)
     images, missing = collect_images(root, sources)
     for album in missing:
         print(f"no cover: {album}", file=sys.stderr)

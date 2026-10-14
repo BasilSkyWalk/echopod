@@ -98,6 +98,19 @@ class ArtSearchTest(unittest.TestCase):
     def test_an_album_without_art_has_none(self):
         self.assertIsNone(self.found_color())
 
+    def test_only_the_first_track_is_read(self):
+        second = self.album / "02 - Other.flac"
+        write_silent_flac(second, 1)
+        add_picture(second, image_bytes((255, 0, 0)), 3)
+        data = cover_export.find_art(self.root, ["Artist/Album/01 - Song.flac",
+                                                 "Artist/Album/02 - Other.flac"])
+        self.assertIsNone(data)
+
+    def test_a_missing_track_counts_as_no_art(self):
+        (self.album / "Folder.JPG").write_bytes(image_bytes((0, 0, 255), image_format="JPEG"))
+        data = cover_export.find_art(self.root, ["Artist/Album/missing.flac"])
+        self.assertIsNotNone(data)
+
 
 class EncodeCoversTest(unittest.TestCase):
     def test_the_header_and_index_describe_sorted_records(self):
@@ -126,6 +139,35 @@ class AlbumCoversTest(unittest.TestCase):
         artist = model.album_artists[first.album_artist].name
         self.assertEqual(cover_export.album_key(artist, first.title), albums[0].key)
         self.assertIn("AC DC/Back In Black/1-01 - Hells Bells.flac", albums[0].paths)
+
+
+class LibraryFileSourcesTest(unittest.TestCase):
+    def test_sources_read_from_a_library_file_match_the_scanned_ones(self):
+        model = library_index.build_library(FIXTURE_TRACKS)
+        data = library_index.encode_library(model)
+        self.assertEqual(cover_export.album_sources(model),
+                         cover_export.album_sources_from_library(data))
+
+    def test_a_file_that_is_not_a_library_is_refused(self):
+        with self.assertRaises(ValueError):
+            cover_export.album_sources_from_library(b"NOPE" + bytes(200))
+
+    def test_the_command_uses_the_library_file_instead_of_scanning(self):
+        model = library_index.build_library(FIXTURE_TRACKS)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            library = root / "library.db"
+            library.write_bytes(library_index.encode_library(model))
+            output = root / "covers.bin"
+            original = library_index.scan
+            library_index.scan = lambda *_: self.fail("scanned the music again")
+            try:
+                status = cover_export.main(["--music", str(root), "--library", str(library),
+                                            "--output", str(output)])
+            finally:
+                library_index.scan = original
+            self.assertEqual(0, status)
+            self.assertEqual(b"EMCV", output.read_bytes()[:4])
 
 
 if __name__ == "__main__":
