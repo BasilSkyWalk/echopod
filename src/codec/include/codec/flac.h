@@ -27,6 +27,7 @@ typedef struct FlacInfo {
     uint32_t sample_rate;
     uint8_t channels;
     uint8_t bits_per_sample;
+    uint16_t min_block;
     uint16_t max_block;
     uint32_t total_samples;
 } FlacInfo;
@@ -50,9 +51,11 @@ typedef struct FlacDecoder {
     uint32_t audio_offset;
     uint32_t decoded_samples;
     uint32_t block_samples;
+    uint32_t frame_first_sample;
     int32_t samples[FLAC_MAX_CHANNELS][FLAC_MAX_BLOCK];
 } FlacDecoder;
 
 FlacResult flac_open(FlacDecoder *decoder, FlacInput input);
 FlacResult flac_decode_frame(FlacDecoder *decoder);
+FlacResult flac_seek(FlacDecoder *decoder, uint32_t sample);
 const int32_t *flac_channel(const FlacDecoder *decoder, int channel);

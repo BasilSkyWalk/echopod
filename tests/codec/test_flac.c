@@ -32,9 +32,12 @@ static Buffer load(const char *name, const char *extension)
     return buffer;
 }
 
+static uint32_t bytes_read;
+
 static bool read_memory(void *context, uint32_t offset, void *destination, uint32_t length)
 {
     const Buffer *buffer = context;
+    bytes_read += length;
     if (offset > buffer->size || length > buffer->size - offset) {
         return false;
     }
@@ -156,6 +159,82 @@ static void a_corrupted_frame_is_caught(void)
     free(flac.bytes);
 }
 
+static bool seeks_to(const char *name, uint32_t target)
+{
+    Buffer flac = load(name, "flac");
+    Buffer pcm = load(name, "pcm");
+    bool ok = flac_open(&decoder, input_of(&flac)) == FLAC_OK &&
+              flac_seek(&decoder, target) == FLAC_OK && flac_decode_frame(&decoder) == FLAC_OK;
+    uint32_t first = decoder.frame_first_sample;
+    ok = ok && first <= target && target < first + decoder.block_samples;
+    int channels = decoder.info.channels;
+    for (uint32_t sample = 0; ok && sample < decoder.block_samples; sample++) {
+        for (int channel = 0; ok && channel < channels; channel++) {
+            uint32_t index = (first + sample) * (uint32_t)channels + (uint32_t)channel;
+            ok = flac_channel(&decoder, channel)[sample] == expected_at(&pcm, index);
+        }
+    }
+    free(flac.bytes);
+    free(pcm.bytes);
+    return ok;
+}
+
+static void seeking_lands_on_the_frame_that_holds_the_target(void)
+{
+    CHECK(seeks_to("lpc_16_44k_stereo", 0));
+    CHECK(seeks_to("lpc_16_44k_stereo", 4095));
+    CHECK(seeks_to("lpc_16_44k_stereo", 4096));
+    CHECK(seeks_to("lpc_16_44k_stereo", 5999));
+    CHECK(seeks_to("lpc_24_96k_stereo", 2500));
+    CHECK(seeks_to("odd_blocks_16", 1152));
+    CHECK(seeks_to("odd_blocks_16", 3000));
+    CHECK(seeks_to("constant_and_noise", 7777));
+}
+
+static void decoding_carries_on_after_a_seek(void)
+{
+    Buffer flac = load("odd_blocks_16", "flac");
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(FLAC_OK, flac_seek(&decoder, 1500));
+    uint32_t total = 0;
+    FlacResult result;
+    while ((result = flac_decode_frame(&decoder)) == FLAC_OK) {
+        total += decoder.block_samples;
+    }
+    CHECK_EQUAL(FLAC_END, result);
+    CHECK_EQUAL(3001u - 1152u, total);
+    free(flac.bytes);
+}
+
+static void seeking_past_the_end_is_refused(void)
+{
+    Buffer flac = load("odd_blocks_16", "flac");
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(FLAC_END, flac_seek(&decoder, 3001));
+    free(flac.bytes);
+}
+
+static void frames_report_their_first_sample(void)
+{
+    Buffer flac = load("odd_blocks_16", "flac");
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+    CHECK_EQUAL(0u, decoder.frame_first_sample);
+    CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+    CHECK_EQUAL(1152u, decoder.frame_first_sample);
+    free(flac.bytes);
+}
+
+static void a_seek_reads_little_of_the_file(void)
+{
+    Buffer flac = load("lpc_24_96k_stereo", "flac");
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    bytes_read = 0;
+    CHECK_EQUAL(FLAC_OK, flac_seek(&decoder, 4500));
+    CHECK(bytes_read < 64 * 1024);
+    free(flac.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -170,6 +249,11 @@ int main(void)
         TEST_CASE(a_file_that_is_not_flac_is_refused),
         TEST_CASE(a_truncated_file_ends_with_an_error),
         TEST_CASE(a_corrupted_frame_is_caught),
+        TEST_CASE(frames_report_their_first_sample),
+        TEST_CASE(seeking_lands_on_the_frame_that_holds_the_target),
+        TEST_CASE(decoding_carries_on_after_a_seek),
+        TEST_CASE(seeking_past_the_end_is_refused),
+        TEST_CASE(a_seek_reads_little_of_the_file),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -18,7 +18,11 @@ enum {
     CHANNEL_SIDE_RIGHT = 9,
     CHANNEL_MID_SIDE = 10,
     RICE_ESCAPE_4 = 15,
-    RICE_ESCAPE_5 = 31
+    RICE_ESCAPE_5 = 31,
+    SEEK_LINEAR_BYTES = 16384,
+    SYNC_FIRST_BYTE = 0xFF,
+    SYNC_SECOND_MASK = 0xFE,
+    SYNC_SECOND_BYTE = 0xF8
 };
 
 typedef enum Subframe {
@@ -30,6 +34,7 @@ typedef enum Subframe {
 } Subframe;
 
 typedef struct FrameHeader {
+    uint32_t first_sample;
     uint32_t block_size;
     uint32_t bits_per_sample;
     uint32_t channel_assignment;
@@ -61,7 +66,7 @@ static uint32_t id3_size(FlacDecoder *decoder)
 static FlacResult read_streaminfo(FlacDecoder *decoder)
 {
     FlacInfo *info = &decoder->info;
-    read(decoder, 16);
+    info->min_block = (uint16_t)read(decoder, 16);
     info->max_block = (uint16_t)read(decoder, 16);
     read(decoder, 24);
     read(decoder, 24);
@@ -114,6 +119,7 @@ FlacResult flac_open(FlacDecoder *decoder, FlacInput input)
     decoder->info = (FlacInfo){0};
     decoder->decoded_samples = 0;
     decoder->block_samples = 0;
+    decoder->frame_first_sample = 0;
     flac_bits_start(&decoder->bits, input, 0);
     uint32_t start = id3_size(decoder);
     flac_bits_start(&decoder->bits, input, start);
@@ -123,7 +129,7 @@ FlacResult flac_open(FlacDecoder *decoder, FlacInput input)
     return read_metadata(decoder);
 }
 
-static bool skip_coded_number(FlacDecoder *decoder)
+static bool read_coded_number(FlacDecoder *decoder, uint64_t *number)
 {
     uint32_t first = read(decoder, 8);
     int extra = 0;
@@ -133,12 +139,21 @@ static bool skip_coded_number(FlacDecoder *decoder)
     if (extra == 1 || extra == 7) {
         return false;
     }
+    uint64_t value = extra == 0 ? first : first & (0x7Fu >> extra);
     for (int index = 1; index < extra; index++) {
-        if ((read(decoder, 8) & 0xC0u) != 0x80u) {
+        uint32_t next = read(decoder, 8);
+        if ((next & 0xC0u) != 0x80u) {
             return false;
         }
+        value = value << 6 | (next & 0x3Fu);
     }
+    *number = value;
     return true;
+}
+
+static uint32_t fixed_block_size(const FlacInfo *info)
+{
+    return info->min_block == info->max_block ? info->min_block : info->max_block;
 }
 
 static uint32_t block_size_of(FlacDecoder *decoder, uint32_t code)
@@ -176,14 +191,20 @@ static bool read_frame_header(FlacDecoder *decoder, FrameHeader *header)
     if (read(decoder, 14) != FRAME_SYNC || read(decoder, 1) != 0) {
         return false;
     }
-    read(decoder, 1);
+    bool variable = read(decoder, 1) != 0;
     uint32_t block_code = read(decoder, 4);
     uint32_t rate_code = read(decoder, 4);
     header->channel_assignment = read(decoder, 4);
     uint32_t size_code = read(decoder, 3);
-    if (read(decoder, 1) != 0 || rate_code == 15 || !skip_coded_number(decoder)) {
+    uint64_t number = 0;
+    if (read(decoder, 1) != 0 || rate_code == 15 || !read_coded_number(decoder, &number)) {
         return false;
     }
+    uint64_t first = variable ? number : number * fixed_block_size(&decoder->info);
+    if (first > UINT32_MAX) {
+        return false;
+    }
+    header->first_sample = (uint32_t)first;
     header->block_size = block_size_of(decoder, block_code);
     skip_sample_rate(decoder, rate_code);
     uint8_t expected_crc = decoder->bits.crc8;
@@ -440,11 +461,97 @@ FlacResult flac_decode_frame(FlacDecoder *decoder)
     }
     decorrelate(decoder, &header);
     decoder->block_samples = header.block_size;
-    decoder->decoded_samples += header.block_size;
+    decoder->frame_first_sample = header.first_sample;
+    decoder->decoded_samples = header.first_sample + header.block_size;
     return FLAC_OK;
 }
 
 const int32_t *flac_channel(const FlacDecoder *decoder, int channel)
 {
     return decoder->samples[channel];
+}
+
+static bool frame_at(FlacDecoder *decoder, uint32_t offset, FrameHeader *header)
+{
+    flac_bits_start(&decoder->bits, decoder->bits.input, offset);
+    return read_frame_header(decoder, header);
+}
+
+static bool is_sync(const uint8_t *bytes)
+{
+    return bytes[0] == SYNC_FIRST_BYTE && (bytes[1] & SYNC_SECOND_MASK) == SYNC_SECOND_BYTE;
+}
+
+static uint32_t find_sync(FlacDecoder *decoder, uint32_t from, uint32_t limit)
+{
+    uint8_t *chunk = decoder->bits.buffer;
+    uint32_t size = decoder->bits.input.size;
+    while (from + 1 < limit && from + 1 < size) {
+        uint32_t end = limit < size ? limit : size;
+        uint32_t length = end - from < FLAC_BUFFER_BYTES ? end - from : FLAC_BUFFER_BYTES;
+        if (length < 2 ||
+            !decoder->bits.input.read(decoder->bits.input.context, from, chunk, length)) {
+            return limit;
+        }
+        for (uint32_t index = 0; index + 1 < length; index++) {
+            if (is_sync(&chunk[index])) {
+                return from + index;
+            }
+        }
+        from += length - 1;
+    }
+    return limit;
+}
+
+static bool next_frame(FlacDecoder *decoder, uint32_t from, uint32_t limit, uint32_t *offset,
+                       FrameHeader *header)
+{
+    uint32_t candidate = find_sync(decoder, from, limit);
+    while (candidate < limit) {
+        if (frame_at(decoder, candidate, header)) {
+            *offset = candidate;
+            return true;
+        }
+        candidate = find_sync(decoder, candidate + 1, limit);
+    }
+    return false;
+}
+
+FlacResult flac_seek(FlacDecoder *decoder, uint32_t sample)
+{
+    uint32_t size = decoder->bits.input.size;
+    if (decoder->info.total_samples > 0 && sample >= decoder->info.total_samples) {
+        return FLAC_END;
+    }
+    FrameHeader header;
+    uint32_t best = decoder->audio_offset;
+    if (!frame_at(decoder, best, &header)) {
+        return FLAC_ERROR;
+    }
+    uint32_t low = best;
+    uint32_t high = size;
+    while (high - low > SEEK_LINEAR_BYTES) {
+        uint32_t middle = low + (high - low) / 2;
+        uint32_t found = 0;
+        if (!next_frame(decoder, middle, high, &found, &header) || header.first_sample > sample) {
+            high = middle;
+            continue;
+        }
+        best = found;
+        low = found;
+    }
+    for (;;) {
+        uint32_t found = 0;
+        if (!frame_at(decoder, best, &header)) {
+            return FLAC_ERROR;
+        }
+        if (sample < header.first_sample + header.block_size ||
+            !next_frame(decoder, best + 1, size, &found, &header) || header.first_sample > sample) {
+            break;
+        }
+        best = found;
+    }
+    flac_bits_start(&decoder->bits, decoder->bits.input, best);
+    decoder->decoded_samples = 0;
+    return FLAC_OK;
 }
