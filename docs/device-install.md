@@ -1,48 +1,61 @@
-# Installing our firmware (Phase 3a)
+# Installing our firmware
 
-Only do this after the recovery write test in `docs/device-recovery.md` has passed on the player. It passed on the test unit on 2026-10-14. If anything goes wrong, that same procedure puts stock 3.7.0 back.
+Recovery has been confirmed on the test unit (`docs/device-recovery.md`): maskrom can write the stock 3.7.0 image back. Every route below falls back to that.
 
-## First install: through the stock updater
+## First install: a direct maskrom write
 
-This is the route ReChord used (`docs/device-facts.md` 2.1). It needs the player on stock 3.7.0.
+On the test unit the stock 3.7.0 updater shows "Updating" for under a second, deletes the file and keeps stock. It did this for our image, for RECHO 0.9.2, and even for FiiO's own image. So the first install writes our image straight into both firmware slots. Each slot holds the image's first `0x500000` bytes (`docs/device-facts.md` 2.2). On this unit rockusb LBA = raw − `0x2000`, so slot 1 is rockusb 0 and slot 2 is rockusb `0x11000` = 69632 (2.3.1).
 
-1. Build the image: `cmake --preset device && cmake --build --preset device` writes `build/device/HIFIEC90.IMG`. The `device_image_passes_the_updater_check` test confirms it's well formed.
-2. Remove the microSD card from the player.
-3. Plug the player in normally. The ECHO MINI drive should appear on the Mac. If it doesn't, check that the player's USB mode is set to storage, not DAC or charging only.
-4. Copy the image to the root of the drive, without macOS's extra `._` file, then eject:
+1. Build: `cmake --preset device && cmake --build --preset device`. Then cut the slot contents:
 
    ```sh
-   cp -X build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/"
-   dot_clean -m "/Volumes/ECHO MINI"
-   ls -la "/Volumes/ECHO MINI"
-   diskutil eject "/Volumes/ECHO MINI"
+   head -c 5242880 build/device/HIFIEC90.IMG > build/device/slot.bin
    ```
 
-   The listing should show `HIFIEC90.IMG` (5,242,884 bytes) and no other `.IMG` file.
-5. Unplug and restart the player. The stock updater runs at start-up and installs the image.
-6. If the stock screen comes back afterwards, or the screen stays black, turn the player off and on once more. A cold start runs the new image.
+2. Enter maskrom: unplug, press RST, hold every button except Power, plug in, then let go after 2–3 s.
+3. Write slot 2, then slot 1, and read both back:
 
-## What to check
+   ```sh
+   cd external/rkdeveloptool
+   ./rkdeveloptool ld && ./rkdeveloptool td
+   ./rkdeveloptool wl 69632 ../../build/device/slot.bin
+   ./rkdeveloptool wl 0 ../../build/device/slot.bin
+   ./rkdeveloptool rl 0 1 /tmp/s1.bin && ./rkdeveloptool rl 69632 1 /tmp/s2.bin
+   ```
 
-- **Home screen:** "Echo Mini" with Music, Now Playing, Settings and Diagnostics. Without a card, the music lists say "No library".
-- **Keys:** open Diagnostics → Key test and press every key. Note which end of the volume rocker shows as up and which as down.
-- **Navigation:** the volume rocker moves, ▶‖ selects, ↩ goes back, and holding ↩ goes home.
-- **Power:** a short press turns the screen off and on, and a long press turns the player off.
-- **USB:** plug into the Mac. The player shows a "USB" notice, and an "Internal storage" drive appears. Ejecting that drive returns the player to the menu.
-
-## If something goes wrong
-
-| Symptom | Meaning | Next step |
-|---|---|---|
-| The screen stays black, but the Internal storage drive appears over USB | Our firmware runs; the panel is probably variant A | Tell me. The next image goes in over USB, with no maskrom |
-| The screen stays black and nothing appears over USB | It didn't boot | Maskrom recovery (`docs/device-recovery.md`, "Recovery write test"), then tell me |
-| The screen shows garbage or wrong colours | The panel init or window is off | Note what you see, then recover as above |
-| Keys do nothing | The ADC or key ladder differs on this unit | Plug in USB to check that it's alive, then recover |
+   Both read-backs must equal the first 512 bytes of `slot.bin`.
+4. `./rkdeveloptool rd`. The player starts our firmware.
 
 ## Later updates: our own updater
 
-1. Plug in. The player shows "USB", and the Internal storage drive appears.
-2. Copy the new `HIFIEC90.IMG` to its root with `cp -X` as above, then eject Internal storage.
-3. The player checks the file, installs it (showing a percentage) and asks you to unplug and turn it off and on.
+1. Plug the player into the Mac. It shows "USB", and the internal-storage drive ("ECHO MINI") mounts.
+2. Copy the new image to the root without macOS's side file, and check it:
 
-An image identical to the installed one is skipped. Stock images are refused, so getting back to stock is always the maskrom procedure.
+   ```sh
+   cp -X build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/"
+   rm -f "/Volumes/ECHO MINI/._HIFIEC90.IMG"
+   shasum -a 256 build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/HIFIEC90.IMG"
+   ```
+
+   5 MiB takes about 30 s, because writes run at about 180 KB/s.
+3. Eject the drive and leave the cable in. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
+4. Press a key, unplug, hold Power to switch off, then switch on. The new build starts.
+
+The updater checks the image's shape, rows, entry vector, header copy and CRC before writing. It skips an image that is already installed and refuses stock images. It writes slot 2 first, then slot 1, and reads back every chunk.
+
+## What to check after an install
+
+- **Home screen:** "Echo Mini" with Music, Now Playing, Settings and Diagnostics. Without a card, Music says "No library".
+- **Keys:** Diagnostics → Key test. The rocker's up end should register as up.
+- **Power:** a short press turns the screen off and on. A long press switches the player off, but only with the cable unplugged; with USB connected the player stays powered.
+- **USB:** the "USB" notice appears and the drive mounts within about 10 s.
+
+## If something goes wrong
+
+| Symptom | Next step |
+|---|---|
+| Black screen, but the drive appears over USB | Copy a fixed image with the updater |
+| Black screen and nothing over USB | Maskrom recovery, then a direct maskrom write of a fixed image |
+| "Update not installed" | The file isn't a valid image for this player; rebuild it and copy it again |
+| "Update failed" | Copy the file again and retry before turning the player off; one slot is always complete |
+| USB shows the "USB 1/4"–"4/4" screens | The controller didn't connect; note the values for diagnosis |
