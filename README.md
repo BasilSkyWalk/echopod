@@ -8,6 +8,7 @@ Status: early development. Nothing here can be flashed yet.
 
 ```sh
 brew install cmake sdl2 clang-format arm-none-eabi-gcc arm-none-eabi-binutils
+python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt
 cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
@@ -33,6 +34,17 @@ ctest --preset dev
 | `--frames N` | Quit after N frames |
 | `--headless` | No window |
 | `--screenshot FILE.bmp` | Save the last frame on exit |
+| `--keys LIST` | Play a key script, e.g. `down,down,play,back:long` (`up`, `down`, `play`, `menu`, `back`, `power`, each optionally `:long`) |
+
+Headless runs use a virtual clock, so scripted screenshots are deterministic.
+
+### Navigation
+
+| Button | In lists |
+|---|---|
+| Volume up / down | Previous / next item (wraps on a single press, not while held) |
+| Play | Select |
+| Back | Back; hold to go home |
 
 ## Layout
 
@@ -40,4 +52,4 @@ See `docs/architecture.md`.
 
 ## License
 
-GPL-3.0-or-later. See `LICENSE`.
+GPL-3.0-or-later. See `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`).
