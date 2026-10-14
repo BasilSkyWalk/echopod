@@ -3,6 +3,7 @@
 
 #include "board.h"
 #include "device/pll.h"
+#include "dmac.h"
 #include "hal/clock.h"
 #include "hal/system.h"
 #include "registers.h"
@@ -132,14 +133,22 @@ uint32_t hal_system_clock_mhz(void)
     return pll_mhz != 0 ? pll_mhz : BOOT_CLOCK_MHZ;
 }
 
-bool hal_system_set_clock_mhz(uint32_t mhz)
+static bool switch_clock(uint32_t mhz)
 {
-    if (mhz == hal_system_clock_mhz()) {
-        return true;
-    }
     if (mhz == BOOT_CLOCK_MHZ) {
         run_from_crystal();
         return true;
     }
     return run_from_pll(mhz);
+}
+
+bool hal_system_set_clock_mhz(uint32_t mhz)
+{
+    if (mhz == hal_system_clock_mhz()) {
+        return true;
+    }
+    dmac_suspend();
+    bool switched = switch_clock(mhz);
+    dmac_resume();
+    return switched;
 }

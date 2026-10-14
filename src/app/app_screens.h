@@ -5,6 +5,7 @@
 #include "browse_screen.h"
 #include "core/power_policy.h"
 #include "cover_cache.h"
+#include "diagnostics_values.h"
 #include "favorites_store.h"
 #include "hal/audio.h"
 #include "library_store.h"
@@ -24,7 +25,7 @@
 enum {
     HOME_ITEM_COUNT = 4,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 8,
+    DIAGNOSTICS_ITEM_COUNT = 9,
     START_PATH_CAPACITY = 2
 };
 
@@ -40,6 +41,12 @@ typedef struct ToneOption {
     bool tried;
     HalToneResult result;
 } ToneOption;
+
+typedef struct DmaToneOption {
+    bool tried;
+    bool stopped;
+    HalToneResult result;
+} DmaToneOption;
 
 typedef struct BrowseEntry {
     BrowsePool *pool;
@@ -66,6 +73,7 @@ typedef struct AppScreens {
     StopwatchScreen stopwatch;
     ClockOption clock;
     ToneOption tone;
+    DmaToneOption dma_tone;
     MenuItem home_items[HOME_ITEM_COUNT];
     MenuItem music_items[MUSIC_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];

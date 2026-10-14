@@ -67,6 +67,7 @@ typedef struct FakeHal {
     uint32_t clock_mhz;
     bool refuse_clock_switch;
     int test_tone_count;
+    bool dma_tone_running;
 } FakeHal;
 
 static FakeHal fake;
@@ -400,6 +401,22 @@ HalToneResult hal_audio_test_tone(void)
 {
     fake.test_tone_count++;
     return HAL_TONE_PLAYED;
+}
+
+HalToneResult hal_audio_dma_tone_start(void)
+{
+    fake.dma_tone_running = true;
+    return HAL_TONE_PLAYED;
+}
+
+void hal_audio_dma_tone_stop(void)
+{
+    fake.dma_tone_running = false;
+}
+
+HalDmaToneStatus hal_audio_dma_tone_status(void)
+{
+    return (HalDmaToneStatus){.running = fake.dma_tone_running, .position = 0};
 }
 
 HalAudioStatus hal_audio_status(void)

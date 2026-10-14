@@ -36,8 +36,14 @@ typedef enum HalToneResult {
     HAL_TONE_NO_DAC,
     HAL_TONE_SETUP_FAILED,
     HAL_TONE_NOT_READY,
-    HAL_TONE_STALLED
+    HAL_TONE_STALLED,
+    HAL_TONE_NO_DMAC
 } HalToneResult;
+
+typedef struct HalDmaToneStatus {
+    bool running;
+    uint32_t position;
+} HalDmaToneStatus;
 
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token);
 void hal_audio_queue_next(const char *path, uint32_t token);
@@ -49,3 +55,6 @@ void hal_audio_set_gain(HalAudioGain gain);
 void hal_audio_set_output(HalAudioOutput output);
 HalAudioStatus hal_audio_status(void);
 HalToneResult hal_audio_test_tone(void);
+HalToneResult hal_audio_dma_tone_start(void);
+void hal_audio_dma_tone_stop(void);
+HalDmaToneStatus hal_audio_dma_tone_status(void);

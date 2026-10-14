@@ -300,6 +300,24 @@ void hal_audio_set_output(HalAudioOutput output)
     unlock();
 }
 
+static bool dma_tone_running;
+
+HalToneResult hal_audio_dma_tone_start(void)
+{
+    dma_tone_running = true;
+    return HAL_TONE_PLAYED;
+}
+
+void hal_audio_dma_tone_stop(void)
+{
+    dma_tone_running = false;
+}
+
+HalDmaToneStatus hal_audio_dma_tone_status(void)
+{
+    return (HalDmaToneStatus){.running = dma_tone_running, .position = 0};
+}
+
 HalToneResult hal_audio_test_tone(void)
 {
     return HAL_TONE_PLAYED;

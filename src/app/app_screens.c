@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "diagnostics_values.h"
 #include "hal/system.h"
 
 typedef enum MusicSource {
@@ -131,22 +132,34 @@ static ScreenAction play_test_tone(void *context)
 static const char *tone_value(const void *context)
 {
     const ToneOption *tone = context;
-    if (!tone->tried) {
-        return "";
+    return tone->tried ? diagnostics_tone_result_text(tone->result) : "";
+}
+
+static ScreenAction toggle_dma_tone(void *context)
+{
+    DmaToneOption *tone = context;
+    if (hal_audio_dma_tone_status().running) {
+        hal_audio_dma_tone_stop();
+        tone->stopped = true;
+        return screen_action_none();
     }
-    switch (tone->result) {
-    case HAL_TONE_PLAYED:
-        return "Played";
-    case HAL_TONE_NO_DAC:
-        return "No DAC";
-    case HAL_TONE_SETUP_FAILED:
-        return "Setup failed";
-    case HAL_TONE_NOT_READY:
-        return "Not ready";
-    case HAL_TONE_STALLED:
-        return "I2S stalled";
-    }
-    return "";
+    tone->result = hal_audio_dma_tone_start();
+    tone->tried = true;
+    tone->stopped = false;
+    return screen_action_none();
+}
+
+static char dma_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *dma_tone_value(const void *context)
+{
+    const DmaToneOption *tone = context;
+    DmaToneView view = {.tried = tone->tried,
+                        .stopped = tone->stopped,
+                        .result = tone->result,
+                        .status = hal_audio_dma_tone_status()};
+    diagnostics_dma_tone_text(view, dma_tone_text, sizeof dma_tone_text);
+    return dma_tone_text;
 }
 
 static MenuItem open_item(const char *label, Screen *target)
@@ -264,6 +277,12 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                .select = play_test_tone,
                                                .context = &screens->tone,
                                                .value = tone_value};
+    screens->dma_tone =
+        (DmaToneOption){.tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
+    screens->diagnostics_items[8] = (MenuItem){.label = "DMA tone",
+                                               .select = toggle_dma_tone,
+                                               .context = &screens->dma_tone,
+                                               .value = dma_tone_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

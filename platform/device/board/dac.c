@@ -6,6 +6,8 @@
 #include "cru.h"
 #include "device/audio_math.h"
 #include "device/dac_sequence.h"
+#include "device/dma_loop.h"
+#include "dmac.h"
 #include "gpio.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -53,6 +55,8 @@
 #define CRU_I2S_CLOCK 0x10000000u
 #define I2S_FORMAT_16_BIT_STEREO 0x401Fu
 #define I2S_INTERRUPTS 0x01F00102u
+#define I2S_INTERRUPTS_FOR_DMA 0x01F00100u
+#define I2S_DMA_TX 0x00000110u
 #define I2C_MRXADDR_VALID 0x01000000u
 
 enum {
@@ -84,6 +88,7 @@ enum {
     TONE_AMPLITUDE = 3000,
     TONE_SEGMENT_MS = 2000,
     TONE_GAP_MS = 400,
+    DMA_TONE_WORDS = 4000,
     I2S_RESET_MS = 1,
     I2S_CLEAR_MS = 2,
     ACODEC_SETTLE_MS = 5
@@ -246,7 +251,7 @@ static void start_acodec(const uint8_t *row)
     set_bits(ACODEC_MUX_CONTROL, 1u << 2, 1u << 2);
 }
 
-static void start_i2s(uint32_t divider)
+static void start_i2s(uint32_t divider, uint32_t interrupts, bool transfer)
 {
     cru_reset(RESET_I2S1, true);
     board_delay_ms(I2S_RESET_MS);
@@ -268,8 +273,10 @@ static void start_i2s(uint32_t divider)
     register_write(I2S_TXCR, I2S_FORMAT_16_BIT_STEREO);
     register_write(I2S_RXCR, I2S_FORMAT_16_BIT_STEREO);
     register_write(I2S_CKR, i2s_clock_register(divider));
-    register_write(I2S_INTCR, I2S_INTERRUPTS);
-    register_write(I2S_XFER, 1);
+    register_write(I2S_INTCR, interrupts);
+    if (transfer) {
+        register_write(I2S_XFER, 1);
+    }
 }
 
 static void set_i2s_divider(uint32_t divider)
@@ -342,7 +349,7 @@ static void use_dac_pins_as_gpio(void)
     }
 }
 
-HalToneResult hal_audio_test_tone(void)
+static HalToneResult start_audio_path(uint32_t divider, uint32_t interrupts, bool transfer)
 {
     cru_gate(GATE_GPIO1, true);
     use_dac_pins_as_gpio();
@@ -354,13 +361,91 @@ HalToneResult hal_audio_test_tone(void)
         return HAL_TONE_NO_DAC;
     }
     start_acodec(ACODEC_44100);
-    start_i2s(i2s_divider_truncated(TONE_MCLK_HZ, TONE_RATE_HZ));
+    start_i2s(divider, interrupts, transfer);
     DacResult configured = dac_configure(&BUS, TONE_RATE_BYTE);
-    bool played = configured == DAC_READY && play_tone_segments();
-    dac_output_off(&BUS);
-    stop_i2s();
     if (configured != DAC_READY) {
+        dac_output_off(&BUS);
+        stop_i2s();
         return result_of(configured);
     }
+    return HAL_TONE_PLAYED;
+}
+
+static void stop_audio_path(void)
+{
+    dac_output_off(&BUS);
+    stop_i2s();
+}
+
+HalToneResult hal_audio_test_tone(void)
+{
+    hal_audio_dma_tone_stop();
+    HalToneResult result =
+        start_audio_path(i2s_divider_truncated(TONE_MCLK_HZ, TONE_RATE_HZ), I2S_INTERRUPTS, true);
+    if (result != HAL_TONE_PLAYED) {
+        return result;
+    }
+    bool played = play_tone_segments();
+    stop_audio_path();
     return played ? HAL_TONE_PLAYED : HAL_TONE_STALLED;
+}
+
+static uint32_t dma_buffer[DMA_TONE_WORDS];
+static DmaItem dma_item;
+static bool dma_tone_active;
+
+static void fill_dma_buffer(void)
+{
+    static int16_t samples[TONE_PERIOD_SAMPLES];
+    tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
+    for (uint32_t index = 0; index < DMA_TONE_WORDS; index++) {
+        uint16_t sample = (uint16_t)samples[index % TONE_PERIOD_SAMPLES];
+        dma_buffer[index] = (uint32_t)sample | (uint32_t)sample << 16;
+    }
+}
+
+HalToneResult hal_audio_dma_tone_start(void)
+{
+    hal_audio_dma_tone_stop();
+    if (!dmac_present()) {
+        return HAL_TONE_NO_DMAC;
+    }
+    HalToneResult result = start_audio_path(i2s_divider_rounded(TONE_MCLK_HZ, TONE_RATE_HZ),
+                                            I2S_INTERRUPTS_FOR_DMA, false);
+    if (result != HAL_TONE_PLAYED) {
+        return result;
+    }
+    fill_dma_buffer();
+    dma_item = dma_loop_item((uint32_t)(uintptr_t)dma_buffer, DMA_TONE_WORDS,
+                             (uint32_t)(uintptr_t)&dma_item);
+    dac_output_on(&BUS);
+    if (!dmac_start_loop(&dma_item)) {
+        stop_audio_path();
+        return HAL_TONE_NO_DMAC;
+    }
+    register_write(I2S_DMACR, I2S_DMA_TX);
+    register_write(I2S_XFER, 1);
+    dma_tone_active = true;
+    return HAL_TONE_PLAYED;
+}
+
+void hal_audio_dma_tone_stop(void)
+{
+    if (!dma_tone_active) {
+        return;
+    }
+    dac_output_off(&BUS);
+    dmac_stop();
+    stop_i2s();
+    dma_tone_active = false;
+}
+
+HalDmaToneStatus hal_audio_dma_tone_status(void)
+{
+    if (!dma_tone_active) {
+        return (HalDmaToneStatus){.running = false, .position = 0};
+    }
+    uint32_t position =
+        dma_loop_position(dmac_source(), (uint32_t)(uintptr_t)dma_buffer, DMA_TONE_WORDS);
+    return (HalDmaToneStatus){.running = dmac_running(), .position = position};
 }

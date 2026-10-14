@@ -46,6 +46,7 @@ enum {
     DIAGNOSTICS_CPU_CLOCK_INDEX = 5,
     DIAGNOSTICS_STOPWATCH_INDEX = 6,
     DIAGNOSTICS_TEST_TONE_INDEX = 7,
+    DIAGNOSTICS_DMA_TONE_INDEX = 8,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 600,
@@ -936,6 +937,18 @@ static void the_test_tone_plays_once_per_press(void)
     CHECK(title_is("Diagnostics"));
 }
 
+static void the_dma_tone_starts_and_stops_from_one_row(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_DMA_TONE_INDEX);
+    CHECK(!hal_audio_dma_tone_status().running);
+    tap(KEY_PLAY);
+    CHECK(hal_audio_dma_tone_status().running);
+    tap(KEY_PLAY);
+    CHECK(!hal_audio_dma_tone_status().running);
+    CHECK(title_is("Diagnostics"));
+}
+
 static void a_clock_that_does_not_lock_stays_at_24_mhz(void)
 {
     start_app();
@@ -1011,6 +1024,7 @@ int main(void)
         TEST_CASE(waking_while_paused_keeps_the_screen),
         TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
         TEST_CASE(the_test_tone_plays_once_per_press),
+        TEST_CASE(the_dma_tone_starts_and_stops_from_one_row),
         TEST_CASE(a_clock_that_does_not_lock_stays_at_24_mhz),
         TEST_CASE(the_stopwatch_stays_open_while_playing),
         TEST_CASE(menu_does_nothing_while_nothing_plays),
