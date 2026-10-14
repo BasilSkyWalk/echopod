@@ -10,6 +10,7 @@
 #include "default_theme.h"
 #include "favorites_store.h"
 #include "frame_overlay.h"
+#include "gfx/frame_diff.h"
 #include "gfx/strip_renderer.h"
 #include "hal/clock.h"
 #include "hal/display.h"
@@ -59,6 +60,7 @@ typedef struct AppState {
     StatusBarState status_bar;
     AppScreens screens;
     MessageScreen notice;
+    FrameDiff frame_diff;
     AppOptions options;
     bool display_on;
     bool powered_off;
@@ -66,6 +68,7 @@ typedef struct AppState {
 
 static AppState app;
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
+static uint32_t row_hashes[HAL_DISPLAY_HEIGHT];
 
 static Screen *top_screen(void)
 {
@@ -180,7 +183,12 @@ static void draw_frame(void *context, Canvas *canvas)
 static void write_to_display(void *context, Rect area, const Color *pixels)
 {
     (void)context;
-    hal_display_write(area.x, area.y, area.width, area.height, pixels);
+    Rect changed;
+    if (!frame_diff_changed(&app.frame_diff, area, pixels, &changed)) {
+        return;
+    }
+    const Color *first_row = pixels + (size_t)(changed.y - area.y) * (size_t)area.width;
+    hal_display_write(changed.x, changed.y, changed.width, changed.height, first_row);
 }
 
 static StatusPlayback playback_of(PlayerState state)
@@ -281,6 +289,7 @@ static void start_screens(uint32_t now_ms)
 void app_start(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
+    frame_diff_init(&app.frame_diff, row_hashes, HAL_DISPLAY_HEIGHT);
     key_tracker_init(&app.keys, &KEY_CONFIG);
     frame_stats_reset(&app.frame_stats);
     app.options = (AppOptions){.show_frame_time = false};

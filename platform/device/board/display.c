@@ -54,9 +54,18 @@ static void bus_data(void *context, uint8_t value)
 static void bus_pixels(void *context, const uint16_t *pixels, uint32_t count)
 {
     (void)context;
+    volatile uint32_t *port = register_at(GPIO0_BASE + GPIO_DATA);
+    uint32_t base = panel_bus_word(port_shadow, 0, true);
     for (uint32_t index = 0; index < count; index++) {
-        send_byte((uint8_t)(pixels[index] >> 8), true);
-        send_byte((uint8_t)pixels[index], true);
+        uint32_t pixel = pixels[index];
+        uint32_t high = base | (pixel >> 8) << PANEL_BUS_DATA_SHIFT;
+        uint32_t low = base | (pixel & 0xFFu) << PANEL_BUS_DATA_SHIFT;
+        *port = high;
+        *port = high;
+        *port = high | PANEL_BUS_WR;
+        *port = low;
+        *port = low;
+        *port = low | PANEL_BUS_WR;
     }
 }
 

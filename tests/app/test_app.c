@@ -656,7 +656,7 @@ static void a_notice_is_drawn_at_once_over_the_current_screen(void)
     long pixels = fake_hal_pixels_written();
     app_show_notice("USB", "Connected to a computer");
     CHECK_EQUAL(presents + 1, fake_hal_present_count());
-    CHECK_EQUAL(pixels + HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT, fake_hal_pixels_written());
+    CHECK(fake_hal_pixels_written() > pixels);
     CHECK(title_is("Echo Mini"));
 }
 
@@ -718,6 +718,36 @@ static void now_playing_without_a_cover_keeps_the_text_layout(void)
     CHECK_EQUAL(DEFAULT_THEME.colors.background, cover_probe());
 }
 
+static void an_unchanged_frame_sends_no_pixels(void)
+{
+    start_app();
+    step();
+    long pixels = fake_hal_pixels_written();
+    step();
+    CHECK_EQUAL(pixels, fake_hal_pixels_written());
+}
+
+static void moving_the_selection_sends_only_part_of_the_screen(void)
+{
+    start_app();
+    step();
+    long pixels = fake_hal_pixels_written();
+    tap(KEY_VOLUME_DOWN);
+    long sent = fake_hal_pixels_written() - pixels;
+    CHECK(sent > 0);
+    CHECK(sent < FULL_FRAME_PIXELS / 2);
+}
+
+static void restarting_the_app_sends_a_whole_frame_again(void)
+{
+    start_app();
+    step();
+    restart_app();
+    long pixels = fake_hal_pixels_written();
+    step();
+    CHECK_EQUAL(pixels + FULL_FRAME_PIXELS, fake_hal_pixels_written());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -725,6 +755,9 @@ int main(void)
         TEST_CASE(a_notice_turns_the_display_on),
         TEST_CASE(waking_keeps_the_screen_on_for_a_full_timeout),
         TEST_CASE(a_step_writes_one_full_frame_and_presents_it),
+        TEST_CASE(an_unchanged_frame_sends_no_pixels),
+        TEST_CASE(moving_the_selection_sends_only_part_of_the_screen),
+        TEST_CASE(restarting_the_app_sends_a_whole_frame_again),
         TEST_CASE(the_home_menu_is_the_root),
         TEST_CASE(selecting_music_opens_the_music_menu),
         TEST_CASE(back_returns_to_the_previous_screen),

@@ -85,7 +85,7 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 
 ## Rendering
 
-The panel keeps its own image memory, so we never hold a full framebuffer. The strip renderer clears a 320×34 buffer, asks the current screen to draw into it, pushes it to the display, and moves on to the next strip. After the screen, the app draws the status icons (play state on the left of the header, battery on the right, both inside the header insets), the toast and the frame overlay. Screens marked `full_screen` (the key test) get no status icons. Drawing uses screen coordinates and clips to the strip. Lists skip rows outside the strip, and glyphs outside the clip are culled. This saves ~85 KB of RAM compared with a full framebuffer.
+The panel keeps its own image memory, so we never hold a full framebuffer. The strip renderer clears a 320×34 buffer, asks the current screen to draw into it, pushes it to the display, and moves on to the next strip. Before pushing, `gfx/frame_diff` compares a hash of every row with the previous frame's (680 bytes for 170 rows), and only the span of changed rows in each strip goes to the display. An unchanged frame sends nothing, and moving a selection sends a few rows. `app_start` forgets the hashes, so the first frame is always sent whole. After the screen, the app draws the status icons (play state on the left of the header, battery on the right, both inside the header insets), the toast and the frame overlay. Screens marked `full_screen` (the key test) get no status icons. Drawing uses screen coordinates and clips to the strip. Lists skip rows outside the strip, and glyphs outside the clip are culled. This saves ~85 KB of RAM compared with a full framebuffer.
 
 ## Generated code
 
