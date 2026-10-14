@@ -41,15 +41,15 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
 
 if(EXISTS ${ECHO_REFERENCE_IMG})
-    add_custom_command(OUTPUT ${ECHO_DEVICE_IMAGE}
+    add_custom_target(echo_device_image ALL
         COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
             --reference ${ECHO_REFERENCE_IMG}
             --elf $<TARGET_FILE:echo_device>
             --output ${ECHO_DEVICE_IMAGE}
+        BYPRODUCTS ${ECHO_DEVICE_IMAGE}
         DEPENDS echo_device ${PROJECT_SOURCE_DIR}/tools/make_image.py
         VERBATIM
     )
-    add_custom_target(echo_device_image ALL DEPENDS ${ECHO_DEVICE_IMAGE})
 else()
     message(STATUS "reference image not found at ${ECHO_REFERENCE_IMG}: only the ELF is built")
 endif()
