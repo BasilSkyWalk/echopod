@@ -37,6 +37,7 @@ void board_main(void)
     board_input_start();
     board_display_start();
     app_start();
+    app_show_splash();
     for (;;) {
         app_step();
         check_usb();

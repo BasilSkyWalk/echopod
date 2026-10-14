@@ -1,6 +1,7 @@
 add_library(echo_ui STATIC
     choice_screen.c
     cover_flow.c
+    fade.c
     header.c
     icons.c
     label.c

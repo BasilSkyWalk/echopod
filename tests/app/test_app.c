@@ -41,6 +41,9 @@ enum {
     DEFAULT_TIMEOUT_MS = 30000,
     SHORT_TIMEOUT_MS = 10000,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
+    GOODBYE_MS = 1000,
+    SPLASH_FADE_MS = 600,
+    SPLASH_MS = 1100,
     HALF_BATTERY = 50
 };
 
@@ -440,11 +443,46 @@ static void holding_power_saves_and_turns_the_player_off(void)
     play_first_album_track();
     int writes = fake_hal_write_count();
     hold(KEY_POWER);
-    CHECK_EQUAL(1, fake_hal_power_off_count());
     CHECK(fake_hal_write_count() > writes);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    CHECK(fake_hal_display_on());
+    wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(1, fake_hal_power_off_count());
     CHECK(!fake_hal_display_on());
     tap(KEY_PLAY);
     CHECK_EQUAL(1, fake_hal_power_off_count());
+}
+
+static void keys_are_ignored_while_saying_goodbye(void)
+{
+    start_app_with_library();
+    hold(KEY_POWER);
+    const char *title = app_screen_title();
+    tap(KEY_PLAY);
+    CHECK(title_is(title));
+    wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(1, fake_hal_power_off_count());
+}
+
+static void the_splash_ignores_keys_until_it_ends(void)
+{
+    start_app();
+    app_show_splash();
+    step();
+    tap(KEY_PLAY);
+    CHECK(title_is("Echo Mini"));
+    wait_ms(SPLASH_MS);
+    tap(KEY_PLAY);
+    CHECK(title_is("Music"));
+}
+
+static void the_splash_draws_over_the_home_screen(void)
+{
+    start_app();
+    app_show_splash();
+    wait_ms(SPLASH_FADE_MS);
+    Rect content = theme_content_area(&DEFAULT_THEME);
+    CHECK_EQUAL(DEFAULT_THEME.colors.background, fake_hal_pixel(content.x + 2, content.y + 4));
 }
 
 static void the_sleep_timer_turns_the_player_off(void)
@@ -458,6 +496,7 @@ static void the_sleep_timer_turns_the_player_off(void)
     wait_ms(FIFTEEN_MINUTES_MS - 1000);
     CHECK_EQUAL(0, fake_hal_power_off_count());
     wait_ms(1000);
+    wait_ms(GOODBYE_MS);
     CHECK_EQUAL(1, fake_hal_power_off_count());
 }
 
@@ -848,6 +887,9 @@ int main(void)
         TEST_CASE(the_timeout_setting_is_used),
         TEST_CASE(with_the_screen_off_media_keys_keep_working),
         TEST_CASE(holding_power_saves_and_turns_the_player_off),
+        TEST_CASE(keys_are_ignored_while_saying_goodbye),
+        TEST_CASE(the_splash_ignores_keys_until_it_ends),
+        TEST_CASE(the_splash_draws_over_the_home_screen),
         TEST_CASE(the_sleep_timer_turns_the_player_off),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),
         TEST_CASE(holding_play_in_favorites_removes_the_album),

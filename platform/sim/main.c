@@ -193,6 +193,7 @@ int main(int argument_count, char **arguments)
     sim_audio_start(session.options.headless);
     sim_power_configure(session.options.battery_percent, session.options.battery_charging);
     app_start();
+    app_show_splash();
     run(&session);
     return finish(&session.options);
 }

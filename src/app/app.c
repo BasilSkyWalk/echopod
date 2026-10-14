@@ -19,6 +19,8 @@
 #include "library_store.h"
 #include "player.h"
 #include "settings_store.h"
+#include "ui/fade.h"
+#include "ui/label.h"
 #include "ui/message_screen.h"
 #include "ui/screen_stack.h"
 #include "ui/status_bar.h"
@@ -61,12 +63,21 @@ typedef struct AppState {
     AppScreens screens;
     MessageScreen notice;
     FrameDiff frame_diff;
+    Fade splash;
+    Fade goodbye;
+    bool saying_goodbye;
+    uint32_t now_ms;
     AppOptions options;
     bool display_on;
     bool powered_off;
 } AppState;
 
 static AppState app;
+
+static const FadeTiming SPLASH_TIMING = {.fade_ms = 600, .hold_ms = 500, .rising = true};
+static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
+static const char SPLASH_TEXT[] = "Echo Mini";
+static const char GOODBYE_TEXT[] = "Goodbye";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_HEIGHT];
 
@@ -110,12 +121,35 @@ static void save_session(void)
     save_settings();
 }
 
-static void shut_down(void)
+static void finish_shut_down(void)
 {
-    save_session();
+    app.saying_goodbye = false;
     set_display(false);
     app.powered_off = true;
     hal_power_off();
+}
+
+static void shut_down(void)
+{
+    save_session();
+    if (!app.display_on) {
+        finish_shut_down();
+        return;
+    }
+    fade_start(&app.goodbye, app.now_ms, GOODBYE_TIMING);
+    app.saying_goodbye = true;
+}
+
+static bool fade_running(void)
+{
+    return app.saying_goodbye || !fade_finished(&app.splash, app.now_ms);
+}
+
+static void drain_key_events(void)
+{
+    KeyEvent event;
+    while (key_tracker_next_event(&app.keys, &event)) {
+    }
 }
 
 static void use_screen_key_behaviors(void)
@@ -204,9 +238,37 @@ static void update_screen(uint32_t now_ms)
     }
 }
 
+static void draw_fade(Canvas *canvas, const Fade *fade, const char *text)
+{
+    const Theme *theme = &DEFAULT_THEME;
+    Rect screen = {0, 0, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT};
+    Color color =
+        color_blend(theme->colors.background, theme->colors.text, fade_alpha(fade, app.now_ms));
+    TextStyle style = {.font = theme->fonts.title, .color = color};
+    canvas_fill_rect(canvas, screen, theme->colors.background);
+    label_draw(canvas, style,
+               (Label){.area = label_centered_area(style.font, screen, text), .text = text});
+}
+
+static bool draw_running_fade(Canvas *canvas)
+{
+    if (app.saying_goodbye) {
+        draw_fade(canvas, &app.goodbye, GOODBYE_TEXT);
+        return true;
+    }
+    if (!fade_finished(&app.splash, app.now_ms)) {
+        draw_fade(canvas, &app.splash, SPLASH_TEXT);
+        return true;
+    }
+    return false;
+}
+
 static void draw_frame(void *context, Canvas *canvas)
 {
     const AppState *state = context;
+    if (draw_running_fade(canvas)) {
+        return;
+    }
     Screen *screen = screen_stack_top(&state->stack);
     screen->draw(screen->context, canvas);
     if (!screen->full_screen) {
@@ -333,6 +395,9 @@ void app_start(void)
     app.options = (AppOptions){.show_frame_time = false};
     app.toast = (Toast){.visible = false};
     app.powered_off = false;
+    app.saying_goodbye = false;
+    app.splash = (Fade){.active = false};
+    app.now_ms = now_ms;
     settings_store_load(&app.settings);
     start_playback();
     start_hardware(now_ms);
@@ -346,9 +411,17 @@ void app_step(void)
     }
     uint32_t started_us = hal_clock_microseconds();
     uint32_t now_ms = hal_clock_milliseconds();
+    app.now_ms = now_ms;
     read_input();
     key_tracker_update(&app.keys, now_ms);
-    dispatch_key_events(now_ms);
+    if (fade_running()) {
+        drain_key_events();
+    } else {
+        dispatch_key_events(now_ms);
+    }
+    if (app.saying_goodbye && fade_finished(&app.goodbye, now_ms)) {
+        finish_shut_down();
+    }
     if (!app.powered_off) {
         player_update(&app.player, now_ms);
         update_power(now_ms);
@@ -372,6 +445,12 @@ void app_show_notice(const char *title, const char *message)
         set_display(true);
     }
     render((FrameDrawer){.draw = draw_notice, .context = screen});
+}
+
+void app_show_splash(void)
+{
+    app.now_ms = hal_clock_milliseconds();
+    fade_start(&app.splash, app.now_ms, SPLASH_TIMING);
 }
 
 void app_wake(void)
