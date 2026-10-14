@@ -12,8 +12,8 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | 1b | UI toolkit: screen stack, lists, marquee, bitmap fonts from TTF | 3–5 d | no | done |
 | 1c | PC indexer, DB format, browse screens | 4–6 d | no | done |
 | 1d | Simulator playback: queue, shuffle/repeat, gapless, resume | 3–4 d | no | done |
-| 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | done (awaiting review) |
-| 1f | Cover Flow and cover export script | 4–6 d | no | todo |
+| 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | done |
+| 1f | Cover Flow and cover export script | 4–6 d | no | done (awaiting review) |
 | 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | todo |
 | 3 | Device gaps: PLL, IRQs/SysTick, DMA audio, FAT writes, battery, backlight PWM, key timing, sleep | 3–8 wk | yes | todo |
 | 4 | Our app on the device; memory and Cover Flow tuning | 1–2 wk | yes | todo |
@@ -30,7 +30,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | Resume after power-off | sim | `/.echo/resume.bin`; needs FAT writes on the device |
 | Library DB from SD scan | sim | Built on the PC (`tools/library_index.py`); an on-device rescan comes later |
 | Browse: Artist / Album Artist / Album / Genre / Folder / All Songs / Playlists / Favorites | sim | Selecting a track plays the list from it |
-| Now Playing: art, info, progress, seek | in progress | Info, progress, times, state, modes, volume and seek done; art in 1f |
+| Now Playing: art, info, progress, seek | in progress | Info, progress, times, state, modes, volume and seek done; the cover isn't shown on Now Playing yet |
 | Queue, shuffle, repeat | sim | Shuffle Songs/Albums, Repeat One/All, seeded |
 | Volume and button mapping, lock/hold | sim | Rocker = volume (hold on Now Playing = previous/next track). Power short press = lock/unlock, long press = off; wake on any key |
 | Settings: brightness, screen timeout, sleep timer, gain, output | sim | Saved in `/.echo/settings.bin`. On the device, brightness needs PWM, gain the CS43131 and output jack routing |
@@ -41,7 +41,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 
 | Feature | Status | Notes |
 |---|---|---|
-| Cover Flow album browser | todo | Strip renderer + mip cover cache |
+| Cover Flow album browser | sim | Perspective covers from a 69 KB cache, by album artist |
 | Album favorites | sim | Hold Play on an album; Music → Favorites |
 | Configurable home screen | sim | Start screen setting: Main menu, Now Playing, Albums, Artists, Favorites, Playlists |
 | M3U playlists | sim | Resolved by the PC indexer, including MusicBee's Windows paths |
@@ -76,4 +76,4 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 |---|---|
 | Font builder (Python) | done |
 | Library indexer (Python) | done |
-| Cover exporter (raw RGB565 thumbnails + index) | todo |
+| Cover exporter (raw RGB565 thumbnails + index) | done |

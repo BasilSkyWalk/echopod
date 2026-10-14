@@ -19,10 +19,11 @@ ctest --preset dev
 
 ```sh
 .venv/bin/python tools/library_index.py --music /path/to/music --output build/library/library.db
+.venv/bin/python tools/cover_export.py --music /path/to/music --output build/library/covers.bin
 ./build/dev/platform/sim/echo_sim --card /path/to/music --system-dir build/library
 ```
 
-The indexer only reads the music folder. On the device, the database goes in `/.echo/library.db` on the card. The format is described in `docs/library-format.md`.
+The indexer and the cover exporter only read the music folder. The exporter uses embedded front covers, or a `cover`/`folder` image next to the tracks. On the device, the database goes in `/.echo/library.db` on the card, and the covers in `/.echo/covers.bin`. The format is described in `docs/library-format.md`.
 
 ### Simulator keys
 
@@ -65,7 +66,7 @@ The screen turns off after the screen timeout. Any key wakes it and does nothing
 
 Settings: Shuffle (Off / Songs / Albums), Repeat (Off / One / All), Sleep timer, Screen timeout, Brightness, Gain, Output and Start screen. They're saved in `/.echo/settings.bin`, and favorites in `/.echo/favorites.bin`. Without `--system-dir` the simulator can't save, and says so. Playback resumes, paused, where it left off.
 
-Music → Playlists lists the M3U playlists the indexer found. Music → Favorites lists your favorite albums.
+Music → Cover Flow shows your albums as covers, by album artist. Vol± move, Play opens the album, holding Play adds or removes it from Favorites, and Back leaves. Music → Playlists lists the M3U playlists the indexer found. Music → Favorites lists your favorite albums.
 
 ## Layout
 

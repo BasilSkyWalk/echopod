@@ -23,14 +23,14 @@ platform/sim        platform/device (later)
 | Layer | Path | May depend on | Purpose |
 |---|---|---|---|
 | core | `src/core` | nothing | Pure logic: deadlines, key gestures, frame stats, UTF-8, string building, formatting, hashing, seeded random, the power policy |
-| gfx | `src/gfx` | core | RGB565 colors and blending, rectangles, clipped canvases, strip rendering, 4-bit anti-aliased text |
+| gfx | `src/gfx` | core | RGB565 colors and blending, rectangles, clipped canvases, strip rendering, 4-bit anti-aliased text, images drawn into perspective quads |
 | fonts | `src/fonts` | gfx | Generated glyph tables (see Generated code) |
-| ui | `src/ui` | core, gfx | Screen interface and stack, navigation intents, list view, menus, choice screens, messages, toasts, header and status icons, labels, marquee, theme type |
-| library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader, browse queries and the favorites set (see `docs/library-format.md`) |
+| ui | `src/ui` | core, gfx | Screen interface and stack, navigation intents, list view, menus, choice screens, messages, toasts, header and status icons, labels, marquee, Cover Flow layout and motion, theme type |
+| library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader, browse queries, the favorites set and the covers file reader (see `docs/library-format.md`) |
 | playback | `src/playback` | core, library | Play queue (list order, songs shuffle, album shuffle, repeat, gapless look-ahead) and the resume file format |
 | settings | `src/settings` | core, playback | The settings values, their defaults and option tables, and the settings file format |
 | hal | `src/hal` | core (types only) | Hardware interfaces: display (with power and brightness), input, clock, files, audio (with gain and output), power (battery, power off) |
-| app | `src/app` | core, gfx, fonts, ui, library, playback, settings, hal | Default theme, screen tree, library, settings and favorites stores, player controller, browse, Settings and Now Playing screens, frame overlay, the main step |
+| app | `src/app` | core, gfx, fonts, ui, library, playback, settings, hal | Default theme, screen tree, library, settings and favorites stores, cover cache, player controller, browse, Cover Flow, Settings and Now Playing screens, frame overlay, the main step |
 | platform | `platform/*` | app, hal, OS/SDK | Implements hal and owns `main()` |
 
 The CMake targets enforce these rules. Each module exposes only its own `include/<module>/` directory, and a module can only include headers from targets it links. Anything in a module's own directory, outside `include/`, is private.
@@ -71,6 +71,15 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 - Gapless: when a track starts, the player queues the next one with a new token. The backend switches without a gap and reports the new token, and `player_update` then moves the queue on and queues the following track.
 - Shuffle is seeded (`core/random`). The resume file (`/.echo/resume.bin`, `playback/resume_state`) stores the queue plan (source list, anchor track, shuffle mode, seed), the cursor, the track and the position, so the exact same queue is rebuilt after power-off. A library fingerprint rejects resume files from an older index.
 - The player saves on start, on track change, on pause, every 15 s while playing, and in `app_stop()`.
+
+## Cover Flow
+
+- Albums run by album artist, then by year, the same order as Album Artists. The screen keeps up to 1,024 album indices (2 KB).
+- `ui/cover_flow` holds the geometry and the motion, in fixed point (256 = one cover). The center cover is flat and 112 px. Neighbours are 42 px wide trapezoids, 84 px tall on the side facing the center and 64 px on the far side, spaced 32 px apart. Between those positions, every measure is interpolated, so a cover grows and flattens as it slides in. The position eases toward the selected album with a 70 ms time constant, at no less than about 4 covers per second, and never overshoots.
+- Covers are drawn farthest first, so nearer covers overlap them. `gfx/image` draws a cover column by column with nearest-neighbour sampling, clipped to the current strip.
+- `app/cover_cache` holds 7 half-size covers (56 px, 6,272 B each) for the center ±3, in slot `position % 7`, plus one full-size cover (112 px, 25,088 B) for the center, about 69 KB in total.
+- Covers load in `update`, one per frame: the nearest missing half cover first, then the full cover once the motion has stopped. A cover is drawn from the full image when that's loaded for its album, otherwise from the half image, otherwise as a placeholder. Beyond ±3, covers that aren't loaded aren't drawn.
+- Play opens the album's track list, a long Play toggles the favorite, and Back leaves. The screen is full screen: no header or status icons, and the title (★ for favorites) and album artist go under the cover. The first time it opens, it starts at the playing album.
 
 ## Rendering
 
@@ -128,6 +137,7 @@ The panel keeps its own image memory, so we never hold a full framebuffer. The s
 | `tools_unit_tests` | Python tests for the PC tools |
 | `fonts_up_to_date` | that the generated fonts match their sources |
 | `library_fixture_up_to_date` | that `tests/fixtures/small_library.db`, written by the Python indexer and read by the C tests, matches the indexer |
+| `cover_fixture_up_to_date` | that `tests/fixtures/small_covers.bin` (two solid-color covers for the fixture albums) matches the cover exporter |
 | `no_comments` | that no code file contains a comment |
 | `format` | that every C file matches `clang-format` |
 | `target_audit` | the Cortex-M3 cross-compile: heap symbols, flash and static RAM |
@@ -143,7 +153,7 @@ Host builds run under UndefinedBehaviorSanitizer. AddressSanitizer is opt-in (`E
 
 ## Simulator storage
 
-`--card DIR` maps the card root `/` to a host folder, which is only ever read. `--system-dir DIR` maps `/.echo/` to a separate folder, so the database, resume file, settings and favorites can live in `build/` without touching your music folder. Writes are refused outside `--system-dir`:
+`--card DIR` maps the card root `/` to a host folder, which is only ever read. `--system-dir DIR` maps `/.echo/` to a separate folder, so the database, covers, resume file, settings and favorites can live in `build/` without touching your music folder. Writes are refused outside `--system-dir`:
 
 ```sh
 .venv/bin/python tools/library_index.py --music ~/Music --output build/library/library.db

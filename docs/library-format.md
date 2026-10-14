@@ -43,7 +43,7 @@ Each section directory entry is `u32 offset`, `u32 count`, `u16 record size`, `u
 Field notes:
 - `u32` string fields hold an offset into the strings section.
 - Track `path` is relative to the music root and uses `/`. Track `artist` indexes the artists section, and `genre` indexes genres.
-- An album's tracks are `tracks[first_track .. first_track + track_count)`. Album `cover` is `0xFFFF` until the cover exporter fills it (Phase 1f).
+- An album's tracks are `tracks[first_track .. first_track + track_count)`. Album `cover` is reserved and always `0xFFFF`. Covers live in their own file, keyed by album key (see Covers file).
 - A group's albums are `links[first_link .. first_link + link_count)`. Artists list every album containing at least one of their tracks. Artist and album-artist albums are ordered by year, then title; genre albums are ordered by title.
 - A playlist's links are track indices in playlist order. Its name is the file name without `.m3u` or `.m3u8`.
 - A folder's items are `links[first_link ..]`: first `subfolder_count` folder indices (sorted by name), then `track_count` track indices (sorted by disc, number, file name).
@@ -79,3 +79,26 @@ Entries that match nothing are left out, and the indexer reports how many each p
 ## Album keys and favorites
 
 Favorites outlive a re-index, so they don't store album indices. An album's key is the FNV-1a hash of its album artist, a `0x1F` separator and its title (`library_album_key`). `/.echo/favorites.bin` holds the magic `EMFV`, `u16` version 1, a `u16` count, the `u32` keys and an FNV-1a checksum. At most 256 albums can be favorites. An album that leaves the library just stops showing up.
+
+## Covers file
+
+`tools/cover_export.py` writes `/.echo/covers.bin`. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | `char[4]` | magic `EMCV` |
+| 4 | `u16` | version = 1 |
+| 6 | `u16` | cover count |
+| 8 | `u16` | full size = 112 |
+| 10 | `u16` | half size = 56 |
+| 12 | `u32` | reserved (0) |
+| 16 | count × 8 B | index: `u32 album key`, `u32 record offset`, sorted by key |
+
+Each record is the full cover (112 × 112 pixels) followed by the half cover (56 × 56), as little-endian RGB565 rows, top to bottom. That's 31,360 bytes per album, so about 6.8 MB for 217 albums.
+
+The exporter takes, for each album:
+1. the first embedded front cover (picture type 3) in any of its tracks
+2. otherwise the first embedded picture of any type
+3. otherwise `cover`, `folder`, `front` or `albumart` (`.jpg`, `.jpeg` or `.png`, any case) in a folder holding its tracks
+
+The image is cropped to a centered square and resized with Lanczos filtering, separately for each size. Albums without art are left out and listed when the export finishes; the device draws a plain placeholder for them.
