@@ -68,6 +68,7 @@ typedef struct Msc {
     uint8_t lun;
     uint32_t lba;
     uint32_t sector_offset;
+    bool sector_loaded;
     uint8_t sense_key[MSC_MAX_LUNS];
     uint8_t sense_code[MSC_MAX_LUNS];
     uint8_t ejected;
@@ -85,7 +86,8 @@ typedef struct Msc {
 void msc_init(Msc *msc, const MscLun *luns, uint8_t count);
 void msc_reset(Msc *msc);
 void msc_receive(Msc *msc, const uint8_t *packet, uint32_t length);
-bool msc_next_in(Msc *msc, uint8_t *packet, uint32_t *length);
+bool msc_next_in(Msc *msc, uint8_t *buffer, uint32_t capacity, uint32_t *length);
+void msc_prefetch(Msc *msc);
 bool msc_ejected(const Msc *msc, uint8_t lun);
 MscStats msc_stats(const Msc *msc);
 MscHistory msc_history(const Msc *msc);

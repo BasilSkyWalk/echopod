@@ -23,9 +23,12 @@ typedef struct Exchange {
 static RamDisk writable_disk;
 static RamDisk read_only_disk;
 
+static uint32_t disk_reads;
+
 static bool ram_read(void *context, uint32_t lba, uint32_t count, void *buffer)
 {
     RamDisk *disk = context;
+    disk_reads += count;
     memcpy(buffer, disk->bytes + lba * 512, count * 512);
     return true;
 }
@@ -46,6 +49,7 @@ static Msc *started(void)
 {
     static Msc msc;
     failing_write_lba = UINT32_MAX;
+    disk_reads = 0;
     for (uint32_t index = 0; index < sizeof writable_disk.bytes; index++) {
         writable_disk.bytes[index] = (uint8_t)(index * 7 + 1);
         read_only_disk.bytes[index] = (uint8_t)(index * 3 + 2);
@@ -87,7 +91,7 @@ static Exchange *collect(Msc *msc)
     memset(&exchange, 0, sizeof exchange);
     uint8_t packet[64];
     uint32_t length = 0;
-    while (msc_next_in(msc, packet, &length)) {
+    while (msc_next_in(msc, packet, sizeof packet, &length)) {
         exchange.packets++;
         exchange.largest_packet =
             (int)length > exchange.largest_packet ? (int)length : exchange.largest_packet;
@@ -318,7 +322,7 @@ static void an_invalid_command_block_is_ignored(void)
     uint32_t length = 0;
     Msc *msc = started();
     msc_receive(msc, garbage, sizeof garbage);
-    CHECK(!msc_next_in(msc, packet, &length));
+    CHECK(!msc_next_in(msc, packet, sizeof packet, &length));
 }
 
 static void a_reset_drops_a_transfer_in_progress(void)
@@ -329,9 +333,9 @@ static void a_reset_drops_a_transfer_in_progress(void)
     Msc *msc = started();
     read_10_block(block, 0x28, 0, 4);
     send_command(msc, 4 * 512, true, 0, block, 10);
-    CHECK(msc_next_in(msc, packet, &length));
+    CHECK(msc_next_in(msc, packet, sizeof packet, &length));
     msc_reset(msc);
-    CHECK(!msc_next_in(msc, packet, &length));
+    CHECK(!msc_next_in(msc, packet, sizeof packet, &length));
     static const uint8_t ready[6] = {0x00};
     send_command(msc, 0, false, 0, ready, 6);
     check_csw(collect(msc), 0, 0);
@@ -480,6 +484,78 @@ static void history_records_only_the_first_lun(void)
     CHECK_EQUAL(0x12, history.entries[0].opcode);
 }
 
+static int collect_chunks(Msc *msc, uint32_t capacity, uint8_t *data, uint32_t *lengths)
+{
+    static uint32_t chunk[128];
+    uint32_t length = 0;
+    uint32_t offset = 0;
+    int chunks = 0;
+    while (msc_next_in(msc, (uint8_t *)chunk, capacity, &length)) {
+        if (length == 13 && memcmp(chunk, "USBS", 4) == 0) {
+            break;
+        }
+        memcpy(data + offset, chunk, length);
+        offset += length;
+        lengths[chunks++] = length;
+    }
+    return chunks;
+}
+
+static void sectors_come_out_in_whole_sector_chunks(void)
+{
+    static uint8_t data[3 * 512];
+    uint32_t lengths[8] = {0};
+    uint8_t block[10];
+    Msc *msc = started();
+    read_10_block(block, 0x28, 4, 3);
+    send_command(msc, 3 * 512, true, 0, block, 10);
+    CHECK_EQUAL(3, collect_chunks(msc, 512, data, lengths));
+    CHECK_EQUAL(512, lengths[0]);
+    CHECK_EQUAL(512, lengths[2]);
+    CHECK(memcmp(data, writable_disk.bytes + 4 * 512, sizeof data) == 0);
+}
+
+static void a_reply_fits_in_one_chunk(void)
+{
+    static uint8_t data[512];
+    uint32_t lengths[8] = {0};
+    static const uint8_t block[6] = {0x1A, 0, 0x3F, 0, 192, 0};
+    Msc *msc = started();
+    send_command(msc, 192, true, 0, block, 6);
+    CHECK_EQUAL(1, collect_chunks(msc, 512, data, lengths));
+    CHECK_EQUAL(192, lengths[0]);
+}
+
+static void prefetching_reads_the_next_sector_once(void)
+{
+    static uint32_t chunk[128];
+    uint32_t length = 0;
+    uint8_t block[10];
+    Msc *msc = started();
+    read_10_block(block, 0x28, 0, 2);
+    send_command(msc, 2 * 512, true, 0, block, 10);
+    CHECK(msc_next_in(msc, (uint8_t *)chunk, 512, &length));
+    CHECK_EQUAL(1, disk_reads);
+    msc_prefetch(msc);
+    CHECK_EQUAL(2, disk_reads);
+    msc_prefetch(msc);
+    CHECK_EQUAL(2, disk_reads);
+    CHECK(msc_next_in(msc, (uint8_t *)chunk, 512, &length));
+    CHECK_EQUAL(512, length);
+    CHECK_EQUAL(2, disk_reads);
+    CHECK(memcmp(chunk, writable_disk.bytes + 512, 512) == 0);
+}
+
+static void prefetching_outside_a_read_does_nothing(void)
+{
+    static const uint8_t inquiry[6] = {0x12, 0, 0, 0, 36, 0};
+    Msc *msc = started();
+    msc_prefetch(msc);
+    send_command(msc, 36, true, 0, inquiry, 6);
+    msc_prefetch(msc);
+    CHECK_EQUAL(0, disk_reads);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -508,6 +584,10 @@ int main(void)
         TEST_CASE(history_holds_the_most_recent_entries),
         TEST_CASE(each_lun_keeps_its_own_sense),
         TEST_CASE(history_records_only_the_first_lun),
+        TEST_CASE(sectors_come_out_in_whole_sector_chunks),
+        TEST_CASE(a_reply_fits_in_one_chunk),
+        TEST_CASE(prefetching_reads_the_next_sector_once),
+        TEST_CASE(prefetching_outside_a_read_does_nothing),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

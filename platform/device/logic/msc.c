@@ -224,6 +224,7 @@ static bool start_transfer(Msc *msc, const MscLun *lun, const uint8_t *block)
     uint32_t count = (uint32_t)block[7] << 8 | block[8];
     msc->lba = be32(block + 2);
     msc->sector_offset = 0;
+    msc->sector_loaded = false;
     if (msc->lba > lun->sector_count || count > lun->sector_count - msc->lba) {
         set_sense(msc, SENSE_ILLEGAL_REQUEST, CODE_OUT_OF_RANGE);
         return false;
@@ -388,37 +389,94 @@ void msc_receive(Msc *msc, const uint8_t *packet, uint32_t length)
     }
 }
 
-static uint8_t sector_byte(Msc *msc)
+static bool ensure_sector(Msc *msc)
 {
+    if (msc->sector_loaded) {
+        return true;
+    }
     const MscLun *lun = &msc->luns[msc->lun];
-    if (msc->sector_offset == 0) {
-        if (!lun->read(lun->context, msc->lba, 1, msc->sector)) {
-            set_sense(msc, SENSE_MEDIUM_ERROR, CODE_UNRECOVERED_READ);
-            msc->source = MSC_SOURCE_NONE;
-            msc->stats.read_failures++;
-            msc->stats.last_failed_lba = msc->lba;
-            return 0;
-        }
-        msc->stats.sectors_read++;
+    if (!lun->read(lun->context, msc->lba, 1, msc->sector)) {
+        set_sense(msc, SENSE_MEDIUM_ERROR, CODE_UNRECOVERED_READ);
+        msc->source = MSC_SOURCE_NONE;
+        msc->stats.read_failures++;
+        msc->stats.last_failed_lba = msc->lba;
+        return false;
     }
-    uint8_t value = ((const uint8_t *)msc->sector)[msc->sector_offset++];
-    if (msc->sector_offset == MSC_SECTOR_SIZE) {
-        msc->sector_offset = 0;
-        msc->lba++;
-    }
-    return value;
+    msc->stats.sectors_read++;
+    msc->sector_loaded = true;
+    return true;
 }
 
-static uint8_t next_in_byte(Msc *msc)
+static void copy_bytes(uint8_t *to, const uint8_t *from, uint32_t count)
 {
-    uint32_t position = msc->transferred++;
-    if (position >= msc->valid_bytes) {
+    bool aligned = (((uintptr_t)to | (uintptr_t)from | count) & 3u) == 0;
+    if (aligned) {
+        uint32_t *to_words = (uint32_t *)(void *)to;
+        const uint32_t *from_words = (const uint32_t *)(const void *)from;
+        for (uint32_t index = 0; index < count / 4; index++) {
+            to_words[index] = from_words[index];
+        }
+        return;
+    }
+    for (uint32_t index = 0; index < count; index++) {
+        to[index] = from[index];
+    }
+}
+
+static uint32_t smallest(uint32_t a, uint32_t b, uint32_t c)
+{
+    uint32_t low = a < b ? a : b;
+    return low < c ? low : c;
+}
+
+static uint32_t copy_sector_data(Msc *msc, uint8_t *buffer, uint32_t room)
+{
+    if (!ensure_sector(msc)) {
         return 0;
     }
-    if (msc->source == MSC_SOURCE_RESPONSE) {
-        return msc->response[position];
+    uint32_t count =
+        smallest(room, MSC_SECTOR_SIZE - msc->sector_offset, msc->valid_bytes - msc->transferred);
+    copy_bytes(buffer, (const uint8_t *)msc->sector + msc->sector_offset, count);
+    msc->sector_offset += count;
+    msc->transferred += count;
+    if (msc->sector_offset == MSC_SECTOR_SIZE) {
+        msc->sector_offset = 0;
+        msc->sector_loaded = false;
+        msc->lba++;
     }
-    return msc->source == MSC_SOURCE_SECTORS ? sector_byte(msc) : 0;
+    return count;
+}
+
+static uint8_t next_plain_byte(Msc *msc)
+{
+    uint32_t position = msc->transferred++;
+    bool from_response = msc->source == MSC_SOURCE_RESPONSE && position < msc->valid_bytes;
+    return from_response ? msc->response[position] : 0;
+}
+
+static bool sector_data_pending(const Msc *msc)
+{
+    return msc->source == MSC_SOURCE_SECTORS && msc->transferred < msc->valid_bytes;
+}
+
+static uint32_t fill_in_data(Msc *msc, uint8_t *buffer, uint32_t capacity)
+{
+    uint32_t count = 0;
+    while (count < capacity && msc->transferred < msc->expected) {
+        if (sector_data_pending(msc)) {
+            count += copy_sector_data(msc, buffer + count, capacity - count);
+        } else {
+            buffer[count++] = next_plain_byte(msc);
+        }
+    }
+    return count;
+}
+
+void msc_prefetch(Msc *msc)
+{
+    if (msc->phase == MSC_PHASE_DATA_IN && sector_data_pending(msc)) {
+        ensure_sector(msc);
+    }
 }
 
 static uint32_t residue(const Msc *msc)
@@ -442,20 +500,16 @@ static void status_packet(Msc *msc, uint8_t *packet, uint32_t *length)
     msc->phase = MSC_PHASE_COMMAND;
 }
 
-bool msc_next_in(Msc *msc, uint8_t *packet, uint32_t *length)
+bool msc_next_in(Msc *msc, uint8_t *buffer, uint32_t capacity, uint32_t *length)
 {
     if (msc->phase == MSC_PHASE_STATUS) {
-        status_packet(msc, packet, length);
+        status_packet(msc, buffer, length);
         return true;
     }
     if (msc->phase != MSC_PHASE_DATA_IN) {
         return false;
     }
-    uint32_t count = 0;
-    while (count < MSC_PACKET_SIZE && msc->transferred < msc->expected) {
-        packet[count++] = next_in_byte(msc);
-    }
-    *length = count;
+    *length = fill_in_data(msc, buffer, capacity);
     if (msc->transferred == msc->expected) {
         msc->phase = MSC_PHASE_STATUS;
     }

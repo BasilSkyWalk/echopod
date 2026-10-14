@@ -105,8 +105,7 @@ static void show_counters(MscStats stats)
 
 static bool stats_changed(MscStats now, MscStats shown)
 {
-    return now.commands != shown.commands || now.write_failures != shown.write_failures ||
-           now.read_failures != shown.read_failures;
+    return now.write_failures != shown.write_failures || now.read_failures != shown.read_failures;
 }
 
 static UsbSessionEnd serve(void)

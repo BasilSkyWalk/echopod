@@ -62,6 +62,7 @@
 #define EP_INT_ALL 0xFFFFu
 #define EP0_OUT_SETUP_SIZE 0x60080040u
 #define ONE_PACKET (1u << 19)
+#define PACKET_COUNT_SHIFT 19
 #define DIEPMSK_VALUE 0x2Fu
 #define DOEPMSK_VALUE 0x0Fu
 #define DAINT_EP0 0x00010001u
@@ -95,6 +96,8 @@ enum {
     PACKET_OUT_DATA = 2,
     PACKET_SETUP_DATA = 6,
     BULK_ENDPOINT = 1,
+    PACKET_WORDS = USB_PACKET_SIZE / 4,
+    BULK_CHUNK_BYTES = 512,
     RESET_TIMEOUT_MS = 100,
     SPACE_TIMEOUT_MS = 100,
     PHY_SETTLE_US = 5,
@@ -491,12 +494,49 @@ static void handle_in_endpoints(UsbPort *port)
     }
 }
 
+static bool wait_for_space(const UsbPort *port, uint32_t endpoint, uint32_t words)
+{
+    uint32_t start = hal_clock_milliseconds();
+    while (tx_space(port, endpoint) < words) {
+        if (hal_clock_milliseconds() - start > SPACE_TIMEOUT_MS) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool send_bulk(const UsbPort *port, const uint32_t *words, uint32_t length)
+{
+    uint32_t packets = length == 0 ? 1 : (length + USB_PACKET_SIZE - 1) / USB_PACKET_SIZE;
+    uint32_t total_words = (length + 3) / 4;
+    write_register(in_control(BULK_ENDPOINT) + 0x10u, packets << PACKET_COUNT_SHIFT | length);
+    set_bits(in_control(BULK_ENDPOINT), EP_ENABLE | EP_CLEAR_NAK);
+    for (uint32_t sent = 0; sent < total_words;) {
+        uint32_t chunk = total_words - sent < PACKET_WORDS ? total_words - sent : PACKET_WORDS;
+        if (!wait_for_space(port, BULK_ENDPOINT, chunk)) {
+            return false;
+        }
+        for (uint32_t index = 0; index < chunk; index++) {
+            write_register(fifo(BULK_ENDPOINT), words[sent + index]);
+        }
+        sent += chunk;
+    }
+    return true;
+}
+
 static void pump_bulk_in(UsbPort *port)
 {
-    static uint8_t packet[USB_PACKET_SIZE];
+    static uint32_t chunk[BULK_CHUNK_BYTES / 4];
     uint32_t length = 0;
-    if (port->configured && !port->in_busy && msc_next_in(port->msc, packet, &length)) {
-        port->in_busy = send(port, BULK_ENDPOINT, packet, length);
+    if (!port->configured) {
+        return;
+    }
+    if (port->in_busy) {
+        msc_prefetch(port->msc);
+        return;
+    }
+    if (msc_next_in(port->msc, (uint8_t *)chunk, BULK_CHUNK_BYTES, &length)) {
+        port->in_busy = send_bulk(port, chunk, length);
     }
 }
 
