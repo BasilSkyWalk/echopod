@@ -13,8 +13,9 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | 1c | PC indexer, DB format, browse screens | 4–6 d | no | done |
 | 1d | Simulator playback: queue, shuffle/repeat, gapless, resume | 3–4 d | no | done |
 | 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | done |
-| 1f | Cover Flow and cover export script | 4–6 d | no | done (awaiting review) |
-| 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | todo |
+| 1f | Cover Flow and cover export script | 4–6 d | no | done |
+| 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | in progress: runbook in `docs/device-recovery.md`, waiting for the hardware test |
+| 3a | First device image: our UI on ReChord's display, key and SD-read drivers. No audio and no saving | 3–5 d | yes | todo (needs Phase 2 and decisions 13–14 in NOTES) |
 | 3 | Device gaps: PLL, IRQs/SysTick, DMA audio, FAT writes, battery, backlight PWM, key timing, sleep | 3–8 wk | yes | todo |
 | 4 | Our app on the device; memory and Cover Flow tuning | 1–2 wk | yes | todo |
 
