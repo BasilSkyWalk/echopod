@@ -78,9 +78,26 @@ static bool read_keys(ArgumentCursor *cursor, SimOptions *options)
     return options->key_script != NULL;
 }
 
+static bool read_card(ArgumentCursor *cursor, SimOptions *options)
+{
+    options->card_directory = next_value(cursor);
+    return options->card_directory != NULL;
+}
+
+static bool read_system_directory(ArgumentCursor *cursor, SimOptions *options)
+{
+    options->system_directory = next_value(cursor);
+    return options->system_directory != NULL;
+}
+
 static const OptionSpec OPTION_SPECS[] = {
-    {"--scale", read_scale},           {"--frames", read_frames}, {"--headless", read_headless},
-    {"--screenshot", read_screenshot}, {"--keys", read_keys},
+    {"--scale", read_scale},
+    {"--frames", read_frames},
+    {"--headless", read_headless},
+    {"--screenshot", read_screenshot},
+    {"--keys", read_keys},
+    {"--card", read_card},
+    {"--system-dir", read_system_directory},
 };
 
 static bool read_option(ArgumentCursor *cursor, SimOptions *options)

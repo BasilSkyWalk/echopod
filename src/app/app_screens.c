@@ -1,10 +1,24 @@
 #include "app_screens.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 
-static const char *const MUSIC_LABELS[MUSIC_ITEM_COUNT] = {
-    "Cover Flow", "Artists",   "Album Artists", "Albums",    "Genres",
-    "Folders",    "All Songs", "Playlists",     "Favorites",
+typedef struct MusicEntry {
+    const char *label;
+    bool from_library;
+    BrowseKind kind;
+} MusicEntry;
+
+static const MusicEntry MUSIC_ENTRIES[MUSIC_ITEM_COUNT] = {
+    {"Cover Flow", false, BROWSE_ALBUMS},
+    {"Artists", true, BROWSE_ARTISTS},
+    {"Album Artists", true, BROWSE_ALBUM_ARTISTS},
+    {"Albums", true, BROWSE_ALBUMS},
+    {"Genres", true, BROWSE_GENRES},
+    {"Folders", true, BROWSE_FOLDER},
+    {"All Songs", true, BROWSE_ALL_SONGS},
+    {"Playlists", false, BROWSE_ALBUMS},
+    {"Favorites", false, BROWSE_ALBUMS},
 };
 
 static const char *year_value(const void *context)
@@ -60,10 +74,38 @@ static Screen *build_menu(MenuScreen *menu, const char *title, const MenuItem *i
     return menu_screen_init(menu, (MenuConfig){title, items, count, theme});
 }
 
-static void build_music(AppScreens *screens, const Theme *theme)
+static ScreenAction open_browse(void *context)
 {
+    BrowseEntry *entry = context;
+    if (!entry->store->available) {
+        return screen_action_push(entry->unavailable);
+    }
+    return screen_action_push(browse_pool_open(entry->pool, 0, entry->query));
+}
+
+static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int index)
+{
+    const MusicEntry *entry = &MUSIC_ENTRIES[index];
+    if (!entry->from_library) {
+        return open_item(entry->label, &screens->coming_soon.screen);
+    }
+    screens->browse_entries[index] = (BrowseEntry){
+        .pool = &screens->browse,
+        .store = store,
+        .unavailable = &screens->no_library.screen,
+        .query = browse_root_query(entry->kind),
+    };
+    return (MenuItem){.label = entry->label,
+                      .select = open_browse,
+                      .context = &screens->browse_entries[index],
+                      .value = NULL};
+}
+
+static void build_music(AppScreens *screens, const Theme *theme, const LibraryStore *store)
+{
+    browse_pool_init(&screens->browse, &store->library, theme);
     for (int index = 0; index < MUSIC_ITEM_COUNT; index++) {
-        screens->music_items[index] = open_item(MUSIC_LABELS[index], &screens->coming_soon.screen);
+        screens->music_items[index] = music_item(screens, store, index);
     }
     build_menu(&screens->music, "Music", screens->music_items, MUSIC_ITEM_COUNT, theme);
 }
@@ -96,12 +138,16 @@ static void build_home(AppScreens *screens, const Theme *theme)
     build_menu(&screens->home, "Echo Mini", screens->home_items, HOME_ITEM_COUNT, theme);
 }
 
-Screen *app_screens_init(AppScreens *screens, AppOptions *options, const Theme *theme)
+Screen *app_screens_init(AppScreens *screens, AppOptions *options, const Theme *theme,
+                         const LibraryStore *store)
 {
     MessageConfig coming_soon = {
         .title = "Coming soon", .message = "This part is not built yet", .theme = theme};
+    MessageConfig no_library = {
+        .title = "No library", .message = "Run the PC indexer to build one", .theme = theme};
     message_screen_init(&screens->coming_soon, coming_soon);
-    build_music(screens, theme);
+    message_screen_init(&screens->no_library, no_library);
+    build_music(screens, theme, store);
     build_diagnostics(screens, options, theme);
     build_home(screens, theme);
     return &screens->home.screen;

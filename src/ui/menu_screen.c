@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #include "ui/header.h"
-#include "ui/navigation.h"
+#include "ui/list_navigation.h"
 
 static int item_count(const void *context)
 {
@@ -24,36 +24,18 @@ static const char *item_value(const void *context, int index)
     return item->value != NULL ? item->value(item->context) : NULL;
 }
 
-static ScreenAction select_current(MenuScreen *menu)
+static ScreenAction select_item(void *context, int index)
 {
-    if (menu->config.item_count == 0) {
-        return screen_action_none();
-    }
-    const MenuItem *item = &menu->config.items[menu->list.selected];
+    MenuScreen *menu = context;
+    const MenuItem *item = &menu->config.items[index];
     return item->select != NULL ? item->select(item->context) : screen_action_none();
 }
 
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     MenuScreen *menu = context;
-    Navigation navigation = navigation_from_key(event);
-    switch (navigation.intent) {
-    case NAVIGATION_PREVIOUS:
-        list_view_move(&menu->list, -1, !navigation.repeated, now_ms);
-        return screen_action_none();
-    case NAVIGATION_NEXT:
-        list_view_move(&menu->list, 1, !navigation.repeated, now_ms);
-        return screen_action_none();
-    case NAVIGATION_SELECT:
-        return select_current(menu);
-    case NAVIGATION_BACK:
-        return screen_action_pop();
-    case NAVIGATION_HOME:
-        return screen_action_pop_to_root();
-    case NAVIGATION_NONE:
-        return screen_action_none();
-    }
-    return screen_action_none();
+    ListSelection selection = {.select = select_item, .context = menu};
+    return list_navigation_handle(&menu->list, event, now_ms, selection);
 }
 
 static void enter(void *context, uint32_t now_ms)

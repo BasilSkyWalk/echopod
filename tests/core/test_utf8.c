@@ -61,6 +61,26 @@ static void an_encoded_surrogate_is_rejected(void)
     CHECK_EQUAL(UTF8_REPLACEMENT_CHARACTER, decode_at(&cursor));
 }
 
+static void complete_text_keeps_its_length(void)
+{
+    CHECK_EQUAL(5, utf8_complete_length("Bjo\xCC\x88", 5));
+    CHECK_EQUAL(3, utf8_complete_length("abc", 3));
+    CHECK_EQUAL(0, utf8_complete_length("", 0));
+}
+
+static void a_cut_inside_a_character_drops_the_partial_character(void)
+{
+    CHECK_EQUAL(2, utf8_complete_length("Bj\xC3\xB6rk", 3));
+    CHECK_EQUAL(1, utf8_complete_length("a\xE2\x82\xAC", 3));
+    CHECK_EQUAL(1, utf8_complete_length("a\xF0\x9F\x98\x80", 4));
+}
+
+static void a_cut_after_a_whole_character_is_kept(void)
+{
+    CHECK_EQUAL(4, utf8_complete_length("Bj\xC3\xB6rk", 4));
+    CHECK_EQUAL(4, utf8_complete_length("a\xE2\x82\xAC", 4));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -71,6 +91,9 @@ int main(void)
         TEST_CASE(a_truncated_sequence_is_replaced),
         TEST_CASE(an_overlong_encoding_is_rejected),
         TEST_CASE(an_encoded_surrogate_is_rejected),
+        TEST_CASE(complete_text_keeps_its_length),
+        TEST_CASE(a_cut_inside_a_character_drops_the_partial_character),
+        TEST_CASE(a_cut_after_a_whole_character_is_kept),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

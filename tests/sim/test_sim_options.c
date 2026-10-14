@@ -25,6 +25,17 @@ static void no_arguments_give_a_windowed_run_at_default_scale(void)
     CHECK(!options.headless);
     CHECK(options.screenshot_path == NULL);
     CHECK(options.key_script == NULL);
+    CHECK(options.card_directory == NULL);
+    CHECK(options.system_directory == NULL);
+}
+
+static void storage_directories_are_read(void)
+{
+    char *given[] = {"--card", "/music", "--system-dir", "/tmp/echo"};
+    SimOptions options;
+    CHECK(parse(given, 4, &options));
+    CHECK(options.card_directory == given[1]);
+    CHECK(options.system_directory == given[3]);
 }
 
 static void a_key_script_is_read(void)
@@ -89,6 +100,7 @@ int main(void)
         TEST_CASE(no_arguments_give_a_windowed_run_at_default_scale),
         TEST_CASE(every_option_is_read),
         TEST_CASE(a_key_script_is_read),
+        TEST_CASE(storage_directories_are_read),
         TEST_CASE(an_unknown_option_is_rejected),
         TEST_CASE(an_option_missing_its_value_is_rejected),
         TEST_CASE(non_numeric_values_are_rejected),

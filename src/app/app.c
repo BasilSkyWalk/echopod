@@ -10,6 +10,7 @@
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
+#include "library_store.h"
 #include "ui/screen_stack.h"
 
 enum {
@@ -38,6 +39,7 @@ typedef struct AppState {
     KeyTracker keys;
     FrameStats frame_stats;
     ScreenStack stack;
+    LibraryStore library;
     AppScreens screens;
     AppOptions options;
 } AppState;
@@ -117,7 +119,8 @@ void app_start(void)
     key_tracker_init(&app.keys, &KEY_CONFIG);
     frame_stats_reset(&app.frame_stats);
     app.options = (AppOptions){.show_frame_time = false};
-    Screen *root = app_screens_init(&app.screens, &app.options, &DEFAULT_THEME);
+    library_store_open(&app.library);
+    Screen *root = app_screens_init(&app.screens, &app.options, &DEFAULT_THEME, &app.library);
     screen_stack_init(&app.stack, root, now_ms);
 }
 

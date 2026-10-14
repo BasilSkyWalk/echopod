@@ -3,6 +3,7 @@
 #include "app/app.h"
 #include "check.h"
 #include "fake_hal.h"
+#include "fixture_library.h"
 #include "frame_overlay.h"
 #include "hal/display.h"
 
@@ -11,7 +12,11 @@ enum {
     KEY_HOLD_MS = 30,
     FULL_FRAME_PIXELS = HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT,
     HOME_DIAGNOSTICS_INDEX = 3,
-    DIAGNOSTICS_FRAME_TIME_INDEX = 3
+    DIAGNOSTICS_FRAME_TIME_INDEX = 3,
+    MUSIC_ARTISTS_INDEX = 1,
+    MUSIC_ALBUMS_INDEX = 3,
+    MUSIC_FOLDERS_INDEX = 5,
+    BJORK_POSITION = 3
 };
 
 static uint32_t now_ms;
@@ -19,6 +24,17 @@ static uint32_t now_ms;
 static void start_app(void)
 {
     fake_hal_reset();
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+}
+
+static void start_app_with_library(void)
+{
+    uint32_t size = 0;
+    const uint8_t *bytes = fixture_bytes(&size);
+    fake_hal_reset();
+    fake_hal_add_file("/.echo/library.db", bytes, size);
     now_ms = START_MS;
     fake_hal_set_milliseconds(now_ms);
     app_start();
@@ -119,6 +135,62 @@ static void the_frame_overlay_is_off_until_enabled_in_diagnostics(void)
     CHECK(overlay_visible());
 }
 
+static void open_music_entry(int index)
+{
+    tap(KEY_PLAY);
+    move_down(index);
+    tap(KEY_PLAY);
+}
+
+static void albums_open_from_the_library(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_ALBUMS_INDEX);
+    CHECK(title_is("Albums"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    CHECK_EQUAL(4, app_screen_depth());
+}
+
+static void an_artist_leads_to_their_albums(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_ARTISTS_INDEX);
+    move_down(BJORK_POSITION);
+    tap(KEY_PLAY);
+    CHECK(title_is("Björk"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+}
+
+static void back_returns_to_the_previous_list(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_ALBUMS_INDEX);
+    tap(KEY_PLAY);
+    tap(KEY_BACK);
+    CHECK(title_is("Albums"));
+}
+
+static void folders_can_be_browsed_down_to_an_album(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_FOLDERS_INDEX);
+    CHECK(title_is("Folders"));
+    tap(KEY_PLAY);
+    CHECK(title_is("AC DC"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    CHECK_EQUAL(5, app_screen_depth());
+}
+
+static void without_a_library_the_lists_explain_what_is_missing(void)
+{
+    start_app();
+    open_music_entry(MUSIC_ARTISTS_INDEX);
+    CHECK(title_is("No library"));
+}
+
 static void each_step_records_its_duration(void)
 {
     start_app();
@@ -136,6 +208,11 @@ int main(void)
         TEST_CASE(back_returns_to_the_previous_screen),
         TEST_CASE(a_long_back_returns_home_from_deep_screens),
         TEST_CASE(the_frame_overlay_is_off_until_enabled_in_diagnostics),
+        TEST_CASE(albums_open_from_the_library),
+        TEST_CASE(an_artist_leads_to_their_albums),
+        TEST_CASE(back_returns_to_the_previous_list),
+        TEST_CASE(folders_can_be_browsed_down_to_an_album),
+        TEST_CASE(without_a_library_the_lists_explain_what_is_missing),
         TEST_CASE(each_step_records_its_duration),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

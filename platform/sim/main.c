@@ -11,6 +11,7 @@
 #include "sim_input.h"
 #include "sim_options.h"
 #include "sim_script.h"
+#include "sim_storage.h"
 
 enum {
     EXIT_USAGE = 2,
@@ -34,7 +35,8 @@ static const double MICROSECONDS_PER_MILLISECOND = 1000.0;
 static void print_usage(void)
 {
     fputs("usage: echo_sim [--scale N] [--frames N] [--headless] [--screenshot FILE.bmp]\n"
-          "                [--keys up,down,play,menu,back,power[:long],...]\n",
+          "                [--keys up,down,play,menu,back,power[:long],...]\n"
+          "                [--card MUSIC_DIR] [--system-dir DIR_WITH_LIBRARY_DB]\n",
           stderr);
 }
 
@@ -162,6 +164,7 @@ static int finish(const SimOptions *options)
     format_frame_stats(stats_text, sizeof stats_text);
     printf("%s: %s\n", app_screen_title(), stats_text);
     sim_display_close();
+    sim_storage_close_all();
     SDL_Quit();
     return status;
 }
@@ -178,6 +181,7 @@ int main(int argument_count, char **arguments)
         SDL_Quit();
         return EXIT_FAILURE;
     }
+    sim_storage_configure(session.options.card_directory, session.options.system_directory);
     app_start();
     run(&session);
     return finish(&session.options);

@@ -1,6 +1,7 @@
 add_library(echo_ui STATIC
     header.c
     label.c
+    list_navigation.c
     list_view.c
     marquee.c
     menu_screen.c

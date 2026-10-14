@@ -6,6 +6,7 @@
 #include "core/key.h"
 
 void fake_hal_reset(void);
+void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size);
 void fake_hal_set_milliseconds(uint32_t now_ms);
 void fake_hal_set_microseconds_per_read(uint32_t step_us);
 void fake_hal_queue_transition(Key key, bool pressed, uint32_t time_ms);

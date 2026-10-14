@@ -71,3 +71,19 @@ uint32_t utf8_next(const char **cursor)
     *cursor += length;
     return codepoint;
 }
+
+size_t utf8_complete_length(const char *text, size_t length)
+{
+    const unsigned char *bytes = (const unsigned char *)text;
+    size_t lead = length;
+    while (lead > 0 && is_continuation(bytes[lead - 1])) {
+        lead--;
+    }
+    if (lead == 0) {
+        return 0;
+    }
+    lead--;
+    int expected = sequence_length(bytes[lead]);
+    size_t sequence_end = lead + (size_t)(expected > 0 ? expected : 1);
+    return sequence_end > length ? lead : length;
+}

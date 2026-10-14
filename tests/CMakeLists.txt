@@ -24,6 +24,20 @@ echo_add_unit_test(NAME test_font SOURCES gfx/test_font.c gfx/tiny_font.c LIBRAR
 echo_add_unit_test(NAME test_text SOURCES gfx/test_text.c gfx/tiny_font.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_fonts SOURCES fonts/test_fonts.c LIBRARIES echo_fonts)
 
+add_library(echo_library_fixtures STATIC library/memory_source.c library/fixture_library.c)
+target_include_directories(echo_library_fixtures PUBLIC library)
+target_compile_definitions(echo_library_fixtures PRIVATE
+    ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+)
+target_link_libraries(echo_library_fixtures PUBLIC echo_library PRIVATE echo_options)
+
+foreach(library_test block_cache library library_browse)
+    echo_add_unit_test(NAME test_${library_test}
+        SOURCES library/test_${library_test}.c
+        LIBRARIES echo_library_fixtures
+    )
+endforeach()
+
 echo_add_unit_test(NAME test_screen_stack SOURCES ui/test_screen_stack.c LIBRARIES echo_ui)
 echo_add_unit_test(NAME test_navigation SOURCES ui/test_navigation.c LIBRARIES echo_ui)
 echo_add_unit_test(NAME test_marquee SOURCES ui/test_marquee.c LIBRARIES echo_ui)
@@ -37,7 +51,7 @@ add_library(echo_ui_fixtures STATIC gfx/tiny_font.c ui/ui_test_theme.c ui/ui_tes
 target_include_directories(echo_ui_fixtures PUBLIC gfx ui)
 target_link_libraries(echo_ui_fixtures PUBLIC echo_ui PRIVATE echo_options)
 
-foreach(ui_test theme_layout list_view header menu_screen message_screen)
+foreach(ui_test theme_layout list_view list_navigation header menu_screen message_screen)
     echo_add_unit_test(NAME test_${ui_test}
         SOURCES ui/test_${ui_test}.c
         LIBRARIES echo_ui_fixtures
@@ -46,7 +60,7 @@ endforeach()
 
 echo_add_unit_test(NAME test_app
     SOURCES app/test_app.c app/fake_hal.c
-    LIBRARIES echo_app
+    LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_test_pattern_screen
@@ -108,6 +122,11 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             --config ${PROJECT_SOURCE_DIR}/assets/fonts/fonts.json
             --output ${PROJECT_SOURCE_DIR}/src/fonts
             --style ${PROJECT_SOURCE_DIR}/.clang-format
+            --check
+    )
+    add_test(NAME library_fixture_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/library_fixture.py
+            --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_library.db
             --check
     )
 else()

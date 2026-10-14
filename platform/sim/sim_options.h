@@ -14,6 +14,8 @@ typedef struct SimOptions {
     bool headless;
     const char *screenshot_path;
     const char *key_script;
+    const char *card_directory;
+    const char *system_directory;
 } SimOptions;
 
 bool sim_options_parse(int argument_count, char **arguments, SimOptions *options);
