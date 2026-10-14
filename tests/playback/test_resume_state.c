@@ -99,12 +99,27 @@ static void unknown_modes_are_rejected(void)
     CHECK(!resume_state_decode(bytes, sizeof bytes, &state));
 }
 
+static void playlist_sources_are_accepted(void)
+{
+    ResumeState state = sample_state();
+    state.plan.source = (BrowseQuery){.kind = BROWSE_PLAYLIST_TRACKS,
+                                      .group = LIBRARY_PLAYLISTS,
+                                      .subject = 0,
+                                      .artist = LIBRARY_NONE};
+    uint8_t bytes[RESUME_STATE_SIZE];
+    ResumeState decoded;
+    resume_state_encode(&state, bytes);
+    CHECK(resume_state_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(BROWSE_PLAYLIST_TRACKS, decoded.plan.source.kind);
+    CHECK_EQUAL(LIBRARY_PLAYLISTS, decoded.plan.source.group);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(a_state_survives_a_round_trip),       TEST_CASE(a_wrong_magic_is_rejected),
         TEST_CASE(a_corrupted_byte_fails_the_checksum), TEST_CASE(a_short_file_is_rejected),
-        TEST_CASE(unknown_modes_are_rejected),
+        TEST_CASE(unknown_modes_are_rejected),          TEST_CASE(playlist_sources_are_accepted),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

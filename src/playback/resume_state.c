@@ -93,12 +93,16 @@ static bool header_valid(const uint8_t *bytes)
            get_u32(bytes, CHECKSUM_FIELD) == checksum_of(bytes);
 }
 
+static bool group_valid(uint8_t group)
+{
+    return (group >= LIBRARY_ARTISTS && group <= LIBRARY_GENRES) || group == LIBRARY_PLAYLISTS;
+}
+
 static bool modes_valid(const uint8_t *bytes)
 {
-    uint8_t group = bytes[SOURCE_GROUP_FIELD];
     return bytes[SHUFFLE_FIELD] < SHUFFLE_MODE_COUNT && bytes[REPEAT_FIELD] < REPEAT_MODE_COUNT &&
-           bytes[SOURCE_KIND_FIELD] <= BROWSE_FOLDER && group >= LIBRARY_ARTISTS &&
-           group <= LIBRARY_GENRES;
+           bytes[SOURCE_KIND_FIELD] <= BROWSE_PLAYLIST_TRACKS &&
+           group_valid(bytes[SOURCE_GROUP_FIELD]);
 }
 
 static PlayQueuePlan decode_plan(const uint8_t *bytes)

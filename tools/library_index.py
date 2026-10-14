@@ -1,4 +1,5 @@
 import argparse
+import posixpath
 import re
 import struct
 import sys
@@ -8,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 MAGIC = b"EMDB"
-VERSION = 1
+VERSION = 2
 HEADER_SIZE = 128
 SECTION_ALIGNMENT = 4
 NONE = 0xFFFF
@@ -19,6 +20,8 @@ UNKNOWN_ARTIST = "Unknown Artist"
 UNKNOWN_ALBUM = "Unknown Album"
 UNKNOWN_GENRE = "Unknown Genre"
 AUDIO_SUFFIXES = {".flac", ".mp3", ".wav"}
+PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
+URL_MARKER = "://"
 
 HEADER_PREFIX = struct.Struct("<4sHH")
 SECTION_ENTRY = struct.Struct("<IIHH")
@@ -74,6 +77,20 @@ class Folder:
 
 
 @dataclass
+class RawPlaylist:
+    name: str
+    folder: str
+    entries: list
+
+
+@dataclass
+class Playlist:
+    name: str
+    tracks: list = field(default_factory=list)
+    unresolved: int = 0
+
+
+@dataclass
 class LibraryModel:
     tracks: list
     track_albums: list
@@ -86,6 +103,7 @@ class LibraryModel:
     genres: list
     folders: list
     title_order: list
+    playlists: list = field(default_factory=list)
 
 
 def sort_key(text):
@@ -161,6 +179,72 @@ def read_track(root, path):
     audio = File(path, easy=True)
     duration = audio.info.length if audio is not None else 0.0
     return track_from_tags(path.relative_to(root).as_posix(), normalized_tags(audio), duration)
+
+
+def parse_m3u(text):
+    lines = (line.strip() for line in text.splitlines())
+    return [line for line in lines if line and not line.startswith("#")]
+
+
+def decode_playlist(data):
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp1252", errors="replace")
+
+
+def path_parts(path):
+    return [part.casefold() for part in path.split("/") if part not in ("", ".", "..")]
+
+
+def common_suffix_length(first, second):
+    length = 0
+    while length < min(len(first), len(second)) and first[-1 - length] == second[-1 - length]:
+        length += 1
+    return length
+
+
+class PathIndex:
+    def __init__(self, paths):
+        self.exact = {path.casefold(): index for index, path in enumerate(paths)}
+        self.by_name = {}
+        for index, path in enumerate(paths):
+            parts = path_parts(path)
+            self.by_name.setdefault(parts[-1], []).append((parts, index))
+
+    def resolve(self, entry, playlist_folder):
+        if URL_MARKER in entry:
+            return None
+        normalized = entry.replace("\\", "/")
+        for candidate in (posixpath.join(playlist_folder, normalized), normalized):
+            index = self.exact.get(posixpath.normpath(candidate).casefold())
+            if index is not None:
+                return index
+        return self.resolve_by_suffix(path_parts(normalized))
+
+    def resolve_by_suffix(self, parts):
+        if not parts:
+            return None
+        scored = sorted(((common_suffix_length(parts, candidate), index)
+                         for candidate, index in self.by_name.get(parts[-1], [])), reverse=True)
+        if not scored or (len(scored) > 1 and scored[0][0] == scored[1][0]):
+            return None
+        return scored[0][1]
+
+
+def resolve_playlists(raw_playlists, tracks):
+    paths = PathIndex([track.path for track in tracks])
+    playlists = []
+    for raw in raw_playlists:
+        playlist = Playlist(raw.name)
+        for entry in raw.entries:
+            index = paths.resolve(entry, raw.folder)
+            if index is None:
+                playlist.unresolved += 1
+            else:
+                playlist.tracks.append(index)
+        playlists.append(playlist)
+    return sorted(playlists, key=lambda playlist: (sort_key(playlist.name), playlist.name))
 
 
 class NameIndex:
@@ -264,7 +348,7 @@ def title_order(tracks):
         sort_key(tracks[index].title), sort_key(tracks[index].artist), index))
 
 
-def build_library(track_infos):
+def build_library(track_infos, raw_playlists=()):
     album_artists = NameIndex(track.album_artist for track in track_infos)
     artists = NameIndex(track.artist for track in track_infos)
     genres = NameIndex(track.genre for track in track_infos)
@@ -286,6 +370,7 @@ def build_library(track_infos):
         genres=build_groups(genres, albums, album_tracks, lambda t: t.genre, alphabetical),
         folders=folders,
         title_order=title_order(tracks),
+        playlists=resolve_playlists(raw_playlists, tracks),
     )
 
 
@@ -343,6 +428,14 @@ def encode_folders(folders, strings, links):
     return data
 
 
+def encode_playlists(playlists, strings, links):
+    data = bytearray()
+    for playlist in playlists:
+        data += GROUP_RECORD.pack(strings.add(playlist.name), len(links), len(playlist.tracks), 0)
+        links.extend(playlist.tracks)
+    return data
+
+
 def encode_indices(values):
     return b"".join(INDEX_RECORD.pack(checked_index(value)) for value in values)
 
@@ -359,6 +452,8 @@ def encode_sections(model):
         (encode_groups(model.genres, strings, links), len(model.genres), GROUP_RECORD.size),
         (encode_folders(model.folders, strings, links), len(model.folders), FOLDER_RECORD.size),
         (encode_indices(model.title_order), len(model.title_order), INDEX_RECORD.size),
+        (encode_playlists(model.playlists, strings, links), len(model.playlists),
+         GROUP_RECORD.size),
     ]
     sections.append((encode_indices(links), len(links), INDEX_RECORD.size))
     sections.append((bytes(strings.blob), len(strings.blob), 1))
@@ -378,21 +473,28 @@ def encode_library(model):
     return bytes(header) + bytes(HEADER_SIZE - len(header)) + bytes(body)
 
 
-def audio_files(root):
+def visible_files(root, suffixes):
     for path in sorted(root.rglob("*")):
         hidden = any(part.startswith(".") for part in path.relative_to(root).parts)
-        if path.is_file() and not hidden and path.suffix.lower() in AUDIO_SUFFIXES:
+        if path.is_file() and not hidden and path.suffix.lower() in suffixes:
             yield path
+
+
+def read_playlist(root, path):
+    folder = path.parent.relative_to(root).as_posix()
+    entries = parse_m3u(decode_playlist(path.read_bytes()))
+    return RawPlaylist(path.stem, "" if folder == "." else folder, entries)
 
 
 def scan(root):
     tracks, failures = [], []
-    for path in audio_files(root):
+    for path in visible_files(root, AUDIO_SUFFIXES):
         try:
             tracks.append(read_track(root, path))
         except Exception as error:
             failures.append(f"{path.relative_to(root)}: {error}")
-    return tracks, failures
+    playlists = [read_playlist(root, path) for path in visible_files(root, PLAYLIST_SUFFIXES)]
+    return tracks, playlists, failures
 
 
 def parse_arguments():
@@ -404,16 +506,21 @@ def parse_arguments():
 
 def main():
     arguments = parse_arguments()
-    tracks, failures = scan(arguments.music.resolve())
+    tracks, playlists, failures = scan(arguments.music.resolve())
     for failure in failures:
         print(f"skipped {failure}", file=sys.stderr)
-    model = build_library(tracks)
+    model = build_library(tracks, playlists)
+    for playlist in model.playlists:
+        if playlist.unresolved:
+            print(f"playlist {playlist.name}: {playlist.unresolved} entries not found",
+                  file=sys.stderr)
     data = encode_library(model)
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_bytes(data)
     print(f"{len(model.tracks)} tracks, {len(model.albums)} albums, {len(model.artists)} artists, "
           f"{len(model.album_artists)} album artists, {len(model.genres)} genres, "
-          f"{len(model.folders)} folders, {len(data):,} bytes -> {arguments.output}")
+          f"{len(model.folders)} folders, {len(model.playlists)} playlists, "
+          f"{len(data):,} bytes -> {arguments.output}")
     return 1 if failures else 0
 
 

@@ -1,4 +1,5 @@
 add_library(echo_ui STATIC
+    choice_screen.c
     header.c
     label.c
     list_navigation.c
@@ -10,6 +11,7 @@ add_library(echo_ui STATIC
     screen.c
     screen_stack.c
     theme.c
+    toast.c
 )
 target_include_directories(echo_ui PUBLIC include)
 target_link_libraries(echo_ui

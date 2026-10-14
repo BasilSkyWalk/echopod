@@ -200,6 +200,18 @@ static void album_shuffle_previous_returns_to_the_last_track_of_the_album_before
     CHECK_EQUAL(JOGA, track);
 }
 
+static void playlists_play_in_their_own_order(void)
+{
+    BrowseQuery road_trip = {.kind = BROWSE_PLAYLIST_TRACKS,
+                             .group = LIBRARY_PLAYLISTS,
+                             .subject = 0,
+                             .artist = LIBRARY_NONE};
+    PlayQueue *playlist = built(road_trip, HELLS_BELLS, SHUFFLE_OFF, 1);
+    CHECK_EQUAL(3, playlist->count);
+    CHECK_EQUAL(HELLS_BELLS, current_track(playlist));
+    CHECK_EQUAL(JOGA, track_after(playlist, REPEAT_OFF));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -216,6 +228,7 @@ int main(void)
         TEST_CASE(album_shuffle_starts_inside_the_anchor_album),
         TEST_CASE(album_shuffle_finishes_an_album_before_the_next),
         TEST_CASE(album_shuffle_previous_returns_to_the_last_track_of_the_album_before),
+        TEST_CASE(playlists_play_in_their_own_order),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -4,12 +4,13 @@
 
 #include "ui/navigation.h"
 
-static ScreenAction select_current(const ListView *view, ListSelection selection)
+static ScreenAction run_on_current(const ListView *view,
+                                   ScreenAction (*action)(void *context, int index), void *context)
 {
-    if (view->model->count(view->model->context) == 0 || selection.select == NULL) {
+    if (view->model->count(view->model->context) == 0 || action == NULL) {
         return screen_action_none();
     }
-    return selection.select(selection.context, view->selected);
+    return action(context, view->selected);
 }
 
 ScreenAction list_navigation_handle(ListView *view, KeyEvent event, uint32_t now_ms,
@@ -24,7 +25,9 @@ ScreenAction list_navigation_handle(ListView *view, KeyEvent event, uint32_t now
         list_view_move(view, 1, !navigation.repeated, now_ms);
         return screen_action_none();
     case NAVIGATION_SELECT:
-        return select_current(view, selection);
+        return run_on_current(view, selection.select, selection.context);
+    case NAVIGATION_OPTIONS:
+        return run_on_current(view, selection.hold, selection.context);
     case NAVIGATION_BACK:
         return screen_action_pop();
     case NAVIGATION_HOME:

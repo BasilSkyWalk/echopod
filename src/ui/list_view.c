@@ -70,6 +70,18 @@ void list_view_move(ListView *view, int delta, bool wrap, uint32_t now_ms)
     keep_selection_visible(view);
 }
 
+void list_view_select(ListView *view, int index, uint32_t now_ms)
+{
+    int count = item_count(view);
+    if (count == 0) {
+        return;
+    }
+    int target = index < 0 ? 0 : index >= count ? count - 1 : index;
+    view->selected = target;
+    view->selection_changed_ms = now_ms;
+    keep_selection_visible(view);
+}
+
 void list_view_restart_marquee(ListView *view, uint32_t now_ms)
 {
     view->selection_changed_ms = now_ms;

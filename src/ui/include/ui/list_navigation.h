@@ -8,6 +8,7 @@
 
 typedef struct ListSelection {
     ScreenAction (*select)(void *context, int index);
+    ScreenAction (*hold)(void *context, int index);
     void *context;
 } ListSelection;
 

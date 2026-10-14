@@ -51,6 +51,7 @@ static void the_fixture_opens_with_its_counts(void)
     CHECK_EQUAL(FIXTURE_GROUPS, library_count(library, LIBRARY_GENRES));
     CHECK_EQUAL(FIXTURE_FOLDERS, library_count(library, LIBRARY_FOLDERS));
     CHECK_EQUAL(FIXTURE_TRACKS, library_count(library, LIBRARY_TITLE_ORDER));
+    CHECK_EQUAL(1, library_count(library, LIBRARY_PLAYLISTS));
 }
 
 static void a_wrong_magic_is_rejected(void)
@@ -60,7 +61,7 @@ static void a_wrong_magic_is_rejected(void)
 
 static void a_newer_version_is_rejected(void)
 {
-    CHECK_EQUAL(LIBRARY_BAD_VERSION, open_modified(VERSION_OFFSET, 2, fixture_size()));
+    CHECK_EQUAL(LIBRARY_BAD_VERSION, open_modified(VERSION_OFFSET, 3, fixture_size()));
 }
 
 static void a_truncated_file_is_rejected(void)
@@ -120,7 +121,7 @@ static void groups_link_to_their_albums(void)
     uint16_t second = 0;
     CHECK(library_read_group(library, LIBRARY_ARTISTS, BJORK_ARTIST, &bjork));
     CHECK(string_is(library, bjork.name, "Björk"));
-    CHECK_EQUAL(2, bjork.album_count);
+    CHECK_EQUAL(2, bjork.link_count);
     CHECK(library_read_index(library, LIBRARY_LINKS, bjork.first_link, &first));
     CHECK(library_read_index(library, LIBRARY_LINKS, bjork.first_link + 1, &second));
     CHECK_EQUAL(3, first);
@@ -199,6 +200,35 @@ static void the_fingerprint_changes_when_the_library_changes(void)
     CHECK(original != fingerprint_with_track_count(FIXTURE_TRACKS - 1));
 }
 
+static void playlists_link_to_their_tracks_in_order(void)
+{
+    Library *library = fixture_library_open(&fixture);
+    LibraryGroup road_trip;
+    uint16_t tracks[3] = {0};
+    CHECK(library_read_group(library, LIBRARY_PLAYLISTS, 0, &road_trip));
+    CHECK(string_is(library, road_trip.name, "Road Trip"));
+    CHECK_EQUAL(3, road_trip.link_count);
+    for (uint32_t index = 0; index < 3; index++) {
+        CHECK(library_read_index(library, LIBRARY_LINKS, road_trip.first_link + index,
+                                 &tracks[index]));
+    }
+    CHECK_EQUAL(7, tracks[0]);
+    CHECK_EQUAL(0, tracks[1]);
+    CHECK_EQUAL(6, tracks[2]);
+}
+
+static void album_keys_are_stable_and_distinct(void)
+{
+    Library *library = fixture_library_open(&fixture);
+    uint32_t first = library_album_key(library, 0);
+    CHECK(first != 0);
+    CHECK_EQUAL(first, library_album_key(library, 0));
+    for (uint32_t album = 1; album < FIXTURE_ALBUMS; album++) {
+        CHECK(first != library_album_key(library, album));
+    }
+    CHECK_EQUAL(0, library_album_key(library, FIXTURE_ALBUMS));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -215,6 +245,8 @@ int main(void)
         TEST_CASE(the_title_order_starts_with_the_first_title),
         TEST_CASE(short_buffers_cut_strings_at_a_character_boundary),
         TEST_CASE(indices_out_of_range_are_refused),
+        TEST_CASE(playlists_link_to_their_tracks_in_order),
+        TEST_CASE(album_keys_are_stable_and_distinct),
         TEST_CASE(the_fingerprint_is_stable_for_the_same_library),
         TEST_CASE(the_fingerprint_changes_when_the_library_changes),
     };

@@ -34,7 +34,7 @@ static ScreenAction select_item(void *context, int index)
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     MenuScreen *menu = context;
-    ListSelection selection = {.select = select_item, .context = menu};
+    ListSelection selection = {.select = select_item, .hold = NULL, .context = menu};
     return list_navigation_handle(&menu->list, event, now_ms, selection);
 }
 

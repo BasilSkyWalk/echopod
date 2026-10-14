@@ -139,6 +139,26 @@ static void the_marquee_restarts_only_when_the_selection_changes(void)
     CHECK_EQUAL(1200, view.selection_changed_ms);
 }
 
+static void selecting_an_index_scrolls_it_into_view(void)
+{
+    ListView view = list_of(10);
+    list_view_select(&view, 8, 300);
+    CHECK_EQUAL(8, view.selected);
+    CHECK_EQUAL(6, view.top);
+    CHECK_EQUAL(300, view.selection_changed_ms);
+    list_view_select(&view, 1, 400);
+    CHECK_EQUAL(1, view.top);
+}
+
+static void selecting_past_the_end_picks_the_last_item(void)
+{
+    ListView view = list_of(4);
+    list_view_select(&view, 9, 300);
+    CHECK_EQUAL(3, view.selected);
+    list_view_select(&view, -2, 300);
+    CHECK_EQUAL(0, view.selected);
+}
+
 static void the_selected_row_is_highlighted(void)
 {
     ListView view = list_of(10);
@@ -188,6 +208,8 @@ int main(void)
         TEST_CASE(a_short_list_never_scrolls),
         TEST_CASE(an_empty_list_ignores_moves),
         TEST_CASE(the_marquee_restarts_only_when_the_selection_changes),
+        TEST_CASE(selecting_an_index_scrolls_it_into_view),
+        TEST_CASE(selecting_past_the_end_picks_the_last_item),
         TEST_CASE(the_selected_row_is_highlighted),
         TEST_CASE(the_scrollbar_appears_only_when_items_overflow),
         TEST_CASE(a_detail_is_drawn_in_the_secondary_color_at_the_right),

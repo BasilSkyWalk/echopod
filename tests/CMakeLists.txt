@@ -18,6 +18,7 @@ echo_add_unit_test(NAME test_string_builder SOURCES core/test_string_builder.c L
 echo_add_unit_test(NAME test_format SOURCES core/test_format.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_random SOURCES core/test_random.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_hash SOURCES core/test_hash.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_power_policy SOURCES core/test_power_policy.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_color SOURCES gfx/test_color.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_rect SOURCES gfx/test_rect.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_canvas SOURCES gfx/test_canvas.c LIBRARIES echo_gfx)
@@ -40,7 +41,9 @@ foreach(playback_test play_queue resume_state)
     )
 endforeach()
 
-foreach(library_test block_cache library library_browse)
+echo_add_unit_test(NAME test_settings SOURCES settings/test_settings.c LIBRARIES echo_settings)
+
+foreach(library_test block_cache library library_browse favorites)
     echo_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES echo_library_fixtures
@@ -60,7 +63,8 @@ add_library(echo_ui_fixtures STATIC gfx/tiny_font.c ui/ui_test_theme.c ui/ui_tes
 target_include_directories(echo_ui_fixtures PUBLIC gfx ui)
 target_link_libraries(echo_ui_fixtures PUBLIC echo_ui PRIVATE echo_options)
 
-foreach(ui_test theme_layout list_view list_navigation header menu_screen message_screen)
+foreach(ui_test theme_layout list_view list_navigation header menu_screen message_screen
+        choice_screen toast)
     echo_add_unit_test(NAME test_${ui_test}
         SOURCES ui/test_${ui_test}.c
         LIBRARIES echo_ui_fixtures

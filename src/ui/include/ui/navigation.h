@@ -10,6 +10,7 @@ typedef enum NavigationIntent {
     NAVIGATION_PREVIOUS,
     NAVIGATION_NEXT,
     NAVIGATION_SELECT,
+    NAVIGATION_OPTIONS,
     NAVIGATION_BACK,
     NAVIGATION_HOME
 } NavigationIntent;

@@ -153,13 +153,13 @@ class EncodeLibraryTest(unittest.TestCase):
         return SECTION_ENTRY.unpack_from(self.data, 8 + number * SECTION_ENTRY.size)
 
     def string_at(self, offset):
-        strings_offset = self.section(8)[0]
+        strings_offset = self.section(9)[0]
         start = strings_offset + offset
         return self.data[start:self.data.index(b"\0", start)].decode("utf-8")
 
     def test_the_header_identifies_the_format(self):
         magic, version, sections = struct.unpack_from("<4sHH", self.data, 0)
-        self.assertEqual((b"EMDB", 1, 9), (magic, version, sections))
+        self.assertEqual((b"EMDB", 2, 10), (magic, version, sections))
         self.assertEqual(HEADER_SIZE, self.section(0)[0])
 
     def test_sections_declare_their_counts_and_record_sizes(self):
@@ -183,7 +183,7 @@ class EncodeLibraryTest(unittest.TestCase):
         self.assertEqual(0xFFFF, fields[6])
 
     def test_group_links_point_at_albums(self):
-        links_offset = self.section(7)[0]
+        links_offset = self.section(8)[0]
         name, first_link, count, _ = GROUP_RECORD.unpack_from(
             self.data, self.section(2)[0] + 3 * GROUP_RECORD.size)
         self.assertEqual("Björk", self.string_at(name))
@@ -191,10 +191,83 @@ class EncodeLibraryTest(unittest.TestCase):
         self.assertEqual((3, 1), albums)
 
     def test_strings_are_stored_once(self):
-        strings_offset, strings_size, _, _ = self.section(8)
+        strings_offset, strings_size, _, _ = self.section(9)
         blob = self.data[strings_offset:strings_offset + strings_size]
         self.assertEqual(0, blob[0])
         self.assertEqual(1, blob.count(b"\0AC/DC\0"))
+
+
+class PlaylistParsingTest(unittest.TestCase):
+    def test_entries_skip_comments_and_blank_lines(self):
+        text = "#EXTM3U\n#EXTINF:312,AC/DC - Hells Bells\nA/B/one.flac\n\n  A/B/two.flac  \n"
+        self.assertEqual(["A/B/one.flac", "A/B/two.flac"], library_index.parse_m3u(text))
+
+    def test_utf8_with_a_byte_order_mark_is_decoded(self):
+        data = "\ufeffBjörk/Homogenic/01 - Hunter.flac\n".encode("utf-8")
+        self.assertEqual("Björk/Homogenic/01 - Hunter.flac\n", library_index.decode_playlist(data))
+
+    def test_windows_1252_is_the_fallback(self):
+        data = "Björk\\Homogenic\\01 - Hunter.flac".encode("cp1252")
+        self.assertEqual("Björk\\Homogenic\\01 - Hunter.flac", library_index.decode_playlist(data))
+
+
+class PlaylistResolutionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.paths = library_index.PathIndex([track.path for track in SAMPLE_TRACKS])
+
+    def resolve(self, entry, playlist_folder="Playlists"):
+        index = self.paths.resolve(entry, playlist_folder)
+        return SAMPLE_TRACKS[index].title if index is not None else None
+
+    def test_paths_relative_to_the_playlist_resolve(self):
+        self.assertEqual("Hells Bells",
+                         self.resolve("../AC DC/Back In Black/1-01 - Hells Bells.flac"))
+
+    def test_paths_relative_to_the_music_root_resolve(self):
+        self.assertEqual("Hunter", self.resolve("Björk/Homogenic/01 - Hunter.flac"))
+
+    def test_absolute_windows_paths_resolve_by_their_ending(self):
+        entry = "C:\\Users\\Me\\Music\\AC DC\\Back In Black\\1-01 - Hells Bells.flac"
+        self.assertEqual("Hells Bells", self.resolve(entry))
+
+    def test_matching_ignores_case(self):
+        self.assertEqual("Hunter", self.resolve("björk/HOMOGENIC/01 - hunter.FLAC"))
+
+    def test_unknown_files_do_not_resolve(self):
+        self.assertIsNone(self.resolve("Nobody/Nothing/01 - Silence.flac"))
+        self.assertIsNone(self.resolve("http://radio.example/stream"))
+
+
+class PlaylistLibraryTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        playlists = [
+            library_index.RawPlaylist("Road Trip", "Playlists",
+                                      ["../acloudyskye/This Won't Be The Last Time/01 - Shoots.flac",
+                                       "../AC DC/Back In Black/1-01 - Hells Bells.flac",
+                                       "../Missing/Gone.flac"]),
+            library_index.RawPlaylist("Calm", "", ["Björk/Homogenic/02 - Jóga.flac"]),
+        ]
+        cls.library = library_index.build_library(SAMPLE_TRACKS, playlists)
+        cls.data = library_index.encode_library(cls.library)
+
+    def test_playlists_are_sorted_by_name(self):
+        self.assertEqual(["Calm", "Road Trip"], [playlist.name for playlist in self.library.playlists])
+
+    def test_playlists_keep_their_resolved_order_and_drop_unknown_entries(self):
+        road_trip = self.library.playlists[1]
+        self.assertEqual(["Shoots", "Hells Bells"],
+                         [self.library.tracks[index].title for index in road_trip.tracks])
+        self.assertEqual(1, road_trip.unresolved)
+
+    def test_playlists_are_encoded_with_their_tracks(self):
+        offset, count, size, _ = SECTION_ENTRY.unpack_from(self.data, 8 + 7 * SECTION_ENTRY.size)
+        self.assertEqual((2, 12), (count, size))
+        links_offset = SECTION_ENTRY.unpack_from(self.data, 8 + 8 * SECTION_ENTRY.size)[0]
+        _, first_link, track_count, _ = GROUP_RECORD.unpack_from(self.data, offset + GROUP_RECORD.size)
+        tracks = struct.unpack_from(f"<{track_count}H", self.data, links_offset + 2 * first_link)
+        self.assertEqual(["Shoots", "Hells Bells"], [self.library.tracks[index].title for index in tracks])
 
 
 class ReadTrackTest(unittest.TestCase):

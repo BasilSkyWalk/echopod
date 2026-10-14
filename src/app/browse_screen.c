@@ -113,7 +113,7 @@ static ScreenAction select_row(void *context, int index)
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     BrowseScreen *browse = context;
-    ListSelection selection = {.select = select_row, .context = browse};
+    ListSelection selection = {.select = select_row, .hold = NULL, .context = browse};
     return list_navigation_handle(&browse->list, event, now_ms, selection);
 }
 

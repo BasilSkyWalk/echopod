@@ -209,6 +209,24 @@ static void views_have_titles(void)
     CHECK(title_is(library, child_of(albums, item_at(library, albums, HOMOGENIC)), "Homogenic"));
 }
 
+static void playlists_list_their_tracks_in_order(void)
+{
+    Library *library = open_fixture();
+    BrowseQuery playlists = browse_root_query(BROWSE_PLAYLISTS);
+    CHECK_EQUAL(1, browse_count(library, playlists));
+    CHECK(title_is(library, playlists, "Playlists"));
+    BrowseItem road_trip = item_at(library, playlists, 0);
+    CHECK(label_is(library, playlists, road_trip, "Road Trip"));
+    BrowseQuery tracks = child_of(playlists, road_trip);
+    CHECK_EQUAL(BROWSE_PLAYLIST_TRACKS, tracks.kind);
+    CHECK(title_is(library, tracks, "Road Trip"));
+    CHECK_EQUAL(3, browse_count(library, tracks));
+    CHECK_EQUAL(7, item_at(library, tracks, 0).index);
+    CHECK_EQUAL(HELLS_BELLS, item_at(library, tracks, 1).index);
+    CHECK_EQUAL(JOGA, item_at(library, tracks, 2).index);
+    CHECK(label_is(library, tracks, item_at(library, tracks, 2), "Jóga"));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -224,6 +242,7 @@ int main(void)
         TEST_CASE(items_show_names_years_and_durations),
         TEST_CASE(folder_views_show_folder_names_and_file_names),
         TEST_CASE(views_have_titles),
+        TEST_CASE(playlists_list_their_tracks_in_order),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

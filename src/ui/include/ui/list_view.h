@@ -25,4 +25,5 @@ typedef struct ListView {
 void list_view_init(ListView *view, const ListModel *model, const Theme *theme, uint32_t now_ms);
 void list_view_move(ListView *view, int delta, bool wrap, uint32_t now_ms);
 void list_view_restart_marquee(ListView *view, uint32_t now_ms);
+void list_view_select(ListView *view, int index, uint32_t now_ms);
 void list_view_draw(const ListView *view, Canvas *canvas, Rect area, uint32_t now_ms);

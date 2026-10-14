@@ -133,6 +133,28 @@ static void skipping_back_from_the_first_track_restarts_it(void)
     CHECK_EQUAL(HELLS_BELLS, player_status(started).track);
 }
 
+static void seeking_moves_the_playing_track(void)
+{
+    Player *started = playing(0);
+    player_seek(started, 42000);
+    CHECK_EQUAL(1, fake_hal_audio_seek_count());
+    CHECK_EQUAL(42000, fake_hal_audio_last_seek());
+    CHECK_EQUAL(42000, player_status(started).position_ms);
+}
+
+static void seeking_a_resumed_track_moves_where_it_will_start(void)
+{
+    Player *started = playing(1);
+    CHECK(player_save(started));
+    Player resumed;
+    player_init(&resumed, &fixture.library);
+    CHECK(player_restore(&resumed));
+    player_seek(&resumed, 9000);
+    CHECK_EQUAL(9000, player_status(&resumed).position_ms);
+    player_toggle_pause(&resumed);
+    CHECK_EQUAL(9000, fake_hal_audio_play_start());
+}
+
 static void pausing_and_resuming_follow_the_toggle(void)
 {
     Player *started = playing(0);
@@ -226,6 +248,8 @@ int main(void)
         TEST_CASE(skipping_back_early_plays_the_previous_track),
         TEST_CASE(skipping_back_late_restarts_the_track),
         TEST_CASE(skipping_back_from_the_first_track_restarts_it),
+        TEST_CASE(seeking_moves_the_playing_track),
+        TEST_CASE(seeking_a_resumed_track_moves_where_it_will_start),
         TEST_CASE(pausing_and_resuming_follow_the_toggle),
         TEST_CASE(an_unplayable_track_is_skipped),
         TEST_CASE(volume_changes_are_clamped_and_sent),

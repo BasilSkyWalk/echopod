@@ -21,10 +21,10 @@ static void volume_down_moves_to_the_next_item(void)
     CHECK(navigate(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT).repeated);
 }
 
-static void play_selects_on_a_press_only(void)
+static void play_selects_and_a_long_play_asks_for_options(void)
 {
     CHECK_EQUAL(NAVIGATION_SELECT, navigate(KEY_PLAY, KEY_GESTURE_PRESS).intent);
-    CHECK_EQUAL(NAVIGATION_NONE, navigate(KEY_PLAY, KEY_GESTURE_LONG_PRESS).intent);
+    CHECK_EQUAL(NAVIGATION_OPTIONS, navigate(KEY_PLAY, KEY_GESTURE_LONG_PRESS).intent);
 }
 
 static void back_goes_back_and_a_long_back_goes_home(void)
@@ -62,7 +62,7 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(volume_up_moves_to_the_previous_item),
         TEST_CASE(volume_down_moves_to_the_next_item),
-        TEST_CASE(play_selects_on_a_press_only),
+        TEST_CASE(play_selects_and_a_long_play_asks_for_options),
         TEST_CASE(back_goes_back_and_a_long_back_goes_home),
         TEST_CASE(menu_and_power_do_not_navigate),
         TEST_CASE(back_and_home_leave_a_screen),

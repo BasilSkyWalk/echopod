@@ -44,15 +44,46 @@ static NowPlayingCommand by_gesture(KeyGesture gesture, NowPlayingCommand press,
     return NOW_PLAYING_NONE;
 }
 
-NowPlayingCommand now_playing_command_for(KeyEvent event)
+uint32_t now_playing_scrub_target(uint32_t position_ms, uint32_t duration_ms, int32_t delta_ms)
 {
+    int64_t target = (int64_t)position_ms + delta_ms;
+    if (target < 0) {
+        return 0;
+    }
+    return target > duration_ms ? duration_ms : (uint32_t)target;
+}
+
+static NowPlayingCommand scrub_command_for(KeyEvent event)
+{
+    bool repeated = event.gesture == KEY_GESTURE_REPEAT;
+    switch (event.key) {
+    case KEY_VOLUME_UP:
+        return repeated ? NOW_PLAYING_SCRUB_FORWARD_FAST : NOW_PLAYING_SCRUB_FORWARD;
+    case KEY_VOLUME_DOWN:
+        return repeated ? NOW_PLAYING_SCRUB_BACK_FAST : NOW_PLAYING_SCRUB_BACK;
+    case KEY_PLAY:
+        return by_gesture(event.gesture, NOW_PLAYING_SCRUB_COMMIT, NOW_PLAYING_NONE);
+    case KEY_BACK:
+        return by_gesture(event.gesture, NOW_PLAYING_SCRUB_CANCEL, NOW_PLAYING_HOME);
+    case KEY_MENU:
+    case KEY_POWER:
+        return NOW_PLAYING_NONE;
+    }
+    return NOW_PLAYING_NONE;
+}
+
+NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing)
+{
+    if (scrubbing) {
+        return scrub_command_for(event);
+    }
     switch (event.key) {
     case KEY_VOLUME_UP:
         return NOW_PLAYING_VOLUME_UP;
     case KEY_VOLUME_DOWN:
         return NOW_PLAYING_VOLUME_DOWN;
     case KEY_PLAY:
-        return by_gesture(event.gesture, NOW_PLAYING_TOGGLE_PAUSE, NOW_PLAYING_NONE);
+        return by_gesture(event.gesture, NOW_PLAYING_TOGGLE_PAUSE, NOW_PLAYING_SCRUB_START);
     case KEY_MENU:
         return by_gesture(event.gesture, NOW_PLAYING_NEXT, NOW_PLAYING_PREVIOUS);
     case KEY_BACK:
@@ -74,8 +105,55 @@ int now_playing_progress_width(uint32_t position_ms, uint32_t duration_ms, int w
     return (int)((uint64_t)position_ms * (uint64_t)width / duration_ms);
 }
 
-static ScreenAction run_command(Player *player, NowPlayingCommand command)
+static void move_scrub(NowPlayingScreen *now_playing, int32_t delta_ms)
 {
+    now_playing->scrub_position_ms = now_playing_scrub_target(
+        now_playing->scrub_position_ms, now_playing->status.duration_ms, delta_ms);
+}
+
+static void start_scrub(NowPlayingScreen *now_playing)
+{
+    now_playing->scrubbing = now_playing->status.has_track;
+    now_playing->scrub_position_ms = now_playing->status.position_ms;
+}
+
+static void commit_scrub(NowPlayingScreen *now_playing)
+{
+    player_seek(now_playing->config.player, now_playing->scrub_position_ms);
+    now_playing->scrubbing = false;
+}
+
+static ScreenAction run_scrub_command(NowPlayingScreen *now_playing, NowPlayingCommand command)
+{
+    switch (command) {
+    case NOW_PLAYING_SCRUB_START:
+        start_scrub(now_playing);
+        break;
+    case NOW_PLAYING_SCRUB_FORWARD:
+        move_scrub(now_playing, NOW_PLAYING_SCRUB_STEP_MS);
+        break;
+    case NOW_PLAYING_SCRUB_FORWARD_FAST:
+        move_scrub(now_playing, NOW_PLAYING_SCRUB_FAST_STEP_MS);
+        break;
+    case NOW_PLAYING_SCRUB_BACK:
+        move_scrub(now_playing, -NOW_PLAYING_SCRUB_STEP_MS);
+        break;
+    case NOW_PLAYING_SCRUB_BACK_FAST:
+        move_scrub(now_playing, -NOW_PLAYING_SCRUB_FAST_STEP_MS);
+        break;
+    case NOW_PLAYING_SCRUB_COMMIT:
+        commit_scrub(now_playing);
+        break;
+    default:
+        now_playing->scrubbing = false;
+        break;
+    }
+    return screen_action_none();
+}
+
+static ScreenAction run_command(NowPlayingScreen *now_playing, NowPlayingCommand command)
+{
+    Player *player = now_playing->config.player;
     switch (command) {
     case NOW_PLAYING_TOGGLE_PAUSE:
         player_toggle_pause(player);
@@ -95,7 +173,16 @@ static ScreenAction run_command(Player *player, NowPlayingCommand command)
     case NOW_PLAYING_LEAVE:
         return screen_action_pop();
     case NOW_PLAYING_HOME:
+        now_playing->scrubbing = false;
         return screen_action_pop_to_root();
+    case NOW_PLAYING_SCRUB_START:
+    case NOW_PLAYING_SCRUB_FORWARD:
+    case NOW_PLAYING_SCRUB_FORWARD_FAST:
+    case NOW_PLAYING_SCRUB_BACK:
+    case NOW_PLAYING_SCRUB_BACK_FAST:
+    case NOW_PLAYING_SCRUB_COMMIT:
+    case NOW_PLAYING_SCRUB_CANCEL:
+        return run_scrub_command(now_playing, command);
     case NOW_PLAYING_NONE:
         break;
     }
@@ -139,7 +226,8 @@ static void refresh(NowPlayingScreen *now_playing, uint32_t now_ms)
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
-    ScreenAction action = run_command(now_playing->config.player, now_playing_command_for(event));
+    ScreenAction action =
+        run_command(now_playing, now_playing_command_for(event, now_playing->scrubbing));
     refresh(now_playing, now_ms);
     return action;
 }
@@ -148,6 +236,7 @@ static void enter(void *context, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
     now_playing->has_text = false;
+    now_playing->scrubbing = false;
     refresh(now_playing, now_ms);
 }
 
@@ -193,15 +282,21 @@ static void draw_track_text(const NowPlayingScreen *now_playing, Canvas *canvas)
                    album);
 }
 
+static uint32_t shown_position(const NowPlayingScreen *now_playing)
+{
+    return now_playing->scrubbing ? now_playing->scrub_position_ms
+                                  : now_playing->status.position_ms;
+}
+
 static void draw_progress(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
     Rect bar = line_area(theme, PROGRESS_TOP, PROGRESS_HEIGHT);
-    int filled = now_playing_progress_width(now_playing->status.position_ms,
+    int filled = now_playing_progress_width(shown_position(now_playing),
                                             now_playing->status.duration_ms, bar.width);
+    Color fill = now_playing->scrubbing ? theme->colors.text : theme->colors.selection_background;
     canvas_fill_rect(canvas, bar, theme->colors.divider);
-    canvas_fill_rect(canvas, (Rect){bar.x, bar.y, filled, bar.height},
-                     theme->colors.selection_background);
+    canvas_fill_rect(canvas, (Rect){bar.x, bar.y, filled, bar.height}, fill);
 }
 
 static void draw_right_aligned(Canvas *canvas, TextStyle style, Rect area, const char *text)
@@ -214,12 +309,12 @@ static void draw_right_aligned(Canvas *canvas, TextStyle style, Rect area, const
 static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
-    const PlayerStatus *status = &now_playing->status;
-    uint32_t remaining_ms =
-        status->duration_ms > status->position_ms ? status->duration_ms - status->position_ms : 0;
+    uint32_t position_ms = shown_position(now_playing);
+    uint32_t duration_ms = now_playing->status.duration_ms;
+    uint32_t remaining_ms = duration_ms > position_ms ? duration_ms - position_ms : 0;
     char elapsed[TIME_CAPACITY];
     char remaining[TIME_CAPACITY] = "-";
-    format_duration(status->position_ms, elapsed, sizeof elapsed);
+    format_duration(position_ms, elapsed, sizeof elapsed);
     format_duration(remaining_ms, remaining + 1, sizeof remaining - 1);
     Rect area = line_area(theme, TIMES_TOP, SMALL_LINE_HEIGHT);
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
@@ -282,6 +377,10 @@ static void draw_status(const NowPlayingScreen *now_playing, Canvas *canvas)
     string_builder_append(&builder, "Vol ");
     string_builder_append_unsigned(&builder, now_playing->status.volume);
     modes_text(&now_playing->status, modes, sizeof modes);
+    if (now_playing->scrubbing) {
+        StringBuilder seeking = string_builder_make(modes, sizeof modes);
+        string_builder_append(&seeking, "Seeking \xC2\xB7 Play to jump");
+    }
     draw_state_icon(now_playing, canvas, (Point){area.x, area.y + (area.height - ICON_SIZE) / 2});
     Rect modes_area = {area.x + ICON_SIZE + ICON_GAP, area.y, area.width / 2, area.height};
     label_draw(canvas, style, (Label){.area = modes_area, .text = modes});
@@ -316,6 +415,8 @@ Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig 
 {
     now_playing->config = config;
     now_playing->has_text = false;
+    now_playing->scrubbing = false;
+    now_playing->scrub_position_ms = 0;
     now_playing->status = (PlayerStatus){.state = PLAYER_IDLE};
     now_playing->screen = (Screen){
         .title = "Now Playing",

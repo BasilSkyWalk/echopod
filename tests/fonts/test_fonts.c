@@ -25,7 +25,8 @@ static void every_font_covers_printable_ascii(void)
 
 static void every_font_covers_western_european_accents(void)
 {
-    const uint32_t accented[] = {0xE9, 0xF6, 0xF8, 0xC5, 0xF1, 0xDF, 0x2026, 0x2019};
+    const uint32_t accented[] = {0xE9,   0xF6,   0xF8,   0xC5,   0xF1,  0xDF,
+                                 0x2026, 0x2019, 0x203A, 0x2605, 0x2713};
     for (size_t font = 0; font < FONT_COUNT; font++) {
         for (size_t index = 0; index < sizeof accented / sizeof accented[0]; index++) {
             const Glyph *glyph = font_find_glyph(ALL_FONTS[font], accented[index]);

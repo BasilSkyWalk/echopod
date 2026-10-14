@@ -14,13 +14,14 @@ typedef enum LibrarySection {
     LIBRARY_GENRES,
     LIBRARY_FOLDERS,
     LIBRARY_TITLE_ORDER,
+    LIBRARY_PLAYLISTS,
     LIBRARY_LINKS,
     LIBRARY_STRINGS
 } LibrarySection;
 
 enum {
     LIBRARY_SECTION_COUNT = LIBRARY_STRINGS + 1,
-    LIBRARY_VERSION = 1,
+    LIBRARY_VERSION = 2,
     LIBRARY_HEADER_SIZE = 128,
     LIBRARY_NONE = 0xFFFF
 };
@@ -69,7 +70,7 @@ typedef struct LibraryAlbum {
 typedef struct LibraryGroup {
     uint32_t name;
     uint32_t first_link;
-    uint16_t album_count;
+    uint16_t link_count;
 } LibraryGroup;
 
 typedef struct LibraryFolder {
@@ -91,3 +92,4 @@ bool library_read_index(const Library *library, LibrarySection section, uint32_t
                         uint16_t *value);
 bool library_read_string(const Library *library, uint32_t offset, char *buffer, size_t capacity);
 uint32_t library_fingerprint(const Library *library);
+uint32_t library_album_key(const Library *library, uint32_t album_index);

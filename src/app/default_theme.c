@@ -16,6 +16,8 @@ const Theme DEFAULT_THEME = {
             .divider = COLOR_RGB(48, 49, 56),
             .scrollbar_track = COLOR_RGB(28, 29, 34),
             .scrollbar_thumb = COLOR_RGB(96, 97, 106),
+            .danger = COLOR_RGB(235, 77, 61),
+            .success = COLOR_RGB(52, 199, 89),
         },
     .fonts =
         {
@@ -28,6 +30,7 @@ const Theme DEFAULT_THEME = {
             .screen_width = HAL_DISPLAY_WIDTH,
             .screen_height = HAL_DISPLAY_HEIGHT,
             .header_height = 24,
+            .header_inset = 40,
             .row_height = 24,
             .padding = 10,
             .scrollbar_width = 3,

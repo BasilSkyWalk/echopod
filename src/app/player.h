@@ -56,6 +56,7 @@ void player_init(Player *player, const Library *library);
 bool player_play_list(Player *player, BrowseQuery source, uint32_t position, uint32_t seed);
 void player_toggle_pause(Player *player);
 void player_skip(Player *player, int direction);
+void player_seek(Player *player, uint32_t position_ms);
 void player_change_volume(Player *player, int delta);
 void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed);
 void player_set_repeat(Player *player, RepeatMode repeat);

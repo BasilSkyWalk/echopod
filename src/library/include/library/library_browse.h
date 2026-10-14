@@ -14,7 +14,9 @@ typedef enum BrowseKind {
     BROWSE_ALL_SONGS,
     BROWSE_GROUP_ALBUMS,
     BROWSE_ALBUM_TRACKS,
-    BROWSE_FOLDER
+    BROWSE_FOLDER,
+    BROWSE_PLAYLISTS,
+    BROWSE_PLAYLIST_TRACKS
 } BrowseKind;
 
 typedef struct BrowseQuery {

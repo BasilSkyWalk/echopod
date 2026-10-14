@@ -7,7 +7,15 @@ static Navigation navigation(NavigationIntent intent, bool repeated)
 
 static Navigation from_play(KeyGesture gesture)
 {
-    return navigation(gesture == KEY_GESTURE_PRESS ? NAVIGATION_SELECT : NAVIGATION_NONE, false);
+    switch (gesture) {
+    case KEY_GESTURE_PRESS:
+        return navigation(NAVIGATION_SELECT, false);
+    case KEY_GESTURE_LONG_PRESS:
+        return navigation(NAVIGATION_OPTIONS, false);
+    case KEY_GESTURE_REPEAT:
+        return navigation(NAVIGATION_NONE, false);
+    }
+    return navigation(NAVIGATION_NONE, false);
 }
 
 static Navigation from_back(KeyGesture gesture)
@@ -52,6 +60,7 @@ ScreenAction navigation_exit_action(KeyEvent event)
     case NAVIGATION_PREVIOUS:
     case NAVIGATION_NEXT:
     case NAVIGATION_SELECT:
+    case NAVIGATION_OPTIONS:
     case NAVIGATION_NONE:
         return screen_action_none();
     }

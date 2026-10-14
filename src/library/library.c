@@ -21,8 +21,11 @@ enum {
 static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'D', 'B'};
 
 static const uint16_t RECORD_SIZES[LIBRARY_SECTION_COUNT] = {
-    TRACK_SIZE,  ALBUM_SIZE, GROUP_SIZE, GROUP_SIZE,  GROUP_SIZE,
-    FOLDER_SIZE, INDEX_SIZE, INDEX_SIZE, STRING_SIZE,
+    [LIBRARY_TRACKS] = TRACK_SIZE,      [LIBRARY_ALBUMS] = ALBUM_SIZE,
+    [LIBRARY_ARTISTS] = GROUP_SIZE,     [LIBRARY_ALBUM_ARTISTS] = GROUP_SIZE,
+    [LIBRARY_GENRES] = GROUP_SIZE,      [LIBRARY_FOLDERS] = FOLDER_SIZE,
+    [LIBRARY_TITLE_ORDER] = INDEX_SIZE, [LIBRARY_PLAYLISTS] = GROUP_SIZE,
+    [LIBRARY_LINKS] = INDEX_SIZE,       [LIBRARY_STRINGS] = STRING_SIZE,
 };
 
 static uint16_t u16_at(const uint8_t *bytes, uint32_t offset)
@@ -101,7 +104,7 @@ static bool read_record(const Library *library, LibrarySection section, uint32_t
 static bool is_group_section(LibrarySection section)
 {
     return section == LIBRARY_ARTISTS || section == LIBRARY_ALBUM_ARTISTS ||
-           section == LIBRARY_GENRES;
+           section == LIBRARY_GENRES || section == LIBRARY_PLAYLISTS;
 }
 
 static bool is_index_section(LibrarySection section)
@@ -176,7 +179,7 @@ bool library_read_group(const Library *library, LibrarySection section, uint32_t
     *group = (LibraryGroup){
         .name = u32_at(record, 0),
         .first_link = u32_at(record, 4),
-        .album_count = u16_at(record, 8),
+        .link_count = u16_at(record, 8),
     };
     return true;
 }
@@ -253,4 +256,39 @@ uint32_t library_fingerprint(const Library *library)
         hash = hash_word(hash, library->sections[section].count);
     }
     return hash;
+}
+
+enum {
+    KEY_TEXT_CAPACITY = 256,
+    KEY_SEPARATOR = 0x1F
+};
+
+static size_t text_length(const char *text)
+{
+    size_t length = 0;
+    while (text[length] != '\0') {
+        length++;
+    }
+    return length;
+}
+
+static uint32_t hash_string(const Library *library, uint32_t hash, uint32_t offset)
+{
+    char text[KEY_TEXT_CAPACITY];
+    library_read_string(library, offset, text, sizeof text);
+    return hash_update(hash, text, text_length(text));
+}
+
+uint32_t library_album_key(const Library *library, uint32_t album_index)
+{
+    LibraryAlbum album;
+    LibraryGroup artist;
+    uint8_t separator = KEY_SEPARATOR;
+    if (!library_read_album(library, album_index, &album) ||
+        !library_read_group(library, LIBRARY_ALBUM_ARTISTS, album.album_artist, &artist)) {
+        return 0;
+    }
+    uint32_t hash = hash_string(library, HASH_START, artist.name);
+    hash = hash_update(hash, &separator, sizeof separator);
+    return hash_string(library, hash, album.title);
 }

@@ -15,6 +15,8 @@ const Theme TEST_THEME = {
             .divider = 0x4208,
             .scrollbar_track = 0x2104,
             .scrollbar_thumb = 0xF81F,
+            .danger = 0xF800,
+            .success = 0x07E0,
         },
     .fonts = {.title = &TINY_FONT, .body = &TINY_FONT, .small = &TINY_FONT},
     .metrics =
@@ -22,6 +24,7 @@ const Theme TEST_THEME = {
             .screen_width = TEST_SCREEN_WIDTH,
             .screen_height = TEST_SCREEN_HEIGHT,
             .header_height = TEST_HEADER_HEIGHT,
+            .header_inset = TEST_HEADER_INSET,
             .row_height = TEST_ROW_HEIGHT,
             .padding = 1,
             .scrollbar_width = 2,

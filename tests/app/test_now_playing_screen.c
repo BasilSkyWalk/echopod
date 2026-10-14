@@ -3,7 +3,12 @@
 
 static NowPlayingCommand command(Key key, KeyGesture gesture)
 {
-    return now_playing_command_for((KeyEvent){.key = key, .gesture = gesture});
+    return now_playing_command_for((KeyEvent){.key = key, .gesture = gesture}, false);
+}
+
+static NowPlayingCommand scrub_command(Key key, KeyGesture gesture)
+{
+    return now_playing_command_for((KeyEvent){.key = key, .gesture = gesture}, true);
 }
 
 static void volume_keys_change_the_volume_while_held(void)
@@ -14,10 +19,33 @@ static void volume_keys_change_the_volume_while_held(void)
     CHECK_EQUAL(NOW_PLAYING_VOLUME_DOWN, command(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT));
 }
 
-static void play_toggles_pause(void)
+static void play_toggles_pause_and_a_long_play_starts_seeking(void)
 {
     CHECK_EQUAL(NOW_PLAYING_TOGGLE_PAUSE, command(KEY_PLAY, KEY_GESTURE_PRESS));
-    CHECK_EQUAL(NOW_PLAYING_NONE, command(KEY_PLAY, KEY_GESTURE_LONG_PRESS));
+    CHECK_EQUAL(NOW_PLAYING_SCRUB_START, command(KEY_PLAY, KEY_GESTURE_LONG_PRESS));
+}
+
+static void while_seeking_volume_keys_move_the_target(void)
+{
+    CHECK_EQUAL(NOW_PLAYING_SCRUB_FORWARD, scrub_command(KEY_VOLUME_UP, KEY_GESTURE_PRESS));
+    CHECK_EQUAL(NOW_PLAYING_SCRUB_FORWARD_FAST, scrub_command(KEY_VOLUME_UP, KEY_GESTURE_REPEAT));
+    CHECK_EQUAL(NOW_PLAYING_SCRUB_BACK, scrub_command(KEY_VOLUME_DOWN, KEY_GESTURE_PRESS));
+    CHECK_EQUAL(NOW_PLAYING_SCRUB_BACK_FAST, scrub_command(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT));
+}
+
+static void while_seeking_play_commits_and_back_cancels(void)
+{
+    CHECK_EQUAL(NOW_PLAYING_SCRUB_COMMIT, scrub_command(KEY_PLAY, KEY_GESTURE_PRESS));
+    CHECK_EQUAL(NOW_PLAYING_SCRUB_CANCEL, scrub_command(KEY_BACK, KEY_GESTURE_PRESS));
+    CHECK_EQUAL(NOW_PLAYING_HOME, scrub_command(KEY_BACK, KEY_GESTURE_LONG_PRESS));
+    CHECK_EQUAL(NOW_PLAYING_NONE, scrub_command(KEY_MENU, KEY_GESTURE_PRESS));
+}
+
+static void the_seek_target_stays_inside_the_track(void)
+{
+    CHECK_EQUAL(65000, now_playing_scrub_target(60000, 200000, NOW_PLAYING_SCRUB_STEP_MS));
+    CHECK_EQUAL(0, now_playing_scrub_target(3000, 200000, -NOW_PLAYING_SCRUB_STEP_MS));
+    CHECK_EQUAL(200000, now_playing_scrub_target(198000, 200000, NOW_PLAYING_SCRUB_FAST_STEP_MS));
 }
 
 static void menu_skips_forward_and_a_long_menu_skips_back(void)
@@ -55,7 +83,10 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(volume_keys_change_the_volume_while_held),
-        TEST_CASE(play_toggles_pause),
+        TEST_CASE(play_toggles_pause_and_a_long_play_starts_seeking),
+        TEST_CASE(while_seeking_volume_keys_move_the_target),
+        TEST_CASE(while_seeking_play_commits_and_back_cancels),
+        TEST_CASE(the_seek_target_stays_inside_the_track),
         TEST_CASE(menu_skips_forward_and_a_long_menu_skips_back),
         TEST_CASE(back_leaves_and_a_long_back_goes_home),
         TEST_CASE(power_is_left_to_the_system),

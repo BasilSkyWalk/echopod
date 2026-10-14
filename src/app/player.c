@@ -170,6 +170,18 @@ void player_skip(Player *player, int direction)
     }
 }
 
+void player_seek(Player *player, uint32_t position_ms)
+{
+    if (!player->has_track) {
+        return;
+    }
+    if (player->loaded) {
+        hal_audio_seek(position_ms);
+    } else {
+        player->paused_position_ms = position_ms;
+    }
+}
+
 void player_change_volume(Player *player, int delta)
 {
     int level = player->volume + delta;

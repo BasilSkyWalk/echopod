@@ -21,6 +21,9 @@ static LibrarySection group_section_of(BrowseKind kind)
         return LIBRARY_ALBUM_ARTISTS;
     case BROWSE_GENRES:
         return LIBRARY_GENRES;
+    case BROWSE_PLAYLISTS:
+    case BROWSE_PLAYLIST_TRACKS:
+        return LIBRARY_PLAYLISTS;
     case BROWSE_ARTISTS:
     case BROWSE_ALBUMS:
     case BROWSE_ALL_SONGS:
@@ -47,10 +50,10 @@ static bool track_matches(const Library *library, BrowseQuery query, uint32_t tr
     return library_read_track(library, track_index, &track) && track.artist == query.artist;
 }
 
-static uint32_t group_album_count(const Library *library, BrowseQuery query)
+static uint32_t group_link_count(const Library *library, BrowseQuery query)
 {
     LibraryGroup group;
-    return library_read_group(library, query.group, query.subject, &group) ? group.album_count : 0;
+    return library_read_group(library, query.group, query.subject, &group) ? group.link_count : 0;
 }
 
 static uint32_t album_track_count(const Library *library, BrowseQuery query)
@@ -90,11 +93,14 @@ uint32_t browse_count(const Library *library, BrowseQuery query)
     case BROWSE_ALL_SONGS:
         return library_count(library, LIBRARY_TITLE_ORDER);
     case BROWSE_GROUP_ALBUMS:
-        return group_album_count(library, query);
+    case BROWSE_PLAYLIST_TRACKS:
+        return group_link_count(library, query);
     case BROWSE_ALBUM_TRACKS:
         return album_track_count(library, query);
     case BROWSE_FOLDER:
         return folder_item_count(library, query.subject);
+    case BROWSE_PLAYLISTS:
+        return library_count(library, LIBRARY_PLAYLISTS);
     }
     return 0;
 }
@@ -131,15 +137,17 @@ static bool title_order_item(const Library *library, uint32_t position, BrowseIt
     return true;
 }
 
-static bool group_album_item(const Library *library, BrowseQuery query, uint32_t position,
-                             BrowseItem *item)
+static bool group_link_item(const Library *library, BrowseQuery query, uint32_t position,
+                            BrowseItem *item)
 {
     LibraryGroup group;
     if (!library_read_group(library, query.group, query.subject, &group) ||
-        position >= group.album_count) {
+        position >= group.link_count) {
         return false;
     }
-    return linked_item(library, group.first_link + position, BROWSE_ITEM_ALBUM, item);
+    BrowseItemKind kind =
+        query.kind == BROWSE_PLAYLIST_TRACKS ? BROWSE_ITEM_TRACK : BROWSE_ITEM_ALBUM;
+    return linked_item(library, group.first_link + position, kind, item);
 }
 
 static bool album_track_item(const Library *library, BrowseQuery query, uint32_t position,
@@ -179,13 +187,15 @@ bool browse_item(const Library *library, BrowseQuery query, uint32_t position, B
     case BROWSE_ARTISTS:
     case BROWSE_ALBUM_ARTISTS:
     case BROWSE_GENRES:
+    case BROWSE_PLAYLISTS:
         return table_item(library, group_section_of(query.kind), position, item);
     case BROWSE_ALBUMS:
         return table_item(library, LIBRARY_ALBUMS, position, item);
     case BROWSE_ALL_SONGS:
         return title_order_item(library, position, item);
     case BROWSE_GROUP_ALBUMS:
-        return group_album_item(library, query, position, item);
+    case BROWSE_PLAYLIST_TRACKS:
+        return group_link_item(library, query, position, item);
     case BROWSE_ALBUM_TRACKS:
         return album_track_item(library, query, position, item);
     case BROWSE_FOLDER:
@@ -210,7 +220,9 @@ bool browse_child(BrowseQuery parent, BrowseItem item, BrowseQuery *child)
 {
     switch (item.kind) {
     case BROWSE_ITEM_GROUP:
-        *child = query_of(BROWSE_GROUP_ALBUMS, item.group, item.index, LIBRARY_NONE);
+        *child =
+            query_of(item.group == LIBRARY_PLAYLISTS ? BROWSE_PLAYLIST_TRACKS : BROWSE_GROUP_ALBUMS,
+                     item.group, item.index, LIBRARY_NONE);
         return true;
     case BROWSE_ITEM_ALBUM:
         *child = query_of(BROWSE_ALBUM_TRACKS, LIBRARY_ARTISTS, item.index, artist_filter(parent));
@@ -333,6 +345,7 @@ static bool subject_title(const Library *library, BrowseQuery query, char *buffe
     LibraryFolder folder;
     switch (query.kind) {
     case BROWSE_GROUP_ALBUMS:
+    case BROWSE_PLAYLIST_TRACKS:
         return library_read_group(library, query.group, query.subject, &group) &&
                library_read_string(library, group.name, buffer, capacity);
     case BROWSE_ALBUM_TRACKS:
@@ -346,6 +359,7 @@ static bool subject_title(const Library *library, BrowseQuery query, char *buffe
     case BROWSE_GENRES:
     case BROWSE_ALBUMS:
     case BROWSE_ALL_SONGS:
+    case BROWSE_PLAYLISTS:
         return false;
     }
     return false;
@@ -364,6 +378,8 @@ bool browse_title(const Library *library, BrowseQuery query, char *buffer, size_
         return fixed_title("Albums", buffer, capacity);
     case BROWSE_ALL_SONGS:
         return fixed_title("All Songs", buffer, capacity);
+    case BROWSE_PLAYLISTS:
+        return fixed_title("Playlists", buffer, capacity);
     case BROWSE_FOLDER:
         if (query.subject == ROOT_FOLDER) {
             return fixed_title("Folders", buffer, capacity);
@@ -371,6 +387,7 @@ bool browse_title(const Library *library, BrowseQuery query, char *buffer, size_
         return subject_title(library, query, buffer, capacity);
     case BROWSE_GROUP_ALBUMS:
     case BROWSE_ALBUM_TRACKS:
+    case BROWSE_PLAYLIST_TRACKS:
         return subject_title(library, query, buffer, capacity);
     }
     return false;

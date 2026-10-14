@@ -1,18 +1,69 @@
 {
   "character_ranges": [
-    [32, 126],
-    [160, 255],
-    [8211, 8212],
-    [8216, 8217],
-    [8220, 8221],
-    [8226, 8226],
-    [8230, 8230],
-    [8364, 8364],
-    [8482, 8482]
+    [
+      32,
+      126
+    ],
+    [
+      160,
+      255
+    ],
+    [
+      8211,
+      8212
+    ],
+    [
+      8216,
+      8217
+    ],
+    [
+      8220,
+      8221
+    ],
+    [
+      8226,
+      8226
+    ],
+    [
+      8230,
+      8230
+    ],
+    [
+      8364,
+      8364
+    ],
+    [
+      8482,
+      8482
+    ],
+    [
+      8250,
+      8250
+    ],
+    [
+      9733,
+      9733
+    ],
+    [
+      10003,
+      10003
+    ]
   ],
   "fonts": [
-    {"name": "inter_regular_12", "file": "inter/Inter-Regular.ttf", "size": 12},
-    {"name": "inter_regular_16", "file": "inter/Inter-Regular.ttf", "size": 16},
-    {"name": "inter_semibold_16", "file": "inter/Inter-SemiBold.ttf", "size": 16}
+    {
+      "name": "inter_regular_12",
+      "file": "inter/Inter-Regular.ttf",
+      "size": 12
+    },
+    {
+      "name": "inter_regular_16",
+      "file": "inter/Inter-Regular.ttf",
+      "size": 16
+    },
+    {
+      "name": "inter_semibold_16",
+      "file": "inter/Inter-SemiBold.ttf",
+      "size": 16
+    }
   ]
 }
