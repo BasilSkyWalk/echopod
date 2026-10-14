@@ -19,6 +19,20 @@ DmaItem dma_loop_item(uint32_t buffer, uint32_t words, uint32_t item_address)
     };
 }
 
+bool dma_ring_items(DmaItem *items, uint32_t count, uint32_t buffer, uint32_t words_per_item,
+                    uint32_t items_address)
+{
+    if (count == 0 || words_per_item == 0 || words_per_item > DMA_MAX_BLOCK_WORDS) {
+        return false;
+    }
+    for (uint32_t index = 0; index < count; index++) {
+        uint32_t next = items_address + ((index + 1) % count) * (uint32_t)sizeof(DmaItem);
+        items[index] =
+            dma_loop_item(buffer + index * words_per_item * WORD_BYTES, words_per_item, next);
+    }
+    return true;
+}
+
 uint32_t dma_loop_position(uint32_t source, uint32_t buffer, uint32_t words)
 {
     if (source < buffer) {

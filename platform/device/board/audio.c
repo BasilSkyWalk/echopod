@@ -12,19 +12,20 @@
 #include "hal/storage.h"
 
 enum {
-    RING_WORDS = 16384,
+    RING_BLOCKS = 4,
+    BLOCK_WORDS = 4000,
+    RING_WORDS = RING_BLOCKS * BLOCK_WORDS,
     PREFILL_ROUNDS = 64,
     IDLE_SHUTDOWN_MS = 3000,
     TONE_RATE_HZ = 44100,
     TONE_PERIOD_SAMPLES = 100,
-    TONE_WORDS = 16000,
     TONE_AMPLITUDE = 9000
 };
 
 static FlacDecoder decoder;
 static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
-static DmaItem item;
+static DmaItem items[RING_BLOCKS];
 static HalFile file;
 static bool engine_ready;
 static bool path_up;
@@ -128,8 +129,9 @@ static bool start_transfer(uint32_t words)
     ring_words = words;
     consumed = 0;
     last_position = 0;
-    item = dma_loop_item(ring_address(), words, (uint32_t)(uintptr_t)&item);
-    if (!dmac_start_loop(&item)) {
+    uint32_t blocks = words / BLOCK_WORDS;
+    if (!dma_ring_items(items, blocks, ring_address(), BLOCK_WORDS, (uint32_t)(uintptr_t)items) ||
+        !dmac_start_loop(&items[0])) {
         return false;
     }
     dac_path_set_muted(false);
@@ -315,12 +317,12 @@ HalToneResult hal_audio_dma_tone_start(void)
     path_rate = TONE_RATE_HZ;
     int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
-    for (uint32_t index = 0; index < TONE_WORDS; index++) {
+    for (uint32_t index = 0; index < RING_WORDS; index++) {
         uint16_t sample = (uint16_t)samples[index % TONE_PERIOD_SAMPLES];
         ring[index] = (uint32_t)sample | (uint32_t)sample << 16;
     }
     dac_path_output_on();
-    if (!start_transfer(TONE_WORDS)) {
+    if (!start_transfer(RING_WORDS)) {
         stop_path();
         return HAL_TONE_NO_DMAC;
     }
