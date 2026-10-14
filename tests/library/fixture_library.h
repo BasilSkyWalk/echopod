@@ -10,7 +10,8 @@ enum {
     FIXTURE_ALBUMS = 5,
     FIXTURE_GROUPS = 4,
     FIXTURE_FOLDERS = 10,
-    FIXTURE_CAPACITY = 8192
+    FIXTURE_CAPACITY = 8192,
+    FIXTURE_COVERS_CAPACITY = 65536
 };
 
 typedef struct FixtureLibrary {
@@ -21,4 +22,5 @@ typedef struct FixtureLibrary {
 } FixtureLibrary;
 
 const uint8_t *fixture_bytes(uint32_t *size);
+const uint8_t *fixture_covers_bytes(uint32_t *size);
 Library *fixture_library_open(FixtureLibrary *fixture);

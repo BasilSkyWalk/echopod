@@ -22,7 +22,7 @@ static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2",
 static const char *const GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {"Low", "High"};
 static const char *const OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {"Auto", "3.5 mm", "4.4 mm"};
 static const char *const START_OPTIONS[START_SCREEN_COUNT] = {
-    "Main menu", "Now Playing", "Albums", "Artists", "Favorites", "Playlists"};
+    "Main menu", "Now Playing", "Albums", "Artists", "Favorites", "Playlists", "Cover Flow"};
 
 static const Settings *settings_of(const void *context)
 {

@@ -2,6 +2,7 @@ add_library(echo_gfx STATIC
     canvas.c
     color.c
     font.c
+    image.c
     rect.c
     strip_renderer.c
     text.c

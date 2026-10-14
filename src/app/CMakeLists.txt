@@ -2,6 +2,7 @@ add_library(echo_app STATIC
     app.c
     app_screens.c
     browse_screen.c
+    cover_cache.c
     default_theme.c
     favorites_store.c
     frame_overlay.c
@@ -9,6 +10,7 @@ add_library(echo_app STATIC
     player.c
     settings_screens.c
     settings_store.c
+    screens/cover_flow_screen.c
     screens/font_sample_screen.c
     screens/now_playing_screen.c
     screens/test_pattern_screen.c

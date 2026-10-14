@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 typedef enum MusicSource {
-    MUSIC_COMING_SOON,
+    MUSIC_COVER_FLOW,
     MUSIC_LIBRARY,
     MUSIC_FAVORITES
 } MusicSource;
@@ -16,6 +16,7 @@ typedef struct MusicEntry {
 } MusicEntry;
 
 enum {
+    MUSIC_COVER_FLOW_ENTRY = 0,
     MUSIC_ARTISTS_ENTRY = 1,
     MUSIC_ALBUMS_ENTRY = 3,
     MUSIC_PLAYLISTS_ENTRY = 7,
@@ -23,7 +24,7 @@ enum {
 };
 
 static const MusicEntry MUSIC_ENTRIES[MUSIC_ITEM_COUNT] = {
-    {"Cover Flow", MUSIC_COMING_SOON, BROWSE_ALBUMS},
+    {"Cover Flow", MUSIC_COVER_FLOW, BROWSE_ALBUMS},
     {"Artists", MUSIC_LIBRARY, BROWSE_ARTISTS},
     {"Album Artists", MUSIC_LIBRARY, BROWSE_ALBUM_ARTISTS},
     {"Albums", MUSIC_LIBRARY, BROWSE_ALBUMS},
@@ -92,6 +93,9 @@ static Screen *browse_screen_for(BrowseEntry *entry)
     if (!entry->store->available) {
         return entry->unavailable;
     }
+    if (entry->fixed != NULL) {
+        return entry->fixed;
+    }
     if (entry->favorites) {
         return browse_pool_open_favorites(entry->pool, 0);
     }
@@ -106,15 +110,13 @@ static ScreenAction open_browse(void *context)
 static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int index)
 {
     const MusicEntry *entry = &MUSIC_ENTRIES[index];
-    if (entry->source == MUSIC_COMING_SOON) {
-        return open_item(entry->label, &screens->coming_soon.screen);
-    }
     screens->browse_entries[index] = (BrowseEntry){
         .pool = &screens->browse,
         .store = store,
         .unavailable = &screens->no_library.screen,
         .query = browse_root_query(entry->kind),
         .favorites = entry->source == MUSIC_FAVORITES,
+        .fixed = entry->source == MUSIC_COVER_FLOW ? &screens->cover_flow.screen : NULL,
     };
     return (MenuItem){.label = entry->label,
                       .select = open_browse,
@@ -133,6 +135,16 @@ static void build_music(AppScreens *screens, AppScreensContext context)
         .toast = context.toast,
     };
     browse_pool_init(&screens->browse, browse);
+    CoverFlowConfig cover_flow = {
+        .library = &context.store->library,
+        .theme = context.theme,
+        .covers = context.covers,
+        .favorites = context.favorites,
+        .toast = context.toast,
+        .browse = &screens->browse,
+        .player = context.player,
+    };
+    cover_flow_screen_init(&screens->cover_flow, cover_flow);
     for (int index = 0; index < MUSIC_ITEM_COUNT; index++) {
         screens->music_items[index] = music_item(screens, context.store, index);
     }
@@ -182,13 +194,10 @@ static void build_home(AppScreens *screens, const Theme *theme)
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
-    MessageConfig coming_soon = {
-        .title = "Coming soon", .message = "This part is not built yet", .theme = theme};
     MessageConfig no_library = {
         .title = "No library", .message = "Run the PC indexer to build one", .theme = theme};
     NowPlayingConfig now_playing = {
         .player = context.player, .library = &context.store->library, .theme = theme};
-    message_screen_init(&screens->coming_soon, coming_soon);
     message_screen_init(&screens->no_library, no_library);
     now_playing_screen_init(&screens->now_playing, now_playing);
     build_music(screens, context);
@@ -227,6 +236,8 @@ int app_screens_start_path(AppScreens *screens, StartScreen start, Screen **path
         return music_path(screens, MUSIC_FAVORITES_ENTRY, path);
     case START_PLAYLISTS:
         return music_path(screens, MUSIC_PLAYLISTS_ENTRY, path);
+    case START_COVER_FLOW:
+        return music_path(screens, MUSIC_COVER_FLOW_ENTRY, path);
     }
     return 0;
 }

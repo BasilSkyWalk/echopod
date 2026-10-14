@@ -6,6 +6,7 @@
 #include "app_screens.h"
 #include "core/key_tracker.h"
 #include "core/power_policy.h"
+#include "cover_cache.h"
 #include "default_theme.h"
 #include "favorites_store.h"
 #include "frame_overlay.h"
@@ -51,6 +52,7 @@ typedef struct AppState {
     Player player;
     SettingsStore settings;
     FavoritesStore favorites;
+    CoverCache covers;
     PowerPolicy power;
     Toast toast;
     StatusBarState status_bar;
@@ -226,6 +228,7 @@ static void start_playback(void)
     settings_store_restore_playback(&app.settings, &app.player, hal_clock_microseconds());
     player_restore(&app.player);
     favorites_store_load(&app.favorites, &app.library.library);
+    cover_cache_open(&app.covers, &app.library.library);
 }
 
 static void start_hardware(uint32_t now_ms)
@@ -255,6 +258,7 @@ static void start_screens(uint32_t now_ms)
         .favorites = &app.favorites,
         .power = &app.power,
         .toast = &app.toast,
+        .covers = &app.covers,
     };
     Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);

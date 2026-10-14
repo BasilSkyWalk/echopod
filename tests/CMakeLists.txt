@@ -22,6 +22,7 @@ echo_add_unit_test(NAME test_power_policy SOURCES core/test_power_policy.c LIBRA
 echo_add_unit_test(NAME test_color SOURCES gfx/test_color.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_rect SOURCES gfx/test_rect.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_canvas SOURCES gfx/test_canvas.c LIBRARIES echo_gfx)
+echo_add_unit_test(NAME test_image SOURCES gfx/test_image.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_strip_renderer SOURCES gfx/test_strip_renderer.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_font SOURCES gfx/test_font.c gfx/tiny_font.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_text SOURCES gfx/test_text.c gfx/tiny_font.c LIBRARIES echo_gfx)
@@ -43,7 +44,7 @@ endforeach()
 
 echo_add_unit_test(NAME test_settings SOURCES settings/test_settings.c LIBRARIES echo_settings)
 
-foreach(library_test block_cache library library_browse favorites)
+foreach(library_test block_cache library library_browse favorites covers)
     echo_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES echo_library_fixtures
@@ -53,6 +54,7 @@ endforeach()
 echo_add_unit_test(NAME test_screen_stack SOURCES ui/test_screen_stack.c LIBRARIES echo_ui)
 echo_add_unit_test(NAME test_navigation SOURCES ui/test_navigation.c LIBRARIES echo_ui)
 echo_add_unit_test(NAME test_marquee SOURCES ui/test_marquee.c LIBRARIES echo_ui)
+echo_add_unit_test(NAME test_cover_flow SOURCES ui/test_cover_flow.c LIBRARIES echo_ui)
 echo_add_unit_test(NAME test_label
     SOURCES ui/test_label.c gfx/tiny_font.c
     LIBRARIES echo_ui
@@ -78,6 +80,11 @@ echo_add_unit_test(NAME test_app
 )
 echo_add_unit_test(NAME test_player
     SOURCES app/test_player.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_cover_cache
+    SOURCES app/test_cover_cache.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
@@ -150,6 +157,11 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             --config ${PROJECT_SOURCE_DIR}/assets/fonts/fonts.json
             --output ${PROJECT_SOURCE_DIR}/src/fonts
             --style ${PROJECT_SOURCE_DIR}/.clang-format
+            --check
+    )
+    add_test(NAME cover_fixture_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/cover_fixture.py
+            --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_covers.bin
             --check
     )
     add_test(NAME library_fixture_up_to_date

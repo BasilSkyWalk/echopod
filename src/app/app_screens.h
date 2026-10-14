@@ -4,9 +4,11 @@
 
 #include "browse_screen.h"
 #include "core/power_policy.h"
+#include "cover_cache.h"
 #include "favorites_store.h"
 #include "library_store.h"
 #include "player.h"
+#include "screens/cover_flow_screen.h"
 #include "screens/font_sample_screen.h"
 #include "screens/now_playing_screen.h"
 #include "screens/test_pattern_screen.h"
@@ -34,6 +36,7 @@ typedef struct BrowseEntry {
     Screen *unavailable;
     BrowseQuery query;
     bool favorites;
+    Screen *fixed;
 } BrowseEntry;
 
 typedef struct AppScreens {
@@ -42,10 +45,10 @@ typedef struct AppScreens {
     SettingsScreens settings;
     MenuScreen diagnostics;
     MenuScreen long_names;
-    MessageScreen coming_soon;
     MessageScreen no_library;
     BrowsePool browse;
     NowPlayingScreen now_playing;
+    CoverFlowScreen cover_flow;
     BrowseEntry browse_entries[MUSIC_ITEM_COUNT];
     TestPatternScreen test_pattern;
     FontSampleScreen font_sample;
@@ -63,6 +66,7 @@ typedef struct AppScreensContext {
     FavoritesStore *favorites;
     PowerPolicy *power;
     Toast *toast;
+    CoverCache *covers;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);

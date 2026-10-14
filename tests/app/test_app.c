@@ -29,7 +29,13 @@ enum {
     SETTINGS_TIMEOUT_INDEX = 3,
     SETTINGS_BRIGHTNESS_INDEX = 4,
     SETTINGS_GAIN_INDEX = 5,
+    MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
+    COVER_CENTER_X = 160,
+    COVER_CENTER_Y = 60,
+    SETTLE_STEPS = 30,
+    RED_COVER = 0xF800,
+    BLUE_COVER = 0x001F,
     MUSIC_FAVORITES_INDEX = 8,
     DEFAULT_TIMEOUT_MS = 30000,
     SHORT_TIMEOUT_MS = 10000,
@@ -54,9 +60,12 @@ static void start_app(void)
 static void start_app_with_library(void)
 {
     uint32_t size = 0;
+    uint32_t covers_size = 0;
     const uint8_t *bytes = fixture_bytes(&size);
+    const uint8_t *covers = fixture_covers_bytes(&covers_size);
     fake_hal_reset();
     fake_hal_add_file("/.echo/library.db", bytes, size);
+    fake_hal_add_file("/.echo/covers.bin", covers, covers_size);
     now_ms = START_MS;
     fake_hal_set_milliseconds(now_ms);
     app_start();
@@ -530,6 +539,71 @@ static void the_start_screen_setting_opens_now_playing(void)
     CHECK_EQUAL(2, app_screen_depth());
 }
 
+static void settle(void)
+{
+    for (int count = 0; count < SETTLE_STEPS; count++) {
+        wait_ms(16);
+    }
+}
+
+static void cover_flow_opens_from_the_music_menu(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_COVER_FLOW_INDEX);
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_BACK);
+    CHECK(title_is("Music"));
+}
+
+static void cover_flow_needs_a_library(void)
+{
+    start_app();
+    open_music_entry(MUSIC_COVER_FLOW_INDEX);
+    CHECK(title_is("No library"));
+}
+
+static void cover_flow_runs_by_album_artist_and_opens_the_centre_album(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_COVER_FLOW_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("High Voltage"));
+    tap(KEY_BACK);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+}
+
+static void cover_flow_shows_the_centre_cover(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_COVER_FLOW_INDEX);
+    settle();
+    CHECK_EQUAL(BLUE_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+    move_down(1);
+    settle();
+    CHECK_EQUAL(RED_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+}
+
+static void cover_flow_starts_at_the_playing_album(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    hold_back();
+    open_music_entry(MUSIC_COVER_FLOW_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+}
+
+static void holding_play_in_cover_flow_toggles_a_favorite(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_COVER_FLOW_INDEX);
+    hold(KEY_PLAY);
+    CHECK(toast_is("Added to Favorites"));
+    CHECK(title_is("Cover Flow"));
+}
+
 static bool area_has_color(Rect area, Color color)
 {
     for (int y = area.y; y < area.y + area.height; y++) {
@@ -609,6 +683,12 @@ int main(void)
         TEST_CASE(the_start_screen_setting_opens_albums),
         TEST_CASE(the_start_screen_setting_opens_now_playing),
         TEST_CASE(the_header_shows_the_play_state_and_battery),
+        TEST_CASE(cover_flow_opens_from_the_music_menu),
+        TEST_CASE(cover_flow_needs_a_library),
+        TEST_CASE(cover_flow_runs_by_album_artist_and_opens_the_centre_album),
+        TEST_CASE(cover_flow_shows_the_centre_cover),
+        TEST_CASE(cover_flow_starts_at_the_playing_album),
+        TEST_CASE(holding_play_in_cover_flow_toggles_a_favorite),
         TEST_CASE(stopping_the_app_saves_the_session),
         TEST_CASE(each_step_records_its_duration),
     };
