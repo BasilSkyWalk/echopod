@@ -2,12 +2,14 @@ add_library(echo_device_logic STATIC
     emmc_layout.c
     fat.c
     fat_layout.c
+    image_crc.c
     key_ladder.c
     key_scanner.c
     msc.c
     panel.c
     sd_card.c
     tick_clock.c
+    updater.c
     usb_device.c
 )
 target_include_directories(echo_device_logic PUBLIC include)

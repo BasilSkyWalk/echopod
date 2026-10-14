@@ -15,7 +15,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | done |
 | 1f | Cover Flow and cover export script | 4–6 d | no | done |
 | 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | done 2026-10-14: maskrom, `ld` and `td` pass on macOS; stock boots after. No writes |
-| 3a | First device image: our UI on our own display, key, SD/eMMC-read and power-off drivers, written from `docs/device-facts.md`, plus USB mass storage and an updater. No audio and no saving | 1–2 wk | yes | in progress: image builder done; display, keys, clock, power-off, SD card reads (FAT16/FAT32), internal storage and USB mass storage written and building, not yet run on the device. The updater is next |
+| 3a | First device image: our UI on our own display, key, SD/eMMC-read and power-off drivers, written from `docs/device-facts.md`, plus USB mass storage and an updater. No audio and no saving | 1–2 wk | yes | in progress: image builder done; display, keys, clock, power-off, SD card reads (FAT16/FAT32), internal storage, USB mass storage and the updater written and building, not yet run on the device. Next: the recovery write test (Phase 2b), then the first install |
 | 3 | Device gaps: PLL, IRQs/SysTick, DMA audio, FAT writes, battery, backlight PWM, key timing, sleep | 3–8 wk | yes | todo |
 | 4 | Our app on the device; memory and Cover Flow tuning | 1–2 wk | yes | todo |
 

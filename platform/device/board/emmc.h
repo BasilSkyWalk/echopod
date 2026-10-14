@@ -16,3 +16,5 @@ bool emmc_start(EmmcInfo *info);
 bool emmc_read(void *context, uint32_t lba, uint32_t count, void *buffer);
 bool emmc_write(void *context, uint32_t lba, uint32_t count, const void *buffer);
 BlockDevice emmc_device(void);
+bool emmc_volume_read(void *context, uint32_t lba, uint32_t count, void *buffer);
+bool emmc_volume_write(void *context, uint32_t lba, uint32_t count, const void *buffer);

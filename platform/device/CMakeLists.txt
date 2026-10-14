@@ -13,6 +13,7 @@ add_executable(echo_device
     board/sd.c
     board/startup.c
     board/storage.c
+    board/update.c
     board/usb.c
     board/usb_session.c
 )

@@ -20,18 +20,6 @@ static EmmcInfo internal;
 static UsbPort port;
 static Msc msc;
 
-static bool internal_read(void *context, uint32_t lba, uint32_t count, void *buffer)
-{
-    (void)context;
-    return emmc_read(NULL, internal.layout.volume_start + lba, count, buffer);
-}
-
-static bool internal_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
-{
-    (void)context;
-    return emmc_write(NULL, internal.layout.volume_start + lba, count, buffer);
-}
-
 static bool card_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
 {
     (void)context;
@@ -56,8 +44,8 @@ static void prepare_luns(void)
     bool internal_ready = emmc_start(&internal);
     bool card_ready = sd_start(&card);
     MscLun luns[LUN_COUNT] = {
-        {internal_read, internal_write, NULL, internal.layout.volume_sectors, true, internal_ready,
-         "Internal storage"},
+        {emmc_volume_read, emmc_volume_write, NULL, internal.layout.volume_sectors, true,
+         internal_ready, "Internal storage"},
         {sd_read, card_write, NULL, sd_sector_count(), false, card_ready, "SD card"},
     };
     msc_init(&msc, luns, LUN_COUNT);

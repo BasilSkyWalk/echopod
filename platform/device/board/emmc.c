@@ -182,6 +182,23 @@ BlockDevice emmc_device(void)
     return (BlockDevice){emmc_read, NULL};
 }
 
+static bool inside_volume(uint32_t lba, uint32_t count)
+{
+    return lba < emmc.layout.volume_sectors && count <= emmc.layout.volume_sectors - lba;
+}
+
+bool emmc_volume_read(void *context, uint32_t lba, uint32_t count, void *buffer)
+{
+    return inside_volume(lba, count) &&
+           emmc_read(context, emmc.layout.volume_start + lba, count, buffer);
+}
+
+bool emmc_volume_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
+{
+    return inside_volume(lba, count) &&
+           emmc_write(context, emmc.layout.volume_start + lba, count, buffer);
+}
+
 bool emmc_start(EmmcInfo *info)
 {
     if (!started) {

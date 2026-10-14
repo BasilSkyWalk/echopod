@@ -159,6 +159,7 @@ Written only from `docs/device-facts.md` (the clean-room rule in `NOTES.md`).
   - `emmc_layout`: finds the firmware slots (from the IDB's system size) and scans for the user volume on internal storage. It also answers which internal-storage writes are allowed: only the user volume and the two firmware slots, never the IDB, the SAVE block or the gap
   - `usb_device`: the descriptors and standard requests for a full-speed, bulk-only mass-storage device (`1209:0001`, the pid.codes test ID), plus GET_MAX_LUN and the mass-storage reset
   - `msc`: the bulk-only transport and SCSI commands over up to two LUNs. A reply shorter than the host asked for is padded with zeros and reported in the residue instead of stalling. Ejecting a LUN marks only that LUN absent
+  - `image_crc` and `updater`: the image check and the slot writer. The check accepts only our 5 MiB shape (size, magic, fw size `0x44C000`, header copy, trailer CRC, fits a slot) and reports an image already in slot 1 as installed. The install fills slot 2, then copies slot 2 into slot 1. For each slot it first writes `0xFF` over the first 8 KiB, then every other 8 KiB chunk, then the first chunk last. Chunks that already match are skipped, and every write is read back. One slot is complete at every moment
   - `fat`: a read-only FAT16 and FAT32 reader over a `BlockDevice`. It reads unpartitioned cards or MBR partition 0, follows long file names (UTF-16, including surrogate pairs), matches path components exactly by code point and ASCII letters in either case, and reads at any offset through a per-file cluster cursor
 - `platform/device/board` is device-only. It holds the register helpers, GPIO and pin mux, startup (the vector tables and the steps in facts 3.1), the linker script, a minimal `memcpy`/`memset`, and the HAL implementations.
 - **Build:** `cmake --preset device && cmake --build --preset device` cross-compiles to `build/device/platform/device/echo_device.elf`. Then `tools/make_image.py` packs it into `build/device/HIFIEC90.IMG`, using header bytes from the RECHO 0.9.2 file at `ECHO_REFERENCE_IMG` (outside the repo). Without that file, only the ELF is built.
@@ -172,7 +173,7 @@ Written only from `docs/device-facts.md` (the clean-room rule in `NOTES.md`).
 - **USB:** the main loop watches VBUS. When the cable is plugged in, `board/usb_session` powers the PHY and the polled DWC2 core (`board/usb`) and waits up to 3 s for a host; no host means a charger, and the app carries on. With a host:
   - the app shows a notice, and its steps pause
   - LUN 0 is the internal-storage user volume, read/write; LUN 1 is the SD card, read-only
-  - the session ends when LUN 0 is ejected or the cable is pulled; then `app_wake` restarts the screen timeout
+  - the session ends when LUN 0 is ejected or the cable is pulled. Then `board/update` looks for `/HIFIEC90.IMG` on internal storage and installs it if it's valid and differs from slot 1, showing progress and the result (a key press dismisses it). Finally `app_wake` restarts the screen timeout. The new firmware starts at the next power cycle, because a warm reboot doesn't work on this hardware
 - **Stubs for now:** file writes, audio, battery (unknown), and brightness (backlight on or off only).
 
 ## Simulator audio
