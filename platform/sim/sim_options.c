@@ -72,11 +72,15 @@ static bool read_screenshot(ArgumentCursor *cursor, SimOptions *options)
     return options->screenshot_path != NULL;
 }
 
+static bool read_keys(ArgumentCursor *cursor, SimOptions *options)
+{
+    options->key_script = next_value(cursor);
+    return options->key_script != NULL;
+}
+
 static const OptionSpec OPTION_SPECS[] = {
-    {"--scale", read_scale},
-    {"--frames", read_frames},
-    {"--headless", read_headless},
-    {"--screenshot", read_screenshot},
+    {"--scale", read_scale},           {"--frames", read_frames}, {"--headless", read_headless},
+    {"--screenshot", read_screenshot}, {"--keys", read_keys},
 };
 
 static bool read_option(ArgumentCursor *cursor, SimOptions *options)

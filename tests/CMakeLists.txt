@@ -13,12 +13,44 @@ endfunction()
 echo_add_unit_test(NAME test_deadline SOURCES core/test_deadline.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_frame_stats SOURCES core/test_frame_stats.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_key_tracker SOURCES core/test_key_tracker.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_utf8 SOURCES core/test_utf8.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_string_builder SOURCES core/test_string_builder.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_format SOURCES core/test_format.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_color SOURCES gfx/test_color.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_rect SOURCES gfx/test_rect.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_canvas SOURCES gfx/test_canvas.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_strip_renderer SOURCES gfx/test_strip_renderer.c LIBRARIES echo_gfx)
+echo_add_unit_test(NAME test_font SOURCES gfx/test_font.c gfx/tiny_font.c LIBRARIES echo_gfx)
+echo_add_unit_test(NAME test_text SOURCES gfx/test_text.c gfx/tiny_font.c LIBRARIES echo_gfx)
+echo_add_unit_test(NAME test_fonts SOURCES fonts/test_fonts.c LIBRARIES echo_fonts)
+
+echo_add_unit_test(NAME test_screen_stack SOURCES ui/test_screen_stack.c LIBRARIES echo_ui)
+echo_add_unit_test(NAME test_navigation SOURCES ui/test_navigation.c LIBRARIES echo_ui)
+echo_add_unit_test(NAME test_marquee SOURCES ui/test_marquee.c LIBRARIES echo_ui)
+echo_add_unit_test(NAME test_label
+    SOURCES ui/test_label.c gfx/tiny_font.c
+    LIBRARIES echo_ui
+    PRIVATE_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/gfx
+)
+
+add_library(echo_ui_fixtures STATIC gfx/tiny_font.c ui/ui_test_theme.c ui/ui_test_canvas.c)
+target_include_directories(echo_ui_fixtures PUBLIC gfx ui)
+target_link_libraries(echo_ui_fixtures PUBLIC echo_ui PRIVATE echo_options)
+
+foreach(ui_test theme_layout list_view header menu_screen message_screen)
+    echo_add_unit_test(NAME test_${ui_test}
+        SOURCES ui/test_${ui_test}.c
+        LIBRARIES echo_ui_fixtures
+    )
+endforeach()
+
 echo_add_unit_test(NAME test_app
     SOURCES app/test_app.c app/fake_hal.c
+    LIBRARIES echo_app
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_test_pattern_screen
+    SOURCES app/test_test_pattern_screen.c app/fake_hal.c
     LIBRARIES echo_app
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
@@ -26,6 +58,10 @@ echo_add_unit_test(NAME test_app
 if(ECHO_BUILD_SIM)
     echo_add_unit_test(NAME test_sim_options
         SOURCES sim/test_sim_options.c
+        LIBRARIES echo_sim_options
+    )
+    echo_add_unit_test(NAME test_sim_script
+        SOURCES sim/test_sim_script.c
         LIBRARIES echo_sim_options
     )
     add_test(NAME sim_headless_smoke
@@ -60,4 +96,20 @@ if(ARM_GCC)
     )
 else()
     message(STATUS "arm-none-eabi-gcc not found: the target_audit test is skipped")
+endif()
+
+set(ECHO_TOOLS_PYTHON ${PROJECT_SOURCE_DIR}/.venv/bin/python)
+if(EXISTS ${ECHO_TOOLS_PYTHON})
+    add_test(NAME tools_unit_tests
+        COMMAND ${ECHO_TOOLS_PYTHON} -m unittest discover -s ${PROJECT_SOURCE_DIR}/tools/tests
+    )
+    add_test(NAME fonts_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/font_build.py
+            --config ${PROJECT_SOURCE_DIR}/assets/fonts/fonts.json
+            --output ${PROJECT_SOURCE_DIR}/src/fonts
+            --style ${PROJECT_SOURCE_DIR}/.clang-format
+            --check
+    )
+else()
+    message(STATUS "tools venv not found: run python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt")
 endif()

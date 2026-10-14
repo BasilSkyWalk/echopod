@@ -1,6 +1,6 @@
-add_library(echo_sim_options STATIC sim_options.c)
+add_library(echo_sim_options STATIC sim_options.c sim_script.c)
 target_include_directories(echo_sim_options PUBLIC .)
-target_link_libraries(echo_sim_options PRIVATE echo_options)
+target_link_libraries(echo_sim_options PUBLIC echo_core PRIVATE echo_options)
 
 find_package(SDL2 CONFIG REQUIRED)
 

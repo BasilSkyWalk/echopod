@@ -7,25 +7,32 @@ static Color *pixel_address(const Canvas *canvas, int x, int y)
     return &canvas->pixels[row * canvas->bounds.width + column];
 }
 
-static bool contains(const Canvas *canvas, int x, int y)
+static bool contains(Rect area, Point point)
 {
-    Rect point = {x, y, 1, 1};
-    return !rect_is_empty(rect_intersection(canvas->bounds, point));
+    Rect single = {point.x, point.y, 1, 1};
+    return !rect_is_empty(rect_intersection(area, single));
 }
 
 Canvas canvas_make(Color *pixels, Rect bounds)
 {
-    return (Canvas){.pixels = pixels, .bounds = bounds};
+    return (Canvas){.pixels = pixels, .bounds = bounds, .clip = bounds};
+}
+
+Canvas canvas_clipped(const Canvas *canvas, Rect area)
+{
+    Canvas clipped = *canvas;
+    clipped.clip = rect_intersection(canvas->clip, area);
+    return clipped;
 }
 
 void canvas_clear(Canvas *canvas, Color color)
 {
-    canvas_fill_rect(canvas, canvas->bounds, color);
+    canvas_fill_rect(canvas, canvas->clip, color);
 }
 
 void canvas_fill_rect(Canvas *canvas, Rect area, Color color)
 {
-    Rect visible = rect_intersection(canvas->bounds, area);
+    Rect visible = rect_intersection(canvas->clip, area);
     if (rect_is_empty(visible)) {
         return;
     }
@@ -37,7 +44,16 @@ void canvas_fill_rect(Canvas *canvas, Rect area, Color color)
     }
 }
 
+void canvas_blend_pixel(Canvas *canvas, Point point, Color color, uint8_t alpha)
+{
+    if (!contains(canvas->clip, point)) {
+        return;
+    }
+    Color *pixel = pixel_address(canvas, point.x, point.y);
+    *pixel = color_blend(*pixel, color, alpha);
+}
+
 Color canvas_pixel_at(const Canvas *canvas, int x, int y)
 {
-    return contains(canvas, x, y) ? *pixel_address(canvas, x, y) : 0;
+    return contains(canvas->bounds, (Point){x, y}) ? *pixel_address(canvas, x, y) : 0;
 }

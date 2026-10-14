@@ -13,6 +13,7 @@ typedef struct SimOptions {
     uint32_t frame_limit;
     bool headless;
     const char *screenshot_path;
+    const char *key_script;
 } SimOptions;
 
 bool sim_options_parse(int argument_count, char **arguments, SimOptions *options);

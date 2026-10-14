@@ -24,6 +24,15 @@ static void no_arguments_give_a_windowed_run_at_default_scale(void)
     CHECK_EQUAL(0, options.frame_limit);
     CHECK(!options.headless);
     CHECK(options.screenshot_path == NULL);
+    CHECK(options.key_script == NULL);
+}
+
+static void a_key_script_is_read(void)
+{
+    char *given[] = {"--keys", "down,play"};
+    SimOptions options;
+    CHECK(parse(given, 2, &options));
+    CHECK(options.key_script == given[1]);
 }
 
 static void every_option_is_read(void)
@@ -79,6 +88,7 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(no_arguments_give_a_windowed_run_at_default_scale),
         TEST_CASE(every_option_is_read),
+        TEST_CASE(a_key_script_is_read),
         TEST_CASE(an_unknown_option_is_rejected),
         TEST_CASE(an_option_missing_its_value_is_rejected),
         TEST_CASE(non_numeric_values_are_rejected),

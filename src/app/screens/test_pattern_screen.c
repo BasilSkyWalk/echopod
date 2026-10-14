@@ -1,5 +1,7 @@
 #include "test_pattern_screen.h"
 
+#include <stddef.h>
+
 #include "core/deadline.h"
 #include "hal/display.h"
 
@@ -109,7 +111,7 @@ static void draw(void *context, Canvas *canvas)
     draw_indicators(screen, canvas);
 }
 
-static void handle_key(void *context, KeyEvent event, uint32_t now_ms)
+static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     TestPatternScreen *screen = context;
     screen->flashes[event.key] = (KeyFlash){
@@ -117,6 +119,8 @@ static void handle_key(void *context, KeyEvent event, uint32_t now_ms)
         .until_ms = now_ms + TEST_PATTERN_FLASH_MS,
         .active = true,
     };
+    bool leaving = event.key == KEY_BACK && event.gesture == KEY_GESTURE_LONG_PRESS;
+    return leaving ? screen_action_pop() : screen_action_none();
 }
 
 static void update(void *context, uint32_t now_ms)
@@ -131,17 +135,26 @@ static void update(void *context, uint32_t now_ms)
     }
 }
 
-void test_pattern_screen_init(TestPatternScreen *screen, uint32_t now_ms)
+static void enter(void *context, uint32_t now_ms)
 {
-    *screen = (TestPatternScreen){.started_at_ms = now_ms, .now_ms = now_ms};
+    TestPatternScreen *pattern = context;
+    pattern->started_at_ms = now_ms;
+    pattern->now_ms = now_ms;
+    for (int index = 0; index < KEY_COUNT; index++) {
+        pattern->flashes[index].active = false;
+    }
 }
 
-Screen test_pattern_screen_as_screen(TestPatternScreen *screen)
+Screen *test_pattern_screen_init(TestPatternScreen *pattern)
 {
-    return (Screen){
-        .context = screen,
+    *pattern = (TestPatternScreen){0};
+    pattern->screen = (Screen){
+        .title = "Key test",
+        .context = pattern,
+        .enter = enter,
         .handle_key = handle_key,
         .update = update,
         .draw = draw,
     };
+    return &pattern->screen;
 }

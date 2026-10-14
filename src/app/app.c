@@ -2,13 +2,15 @@
 
 #include <stddef.h>
 
+#include "app_screens.h"
 #include "core/key_tracker.h"
+#include "default_theme.h"
+#include "frame_overlay.h"
 #include "gfx/strip_renderer.h"
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
-#include "screen.h"
-#include "test_pattern_screen.h"
+#include "ui/screen_stack.h"
 
 enum {
     STRIP_HEIGHT = 34
@@ -35,12 +37,18 @@ static const KeyConfig KEY_CONFIG = {
 typedef struct AppState {
     KeyTracker keys;
     FrameStats frame_stats;
-    TestPatternScreen test_pattern;
-    Screen screen;
+    ScreenStack stack;
+    AppScreens screens;
+    AppOptions options;
 } AppState;
 
 static AppState app;
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
+
+static Screen *top_screen(void)
+{
+    return screen_stack_top(&app.stack);
+}
 
 static void read_input(void)
 {
@@ -58,14 +66,28 @@ static void dispatch_key_events(uint32_t now_ms)
 {
     KeyEvent event;
     while (key_tracker_next_event(&app.keys, &event)) {
-        app.screen.handle_key(app.screen.context, event, now_ms);
+        Screen *screen = top_screen();
+        ScreenAction action = screen->handle_key(screen->context, event, now_ms);
+        screen_stack_apply(&app.stack, action, now_ms);
     }
 }
 
-static void draw_current_screen(void *context, Canvas *canvas)
+static void update_screen(uint32_t now_ms)
 {
-    const Screen *screen = context;
+    Screen *screen = top_screen();
+    if (screen->update != NULL) {
+        screen->update(screen->context, now_ms);
+    }
+}
+
+static void draw_frame(void *context, Canvas *canvas)
+{
+    const AppState *state = context;
+    Screen *screen = screen_stack_top(&state->stack);
     screen->draw(screen->context, canvas);
+    if (state->options.show_frame_time) {
+        frame_overlay_draw(canvas, &DEFAULT_THEME, &state->frame_stats);
+    }
 }
 
 static void write_to_display(void *context, Rect area, const Color *pixels)
@@ -81,9 +103,9 @@ static void render_frame(void)
         .screen_width = HAL_DISPLAY_WIDTH,
         .screen_height = HAL_DISPLAY_HEIGHT,
         .strip_height = STRIP_HEIGHT,
-        .background = 0,
+        .background = DEFAULT_THEME.colors.background,
     };
-    FrameDrawer drawer = {.draw = draw_current_screen, .context = &app.screen};
+    FrameDrawer drawer = {.draw = draw_frame, .context = &app};
     FrameSink sink = {.write = write_to_display, .context = NULL};
     strip_renderer_render(&renderer, drawer, sink);
     hal_display_present();
@@ -94,8 +116,9 @@ void app_start(void)
     uint32_t now_ms = hal_clock_milliseconds();
     key_tracker_init(&app.keys, &KEY_CONFIG);
     frame_stats_reset(&app.frame_stats);
-    test_pattern_screen_init(&app.test_pattern, now_ms);
-    app.screen = test_pattern_screen_as_screen(&app.test_pattern);
+    app.options = (AppOptions){.show_frame_time = false};
+    Screen *root = app_screens_init(&app.screens, &app.options, &DEFAULT_THEME);
+    screen_stack_init(&app.stack, root, now_ms);
 }
 
 void app_step(void)
@@ -105,7 +128,7 @@ void app_step(void)
     read_input();
     key_tracker_update(&app.keys, now_ms);
     dispatch_key_events(now_ms);
-    app.screen.update(app.screen.context, now_ms);
+    update_screen(now_ms);
     render_frame();
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
 }
@@ -113,4 +136,14 @@ void app_step(void)
 const FrameStats *app_frame_stats(void)
 {
     return &app.frame_stats;
+}
+
+const char *app_screen_title(void)
+{
+    return top_screen()->title;
+}
+
+int app_screen_depth(void)
+{
+    return screen_stack_depth(&app.stack);
 }

@@ -1,0 +1,32 @@
+#pragma once
+
+#include <stdint.h>
+
+#include "ui/list_view.h"
+#include "ui/screen.h"
+#include "ui/theme.h"
+
+typedef struct MenuItem {
+    const char *label;
+    ScreenAction (*select)(void *context);
+    void *context;
+    const char *(*value)(const void *context);
+} MenuItem;
+
+typedef struct MenuConfig {
+    const char *title;
+    const MenuItem *items;
+    int item_count;
+    const Theme *theme;
+} MenuConfig;
+
+typedef struct MenuScreen {
+    Screen screen;
+    MenuConfig config;
+    ListModel model;
+    ListView list;
+    uint32_t now_ms;
+} MenuScreen;
+
+Screen *menu_screen_init(MenuScreen *menu, MenuConfig config);
+ScreenAction menu_open_screen(void *screen);

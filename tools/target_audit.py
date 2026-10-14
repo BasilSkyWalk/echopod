@@ -55,10 +55,10 @@ def compile_object(compiler, flags, source, source_root, output_directory):
     return output
 
 
-def static_ram_bytes(size_tool, object_file):
+def section_bytes(size_tool, object_file):
     data_line = run([size_tool, str(object_file)]).splitlines()[1]
-    _, data, bss = data_line.split()[:3]
-    return int(data) + int(bss)
+    text, data, bss = (int(value) for value in data_line.split()[:3])
+    return text + data, data + bss
 
 
 def heap_symbols(nm_tool, object_file):
@@ -74,23 +74,28 @@ def module_of(source, source_root):
 def audit(arguments, output_directory):
     compiler = arguments.toolchain_prefix + "gcc"
     flags = include_flags(compiler, arguments.source_root)
+    flash_by_module = defaultdict(int)
     ram_by_module = defaultdict(int)
     heap_users = []
     for source in sorted(arguments.source_root.rglob("*.c")):
         object_file = compile_object(compiler, flags, source, arguments.source_root,
                                      output_directory)
-        ram_by_module[module_of(source, arguments.source_root)] += static_ram_bytes(
-            arguments.toolchain_prefix + "size", object_file)
+        flash, ram = section_bytes(arguments.toolchain_prefix + "size", object_file)
+        module = module_of(source, arguments.source_root)
+        flash_by_module[module] += flash
+        ram_by_module[module] += ram
         for symbol in heap_symbols(arguments.toolchain_prefix + "nm", object_file):
             heap_users.append(f"{source.relative_to(arguments.source_root)} uses {symbol}")
-    return ram_by_module, heap_users
+    return flash_by_module, ram_by_module, heap_users
 
 
-def report(ram_by_module, heap_users, budget_bytes):
+def report(flash_by_module, ram_by_module, heap_users, budget_bytes):
     total = sum(ram_by_module.values())
-    for module, used in sorted(ram_by_module.items()):
-        print(f"{module:<8}{used:>10,} B")
-    print(f"{'total':<8}{total:>10,} B of {budget_bytes:,} B budget")
+    print(f"{'module':<8}{'flash':>12}{'static RAM':>14}")
+    for module in sorted(ram_by_module):
+        print(f"{module:<8}{flash_by_module[module]:>10,} B{ram_by_module[module]:>12,} B")
+    print(f"{'total':<8}{sum(flash_by_module.values()):>10,} B{total:>12,} B"
+          f" of {budget_bytes:,} B RAM budget")
     for user in heap_users:
         print(f"heap use forbidden: {user}")
     if total > budget_bytes:
@@ -101,8 +106,9 @@ def report(ram_by_module, heap_users, budget_bytes):
 def main():
     arguments = parse_arguments()
     with tempfile.TemporaryDirectory() as output_directory:
-        ram_by_module, heap_users = audit(arguments, Path(output_directory))
-    return 0 if report(ram_by_module, heap_users, arguments.budget_bytes) else 1
+        flash_by_module, ram_by_module, heap_users = audit(arguments, Path(output_directory))
+    passed = report(flash_by_module, ram_by_module, heap_users, arguments.budget_bytes)
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":

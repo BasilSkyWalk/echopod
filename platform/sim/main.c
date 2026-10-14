@@ -6,23 +6,53 @@
 #include "app/app.h"
 #include "core/deadline.h"
 #include "hal/clock.h"
+#include "sim_clock.h"
 #include "sim_display.h"
 #include "sim_input.h"
 #include "sim_options.h"
+#include "sim_script.h"
 
 enum {
     EXIT_USAGE = 2,
     FRAME_PERIOD_MS = 16,
+    VIRTUAL_START_MS = 1000,
+    FIRST_SCRIPTED_FRAME = 1,
     TITLE_REFRESH_MS = 500,
     TITLE_CAPACITY = 128
 };
+
+typedef struct SimSession {
+    SimOptions options;
+    SimScriptEvent events[SIM_SCRIPT_MAX_EVENTS];
+    int event_count;
+    int next_event;
+    uint32_t frames;
+} SimSession;
 
 static const double MICROSECONDS_PER_MILLISECOND = 1000.0;
 
 static void print_usage(void)
 {
-    fputs("usage: echo_sim [--scale N] [--frames N] [--headless] [--screenshot FILE.bmp]\n",
+    fputs("usage: echo_sim [--scale N] [--frames N] [--headless] [--screenshot FILE.bmp]\n"
+          "                [--keys up,down,play,menu,back,power[:long],...]\n",
           stderr);
+}
+
+static bool prepare_session(int argument_count, char **arguments, SimSession *session)
+{
+    *session = (SimSession){.event_count = 0};
+    if (!sim_options_parse(argument_count, arguments, &session->options)) {
+        return false;
+    }
+    if (session->options.key_script == NULL) {
+        return true;
+    }
+    SimScript script;
+    if (!sim_script_parse(session->options.key_script, &script)) {
+        return false;
+    }
+    session->event_count = sim_script_schedule(&script, FIRST_SCRIPTED_FRAME, session->events);
+    return true;
 }
 
 static bool start_sdl(const SimOptions *options)
@@ -32,7 +62,11 @@ static bool start_sdl(const SimOptions *options)
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
     }
-    if (!options->headless && !sim_display_open(options->scale)) {
+    if (options->headless) {
+        sim_clock_use_virtual_time(VIRTUAL_START_MS);
+        return true;
+    }
+    if (!sim_display_open(options->scale)) {
         SDL_Log("could not open the display: %s", SDL_GetError());
         return false;
     }
@@ -52,6 +86,15 @@ static bool pump_events(void)
     return keep_running;
 }
 
+static void inject_scripted_keys(SimSession *session)
+{
+    while (session->next_event < session->event_count &&
+           session->events[session->next_event].frame == session->frames) {
+        const SimScriptEvent *event = &session->events[session->next_event++];
+        sim_input_inject(event->key, event->pressed, hal_clock_milliseconds());
+    }
+}
+
 static void format_frame_stats(char *text, size_t capacity)
 {
     const FrameStats *stats = app_frame_stats();
@@ -66,7 +109,7 @@ static void refresh_title(void)
     char stats_text[TITLE_CAPACITY];
     char title[TITLE_CAPACITY * 2];
     format_frame_stats(stats_text, sizeof stats_text);
-    snprintf(title, sizeof title, "Echo Mini | %s", stats_text);
+    snprintf(title, sizeof title, "Echo Mini | %s | %s", app_screen_title(), stats_text);
     sim_display_set_title(title);
 }
 
@@ -78,27 +121,33 @@ static void wait_for_next_frame(uint32_t frame_started_ms)
     }
 }
 
-static bool frame_limit_reached(const SimOptions *options, uint32_t frames)
+static bool frame_limit_reached(const SimSession *session)
 {
-    return options->frame_limit > 0 && frames >= options->frame_limit;
+    return session->options.frame_limit > 0 && session->frames >= session->options.frame_limit;
 }
 
-static void run(const SimOptions *options)
+static void finish_frame(SimSession *session, uint32_t frame_started_ms, uint32_t *next_title_ms)
 {
-    uint32_t frames = 0;
+    if (session->options.headless) {
+        sim_clock_advance(FRAME_PERIOD_MS);
+        return;
+    }
+    if (deadline_reached(frame_started_ms, *next_title_ms)) {
+        refresh_title();
+        *next_title_ms = frame_started_ms + TITLE_REFRESH_MS;
+    }
+    wait_for_next_frame(frame_started_ms);
+}
+
+static void run(SimSession *session)
+{
     uint32_t next_title_ms = hal_clock_milliseconds();
-    while (pump_events() && !frame_limit_reached(options, frames)) {
+    while (pump_events() && !frame_limit_reached(session)) {
         uint32_t frame_started_ms = hal_clock_milliseconds();
+        inject_scripted_keys(session);
         app_step();
-        frames++;
-        if (options->headless) {
-            continue;
-        }
-        if (deadline_reached(frame_started_ms, next_title_ms)) {
-            refresh_title();
-            next_title_ms = frame_started_ms + TITLE_REFRESH_MS;
-        }
-        wait_for_next_frame(frame_started_ms);
+        session->frames++;
+        finish_frame(session, frame_started_ms, &next_title_ms);
     }
 }
 
@@ -111,7 +160,7 @@ static int finish(const SimOptions *options)
     }
     char stats_text[TITLE_CAPACITY];
     format_frame_stats(stats_text, sizeof stats_text);
-    printf("%s\n", stats_text);
+    printf("%s: %s\n", app_screen_title(), stats_text);
     sim_display_close();
     SDL_Quit();
     return status;
@@ -119,17 +168,17 @@ static int finish(const SimOptions *options)
 
 int main(int argument_count, char **arguments)
 {
-    SimOptions options;
-    if (!sim_options_parse(argument_count, arguments, &options)) {
+    static SimSession session;
+    if (!prepare_session(argument_count, arguments, &session)) {
         print_usage();
         return EXIT_USAGE;
     }
     SDL_SetMainReady();
-    if (!start_sdl(&options)) {
+    if (!start_sdl(&session.options)) {
         SDL_Quit();
         return EXIT_FAILURE;
     }
     app_start();
-    run(&options);
-    return finish(&options);
+    run(&session);
+    return finish(&session.options);
 }

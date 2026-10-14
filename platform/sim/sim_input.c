@@ -65,6 +65,11 @@ void sim_input_handle_event(const SDL_Event *event)
     });
 }
 
+void sim_input_inject(Key key, bool pressed, uint32_t time_ms)
+{
+    enqueue((HalKeyTransition){.key = key, .pressed = pressed, .time_ms = time_ms});
+}
+
 bool hal_input_next_transition(HalKeyTransition *transition)
 {
     if (queue.length == 0) {

@@ -1,0 +1,196 @@
+#include "check.h"
+#include "ui/list_view.h"
+#include "ui_test_canvas.h"
+#include "ui_test_theme.h"
+
+typedef struct FakeItems {
+    int count;
+    const char *detail_at_one;
+} FakeItems;
+
+static int fake_count(const void *context)
+{
+    const FakeItems *items = context;
+    return items->count;
+}
+
+static const char *fake_label(const void *context, int index)
+{
+    (void)context;
+    return index % 2 == 0 ? "A" : "B";
+}
+
+static const char *fake_detail(const void *context, int index)
+{
+    const FakeItems *items = context;
+    return index == 1 ? items->detail_at_one : NULL;
+}
+
+static FakeItems items;
+static ListModel model;
+
+static ListView list_of(int count)
+{
+    items = (FakeItems){.count = count, .detail_at_one = NULL};
+    model = (ListModel){
+        .context = &items, .count = fake_count, .label = fake_label, .detail = fake_detail};
+    ListView view;
+    list_view_init(&view, &model, &TEST_THEME, 0);
+    return view;
+}
+
+static void move_times(ListView *view, int delta, int times)
+{
+    for (int step = 0; step < times; step++) {
+        list_view_move(view, delta, false, 100);
+    }
+}
+
+static Rect row_rect(int row)
+{
+    Rect content = theme_content_area(&TEST_THEME);
+    return (Rect){0, content.y + row * TEST_ROW_HEIGHT, 1, TEST_ROW_HEIGHT};
+}
+
+static void a_new_list_selects_the_first_item(void)
+{
+    ListView view = list_of(10);
+    CHECK_EQUAL(0, view.selected);
+    CHECK_EQUAL(0, view.top);
+    CHECK_EQUAL(TEST_VISIBLE_ROWS, view.visible_rows);
+}
+
+static void moving_within_the_page_keeps_the_top(void)
+{
+    ListView view = list_of(10);
+    move_times(&view, 1, 2);
+    CHECK_EQUAL(2, view.selected);
+    CHECK_EQUAL(0, view.top);
+}
+
+static void moving_past_the_last_visible_row_scrolls_down(void)
+{
+    ListView view = list_of(10);
+    move_times(&view, 1, 3);
+    CHECK_EQUAL(3, view.selected);
+    CHECK_EQUAL(1, view.top);
+}
+
+static void moving_above_the_first_visible_row_scrolls_up(void)
+{
+    ListView view = list_of(10);
+    move_times(&view, 1, 5);
+    move_times(&view, -1, 3);
+    CHECK_EQUAL(2, view.selected);
+    CHECK_EQUAL(2, view.top);
+}
+
+static void wrapping_forward_from_the_last_item_returns_to_the_top(void)
+{
+    ListView view = list_of(10);
+    move_times(&view, 1, 9);
+    list_view_move(&view, 1, true, 100);
+    CHECK_EQUAL(0, view.selected);
+    CHECK_EQUAL(0, view.top);
+}
+
+static void moving_past_the_end_without_wrap_stays_on_the_last_item(void)
+{
+    ListView view = list_of(10);
+    move_times(&view, 1, 12);
+    CHECK_EQUAL(9, view.selected);
+    CHECK_EQUAL(7, view.top);
+}
+
+static void wrapping_back_from_the_first_item_shows_the_last_page(void)
+{
+    ListView view = list_of(10);
+    list_view_move(&view, -1, true, 100);
+    CHECK_EQUAL(9, view.selected);
+    CHECK_EQUAL(7, view.top);
+}
+
+static void a_short_list_never_scrolls(void)
+{
+    ListView view = list_of(2);
+    list_view_move(&view, -1, true, 100);
+    CHECK_EQUAL(1, view.selected);
+    CHECK_EQUAL(0, view.top);
+}
+
+static void an_empty_list_ignores_moves(void)
+{
+    ListView view = list_of(0);
+    list_view_move(&view, 1, true, 100);
+    list_view_move(&view, -1, true, 100);
+    CHECK_EQUAL(0, view.selected);
+    CHECK_EQUAL(0, view.top);
+}
+
+static void the_marquee_restarts_only_when_the_selection_changes(void)
+{
+    ListView view = list_of(3);
+    list_view_move(&view, 1, false, 500);
+    CHECK_EQUAL(500, view.selection_changed_ms);
+    move_times(&view, 1, 5);
+    list_view_move(&view, 1, false, 900);
+    CHECK_EQUAL(100, view.selection_changed_ms);
+    list_view_restart_marquee(&view, 1200);
+    CHECK_EQUAL(1200, view.selection_changed_ms);
+}
+
+static void the_selected_row_is_highlighted(void)
+{
+    ListView view = list_of(10);
+    move_times(&view, 1, 1);
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
+    CHECK(ui_test_area_has_only(&canvas, row_rect(1), TEST_THEME.colors.selection_background));
+    CHECK(ui_test_area_has_only(&canvas, row_rect(0), TEST_THEME.colors.background));
+    CHECK(ui_test_area_has_only(&canvas, row_rect(2), TEST_THEME.colors.background));
+}
+
+static void the_scrollbar_appears_only_when_items_overflow(void)
+{
+    Rect content = theme_content_area(&TEST_THEME);
+    Rect right_edge = {TEST_SCREEN_WIDTH - 1, content.y, 1, content.height};
+    ListView long_list = list_of(10);
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&long_list, &canvas, content, 100);
+    CHECK(ui_test_area_has_color(&canvas, right_edge, TEST_THEME.colors.scrollbar_thumb));
+    ListView short_list = list_of(2);
+    canvas = ui_test_canvas();
+    list_view_draw(&short_list, &canvas, content, 100);
+    CHECK(!ui_test_area_has_color(&canvas, right_edge, TEST_THEME.colors.scrollbar_thumb));
+}
+
+static void a_detail_is_drawn_in_the_secondary_color_at_the_right(void)
+{
+    ListView view = list_of(2);
+    items.detail_at_one = "B";
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
+    Rect right_of_row_one = {TEST_SCREEN_WIDTH / 2, row_rect(1).y, TEST_SCREEN_WIDTH / 2,
+                             TEST_ROW_HEIGHT};
+    CHECK(ui_test_area_has_color(&canvas, right_of_row_one, TEST_THEME.colors.text_secondary));
+}
+
+int main(void)
+{
+    static const TestCase cases[] = {
+        TEST_CASE(a_new_list_selects_the_first_item),
+        TEST_CASE(moving_within_the_page_keeps_the_top),
+        TEST_CASE(moving_past_the_last_visible_row_scrolls_down),
+        TEST_CASE(moving_above_the_first_visible_row_scrolls_up),
+        TEST_CASE(wrapping_forward_from_the_last_item_returns_to_the_top),
+        TEST_CASE(moving_past_the_end_without_wrap_stays_on_the_last_item),
+        TEST_CASE(wrapping_back_from_the_first_item_shows_the_last_page),
+        TEST_CASE(a_short_list_never_scrolls),
+        TEST_CASE(an_empty_list_ignores_moves),
+        TEST_CASE(the_marquee_restarts_only_when_the_selection_changes),
+        TEST_CASE(the_selected_row_is_highlighted),
+        TEST_CASE(the_scrollbar_appears_only_when_items_overflow),
+        TEST_CASE(a_detail_is_drawn_in_the_secondary_color_at_the_right),
+    };
+    return test_run_all(cases, TEST_CASE_COUNT(cases));
+}

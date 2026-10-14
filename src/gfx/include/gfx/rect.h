@@ -2,6 +2,11 @@
 
 #include <stdbool.h>
 
+typedef struct Point {
+    int x;
+    int y;
+} Point;
+
 typedef struct Rect {
     int x;
     int y;
