@@ -22,9 +22,11 @@ cd ~/echo-mini-fw/external
 git clone https://github.com/rockchip-linux/rkdeveloptool.git
 cd rkdeveloptool
 bash ../ReChord/tools/patch-rkdeveloptool-echo-mini.sh
-./autogen.sh && ./configure && make
+./autogen.sh && ./configure && make CXXFLAGS="-g -O2 -Wno-vla-cxx-extension"
 ./rkdeveloptool -v
 ```
+
+Apple clang 17 treats two run-time-sized arrays in upstream `main.cpp` as errors, which is why the `CXXFLAGS` are needed. The linker warns that libusb was built for a newer macOS; that's harmless. Verified on 2026-10-14: it prints `rkdeveloptool ver 1.32`.
 
 The script should print `ok: Echo Mini patches applied`. Never use any other `rkdeveloptool` binary (for example `community/rkbin/tools/rkdeveloptool` in ReChord): it doesn't know this device.
 
