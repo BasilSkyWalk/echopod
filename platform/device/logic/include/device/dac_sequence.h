@@ -35,3 +35,4 @@ bool dac_probe(const DacBus *bus);
 DacResult dac_configure(const DacBus *bus, uint8_t rate_byte);
 void dac_output_on(const DacBus *bus);
 void dac_output_off(const DacBus *bus);
+void dac_set_muted(const DacBus *bus, bool muted);

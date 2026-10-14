@@ -12,6 +12,7 @@
 #include "frame_overlay.h"
 #include "gfx/frame_diff.h"
 #include "gfx/strip_renderer.h"
+#include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
@@ -322,6 +323,7 @@ static void write_to_display(void *context, Rect area, const Color *pixels)
 {
     (void)context;
     Rect changed;
+    hal_audio_service();
     if (!frame_diff_changed(&app.frame_diff, area, pixels, &changed)) {
         return;
     }
@@ -461,6 +463,7 @@ void app_step(void)
     uint32_t started_us = hal_clock_microseconds();
     uint32_t now_ms = hal_clock_milliseconds();
     app.now_ms = now_ms;
+    hal_audio_service();
     read_input();
     key_tracker_update(&app.keys, now_ms);
     if (fade_running()) {

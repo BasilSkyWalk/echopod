@@ -2,11 +2,16 @@
 
 #include "app/app.h"
 #include "board.h"
+#include "hal/system.h"
 #include "storage_reset.h"
 #include "update.h"
 #include "usb.h"
 #include "usb_report.h"
 #include "usb_session.h"
+
+enum {
+    START_CLOCK_MHZ = 96
+};
 
 static bool usb_handled;
 
@@ -35,6 +40,7 @@ void board_main(void)
 {
     board_clock_record_boot();
     board_clock_start();
+    hal_system_set_clock_mhz(START_CLOCK_MHZ);
     board_input_start();
     board_display_start();
     app_start();

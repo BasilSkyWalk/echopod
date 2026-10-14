@@ -149,6 +149,14 @@ static bool overlay_visible(void)
     return fake_hal_pixel(area.x, area.y) == frame_overlay_background();
 }
 
+static void audio_gets_a_turn_after_every_strip(void)
+{
+    start_app();
+    int before = fake_hal_audio_service_count();
+    step();
+    CHECK(fake_hal_audio_service_count() - before >= HAL_DISPLAY_HEIGHT / 34 + 1);
+}
+
 static void a_step_writes_one_full_frame_and_presents_it(void)
 {
     start_app();
@@ -998,6 +1006,7 @@ int main(void)
         TEST_CASE(a_notice_turns_the_display_on),
         TEST_CASE(waking_keeps_the_screen_on_for_a_full_timeout),
         TEST_CASE(a_step_writes_one_full_frame_and_presents_it),
+        TEST_CASE(audio_gets_a_turn_after_every_strip),
         TEST_CASE(an_unchanged_frame_sends_no_pixels),
         TEST_CASE(moving_the_selection_sends_only_part_of_the_screen),
         TEST_CASE(restarting_the_app_sends_a_whole_frame_again),

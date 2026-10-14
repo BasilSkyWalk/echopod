@@ -59,6 +59,7 @@ void hal_audio_set_volume(uint8_t level);
 void hal_audio_set_gain(HalAudioGain gain);
 void hal_audio_set_output(HalAudioOutput output);
 HalAudioStatus hal_audio_status(void);
+void hal_audio_service(void);
 HalToneResult hal_audio_test_tone(void);
 HalToneDetail hal_audio_tone_detail(void);
 HalToneResult hal_audio_dma_tone_start(void);

@@ -221,3 +221,14 @@ void dac_output_off(const DacBus *bus)
     set_pin(bus, DAC_PIN_RESET, true);
     set_pin(bus, DAC_PIN_ENABLE_B, false);
 }
+
+void dac_set_muted(const DacBus *bus, bool muted)
+{
+    if (muted) {
+        set_pin(bus, DAC_PIN_MUTE, true);
+        write_both(bus, 0x010009, 0xFF);
+        return;
+    }
+    write_both(bus, 0x010009, 0x00);
+    set_pin(bus, DAC_PIN_MUTE, false);
+}

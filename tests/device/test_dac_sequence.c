@@ -292,6 +292,19 @@ static void output_off_mutes_and_powers_down(void)
     CHECK_EQUAL(cursor, fake.count);
 }
 
+static void muting_holds_the_pin_and_mutes_both_chips(void)
+{
+    DacBus bus = fresh_bus();
+    cursor = 0;
+    dac_set_muted(&bus, true);
+    CHECK(next_pin(DAC_PIN_MUTE, true));
+    CHECK(next_both(0x010009, 0xFF));
+    dac_set_muted(&bus, false);
+    CHECK(next_both(0x010009, 0x00));
+    CHECK(next_pin(DAC_PIN_MUTE, false));
+    CHECK_EQUAL(cursor, fake.count);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -304,6 +317,7 @@ int main(void)
         TEST_CASE(a_silent_bus_reports_no_reply),
         TEST_CASE(output_on_unmutes_and_restores_the_channel_values),
         TEST_CASE(output_off_mutes_and_powers_down),
+        TEST_CASE(muting_holds_the_pin_and_mutes_both_chips),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

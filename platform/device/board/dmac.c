@@ -36,7 +36,7 @@ enum {
 };
 
 static bool active;
-static bool suspended;
+static int suspend_depth;
 
 bool dmac_present(void)
 {
@@ -69,7 +69,7 @@ bool dmac_start_loop(const DmaItem *item)
     register_write(DMAC_CONFIG, 1);
     register_write(DMAC_CHANNEL_ENABLE, CHANNEL_WRITE_ENABLE | CHANNEL_BIT);
     active = true;
-    suspended = false;
+    suspend_depth = 0;
     return true;
 }
 
@@ -98,7 +98,7 @@ void dmac_stop(void)
     }
     register_write(CHANNEL_CFG_LOW, register_read(CHANNEL_CFG_LOW) & ~CFG_SUSPEND);
     active = false;
-    suspended = false;
+    suspend_depth = 0;
 }
 
 uint32_t dmac_source(void)
@@ -108,16 +108,22 @@ uint32_t dmac_source(void)
 
 void dmac_suspend(void)
 {
-    if (dmac_running()) {
-        suspend_channel();
-        suspended = true;
+    if (!dmac_running()) {
+        return;
     }
+    if (suspend_depth == 0) {
+        suspend_channel();
+    }
+    suspend_depth++;
 }
 
 void dmac_resume(void)
 {
-    if (suspended) {
+    if (suspend_depth == 0) {
+        return;
+    }
+    suspend_depth--;
+    if (suspend_depth == 0) {
         register_write(CHANNEL_CFG_LOW, register_read(CHANNEL_CFG_LOW) & ~CFG_SUSPEND);
-        suspended = false;
     }
 }
