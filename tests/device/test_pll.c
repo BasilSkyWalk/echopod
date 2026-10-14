@@ -37,12 +37,30 @@ static void other_speeds_are_refused(void)
     CHECK(!pll_setting_for(400, &setting));
 }
 
+static void the_pll_output_follows_the_register_fields(void)
+{
+    CHECK_EQUAL(96000000u, pll_output_hz(0x1078u, 0x1146u));
+    CHECK_EQUAL(200000000u, pll_output_hz(0x1064u, 0x1086u));
+    CHECK_EQUAL(400000000u, pll_output_hz(0x1064u, 0x1046u));
+    CHECK_EQUAL(0u, pll_output_hz(0x0000u, 0x0000u));
+}
+
+static void the_core_clock_comes_from_the_pll_or_the_crystal(void)
+{
+    CHECK_EQUAL(96000000u, pll_core_hz(0x0001u, 0x0000u, 0x1078u, 0x1146u));
+    CHECK_EQUAL(48000000u, pll_core_hz(0x0001u, 0x0001u, 0x1078u, 0x1146u));
+    CHECK_EQUAL(24000000u, pll_core_hz(0x0000u, 0x0000u, 0x1078u, 0x1146u));
+    CHECK_EQUAL(12000000u, pll_core_hz(0x0100u, 0x0000u, 0x1078u, 0x1146u));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_96_mhz_setting_is_stocks_floor_row),
         TEST_CASE(the_200_mhz_setting_runs_the_pll_at_200),
         TEST_CASE(other_speeds_are_refused),
+        TEST_CASE(the_pll_output_follows_the_register_fields),
+        TEST_CASE(the_core_clock_comes_from_the_pll_or_the_crystal),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

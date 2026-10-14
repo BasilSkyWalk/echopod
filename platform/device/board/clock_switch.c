@@ -123,9 +123,16 @@ static HalBootClocks boot_clocks;
 
 void board_clock_record_boot(void)
 {
-    boot_clocks = (HalBootClocks){.mode = register_read(CRU_MODE),
-                                  .clock_select = register_read(CRU_CLOCK_SELECT),
-                                  .pclk_select = register_read(CRU_PCLK_SELECT)};
+    uint32_t mode = register_read(CRU_MODE);
+    uint32_t clock_select = register_read(CRU_CLOCK_SELECT);
+    uint32_t con0 = register_read(PLL_CON0);
+    uint32_t con1 = register_read(PLL_CON1);
+    boot_clocks = (HalBootClocks){.mode = mode,
+                                  .clock_select = clock_select,
+                                  .pclk_select = register_read(CRU_PCLK_SELECT),
+                                  .pll_con0 = con0,
+                                  .pll_con1 = con1,
+                                  .core_hz = pll_core_hz(mode, clock_select, con0, con1)};
 }
 
 HalBootClocks hal_system_boot_clocks(void)

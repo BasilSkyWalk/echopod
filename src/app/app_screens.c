@@ -131,6 +131,7 @@ static ScreenAction play_test_tone(void *context)
 
 static char tone_text[DIAGNOSTICS_VALUE_CAPACITY];
 static char boot_clocks_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char boot_pll_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static const char *tone_value(const void *context)
 {
@@ -148,6 +149,13 @@ static const char *boot_clocks_value(const void *context)
     diagnostics_boot_clocks_text(hal_system_boot_clocks(), boot_clocks_text,
                                  sizeof boot_clocks_text);
     return boot_clocks_text;
+}
+
+static const char *boot_pll_value(const void *context)
+{
+    (void)context;
+    diagnostics_boot_pll_text(hal_system_boot_clocks(), boot_pll_text, sizeof boot_pll_text);
+    return boot_pll_text;
 }
 
 static ScreenAction toggle_dma_tone(void *context)
@@ -301,6 +309,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                .value = dma_tone_value};
     screens->diagnostics_items[9] = (MenuItem){
         .label = "Boot clocks", .select = NULL, .context = NULL, .value = boot_clocks_value};
+    screens->diagnostics_items[10] =
+        (MenuItem){.label = "Boot PLL", .select = NULL, .context = NULL, .value = boot_pll_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

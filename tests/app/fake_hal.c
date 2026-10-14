@@ -410,7 +410,7 @@ HalToneDetail hal_audio_tone_detail(void)
 
 HalBootClocks hal_system_boot_clocks(void)
 {
-    return (HalBootClocks){.mode = 0, .clock_select = 0, .pclk_select = 0};
+    return (HalBootClocks){0};
 }
 
 HalToneResult hal_audio_dma_tone_start(void)

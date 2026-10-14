@@ -13,7 +13,7 @@ const char *hal_system_version(void)
 
 HalBootClocks hal_system_boot_clocks(void)
 {
-    return (HalBootClocks){.mode = 0, .clock_select = 0, .pclk_select = 0};
+    return (HalBootClocks){0};
 }
 
 uint32_t hal_system_clock_mhz(void)

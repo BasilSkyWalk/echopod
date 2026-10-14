@@ -22,3 +22,4 @@ const char *diagnostics_tone_result_text(HalToneResult result);
 void diagnostics_tone_text(HalToneResult result, HalToneDetail detail, char *text, size_t capacity);
 void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity);
 void diagnostics_boot_clocks_text(HalBootClocks clocks, char *text, size_t capacity);
+void diagnostics_boot_pll_text(HalBootClocks clocks, char *text, size_t capacity);

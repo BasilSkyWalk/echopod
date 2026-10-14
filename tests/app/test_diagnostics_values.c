@@ -67,6 +67,14 @@ static void boot_clocks_show_the_low_half_of_each_register(void)
     CHECK(text_is("0001 1023 0100", text));
 }
 
+static void the_boot_pll_shows_its_fields_and_core_speed(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalBootClocks clocks = {.pll_con0 = 0xFFFF1078u, .pll_con1 = 0x1546u, .core_hz = 96000000u};
+    diagnostics_boot_pll_text(clocks, text, sizeof text);
+    CHECK(text_is("1078 1546 96 MHz", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -76,6 +84,7 @@ int main(void)
         TEST_CASE(a_failed_start_names_the_step),
         TEST_CASE(a_missing_dac_names_the_i2c_step_and_status),
         TEST_CASE(boot_clocks_show_the_low_half_of_each_register),
+        TEST_CASE(the_boot_pll_shows_its_fields_and_core_speed),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

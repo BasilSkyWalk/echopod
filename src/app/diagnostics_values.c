@@ -68,3 +68,14 @@ void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
     }
     string_builder_append(&builder, view.stopped ? "Stopped" : "Ended");
 }
+
+void diagnostics_boot_pll_text(HalBootClocks clocks, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    append_hex(&builder, clocks.pll_con0, 4);
+    string_builder_append_char(&builder, ' ');
+    append_hex(&builder, clocks.pll_con1, 4);
+    string_builder_append_char(&builder, ' ');
+    string_builder_append_unsigned(&builder, clocks.core_hz / 1000000u);
+    string_builder_append(&builder, " MHz");
+}

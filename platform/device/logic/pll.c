@@ -19,7 +19,14 @@ enum {
     POSTDIV2_SHIFT = 6,
     PCLK_SHIFT_SHIFT = 8,
     FAST_CORE_HZ = 180000000,
-    FAST_BUS_HZ = 300000000
+    FAST_BUS_HZ = 300000000,
+    FBDIV_MASK = 0xFFF,
+    POSTDIV_MASK = 0x7,
+    REFDIV_MASK = 0x3F,
+    MODE_ON_PLL = 0x1,
+    CRYSTAL_DIVIDER_SHIFT = 8,
+    CRYSTAL_DIVIDER_MASK = 0x3F,
+    CORE_DIVIDER_MASK = 0x7
 };
 
 typedef struct PllRow {
@@ -60,4 +67,25 @@ bool pll_setting_for(uint32_t core_mhz, PllSetting *setting)
         }
     }
     return false;
+}
+
+uint32_t pll_output_hz(uint32_t con0, uint32_t con1)
+{
+    uint32_t fbdiv = con0 & FBDIV_MASK;
+    uint32_t postdiv1 = con0 >> POSTDIV1_SHIFT & POSTDIV_MASK;
+    uint32_t refdiv = con1 & REFDIV_MASK;
+    uint32_t postdiv2 = con1 >> POSTDIV2_SHIFT & POSTDIV_MASK;
+    if (fbdiv == 0 || postdiv1 == 0 || refdiv == 0 || postdiv2 == 0) {
+        return 0;
+    }
+    uint64_t hz = (uint64_t)CRYSTAL_HZ * fbdiv / refdiv / postdiv1 / postdiv2;
+    return hz <= UINT32_MAX ? (uint32_t)hz : 0;
+}
+
+uint32_t pll_core_hz(uint32_t mode, uint32_t clock_select, uint32_t con0, uint32_t con1)
+{
+    if ((mode & MODE_ON_PLL) == 0) {
+        return CRYSTAL_HZ / ((mode >> CRYSTAL_DIVIDER_SHIFT & CRYSTAL_DIVIDER_MASK) + 1);
+    }
+    return pll_output_hz(con0, con1) / ((clock_select & CORE_DIVIDER_MASK) + 1);
 }

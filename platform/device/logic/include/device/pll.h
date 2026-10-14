@@ -15,3 +15,5 @@ typedef struct PllSetting {
 } PllSetting;
 
 bool pll_setting_for(uint32_t core_mhz, PllSetting *setting);
+uint32_t pll_output_hz(uint32_t con0, uint32_t con1);
+uint32_t pll_core_hz(uint32_t mode, uint32_t clock_select, uint32_t con0, uint32_t con1);
