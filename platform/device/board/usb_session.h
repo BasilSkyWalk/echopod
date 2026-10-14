@@ -20,3 +20,4 @@ typedef struct UsbReport {
 
 UsbSessionEnd usb_session_run(void);
 const UsbReport *usb_session_report(void);
+bool usb_session_card_changed(void);

@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "hal/system.h"
+
 typedef enum MusicSource {
     MUSIC_COVER_FLOW,
     MUSIC_LIBRARY,
@@ -75,6 +77,12 @@ static const char *frame_time_value(const void *context)
 {
     const AppOptions *options = context;
     return options->show_frame_time ? "On" : "Off";
+}
+
+static const char *firmware_value(const void *context)
+{
+    (void)context;
+    return hal_system_version();
 }
 
 static MenuItem open_item(const char *label, Screen *target)
@@ -178,6 +186,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         .context = options,
         .value = frame_time_value,
     };
+    screens->diagnostics_items[4] =
+        (MenuItem){.label = "Firmware", .select = NULL, .context = NULL, .value = firmware_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

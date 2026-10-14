@@ -172,10 +172,11 @@ Written only from `docs/device-facts.md` (the clean-room rule in `NOTES.md`).
 - **Storage:** `board/mmc` drives the DW-MMC controller (commands, polled single-block reads and writes, the card clock) and `board/sd` powers the SD slot and checks card detect. `board/emmc` starts internal storage (8-bit bus at 24 MHz) on first use and refuses any write outside what `emmc_layout` allows. The file HAL mounts the card (FAT16, FAT32 or exFAT) on the first open and can hold 8 files open at once; it reads only for now.
 - **USB:** the main loop watches VBUS. When the cable is plugged in, the player shows "Cable detected", then `board/usb_session` powers the PHY and the polled DWC2 core (`board/usb`) and waits up to 3 s for a host; no host means a charger, and the app carries on. With a host:
   - the app shows a notice, and its steps pause
-  - LUN 0 is the internal-storage user volume, read/write; LUN 1 is the SD card, read-only
+  - LUN 0 is the internal-storage user volume and LUN 1 is the SD card, both read/write. Sense data is kept per LUN
   - if no computer answers, or the controller fails to start, `board/usb_report` shows three notices (a key press moves on): the core ID and OTG control after power-up; the failed init step (with `0x10` set when internal storage started) and GHWCFG4; then GINTSTS and OTG control after the wait. This is temporary, while USB is brought up on hardware
-  - the session ends when LUN 0 is ejected or the cable is pulled. Then `board/update` looks for `/HIFIEC90.IMG` on internal storage and installs it if it's valid and differs from slot 1, showing progress and the result (a key press dismisses it). Finally `app_wake` restarts the screen timeout. The new firmware starts at the next power cycle, because a warm reboot doesn't work on this hardware
-- **Stubs for now:** file writes, audio, battery (unknown), and brightness (backlight on or off only).
+  - the session ends when every LUN that was present has been ejected, or the cable is pulled. If the session wrote to the card, the file HAL forgets its mount and open files, and `app_start` reloads the app from the changed card. Then `board/update` looks for `/HIFIEC90.IMG` on internal storage and installs it if it's valid and differs from slot 1, showing progress and the result (a key press dismisses it). Finally `app_wake` restarts the screen timeout. The new firmware starts at the next power cycle, because a warm reboot doesn't work on this hardware
+- **Firmware tag:** `hal_system_version` (`hal/system.h`) reads the build tag from slot 1's header on the device and returns "simulator" in the simulator. Diagnostics shows it as Firmware.
+- **Stubs for now:** file writes from the app, audio, battery (unknown), and brightness (backlight on or off only).
 
 ## Simulator audio
 

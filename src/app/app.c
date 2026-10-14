@@ -363,3 +363,9 @@ const char *app_toast_text(void)
 {
     return app.toast.visible ? app.toast.text : NULL;
 }
+
+const char *app_diagnostics_value(int index)
+{
+    const MenuItem *item = &app.screens.diagnostics_items[index];
+    return item->value != NULL ? item->value(item->context) : NULL;
+}

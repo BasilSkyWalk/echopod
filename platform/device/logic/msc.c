@@ -80,6 +80,9 @@ void msc_init(Msc *msc, const MscLun *luns, uint8_t count)
     *msc = (Msc){.lun_count = count, .stats = {.last_failed_lba = UINT32_MAX}};
     for (uint8_t index = 0; index < count && index < MSC_MAX_LUNS; index++) {
         msc->luns[index] = luns[index];
+        if (luns[index].present) {
+            msc->present_at_start = (uint8_t)(msc->present_at_start | (1u << index));
+        }
     }
 }
 
@@ -119,6 +122,12 @@ static void remember(Msc *msc)
     if (msc->history_count < MSC_HISTORY_CAPACITY) {
         msc->history_count++;
     }
+}
+
+bool msc_finished(const Msc *msc)
+{
+    return msc->present_at_start != 0 &&
+           (msc->ejected & msc->present_at_start) == msc->present_at_start;
 }
 
 bool msc_ejected(const Msc *msc, uint8_t lun)
@@ -359,6 +368,7 @@ static void store_out_byte(Msc *msc, uint8_t value)
         const MscLun *lun = &msc->luns[msc->lun];
         if (lun->write(lun->context, msc->lba, 1, msc->sector)) {
             msc->stats.sectors_written++;
+            msc->stats.lun_sectors_written[msc->lun]++;
         } else {
             set_sense(msc, SENSE_MEDIUM_ERROR, CODE_WRITE_ERROR);
             msc->source = MSC_SOURCE_NONE;

@@ -23,18 +23,10 @@ enum {
 };
 
 static EmmcInfo internal;
+static bool card_present;
 static UsbReport report;
 static UsbPort port;
 static Msc msc;
-
-static bool card_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
-{
-    (void)context;
-    (void)lba;
-    (void)count;
-    (void)buffer;
-    return false;
-}
 
 static void serial_text(uint32_t serial, char *text)
 {
@@ -53,9 +45,10 @@ static void prepare_luns(void)
     MscLun luns[LUN_COUNT] = {
         {emmc_volume_read, emmc_volume_write, NULL, internal.layout.volume_sectors, true,
          internal_ready, "Internal storage"},
-        {sd_read, card_write, NULL, sd_sector_count(), false, card_ready, "SD card"},
+        {sd_read, sd_write, NULL, sd_sector_count(), true, card_ready, "SD card"},
     };
     report.internal_ready = internal_ready;
+    card_present = card_ready;
     msc_init(&msc, luns, LUN_COUNT);
     char serial[SERIAL_DIGITS + 1];
     serial_text(internal.serial, serial);
@@ -120,7 +113,7 @@ static UsbSessionEnd serve(void)
             refreshed = hal_clock_milliseconds();
         }
         usb_poll(&port);
-        if (msc_ejected(&msc, INTERNAL_LUN)) {
+        if (msc_finished(&msc)) {
             finish_last_reply();
             return USB_SESSION_EJECTED;
         }
@@ -139,7 +132,8 @@ UsbSessionEnd usb_session_run(void)
     if (usb_connect(&port)) {
         end = USB_SESSION_NO_HOST;
         if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
-            app_show_notice("USB", "Connected to a computer. Eject Internal storage to finish.");
+            app_show_notice("USB", card_present ? "Connected. Eject both drives to finish."
+                                                : "Connected. Eject the drive to finish.");
             end = serve();
         }
     }
@@ -152,4 +146,9 @@ UsbSessionEnd usb_session_run(void)
 const UsbReport *usb_session_report(void)
 {
     return &report;
+}
+
+bool usb_session_card_changed(void)
+{
+    return msc_stats(&msc).lun_sectors_written[CARD_LUN] > 0;
 }

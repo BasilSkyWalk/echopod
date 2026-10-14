@@ -39,6 +39,7 @@ typedef struct MscStats {
     uint32_t commands;
     uint32_t sectors_read;
     uint32_t sectors_written;
+    uint32_t lun_sectors_written[MSC_MAX_LUNS];
     uint32_t read_failures;
     uint32_t write_failures;
     uint32_t last_failed_lba;
@@ -72,6 +73,7 @@ typedef struct Msc {
     uint8_t sense_key[MSC_MAX_LUNS];
     uint8_t sense_code[MSC_MAX_LUNS];
     uint8_t ejected;
+    uint8_t present_at_start;
     bool data_out;
     MscStats stats;
     uint8_t opcode;
@@ -89,5 +91,6 @@ void msc_receive(Msc *msc, const uint8_t *packet, uint32_t length);
 bool msc_next_in(Msc *msc, uint8_t *buffer, uint32_t capacity, uint32_t *length);
 void msc_prefetch(Msc *msc);
 bool msc_ejected(const Msc *msc, uint8_t lun);
+bool msc_finished(const Msc *msc);
 MscStats msc_stats(const Msc *msc);
 MscHistory msc_history(const Msc *msc);

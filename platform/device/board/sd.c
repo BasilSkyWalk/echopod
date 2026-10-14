@@ -20,12 +20,19 @@
 #define GRF_DETECT_PULL 0x14u
 #define GRF_DETECT_PULL_VALUE 0x00080008u
 #define CRU_MMC_DIVIDERS 0x30u
+#define STATUS_READY_FOR_DATA (1u << 8)
+#define STATUS_STATE_SHIFT 9
+#define STATUS_STATE_MASK 0xFu
+#define STATE_TRANSFER 4u
 
 enum {
     GATE_SD_BUS = 0x18,
     GATE_SD_CARD_CLOCK = 0x6B,
     RESET_SD = 0x12,
     CMD_READ_SINGLE_BLOCK = 17,
+    CMD_WRITE_BLOCK = 24,
+    CMD_SEND_STATUS = 13,
+    STATUS_TRIES = 1000,
     POWER_SETTLE_MS = 1,
     DETECT_SETTLE_MS = 1
 };
@@ -142,6 +149,39 @@ bool sd_start(BlockDevice *device)
     }
     *device = (BlockDevice){sd_read, NULL};
     return ready;
+}
+
+static bool wait_for_transfer_state(void)
+{
+    uint32_t words[4] = {0, 0, 0, 0};
+    SdCommand status = {CMD_SEND_STATUS, sd_card_rca_argument(&card), SD_RESPONSE_SHORT, false};
+    for (int attempt = 0; attempt < STATUS_TRIES; attempt++) {
+        if (mmc_command(&SD_HOST, status, words) && (words[0] & STATUS_READY_FOR_DATA) != 0 &&
+            ((words[0] >> STATUS_STATE_SHIFT) & STATUS_STATE_MASK) == STATE_TRANSFER) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool sd_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
+{
+    (void)context;
+    const uint32_t *words = buffer;
+    if (!ready || lba >= card.sector_count || count > card.sector_count - lba) {
+        return false;
+    }
+    for (uint32_t index = 0; index < count; index++) {
+        uint32_t address = sd_card_address(&card, lba + index);
+        if (!mmc_write_block(&SD_HOST, CMD_WRITE_BLOCK, address, words + index * 128u)) {
+            return false;
+        }
+        if (!wait_for_transfer_state()) {
+            mmc_note_failure(&SD_HOST, MMC_STEP_TRANSFER_STATE);
+            return false;
+        }
+    }
+    return true;
 }
 
 uint32_t sd_sector_count(void)

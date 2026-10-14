@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "board.h"
+#include "storage_reset.h"
 #include "update.h"
 #include "usb.h"
 #include "usb_report.h"
@@ -19,6 +20,10 @@ static void check_usb(void)
             update_after_usb();
         } else {
             usb_report_show(usb_session_report());
+        }
+        if (usb_session_card_changed()) {
+            storage_reset();
+            app_start();
         }
         app_wake();
     } else if (!vbus) {

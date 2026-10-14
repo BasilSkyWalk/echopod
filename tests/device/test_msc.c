@@ -556,6 +556,55 @@ static void prefetching_outside_a_read_does_nothing(void)
     CHECK_EQUAL(0, disk_reads);
 }
 
+static void eject(Msc *msc, uint8_t lun)
+{
+    static const uint8_t block[6] = {0x1B, 0, 0, 0, 0x02, 0};
+    send_command(msc, 0, false, lun, block, 6);
+    collect(msc);
+}
+
+static void the_session_finishes_only_when_every_present_lun_is_ejected(void)
+{
+    Msc *msc = started();
+    CHECK(!msc_finished(msc));
+    eject(msc, 0);
+    CHECK(!msc_finished(msc));
+    eject(msc, 1);
+    CHECK(msc_finished(msc));
+}
+
+static void an_absent_lun_does_not_need_ejecting(void)
+{
+    static Msc msc;
+    MscLun luns[2] = {
+        {ram_read, ram_write, &writable_disk, DISK_SECTORS, true, true, "Internal storage"},
+        {ram_read, ram_write, &read_only_disk, DISK_SECTORS, true, false, "SD card"},
+    };
+    msc_init(&msc, luns, 2);
+    eject(&msc, 0);
+    CHECK(msc_finished(&msc));
+}
+
+static void writes_are_counted_per_lun(void)
+{
+    uint8_t block[10];
+    uint8_t bytes[1024] = {0};
+    Msc *msc = started();
+    msc->luns[1].writable = true;
+    read_10_block(block, 0x2A, 2, 2);
+    send_command(msc, sizeof bytes, false, 1, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    collect(msc);
+    read_10_block(block, 0x2A, 2, 1);
+    send_command(msc, 512, false, 0, block, 10);
+    send_data(msc, bytes, 512);
+    collect(msc);
+    MscStats stats = msc_stats(msc);
+    CHECK_EQUAL(1, stats.lun_sectors_written[0]);
+    CHECK_EQUAL(2, stats.lun_sectors_written[1]);
+    CHECK_EQUAL(3, stats.sectors_written);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -588,6 +637,9 @@ int main(void)
         TEST_CASE(a_reply_fits_in_one_chunk),
         TEST_CASE(prefetching_reads_the_next_sector_once),
         TEST_CASE(prefetching_outside_a_read_does_nothing),
+        TEST_CASE(the_session_finishes_only_when_every_present_lun_is_ejected),
+        TEST_CASE(an_absent_lun_does_not_need_ejecting),
+        TEST_CASE(writes_are_counted_per_lun),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

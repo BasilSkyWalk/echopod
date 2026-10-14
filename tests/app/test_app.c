@@ -19,6 +19,7 @@ enum {
     FULL_FRAME_PIXELS = HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT,
     HOME_DIAGNOSTICS_INDEX = 3,
     DIAGNOSTICS_FRAME_TIME_INDEX = 3,
+    DIAGNOSTICS_FIRMWARE_INDEX = 4,
     MUSIC_ARTISTS_INDEX = 1,
     MUSIC_ALBUMS_INDEX = 3,
     MUSIC_FOLDERS_INDEX = 5,
@@ -681,6 +682,15 @@ static void waking_keeps_the_screen_on_for_a_full_timeout(void)
     CHECK(!fake_hal_display_on());
 }
 
+static void diagnostics_shows_the_firmware_version_from_the_hal(void)
+{
+    start_app();
+    fake_hal_set_version("1e8bebb");
+    const char *value = app_diagnostics_value(DIAGNOSTICS_FIRMWARE_INDEX);
+    CHECK(value != NULL);
+    CHECK(strcmp("1e8bebb", value) == 0);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -693,6 +703,7 @@ int main(void)
         TEST_CASE(back_returns_to_the_previous_screen),
         TEST_CASE(a_long_back_returns_home_from_deep_screens),
         TEST_CASE(the_frame_overlay_is_off_until_enabled_in_diagnostics),
+        TEST_CASE(diagnostics_shows_the_firmware_version_from_the_hal),
         TEST_CASE(albums_open_from_the_library),
         TEST_CASE(an_artist_leads_to_their_albums),
         TEST_CASE(back_returns_to_the_previous_list),

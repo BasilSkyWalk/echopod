@@ -1,5 +1,7 @@
 #include "fake_hal.h"
 
+#include "hal/system.h"
+
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/display.h"
@@ -43,6 +45,7 @@ typedef struct FakeFile {
 } FakeFile;
 
 typedef struct FakeHal {
+    const char *version;
     uint16_t panel[HAL_DISPLAY_HEIGHT][HAL_DISPLAY_WIDTH];
     long pixels_written;
     int present_count;
@@ -68,6 +71,16 @@ static FakeHal fake;
 void fake_hal_reset(void)
 {
     fake = (FakeHal){0};
+}
+
+void fake_hal_set_version(const char *version)
+{
+    fake.version = version;
+}
+
+const char *hal_system_version(void)
+{
+    return fake.version != NULL ? fake.version : "test";
 }
 
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size)

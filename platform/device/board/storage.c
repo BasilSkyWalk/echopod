@@ -3,6 +3,7 @@
 #include "device/fat.h"
 #include "hal/storage.h"
 #include "sd.h"
+#include "storage_reset.h"
 
 enum {
     OPEN_FILE_CAPACITY = 8
@@ -79,4 +80,12 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length)
     (void)bytes;
     (void)length;
     return false;
+}
+
+void storage_reset(void)
+{
+    mount_state = MOUNT_NOT_TRIED;
+    for (int slot = 0; slot < OPEN_FILE_CAPACITY; slot++) {
+        in_use[slot] = false;
+    }
 }
