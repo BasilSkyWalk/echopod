@@ -1,4 +1,5 @@
 add_library(echo_device_logic STATIC
+    audio_engine.c
     audio_math.c
     dac_sequence.c
     dma_loop.c
@@ -20,6 +21,6 @@ add_library(echo_device_logic STATIC
 )
 target_include_directories(echo_device_logic PUBLIC include)
 target_link_libraries(echo_device_logic
-    PUBLIC echo_core echo_hal
+    PUBLIC echo_core echo_hal echo_codec
     PRIVATE echo_options
 )
