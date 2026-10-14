@@ -116,7 +116,7 @@ bool sd_read(void *context, uint32_t lba, uint32_t count, void *buffer)
     }
     uint8_t *bytes = buffer;
     for (uint32_t index = 0; index < count; index++) {
-        if (lba + index >= card.sector_count ||
+        if (lba >= card.sector_count || index >= card.sector_count - lba ||
             !read_aligned(lba + index, (uint32_t *)(void *)(bytes + index * 512u))) {
             return false;
         }

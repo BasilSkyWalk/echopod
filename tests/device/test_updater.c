@@ -16,8 +16,12 @@ enum {
     SLOT_2 = SLOT_1 + SLOT_SECTORS,
     STORAGE_SECTORS = SLOT_2 + SLOT_SECTORS,
     PAYLOAD_END = 0x5000,
+    CODE_OFFSET = 0xD68,
+    CODE_SIZE = PAYLOAD_END - CODE_OFFSET - 8,
     LOG_CAPACITY = 4096
 };
+
+#define RESET_HANDLER 0x03050101u
 
 typedef struct WriteRecord {
     uint32_t lba;
@@ -67,9 +71,31 @@ static uint8_t *valid_image(uint8_t seed)
     put_le32(image + 0x1F4, FW_SIZE);
     memcpy(image + 0x1F8, "RKnanoFW", 8);
     put_le32(image + 0x80, PAYLOAD_END);
-    for (uint32_t index = 0xD68; index < PAYLOAD_END; index++) {
+    for (uint32_t index = CODE_OFFSET; index < PAYLOAD_END; index++) {
         image[index] = (uint8_t)(index * 13 + seed);
     }
+    put_le32(image + 0x200, 0x03050000);
+    put_le32(image + 0x204, 91);
+    uint32_t rows[3][4] = {{0x03050B68, 0x03050000, CODE_SIZE, 0x03050B68 + CODE_SIZE},
+                           {0x03004000, 8, 0x03004008, 0x100},
+                           {0x03078CD0, 0x03079DCC, 4, 0}};
+    for (int row = 0; row < 3; row++) {
+        for (int word = 0; word < 4; word++) {
+            put_le32(image + 0x208 + 16 * row + 4 * word, rows[row][word]);
+        }
+    }
+    put_le32(image + CODE_OFFSET, 0x03004000);
+    put_le32(image + CODE_OFFSET + 4, RESET_HANDLER);
+    put_le32(image + CODE_OFFSET + CODE_SIZE, 0x03004000);
+    put_le32(image + CODE_OFFSET + CODE_SIZE + 4, RESET_HANDLER);
+    seal(image);
+    return image;
+}
+
+static uint8_t *broken_image(uint32_t offset, uint32_t value)
+{
+    uint8_t *image = valid_image(1);
+    put_le32(image + offset, value);
     seal(image);
     return image;
 }
@@ -216,6 +242,7 @@ static void the_installed_image_is_recognised(void)
     uint8_t *image = valid_image(1);
     reset(image, IMAGE_SIZE);
     memcpy(storage.sectors + (size_t)SLOT_1 * 512, image, FW_END);
+    memcpy(storage.sectors + (size_t)SLOT_2 * 512, image, FW_END);
     UpdateStorage storage_target = target();
     UpdateFile update = source();
     CHECK_EQUAL(UPDATE_ALREADY_INSTALLED, updater_check(&update, &storage_target));
@@ -310,6 +337,34 @@ static void a_block_that_reads_back_wrong_fails_the_install(void)
     CHECK_EQUAL(-1, first_write_into(SLOT_1));
 }
 
+static void images_that_could_not_boot_are_invalid(void)
+{
+    check_invalid(broken_image(0x200, 0x03060000), IMAGE_SIZE);
+    check_invalid(broken_image(0x204, 3), IMAGE_SIZE);
+    check_invalid(broken_image(0x208, 0x03050000), IMAGE_SIZE);
+    check_invalid(broken_image(0x208 + 12, 0), IMAGE_SIZE);
+    check_invalid(broken_image(0x218, 0x03000000), IMAGE_SIZE);
+    check_invalid(broken_image(0x218 + 4, 0), IMAGE_SIZE);
+    check_invalid(broken_image(0x218 + 4, 184), IMAGE_SIZE);
+    check_invalid(broken_image(0x228, 0x03078CD4), IMAGE_SIZE);
+    check_invalid(broken_image(0x238, 0x03078CD4), IMAGE_SIZE);
+    check_invalid(broken_image(CODE_OFFSET + CODE_SIZE, 0), IMAGE_SIZE);
+    check_invalid(broken_image(CODE_OFFSET + CODE_SIZE + 4, 0x03050100), IMAGE_SIZE);
+    check_invalid(broken_image(CODE_OFFSET + CODE_SIZE + 4, 0x03004001), IMAGE_SIZE);
+    check_invalid(broken_image(CODE_OFFSET + 4, 0x03050201), IMAGE_SIZE);
+}
+
+static void a_half_installed_image_is_installed_again(void)
+{
+    uint8_t *image = valid_image(1);
+    reset(image, IMAGE_SIZE);
+    memcpy(storage.sectors + (size_t)SLOT_1 * 512, image, FW_END);
+    memset(storage.sectors + (size_t)SLOT_2 * 512, 0xFF, CHUNK_SECTORS * 512);
+    UpdateStorage storage_target = target();
+    UpdateFile update = source();
+    CHECK_EQUAL(UPDATE_VALID, updater_check(&update, &storage_target));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -317,7 +372,9 @@ int main(void)
         TEST_CASE(a_valid_image_passes_the_check),
         TEST_CASE(images_with_the_wrong_shape_or_damage_are_invalid),
         TEST_CASE(an_image_that_does_not_fit_a_slot_is_invalid),
+        TEST_CASE(images_that_could_not_boot_are_invalid),
         TEST_CASE(the_installed_image_is_recognised),
+        TEST_CASE(a_half_installed_image_is_installed_again),
         TEST_CASE(installing_fills_both_slots_with_the_image),
         TEST_CASE(each_slot_is_invalidated_first_and_completed_last),
         TEST_CASE(chunks_that_already_match_are_not_rewritten),

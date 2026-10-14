@@ -20,7 +20,8 @@ enum {
     CHARACTERS_PER_ENTRY = 13,
     SHORT_NAME_LENGTH = 11,
     SHORT_BASE_LENGTH = 8,
-    KANJI_E5_MARKER = 0x05
+    KANJI_E5_MARKER = 0x05,
+    MAXIMUM_DIRECTORY_ENTRIES = 65536
 };
 
 static const uint8_t LONG_NAME_OFFSETS[CHARACTERS_PER_ENTRY] = {1,  3,  5,  7,  9,  14, 16,
@@ -181,7 +182,7 @@ static bool find_entry(FatVolume *volume, FatFile *directory, const char *name, 
                        FatFile *found)
 {
     LongName long_name = {.valid = false};
-    for (uint32_t index = 0;; index++) {
+    for (uint32_t index = 0; index < MAXIMUM_DIRECTORY_ENTRIES; index++) {
         const uint8_t *entry = read_entry(volume, directory, index);
         if (entry == NULL || entry[0] == ENTRY_END) {
             return false;
@@ -198,6 +199,7 @@ static bool find_entry(FatVolume *volume, FatFile *directory, const char *name, 
             long_name.valid = false;
         }
     }
+    return false;
 }
 
 static size_t component_length(const char *path)

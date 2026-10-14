@@ -50,6 +50,7 @@ typedef struct Msc {
     uint8_t sense_key;
     uint8_t sense_code;
     uint8_t ejected;
+    bool data_out;
     uint8_t response[MSC_RESPONSE_CAPACITY];
     uint32_t response_length;
     uint32_t sector[MSC_SECTOR_SIZE / 4];

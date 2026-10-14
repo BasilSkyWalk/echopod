@@ -120,6 +120,7 @@ echo_add_unit_test(NAME test_fat
     LIBRARIES echo_device_logic
 )
 target_compile_definitions(test_fat PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+set_tests_properties(test_fat PROPERTIES TIMEOUT 20)
 
 if(ECHO_BUILD_SIM)
     echo_add_unit_test(NAME test_sim_options
@@ -163,6 +164,16 @@ if(ARM_GCC)
     add_test(NAME device_build
         COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
             -P ${PROJECT_SOURCE_DIR}/cmake/check_device_build.cmake
+    )
+    set_tests_properties(device_build PROPERTIES FIXTURES_SETUP device_image)
+    add_executable(check_device_image device/check_device_image.c)
+    target_link_libraries(check_device_image PRIVATE echo_device_logic echo_options)
+    add_test(NAME device_image_passes_the_updater_check
+        COMMAND check_device_image ${PROJECT_SOURCE_DIR}/build/device/HIFIEC90.IMG
+    )
+    set_tests_properties(device_image_passes_the_updater_check PROPERTIES
+        FIXTURES_REQUIRED device_image
+        SKIP_RETURN_CODE 77
     )
 else()
     message(STATUS "arm-none-eabi-gcc not found: the target_audit test is skipped")

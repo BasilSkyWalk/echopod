@@ -23,3 +23,4 @@ void usb_power_down(void);
 bool usb_connect(UsbPort *port);
 bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms);
 void usb_poll(UsbPort *port);
+bool usb_reply_pending(const UsbPort *port);

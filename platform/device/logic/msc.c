@@ -211,6 +211,7 @@ static void write_10(Msc *msc, const MscLun *lun, const uint8_t *block)
     }
     if (start_transfer(msc, lun, block)) {
         msc->source = MSC_SOURCE_SECTORS;
+        msc->data_out = true;
     }
 }
 
@@ -281,11 +282,18 @@ static void begin_command(Msc *msc, const uint8_t *cbw)
     msc->valid_bytes = 0;
     msc->status = STATUS_GOOD;
     msc->source = MSC_SOURCE_NONE;
+    msc->data_out = false;
     execute(msc, cbw + CBW_BLOCK);
+    bool host_in = (cbw[CBW_FLAGS] & DIRECTION_IN) != 0;
+    if (msc->source != MSC_SOURCE_NONE && msc->expected > 0 && host_in == msc->data_out) {
+        msc->status = STATUS_PHASE_ERROR;
+        msc->source = MSC_SOURCE_NONE;
+        msc->valid_bytes = 0;
+    }
     if (msc->expected == 0) {
         msc->phase = MSC_PHASE_STATUS;
     } else {
-        msc->phase = (cbw[CBW_FLAGS] & DIRECTION_IN) != 0 ? MSC_PHASE_DATA_IN : MSC_PHASE_DATA_OUT;
+        msc->phase = host_in ? MSC_PHASE_DATA_IN : MSC_PHASE_DATA_OUT;
     }
 }
 

@@ -133,6 +133,9 @@ static bool cluster_at(FatVolume *volume, FatFile *file, uint32_t index, uint32_
         file->cursor_index = 0;
         file->cursor_cluster = file->first_cluster;
     }
+    if (index >= volume->cluster_count) {
+        return false;
+    }
     while (file->cursor_index < index) {
         if (!next_cluster(volume, file->cursor_cluster, &file->cursor_cluster)) {
             file->cursor_cluster = 0;

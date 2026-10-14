@@ -85,6 +85,7 @@
 enum {
     GATE_USB_A = 0x07,
     GATE_USB_B = 0x6A,
+    GATE_GPIO1 = 0x95,
     RESET_USB_A = 0x00,
     RESET_USB_B = 0x01,
     RESET_USB_C = 0x02,
@@ -170,6 +171,7 @@ bool usb_vbus_present(void)
 
 static void silence_audio(void)
 {
+    cru_gate(GATE_GPIO1, true);
     gpio_mux(AMP_ENABLE, GPIO_FUNCTION_GPIO);
     gpio_mux(AUDIO_MUTE, GPIO_FUNCTION_GPIO);
     gpio_mux(DAC_POWER, GPIO_FUNCTION_GPIO);
@@ -300,7 +302,8 @@ static bool send(const UsbPort *port, uint32_t endpoint, const uint8_t *bytes, u
 {
     uint32_t words = (length + 3) / 4;
     uint32_t start = hal_clock_milliseconds();
-    while (tx_space(port, endpoint) < words) {
+    bool space_unreported = port->dedicated_fifos && endpoint == 0;
+    while (!space_unreported && tx_space(port, endpoint) < words) {
         if (hal_clock_milliseconds() - start > SPACE_TIMEOUT_MS) {
             return false;
         }
@@ -505,4 +508,9 @@ void usb_poll(UsbPort *port)
         handle_in_endpoints(port);
     }
     pump_bulk_in(port);
+}
+
+bool usb_reply_pending(const UsbPort *port)
+{
+    return port->in_busy || port->msc->phase == MSC_PHASE_STATUS;
 }

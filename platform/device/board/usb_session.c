@@ -5,11 +5,13 @@
 #include "app/app.h"
 #include "device/block_device.h"
 #include "emmc.h"
+#include "hal/clock.h"
 #include "sd.h"
 #include "usb.h"
 
 enum {
     HOST_TIMEOUT_MS = 3000,
+    LAST_REPLY_TIMEOUT_MS = 200,
     SERIAL_DIGITS = 8,
     INTERNAL_LUN = 0,
     CARD_LUN = 1,
@@ -55,11 +57,21 @@ static void prepare_luns(void)
     usb_device_init(&port.device, serial, LUN_COUNT);
 }
 
+static void finish_last_reply(void)
+{
+    uint32_t start = hal_clock_milliseconds();
+    while (usb_reply_pending(&port) && hal_clock_milliseconds() - start < LAST_REPLY_TIMEOUT_MS) {
+        usb_poll(&port);
+    }
+}
+
 static UsbSessionEnd serve(void)
 {
     while (usb_vbus_present()) {
+        hal_clock_milliseconds();
         usb_poll(&port);
         if (msc_ejected(&msc, INTERNAL_LUN)) {
+            finish_last_reply();
             return USB_SESSION_EJECTED;
         }
     }

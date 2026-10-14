@@ -331,6 +331,31 @@ static void a_reset_drops_a_transfer_in_progress(void)
     check_csw(collect(msc), 0, 0);
 }
 
+static void a_read_sent_as_host_to_device_is_a_phase_error_and_writes_nothing(void)
+{
+    uint8_t block[10];
+    uint8_t bytes[512];
+    memset(bytes, 0xEE, sizeof bytes);
+    Msc *msc = started();
+    uint8_t before = writable_disk.bytes[3 * 512];
+    read_10_block(block, 0x28, 3, 1);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 2, 512);
+    CHECK_EQUAL(before, writable_disk.bytes[3 * 512]);
+}
+
+static void a_write_sent_as_device_to_host_is_a_phase_error(void)
+{
+    uint8_t block[10];
+    Msc *msc = started();
+    read_10_block(block, 0x2A, 3, 1);
+    send_command(msc, 512, true, 0, block, 10);
+    Exchange *exchange = collect(msc);
+    CHECK_EQUAL(512, exchange->length);
+    check_csw(exchange, 2, 512);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -346,6 +371,8 @@ int main(void)
         TEST_CASE(a_read_past_the_end_fails_with_an_out_of_range_sense),
         TEST_CASE(an_unknown_command_fails_with_an_illegal_request),
         TEST_CASE(a_length_mismatch_is_a_phase_error),
+        TEST_CASE(a_read_sent_as_host_to_device_is_a_phase_error_and_writes_nothing),
+        TEST_CASE(a_write_sent_as_device_to_host_is_a_phase_error),
         TEST_CASE(an_eject_marks_only_that_lun_ejected_and_absent),
         TEST_CASE(a_start_without_eject_changes_nothing),
         TEST_CASE(an_invalid_command_block_is_ignored),

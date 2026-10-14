@@ -190,6 +190,16 @@ static void writes_to_the_idb_the_save_block_or_the_gap_are_refused(void)
     CHECK(!emmc_layout_allows_write(&layout, 0x88000, 0));
 }
 
+static void a_corrupt_system_size_is_rejected(void)
+{
+    static FakeDisk disk;
+    fake_disk_init(&disk, TOTAL_SECTORS);
+    write_idb(&disk, 0, 0xFFFF);
+    write_fat_boot_sector(&disk, 0x24000);
+    EmmcLayout layout;
+    CHECK(!read_layout(&disk, &layout));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -199,6 +209,7 @@ int main(void)
         TEST_CASE(an_mbr_or_exfat_volume_is_also_accepted),
         TEST_CASE(the_first_valid_idb_copy_is_used),
         TEST_CASE(an_idb_without_the_nano_tag_is_ignored),
+        TEST_CASE(a_corrupt_system_size_is_rejected),
         TEST_CASE(no_volume_within_the_scan_limit_fails),
         TEST_CASE(a_volume_is_never_accepted_inside_the_firmware_area),
         TEST_CASE(writes_inside_the_user_volume_are_allowed),

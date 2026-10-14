@@ -151,7 +151,7 @@ bool emmc_read(void *context, uint32_t lba, uint32_t count, void *buffer)
     (void)context;
     uint32_t *words = buffer;
     for (uint32_t index = 0; index < count; index++) {
-        if (!started || lba + index >= emmc.sector_count ||
+        if (!started || lba >= emmc.sector_count || index >= emmc.sector_count - lba ||
             !mmc_read_block(&EMMC_HOST, CMD_READ_SINGLE_BLOCK, lba + index,
                             words + index * (BLOCK_LENGTH / 4))) {
             return false;
