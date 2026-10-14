@@ -164,13 +164,17 @@ def track_from_tags(relative_path, tags, duration_seconds):
     )
 
 
+def nfc(text):
+    return unicodedata.normalize("NFC", text)
+
+
 def normalized_tags(audio):
     if audio is None or audio.tags is None:
         return {}
     tags = {}
     for key, values in audio.tags.items():
         if isinstance(values, list):
-            tags[str(key).lower()] = [str(value) for value in values]
+            tags[str(key).lower()] = [nfc(str(value)) for value in values]
     return tags
 
 
@@ -178,7 +182,7 @@ def read_track(root, path):
     from mutagen import File
     audio = File(path, easy=True)
     duration = audio.info.length if audio is not None else 0.0
-    return track_from_tags(path.relative_to(root).as_posix(), normalized_tags(audio), duration)
+    return track_from_tags(nfc(path.relative_to(root).as_posix()), normalized_tags(audio), duration)
 
 
 def parse_m3u(text):
@@ -481,9 +485,9 @@ def visible_files(root, suffixes):
 
 
 def read_playlist(root, path):
-    folder = path.parent.relative_to(root).as_posix()
-    entries = parse_m3u(decode_playlist(path.read_bytes()))
-    return RawPlaylist(path.stem, "" if folder == "." else folder, entries)
+    folder = nfc(path.parent.relative_to(root).as_posix())
+    entries = [nfc(entry) for entry in parse_m3u(decode_playlist(path.read_bytes()))]
+    return RawPlaylist(nfc(path.stem), "" if folder == "." else folder, entries)
 
 
 def scan(root):

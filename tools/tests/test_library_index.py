@@ -1,5 +1,6 @@
 import struct
 import sys
+import unicodedata
 import tempfile
 import unittest
 from pathlib import Path
@@ -286,6 +287,40 @@ class ReadTrackTest(unittest.TestCase):
         self.assertEqual("Artist/Album/01 - Song.flac", track.path)
         self.assertEqual(("Tagged Title", "Tagged Artist"), (track.title, track.artist))
         self.assertEqual(3000, track.duration_ms)
+
+
+class UnicodeFormTest(unittest.TestCase):
+    def test_decomposed_file_names_are_stored_composed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "Sigur Ro\u0301s" / "A\u0301gætis byrjun" / "01 Intro.flac"
+            path.parent.mkdir(parents=True)
+            write_silent_flac(path, 1)
+            track = library_index.read_track(root, path)
+        self.assertEqual("Sigur R\u00f3s/\u00c1gætis byrjun/01 Intro.flac", track.path)
+        self.assertTrue(unicodedata.is_normalized("NFC", track.path))
+
+    def test_decomposed_tags_are_stored_composed(self):
+        from mutagen.flac import FLAC
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "song.flac"
+            write_silent_flac(path, 1)
+            audio = FLAC(path)
+            audio["artist"] = "Bjo\u0308rk"
+            audio.save()
+            track = library_index.read_track(root, path)
+        self.assertEqual("Bj\u00f6rk", track.artist)
+
+    def test_decomposed_playlist_entries_and_folders_are_composed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "Lists Ro\u0301s" / "mix.m3u"
+            path.parent.mkdir()
+            path.write_text("Bjo\u0308rk/Homogenic/01 - Hunter.flac\n", encoding="utf-8")
+            playlist = library_index.read_playlist(root, path)
+        self.assertEqual("Lists R\u00f3s", playlist.folder)
+        self.assertEqual(["Bj\u00f6rk/Homogenic/01 - Hunter.flac"], playlist.entries)
 
 
 if __name__ == "__main__":
