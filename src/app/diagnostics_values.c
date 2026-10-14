@@ -79,3 +79,26 @@ void diagnostics_boot_pll_text(HalBootClocks clocks, char *text, size_t capacity
     string_builder_append_unsigned(&builder, clocks.core_hz / 1000000u);
     string_builder_append(&builder, " MHz");
 }
+
+static const uint32_t CLOCK_STEPS_MHZ[] = {24, 96, 200};
+
+uint32_t diagnostics_next_clock_mhz(uint32_t current_mhz)
+{
+    for (size_t index = 0; index < sizeof CLOCK_STEPS_MHZ / sizeof CLOCK_STEPS_MHZ[0]; index++) {
+        if (CLOCK_STEPS_MHZ[index] > current_mhz) {
+            return CLOCK_STEPS_MHZ[index];
+        }
+    }
+    return CLOCK_STEPS_MHZ[0];
+}
+
+void diagnostics_clock_text(uint32_t mhz, bool failed, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (failed) {
+        string_builder_append(&builder, "No lock");
+        return;
+    }
+    string_builder_append_unsigned(&builder, mhz);
+    string_builder_append(&builder, " MHz");
+}

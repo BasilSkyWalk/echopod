@@ -75,6 +75,23 @@ static void the_boot_pll_shows_its_fields_and_core_speed(void)
     CHECK(text_is("1078 1546 96 MHz", text));
 }
 
+static void the_clock_row_steps_up_from_the_current_speed_then_wraps(void)
+{
+    CHECK_EQUAL(96u, diagnostics_next_clock_mhz(48));
+    CHECK_EQUAL(96u, diagnostics_next_clock_mhz(24));
+    CHECK_EQUAL(200u, diagnostics_next_clock_mhz(96));
+    CHECK_EQUAL(24u, diagnostics_next_clock_mhz(200));
+}
+
+static void the_clock_row_shows_the_actual_speed(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_clock_text(48, false, text, sizeof text);
+    CHECK(text_is("48 MHz", text));
+    diagnostics_clock_text(48, true, text, sizeof text);
+    CHECK(text_is("No lock", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -85,6 +102,8 @@ int main(void)
         TEST_CASE(a_missing_dac_names_the_i2c_step_and_status),
         TEST_CASE(boot_clocks_show_the_low_half_of_each_register),
         TEST_CASE(the_boot_pll_shows_its_fields_and_core_speed),
+        TEST_CASE(the_clock_row_steps_up_from_the_current_speed_then_wraps),
+        TEST_CASE(the_clock_row_shows_the_actual_speed),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

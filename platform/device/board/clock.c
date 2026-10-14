@@ -5,10 +5,6 @@
 
 #define SYSTICK_ENABLE_CORE_CLOCK 0x5u
 
-enum {
-    TICKS_PER_MICROSECOND = 24
-};
-
 static TickClock clock;
 
 void board_clock_start(void)
@@ -16,7 +12,7 @@ void board_clock_start(void)
     register_write(SYSTICK_RELOAD, TICK_CLOCK_COUNTER_MASK);
     register_write(SYSTICK_CURRENT, 0);
     register_write(SYSTICK_CTRL, SYSTICK_ENABLE_CORE_CLOCK);
-    tick_clock_init(&clock, TICKS_PER_MICROSECOND, register_read(SYSTICK_CURRENT));
+    tick_clock_init(&clock, board_boot_ticks_per_microsecond(), register_read(SYSTICK_CURRENT));
 }
 
 void board_clock_set_rate(uint32_t ticks_per_microsecond)

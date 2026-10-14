@@ -26,7 +26,10 @@ enum {
     MODE_ON_PLL = 0x1,
     CRYSTAL_DIVIDER_SHIFT = 8,
     CRYSTAL_DIVIDER_MASK = 0x3F,
-    CORE_DIVIDER_MASK = 0x7
+    CORE_DIVIDER_MASK = 0x7,
+    BOOT_TICKS_PER_MICROSECOND = 24,
+    MAX_CORE_MHZ = 400,
+    PCLK_SHIFT_MASK = 0x3
 };
 
 typedef struct PllRow {
@@ -88,4 +91,16 @@ uint32_t pll_core_hz(uint32_t mode, uint32_t clock_select, uint32_t con0, uint32
         return CRYSTAL_HZ / ((mode >> CRYSTAL_DIVIDER_SHIFT & CRYSTAL_DIVIDER_MASK) + 1);
     }
     return pll_output_hz(con0, con1) / ((clock_select & CORE_DIVIDER_MASK) + 1);
+}
+
+uint32_t pll_ticks_per_microsecond(uint32_t core_hz)
+{
+    uint32_t mhz = core_hz / MEGAHERTZ;
+    bool whole = mhz * MEGAHERTZ == core_hz;
+    return whole && mhz > 0 && mhz <= MAX_CORE_MHZ ? mhz : BOOT_TICKS_PER_MICROSECOND;
+}
+
+uint32_t pll_pclk_hz(uint32_t core_hz, uint32_t pclk_select)
+{
+    return core_hz >> (pclk_select >> PCLK_SHIFT_SHIFT & PCLK_SHIFT_MASK);
 }

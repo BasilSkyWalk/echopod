@@ -23,3 +23,5 @@ void diagnostics_tone_text(HalToneResult result, HalToneDetail detail, char *tex
 void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity);
 void diagnostics_boot_clocks_text(HalBootClocks clocks, char *text, size_t capacity);
 void diagnostics_boot_pll_text(HalBootClocks clocks, char *text, size_t capacity);
+uint32_t diagnostics_next_clock_mhz(uint32_t current_mhz);
+void diagnostics_clock_text(uint32_t mhz, bool failed, char *text, size_t capacity);

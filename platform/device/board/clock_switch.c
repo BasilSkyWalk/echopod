@@ -33,12 +33,14 @@
 #define BUS_SPEED_SLOW 0xC0000000u
 
 enum {
-    BOOT_CLOCK_MHZ = 24,
+    CRYSTAL_MHZ = 24,
+    HZ_PER_MHZ = 1000000,
     LOCK_TIMEOUT_MS = 200,
     DIVIDER_SETTLE_US = 10
 };
 
-static uint32_t pll_mhz;
+static uint32_t current_mhz;
+static HalBootClocks boot_clocks;
 
 static void leave_pll(void)
 {
@@ -64,10 +66,10 @@ static void run_from_crystal(void)
     register_write(CRU_MODE, MODE_CLEAR_DIVIDER);
     leave_pll();
     register_write(CRU_MODE, MODE_CLEAR_DIVIDER);
-    board_clock_set_rate(BOOT_CLOCK_MHZ);
+    board_clock_set_rate(CRYSTAL_MHZ);
     power_down_pll();
     use_slow_speed_bits();
-    pll_mhz = 0;
+    current_mhz = CRYSTAL_MHZ;
 }
 
 static void program_pll(const PllSetting *setting)
@@ -115,11 +117,9 @@ static bool run_from_pll(uint32_t mhz)
     board_delay_us(DIVIDER_SETTLE_US);
     register_write(CRU_MODE, MODE_FROM_PLL);
     board_clock_set_rate(mhz);
-    pll_mhz = mhz;
+    current_mhz = mhz;
     return true;
 }
-
-static HalBootClocks boot_clocks;
 
 void board_clock_record_boot(void)
 {
@@ -140,23 +140,32 @@ HalBootClocks hal_system_boot_clocks(void)
     return boot_clocks;
 }
 
+uint32_t board_boot_ticks_per_microsecond(void)
+{
+    return pll_ticks_per_microsecond(boot_clocks.core_hz);
+}
+
 uint32_t board_pclk_hz(void)
 {
     PllSetting setting;
-    if (pll_mhz == 0 || !pll_setting_for(pll_mhz, &setting)) {
-        return BOOT_CLOCK_MHZ * 1000000u;
+    if (current_mhz == 0) {
+        uint32_t core_hz = board_boot_ticks_per_microsecond() * HZ_PER_MHZ;
+        return pll_pclk_hz(core_hz, boot_clocks.pclk_select);
+    }
+    if (current_mhz == CRYSTAL_MHZ || !pll_setting_for(current_mhz, &setting)) {
+        return CRYSTAL_MHZ * HZ_PER_MHZ;
     }
     return setting.pclk_hz;
 }
 
 uint32_t hal_system_clock_mhz(void)
 {
-    return pll_mhz != 0 ? pll_mhz : BOOT_CLOCK_MHZ;
+    return current_mhz != 0 ? current_mhz : board_boot_ticks_per_microsecond();
 }
 
 static bool switch_clock(uint32_t mhz)
 {
-    if (mhz == BOOT_CLOCK_MHZ) {
+    if (mhz == CRYSTAL_MHZ) {
         run_from_crystal();
         return true;
     }

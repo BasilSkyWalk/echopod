@@ -86,39 +86,20 @@ static const char *firmware_value(const void *context)
     return hal_system_version();
 }
 
-typedef struct ClockStep {
-    uint32_t mhz;
-    const char *label;
-} ClockStep;
-
-static const ClockStep CLOCK_STEPS[] = {{24, "24 MHz"}, {96, "96 MHz"}, {200, "200 MHz"}};
-
-enum {
-    CLOCK_STEP_COUNT = sizeof CLOCK_STEPS / sizeof CLOCK_STEPS[0]
-};
-
-static int clock_step_index(void)
-{
-    for (int index = 0; index < CLOCK_STEP_COUNT; index++) {
-        if (CLOCK_STEPS[index].mhz == hal_system_clock_mhz()) {
-            return index;
-        }
-    }
-    return 0;
-}
+static char clock_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static ScreenAction cycle_clock(void *context)
 {
     ClockOption *clock = context;
-    int next = (clock_step_index() + 1) % CLOCK_STEP_COUNT;
-    clock->failed = !hal_system_set_clock_mhz(CLOCK_STEPS[next].mhz);
+    clock->failed = !hal_system_set_clock_mhz(diagnostics_next_clock_mhz(hal_system_clock_mhz()));
     return screen_action_none();
 }
 
 static const char *clock_value(const void *context)
 {
     const ClockOption *clock = context;
-    return clock->failed ? "No lock" : CLOCK_STEPS[clock_step_index()].label;
+    diagnostics_clock_text(hal_system_clock_mhz(), clock->failed, clock_text, sizeof clock_text);
+    return clock_text;
 }
 
 static ScreenAction play_test_tone(void *context)

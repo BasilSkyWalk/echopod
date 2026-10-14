@@ -4,6 +4,7 @@
 
 void board_clock_start(void);
 void board_clock_record_boot(void);
+uint32_t board_boot_ticks_per_microsecond(void);
 void board_clock_set_rate(uint32_t ticks_per_microsecond);
 uint32_t board_pclk_hz(void);
 void board_delay_ms(uint32_t milliseconds);

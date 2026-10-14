@@ -53,6 +53,27 @@ static void the_core_clock_comes_from_the_pll_or_the_crystal(void)
     CHECK_EQUAL(12000000u, pll_core_hz(0x0100u, 0x0000u, 0x1078u, 0x1146u));
 }
 
+static void measured_boot_registers_give_48_mhz(void)
+{
+    CHECK_EQUAL(48000000u, pll_core_hz(0x0001u, 0x0330u, 0x4020u, 0x9501u));
+}
+
+static void timekeeping_uses_the_whole_megahertz_of_the_core(void)
+{
+    CHECK_EQUAL(48u, pll_ticks_per_microsecond(48000000u));
+    CHECK_EQUAL(96u, pll_ticks_per_microsecond(96000000u));
+    CHECK_EQUAL(24u, pll_ticks_per_microsecond(0u));
+    CHECK_EQUAL(24u, pll_ticks_per_microsecond(47500000u));
+    CHECK_EQUAL(24u, pll_ticks_per_microsecond(900000000u));
+}
+
+static void pclk_is_the_core_shifted_by_the_select_field(void)
+{
+    CHECK_EQUAL(24000000u, pll_pclk_hz(48000000u, 0x0100u));
+    CHECK_EQUAL(50000000u, pll_pclk_hz(200000000u, 0x0200u));
+    CHECK_EQUAL(24000000u, pll_pclk_hz(24000000u, 0x0000u));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -61,6 +82,9 @@ int main(void)
         TEST_CASE(other_speeds_are_refused),
         TEST_CASE(the_pll_output_follows_the_register_fields),
         TEST_CASE(the_core_clock_comes_from_the_pll_or_the_crystal),
+        TEST_CASE(measured_boot_registers_give_48_mhz),
+        TEST_CASE(timekeeping_uses_the_whole_megahertz_of_the_core),
+        TEST_CASE(pclk_is_the_core_shifted_by_the_select_field),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
