@@ -51,11 +51,14 @@ Headless runs use a virtual clock, so scripted screenshots are deterministic.
 
 ### Navigation
 
-| Button | In lists |
-|---|---|
-| Volume up / down | Previous / next item (wraps on a single press, not while held) |
-| Play | Select |
-| Back | Back; hold to go home |
+| Button | In lists | On Now Playing |
+|---|---|---|
+| Volume up / down | Previous / next item (wraps on a single press, not while held) | Volume |
+| Play | Select (a song plays the list from that song) | Play / pause |
+| Menu | | Next track; hold for previous |
+| Back | Back; hold to go home | Back; hold to go home |
+
+Settings has Shuffle (Off / Songs / Albums) and Repeat (Off / One / All). Playback resumes, paused, where it left off.
 
 ## Layout
 
@@ -63,4 +66,4 @@ See `docs/architecture.md`.
 
 ## License
 
-GPL-3.0-or-later. See `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`).
+GPL-3.0-or-later. See `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`). The simulator's decoders (dr_flac, dr_mp3, dr_wav) are public domain or MIT-0 (`third_party/dr_libs/LICENSE`).

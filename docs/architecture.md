@@ -9,11 +9,11 @@ platform/sim        platform/device (later)
         \                  /
          implement  hal  (interfaces only)
                      |
-                    app          composition root: theme, screen tree, main step
-              /   /   |    \
-            ui  fonts library hal
-             \   |     |
-              gfx      |
+                    app          composition root: theme, screens, player, main step
+              /   /   |     \      \
+            ui  fonts playback  hal
+             \   |      |
+              gfx    library
                 \      |
                   core
 ```
@@ -25,8 +25,9 @@ platform/sim        platform/device (later)
 | fonts | `src/fonts` | gfx | Generated glyph tables (see Generated code) |
 | ui | `src/ui` | core, gfx | Screen interface and stack, navigation intents, list view, menus, messages, header, labels, marquee, theme type |
 | library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader and browse queries (see `docs/library-format.md`) |
-| hal | `src/hal` | core (types only) | Hardware interfaces: display, input, clock, files, and later audio and power |
-| app | `src/app` | core, gfx, fonts, ui, library, hal | Default theme, screen tree, library store, browse screens, app screens, frame overlay, the main step |
+| playback | `src/playback` | core, library | Play queue (list order, songs shuffle, album shuffle, repeat, gapless look-ahead) and the resume file format |
+| hal | `src/hal` | core (types only) | Hardware interfaces: display, input, clock, files, audio, and later power |
+| app | `src/app` | core, gfx, fonts, ui, library, playback, hal | Default theme, screen tree, library store, player controller, browse and Now Playing screens, frame overlay, the main step |
 | platform | `platform/*` | app, hal, OS/SDK | Implements hal and owns `main()` |
 
 The CMake targets enforce these rules. Each module exposes only its own `include/<module>/` directory, and a module can only include headers from targets it links. Anything in a module's own directory, outside `include/`, is private.
@@ -43,6 +44,13 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 - On the device, `app/library_store` opens the database through `hal_file_*`, puts a block cache in front, and validates it with `library_open`.
 - Browse queries (`library/library_browse`) answer three questions for any view: how many rows there are, what row N is, and what selecting it opens. They read records and strings on demand and never load the database into RAM.
 - Browse screens come from a fixed pool of 6 levels. They share one cache of the visible rows' text, which is refreshed in `update` (never during `draw`) whenever the visible rows change.
+
+## Playback
+
+- `hal/audio.h` is high level, as the brief asked. `play(path, start, token)`, `queue_next(path, token)`, pause, resume, seek, volume and status. The backend decodes; the device backend will wrap ReChord's player.
+- Gapless: when a track starts, the player queues the next one with a new token. The backend switches without a gap and reports the new token, and `player_update` then moves the queue on and queues the following track.
+- Shuffle is seeded (`core/random`). The resume file (`/.echo/resume.bin`, `playback/resume_state`) stores the queue plan (source list, anchor track, shuffle mode, seed), the cursor, the track and the position, so the exact same queue is rebuilt after power-off. A library fingerprint rejects resume files from an older index.
+- The player saves on start, on track change, on pause, every 15 s while playing, and in `app_stop()`.
 
 ## Rendering
 
@@ -106,9 +114,16 @@ The panel keeps its own image memory, so we never hold a full framebuffer. The s
 
 Host builds run under UndefinedBehaviorSanitizer. AddressSanitizer is opt-in (`ECHO_ADDRESS_SANITIZER`) because it hangs at startup on macOS 27 with Apple clang 17.
 
+## Simulator audio
+
+- Windowed mode plays through SDL audio. dr_flac, dr_mp3 and dr_wav decode (vendored, pinned in `third_party/dr_libs/COMMIT`). Each track feeds an `SDL_AudioStream` that resamples to the 48 kHz device rate. Two decoder slots (current and queued) make the hand-over gapless.
+- Headless mode uses a silent virtual backend that advances on the simulated clock, so scripted runs, track transitions and resume are deterministic.
+- `SDL_AUDIODRIVER=dummy` runs the real-time path without sound.
+- Third-party code lives in `third_party/` and compiles without our warning flags. The comment and format checks skip it.
+
 ## Simulator storage
 
-`--card DIR` maps the card root `/` to a host folder, which is only ever read. `--system-dir DIR` maps `/.echo/` to a separate folder, so the database can live in `build/` without touching your music folder:
+`--card DIR` maps the card root `/` to a host folder, which is only ever read. `--system-dir DIR` maps `/.echo/` to a separate folder, so the database and resume file can live in `build/` without touching your music folder. Writes are refused outside `--system-dir`:
 
 ```sh
 .venv/bin/python tools/library_index.py --music ~/Music --output build/library/library.db

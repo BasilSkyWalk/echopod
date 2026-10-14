@@ -11,7 +11,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | 1a | SDL simulator, HAL, frame-time counter, memory-budget enforcement | 2–3 d | no | done |
 | 1b | UI toolkit: screen stack, lists, marquee, bitmap fonts from TTF | 3–5 d | no | done |
 | 1c | PC indexer, DB format, browse screens | 4–6 d | no | done |
-| 1d | Simulator playback: queue, shuffle/repeat, gapless, resume | 3–4 d | no | todo |
+| 1d | Simulator playback: queue, shuffle/repeat, gapless, resume | 3–4 d | no | done |
 | 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | todo |
 | 1f | Cover Flow and cover export script | 4–6 d | no | todo |
 | 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | todo |
@@ -24,14 +24,14 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 
 | Feature | Status | Notes |
 |---|---|---|
-| FLAC / MP3 / WAV playback | todo | ReChord decoders are host-tested; not audible on the device yet |
+| FLAC / MP3 / WAV playback | sim | dr_libs in the simulator; the device backend wraps ReChord's player (Phase 3/4) |
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
-| Gapless | todo | ReChord's player design is host-tested |
-| Resume after power-off | todo | Needs FS writes on the device |
+| Gapless | sim | Token-based hand-over through the audio HAL |
+| Resume after power-off | sim | `/.echo/resume.bin`; needs FAT writes on the device |
 | Library DB from SD scan | sim | Built on the PC (`tools/library_index.py`); an on-device rescan comes later |
 | Browse: Artist / Album Artist / Album / Genre / Folder / All Songs | sim | Selecting a track does nothing until 1d |
-| Now Playing: art, info, progress, seek | todo | |
-| Queue, shuffle, repeat | todo | ReChord has only a FIFO queue |
+| Now Playing: art, info, progress, seek | in progress | Info, progress, times, state, modes and volume done; art and seek in 1e/1f |
+| Queue, shuffle, repeat | sim | Shuffle Songs/Albums, Repeat One/All, seeded |
 | Volume and button mapping, lock/hold | todo | Power short press = lock/unlock, long press = off. Gestures and navigation mapping done in sim |
 | Settings: brightness, screen timeout, sleep timer, gain, output | todo | Brightness needs PWM; output needs jack/route control |
 | Battery, charging, power management | todo | No driver yet |
