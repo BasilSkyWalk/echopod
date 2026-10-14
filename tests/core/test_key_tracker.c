@@ -180,6 +180,45 @@ static void long_press_timing_survives_clock_wraparound(void)
     CHECK_EQUAL(KEY_GESTURE_LONG_PRESS, next_gesture(&tracker, KEY_MENU));
 }
 
+static KeyTracker hold_repeat_tracker(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_set_behavior(&tracker, KEY_VOLUME_UP, KEY_BEHAVIOR_TAP_HOLD_REPEAT);
+    return tracker;
+}
+
+static void a_hold_repeat_key_taps_on_release(void)
+{
+    KeyTracker tracker = hold_repeat_tracker();
+    key_tracker_key_down(&tracker, KEY_VOLUME_UP, 1000);
+    key_tracker_update(&tracker, 1000 + REPEAT_DELAY_MS);
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_VOLUME_UP));
+    key_tracker_key_up(&tracker, KEY_VOLUME_UP, 1000 + REPEAT_DELAY_MS + 10);
+    CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_VOLUME_UP));
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_VOLUME_UP));
+}
+
+static void a_held_hold_repeat_key_long_presses_then_repeats(void)
+{
+    KeyTracker tracker = hold_repeat_tracker();
+    key_tracker_key_down(&tracker, KEY_VOLUME_UP, 1000);
+    key_tracker_update(&tracker, 1000 + LONG_PRESS_MS);
+    CHECK_EQUAL(KEY_GESTURE_LONG_PRESS, next_gesture(&tracker, KEY_VOLUME_UP));
+    key_tracker_update(&tracker, 1000 + LONG_PRESS_MS + REPEAT_INTERVAL_MS - 1);
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_VOLUME_UP));
+    key_tracker_update(&tracker, 1000 + LONG_PRESS_MS + REPEAT_INTERVAL_MS);
+    CHECK_EQUAL(KEY_GESTURE_REPEAT, next_gesture(&tracker, KEY_VOLUME_UP));
+    key_tracker_key_up(&tracker, KEY_VOLUME_UP, 1000 + LONG_PRESS_MS + REPEAT_INTERVAL_MS + 10);
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_VOLUME_UP));
+}
+
+static void changing_a_behavior_leaves_other_keys_alone(void)
+{
+    KeyTracker tracker = hold_repeat_tracker();
+    key_tracker_key_down(&tracker, KEY_VOLUME_DOWN, 1000);
+    CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_VOLUME_DOWN));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -196,6 +235,9 @@ int main(void)
         TEST_CASE(a_full_queue_keeps_the_oldest_events),
         TEST_CASE(repeat_timing_survives_clock_wraparound),
         TEST_CASE(long_press_timing_survives_clock_wraparound),
+        TEST_CASE(a_hold_repeat_key_taps_on_release),
+        TEST_CASE(a_held_hold_repeat_key_long_presses_then_repeats),
+        TEST_CASE(changing_a_behavior_leaves_other_keys_alone),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

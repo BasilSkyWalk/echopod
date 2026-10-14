@@ -24,6 +24,7 @@ struct Screen {
     const char *title;
     void *context;
     bool full_screen;
+    bool hold_volume_keys;
     void (*enter)(void *context, uint32_t now_ms);
     ScreenAction (*handle_key)(void *context, KeyEvent event, uint32_t now_ms);
     void (*update)(void *context, uint32_t now_ms);

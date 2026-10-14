@@ -106,11 +106,21 @@ static void shut_down(void)
     hal_power_off();
 }
 
+static void use_screen_key_behaviors(void)
+{
+    KeyBehavior volume =
+        top_screen()->hold_volume_keys ? KEY_BEHAVIOR_TAP_HOLD_REPEAT : KEY_BEHAVIOR_REPEAT;
+    key_tracker_set_behavior(&app.keys, KEY_VOLUME_UP, volume);
+    key_tracker_set_behavior(&app.keys, KEY_VOLUME_DOWN, volume);
+}
+
 static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
 {
     Screen *screen = top_screen();
     ScreenAction action = screen->handle_key(screen->context, event, now_ms);
-    screen_stack_apply(&app.stack, action, now_ms);
+    if (screen_stack_apply(&app.stack, action, now_ms)) {
+        use_screen_key_behaviors();
+    }
 }
 
 static void dispatch_key_events(uint32_t now_ms)
@@ -249,6 +259,7 @@ static void start_screens(uint32_t now_ms)
     Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);
     open_start_screen(now_ms);
+    use_screen_key_behaviors();
 }
 
 void app_start(void)

@@ -17,7 +17,8 @@ typedef enum KeyGesture {
 
 typedef enum KeyBehavior {
     KEY_BEHAVIOR_TAP_OR_HOLD,
-    KEY_BEHAVIOR_REPEAT
+    KEY_BEHAVIOR_REPEAT,
+    KEY_BEHAVIOR_TAP_HOLD_REPEAT
 } KeyBehavior;
 
 typedef struct KeyEvent {
@@ -52,6 +53,7 @@ typedef struct KeyTracker {
 } KeyTracker;
 
 void key_tracker_init(KeyTracker *tracker, const KeyConfig *config);
+void key_tracker_set_behavior(KeyTracker *tracker, Key key, KeyBehavior behavior);
 void key_tracker_key_down(KeyTracker *tracker, Key key, uint32_t now_ms);
 void key_tracker_key_up(KeyTracker *tracker, Key key, uint32_t now_ms);
 void key_tracker_update(KeyTracker *tracker, uint32_t now_ms);

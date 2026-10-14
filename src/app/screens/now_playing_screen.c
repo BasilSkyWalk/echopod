@@ -54,12 +54,12 @@ uint32_t now_playing_scrub_target(uint32_t position_ms, uint32_t duration_ms, in
 
 static NowPlayingCommand scrub_command_for(KeyEvent event)
 {
-    bool repeated = event.gesture == KEY_GESTURE_REPEAT;
+    bool held = event.gesture != KEY_GESTURE_PRESS;
     switch (event.key) {
     case KEY_VOLUME_UP:
-        return repeated ? NOW_PLAYING_SCRUB_FORWARD_FAST : NOW_PLAYING_SCRUB_FORWARD;
+        return held ? NOW_PLAYING_SCRUB_FORWARD_FAST : NOW_PLAYING_SCRUB_FORWARD;
     case KEY_VOLUME_DOWN:
-        return repeated ? NOW_PLAYING_SCRUB_BACK_FAST : NOW_PLAYING_SCRUB_BACK;
+        return held ? NOW_PLAYING_SCRUB_BACK_FAST : NOW_PLAYING_SCRUB_BACK;
     case KEY_PLAY:
         return by_gesture(event.gesture, NOW_PLAYING_SCRUB_COMMIT, NOW_PLAYING_NONE);
     case KEY_BACK:
@@ -78,15 +78,14 @@ NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing)
     }
     switch (event.key) {
     case KEY_VOLUME_UP:
-        return NOW_PLAYING_VOLUME_UP;
+        return by_gesture(event.gesture, NOW_PLAYING_VOLUME_UP, NOW_PLAYING_NEXT);
     case KEY_VOLUME_DOWN:
-        return NOW_PLAYING_VOLUME_DOWN;
+        return by_gesture(event.gesture, NOW_PLAYING_VOLUME_DOWN, NOW_PLAYING_PREVIOUS);
     case KEY_PLAY:
         return by_gesture(event.gesture, NOW_PLAYING_TOGGLE_PAUSE, NOW_PLAYING_SCRUB_START);
-    case KEY_MENU:
-        return by_gesture(event.gesture, NOW_PLAYING_NEXT, NOW_PLAYING_PREVIOUS);
     case KEY_BACK:
         return by_gesture(event.gesture, NOW_PLAYING_LEAVE, NOW_PLAYING_HOME);
+    case KEY_MENU:
     case KEY_POWER:
         return NOW_PLAYING_NONE;
     }
@@ -403,6 +402,7 @@ Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig 
     now_playing->screen = (Screen){
         .title = "Now Playing",
         .context = now_playing,
+        .hold_volume_keys = true,
         .enter = enter,
         .handle_key = handle_key,
         .update = update,

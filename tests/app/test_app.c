@@ -269,8 +269,25 @@ static void now_playing_keys_control_the_player(void)
     CHECK_EQUAL(volume + 1, fake_hal_audio_volume());
     tap(KEY_PLAY);
     CHECK_EQUAL(PLAYER_PAUSED, app_player_status().state);
-    tap(KEY_MENU);
+    hold(KEY_VOLUME_UP);
     CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
+    CHECK_EQUAL(volume + 1, fake_hal_audio_volume());
+    hold(KEY_VOLUME_DOWN);
+    CHECK(playing_path_is(HELLS_BELLS_PATH));
+}
+
+static void lists_still_move_as_soon_as_a_volume_key_goes_down(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    CHECK(title_is("Albums"));
+    fake_hal_queue_transition(KEY_VOLUME_DOWN, true, now_ms);
+    now_ms += 10;
+    step();
+    tap(KEY_PLAY);
+    CHECK(!title_is("Back In Black"));
 }
 
 static void the_home_menu_opens_now_playing(void)
@@ -572,6 +589,7 @@ int main(void)
         TEST_CASE(without_a_library_the_lists_explain_what_is_missing),
         TEST_CASE(selecting_a_track_plays_it_and_shows_now_playing),
         TEST_CASE(now_playing_keys_control_the_player),
+        TEST_CASE(lists_still_move_as_soon_as_a_volume_key_goes_down),
         TEST_CASE(the_home_menu_opens_now_playing),
         TEST_CASE(settings_choose_shuffle_and_repeat),
         TEST_CASE(brightness_is_applied_and_saved),
