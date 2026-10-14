@@ -122,6 +122,11 @@ echo_add_unit_test(NAME test_emmc_layout
     SOURCES device/test_emmc_layout.c device/fake_disk.c
     LIBRARIES echo_device_logic
 )
+echo_add_unit_test(NAME test_flac
+    SOURCES codec/test_flac.c
+    LIBRARIES echo_codec
+)
+target_compile_definitions(test_flac PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_fat
     SOURCES device/test_fat.c device/sparse_card.c
     LIBRARIES echo_device_logic
