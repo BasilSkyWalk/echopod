@@ -1,7 +1,9 @@
 import argparse
+import datetime
 import hashlib
 import re
 import struct
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +37,12 @@ BUILD_TAG_OFFSET = 0x30
 FW1_END_OFFSET = 0x80
 TEXT_FIELD_SIZE = 8
 REFERENCE_MD5 = "4c333e193739512bb4bb706495523955"
+ELF_IDENT = b"\x7fELF\x01\x01"
+ELF_HEADER = struct.Struct("<16sHHIIIIIHHHHHH")
+ELF_SECTION = struct.Struct("<10I")
+SHF_ALLOC = 2
+SHT_NOBITS = 8
+FIRMWARE_SECTIONS = (".code", ".data", ".bss")
 
 
 class ImageError(Exception):
@@ -239,11 +247,77 @@ def validate_image(image):
     return problems
 
 
+@dataclass(frozen=True)
+class Section:
+    kind: int
+    flags: int
+    address: int
+    content: bytes
+    size: int
+
+
+def elf_sections(elf):
+    if elf[:len(ELF_IDENT)] != ELF_IDENT or len(elf) < ELF_HEADER.size:
+        raise ImageError("not a 32-bit little-endian ELF file")
+    fields = ELF_HEADER.unpack_from(elf)
+    table, count, names_index = fields[6], fields[12], fields[13]
+    raw = [ELF_SECTION.unpack_from(elf, table + index * ELF_SECTION.size)
+           for index in range(count)]
+    names = raw[names_index]
+    sections = {}
+    for name, kind, flags, address, offset, size, *_ in raw:
+        start = names[4] + name
+        label = elf[start:elf.index(b"\x00", start)].decode("ascii")
+        content = b"" if kind == SHT_NOBITS else elf[offset:offset + size]
+        sections[label] = Section(kind, flags, address, content, size)
+    return sections
+
+
+def check_sections(sections):
+    if ".code" not in sections or ".data" not in sections:
+        raise ImageError("the ELF needs .code and .data sections")
+    stray = [name for name, section in sections.items()
+             if section.flags & SHF_ALLOC and section.size and name not in FIRMWARE_SECTIONS]
+    if stray:
+        raise ImageError("loaded sections the image would drop: " + ", ".join(sorted(stray)))
+    if sections[".code"].address != CODE_BASE or sections[".data"].address != DATA_BASE:
+        raise ImageError(f".code must be at {CODE_BASE:#010x} and .data at {DATA_BASE:#010x}")
+
+
+def firmware_from_elf(elf):
+    sections = elf_sections(elf)
+    check_sections(sections)
+    code, data = sections[".code"].content, sections[".data"].content
+    bss = sections.get(".bss")
+    if bss is not None and bss.size and bss.address != DATA_BASE + len(data):
+        raise ImageError(".bss must directly follow .data")
+    return Firmware(code=code, data=data, bss_size=bss.size if bss is not None else 0)
+
+
 def load_reference(path):
     reference = Path(path).read_bytes()
     if len(reference) != IMAGE_SIZE or hashlib.md5(reference).hexdigest() != REFERENCE_MD5:
         raise ImageError(f"{path} is not RECHO 0.9.2 HIFIEC90.IMG (md5 {REFERENCE_MD5})")
     return reference
+
+
+def git_output(directory, *arguments):
+    result = subprocess.run(["git", "-C", str(directory), *arguments],
+                            capture_output=True, text=True, check=False)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def default_build_tag(directory):
+    commit = git_output(directory, "rev-parse", "--short=7", "HEAD")
+    if not commit:
+        return "unknown"
+    dirty = git_output(directory, "status", "--porcelain", "--untracked-files=no")
+    return commit[:7] + ("+" if dirty else "")
+
+
+def default_date():
+    today = datetime.date.today()
+    return today.year, today.month, today.day
 
 
 def parse_date(text):
@@ -258,26 +332,23 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser(description="Pack a device build into a 5 MiB fw1 image")
     parser.add_argument("--reference", type=Path, required=True,
                         help="RECHO 0.9.2 HIFIEC90.IMG; only header bytes are copied")
-    parser.add_argument("--code", type=Path, required=True,
-                        help="code block linked at 0x03050000, starting with its vector table")
-    parser.add_argument("--data", type=Path, required=True,
-                        help=".data image placed at 0x03004000, starting with the entry vector")
-    parser.add_argument("--bss-size", type=lambda text: int(text, 0), required=True)
+    parser.add_argument("--elf", type=Path, required=True,
+                        help="device ELF with .code at 0x03050000 and .data at 0x03004000")
     parser.add_argument("--brand", default="ECHOFW")
-    parser.add_argument("--build-tag", required=True)
-    parser.add_argument("--date", type=parse_date, required=True)
+    parser.add_argument("--build-tag", help="defaults to the short git commit, + when dirty")
+    parser.add_argument("--date", type=parse_date, help="YYYY-MM-DD; defaults to today")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     arguments = parse_arguments(argv)
+    build_tag = arguments.build_tag or default_build_tag(Path(__file__).resolve().parents[1])
+    date = arguments.date or default_date()
     try:
         reference = load_reference(arguments.reference)
-        firmware = Firmware(arguments.code.read_bytes(), arguments.data.read_bytes(),
-                            arguments.bss_size)
-        image = build_image(reference, firmware, arguments.brand, arguments.build_tag,
-                            arguments.date)
+        firmware = firmware_from_elf(arguments.elf.read_bytes())
+        image = build_image(reference, firmware, arguments.brand, build_tag, date)
     except ImageError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -287,7 +358,7 @@ def main(argv=None):
         return 1
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_bytes(image)
-    print(f"wrote {arguments.output}: code {len(firmware.code):,} bytes, "
+    print(f"wrote {arguments.output} ({build_tag}): code {len(firmware.code):,} bytes, "
           f".data {len(firmware.data)} bytes, .bss {firmware.bss_size:,} bytes, "
           f"crc {word(image, fw_end(FW_SIZE)):#010x}")
     return 0

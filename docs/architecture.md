@@ -5,7 +5,7 @@ Custom firmware for the Snowsky Echo Mini. The app layer is portable C. It runs 
 ## Layers
 
 ```
-platform/sim        platform/device (later)
+platform/sim        platform/device
         \                  /
          implement  hal  (interfaces only)
                      |
@@ -141,8 +141,29 @@ The panel keeps its own image memory, so we never hold a full framebuffer. The s
 | `no_comments` | that no code file contains a comment |
 | `format` | that every C file matches `clang-format` |
 | `target_audit` | the Cortex-M3 cross-compile: heap symbols, flash and static RAM |
+| device unit tests | `test_key_ladder`, `test_key_scanner`, `test_panel` and `test_tick_clock`: the device driver logic, run on the Mac |
+| `device_build` | that `cmake --preset device` configures and builds the device ELF, and the image when the reference file is present |
 
 Host builds run under UndefinedBehaviorSanitizer. AddressSanitizer is opt-in (`ECHO_ADDRESS_SANITIZER`) because it hangs at startup on macOS 27 with Apple clang 17.
+
+## Device platform
+
+Written only from `docs/device-facts.md` (the clean-room rule in `NOTES.md`).
+
+- `platform/device/logic` holds the driver logic that doesn't touch hardware, so it builds and is tested on the Mac too:
+  - `key_ladder`: ADC bands to keys
+  - `key_scanner`: debounce over two samples, a transition queue, and ignoring the Power press still held from switching on
+  - `panel`: the init streams for both panel variants, and the window and pixel commands, sent through a `PanelBus`
+  - `tick_clock`: milliseconds and microseconds from the 24-bit SysTick down-counter
+- `platform/device/board` is device-only. It holds the register helpers, GPIO and pin mux, startup (the vector tables and the steps in facts 3.1), the linker script, a minimal `memcpy`/`memset`, and the HAL implementations.
+- **Build:** `cmake --preset device && cmake --build --preset device` cross-compiles to `build/device/platform/device/echo_device.elf`. Then `tools/make_image.py` packs it into `build/device/HIFIEC90.IMG`, using header bytes from the RECHO 0.9.2 file at `ECHO_REFERENCE_IMG` (outside the repo). Without that file, only the ELF is built.
+- **Image rules,** enforced by the linker script and the builder:
+  - `.data` holds only the 8-byte entry vector; no initialised mutable globals.
+  - Code stays below the reference's row-0 end.
+  - `.bss` ends below `0x0304C000`.
+  - Nothing loaded is left out of the image.
+- **Run model:** fully polled, with interrupts off. SysTick runs freely at the 24 MHz core clock, wrapping about every 0.7 s, so the clock has to be read at least that often. The display driver samples the keys before and after every strip it pushes, so key presses aren't missed during slow frames.
+- **Stubs for now:** files (no storage yet), audio, battery (unknown), and brightness (backlight on or off only).
 
 ## Simulator audio
 

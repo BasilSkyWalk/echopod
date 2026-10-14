@@ -9,12 +9,28 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "ECHO_SANITIZE": "ON"
       }
+    },
+    {
+      "name": "device",
+      "displayName": "Device firmware (Cortex-M3, MinSizeRel)",
+      "binaryDir": "${sourceDir}/build/device",
+      "toolchainFile": "${sourceDir}/cmake/arm-none-eabi.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "ECHO_BUILD_SIM": "OFF",
+        "ECHO_BUILD_TESTS": "OFF",
+        "ECHO_BUILD_DEVICE": "ON"
+      }
     }
   ],
   "buildPresets": [
     {
       "name": "dev",
       "configurePreset": "dev"
+    },
+    {
+      "name": "device",
+      "configurePreset": "device"
     }
   ],
   "testPresets": [

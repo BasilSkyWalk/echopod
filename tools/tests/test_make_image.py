@@ -1,5 +1,8 @@
+import datetime
 import functools
 import os
+import re
+import subprocess
 import struct
 import sys
 import tempfile
@@ -57,6 +60,49 @@ def build(firmware_parts=None, **options):
     settings = {"brand": "ECHOFW", "build_tag": "abc1234", "date": (2026, 10, 14)}
     settings.update(options)
     return make_image.build_image(fake_reference(), firmware_parts or firmware(), **settings)
+
+
+SHF_ALLOC = 2
+SHT_PROGBITS = 1
+SHT_STRTAB = 3
+SHT_NOBITS = 8
+
+
+def elf_file(sections):
+    sections = [("", 0, 0, 0, b"", 0), *sections]
+    names = b"\x00"
+    name_offsets = []
+    for section in sections[1:]:
+        name_offsets.append(len(names))
+        names += section[0].encode() + b"\x00"
+    name_offsets.append(len(names))
+    names += b".shstrtab\x00"
+    sections.append((".shstrtab", SHT_STRTAB, 0, 0, names, len(names)))
+    body = bytearray(52)
+    file_offsets = []
+    for _, kind, _, _, content, _ in sections:
+        file_offsets.append(len(body))
+        body += b"" if kind == SHT_NOBITS else content
+        body += bytes(-len(body) % 4)
+    headers_offset = len(body)
+    for index, (_, kind, flags, address, _, size) in enumerate(sections):
+        name = 0 if index == 0 else name_offsets[index - 1]
+        body += struct.pack("<10I", name, kind, flags, address, file_offsets[index], size,
+                            0, 0, 4, 0)
+    body[:52] = b"\x7fELF\x01\x01\x01" + bytes(9) + struct.pack(
+        "<HHIIIIIHHHHHH", 2, 40, 1, RESET, 0, headers_offset, 0, 52, 0, 0, 40,
+        len(sections), len(sections) - 1)
+    return bytes(body)
+
+
+def firmware_elf(parts, extra=()):
+    sections = [
+        (".code", SHT_PROGBITS, SHF_ALLOC, 0x03050000, parts.code, len(parts.code)),
+        (".data", SHT_PROGBITS, SHF_ALLOC | 1, 0x03004000, parts.data, len(parts.data)),
+        (".bss", SHT_NOBITS, SHF_ALLOC | 1, 0x03004000 + len(parts.data), b"", parts.bss_size),
+        *extra,
+    ]
+    return elf_file(sections)
 
 
 class CrcTest(unittest.TestCase):
@@ -226,6 +272,68 @@ class FirmwareRulesTest(unittest.TestCase):
         self.assert_refused(firmware(data_tail=b"\x00" * 2))
 
 
+class ElfTest(unittest.TestCase):
+    def test_the_code_data_and_bss_sections_become_the_firmware_parts(self):
+        parts = firmware(data_tail=b"\x01\x02\x03\x04", bss_size=0x400)
+        self.assertEqual(parts, make_image.firmware_from_elf(firmware_elf(parts)))
+
+    def test_a_missing_bss_section_means_no_bss(self):
+        parts = firmware(bss_size=0)
+        elf = elf_file([
+            (".code", SHT_PROGBITS, SHF_ALLOC, 0x03050000, parts.code, len(parts.code)),
+            (".data", SHT_PROGBITS, SHF_ALLOC | 1, 0x03004000, parts.data, len(parts.data)),
+        ])
+        self.assertEqual(parts, make_image.firmware_from_elf(elf))
+
+    def test_code_linked_at_another_address_is_refused(self):
+        parts = firmware()
+        elf = elf_file([
+            (".code", SHT_PROGBITS, SHF_ALLOC, 0x03060000, parts.code, len(parts.code)),
+            (".data", SHT_PROGBITS, SHF_ALLOC | 1, 0x03004000, parts.data, len(parts.data)),
+        ])
+        with self.assertRaises(make_image.ImageError):
+            make_image.firmware_from_elf(elf)
+
+    def test_bss_that_does_not_follow_the_data_is_refused(self):
+        parts = firmware()
+        elf = elf_file([
+            (".code", SHT_PROGBITS, SHF_ALLOC, 0x03050000, parts.code, len(parts.code)),
+            (".data", SHT_PROGBITS, SHF_ALLOC | 1, 0x03004000, parts.data, len(parts.data)),
+            (".bss", SHT_NOBITS, SHF_ALLOC | 1, 0x03008000, b"", 16),
+        ])
+        with self.assertRaises(make_image.ImageError):
+            make_image.firmware_from_elf(elf)
+
+    def test_any_other_loaded_section_is_refused(self):
+        parts = firmware()
+        extra = [(".stray", SHT_PROGBITS, SHF_ALLOC, 0x03070000, b"\x00" * 4, 4)]
+        with self.assertRaises(make_image.ImageError):
+            make_image.firmware_from_elf(firmware_elf(parts, extra))
+
+    def test_sections_that_are_not_loaded_are_ignored(self):
+        parts = firmware()
+        extra = [(".comment", SHT_PROGBITS, 0, 0, b"GCC\x00", 4)]
+        self.assertEqual(parts, make_image.firmware_from_elf(firmware_elf(parts, extra)))
+
+    def test_a_file_that_is_not_a_32_bit_little_endian_elf_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            make_image.firmware_from_elf(b"\x7fELF\x02\x01" + bytes(60))
+
+
+class DefaultsTest(unittest.TestCase):
+    def test_the_default_build_tag_is_the_short_commit_with_a_plus_when_dirty(self):
+        tag = make_image.default_build_tag(TOOLS_DIRECTORY.parent)
+        self.assertRegex(tag, r"^[0-9a-f]{7}\+?$")
+
+    def test_a_directory_outside_git_gets_an_unknown_tag(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual("unknown", make_image.default_build_tag(Path(directory)))
+
+    def test_the_default_date_is_today(self):
+        today = datetime.date.today()
+        self.assertEqual((today.year, today.month, today.day), make_image.default_date())
+
+
 class ValidatorTest(unittest.TestCase):
     def test_a_missing_magic_is_reported(self):
         image = bytearray(build())
@@ -277,15 +385,11 @@ class RealReferenceTest(unittest.TestCase):
     def test_the_command_writes_a_valid_image(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            parts = firmware()
-            (root / "code.bin").write_bytes(parts.code)
-            (root / "data.bin").write_bytes(parts.data)
-            output = root / "HIFIEC91.IMG"
+            (root / "echo.elf").write_bytes(firmware_elf(firmware()))
+            output = root / "HIFIEC90.IMG"
             status = make_image.main([
-                "--reference", str(REFERENCE_PATH),
-                "--code", str(root / "code.bin"), "--data", str(root / "data.bin"),
-                "--bss-size", "256", "--build-tag", "abc1234", "--date", "2026-10-14",
-                "--output", str(output)])
+                "--reference", str(REFERENCE_PATH), "--elf", str(root / "echo.elf"),
+                "--build-tag", "abc1234", "--date", "2026-10-14", "--output", str(output)])
             self.assertEqual(0, status)
             self.assertEqual([], make_image.validate_image(output.read_bytes()))
 

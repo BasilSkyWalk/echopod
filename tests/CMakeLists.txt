@@ -104,6 +104,13 @@ echo_add_unit_test(NAME test_test_pattern_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
+foreach(device_test key_ladder key_scanner panel tick_clock)
+    echo_add_unit_test(NAME test_${device_test}
+        SOURCES device/test_${device_test}.c
+        LIBRARIES echo_device_logic
+    )
+endforeach()
+
 if(ECHO_BUILD_SIM)
     echo_add_unit_test(NAME test_sim_options
         SOURCES sim/test_sim_options.c
@@ -142,6 +149,10 @@ if(ARM_GCC)
         COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/target_audit.py
             --source-root ${PROJECT_SOURCE_DIR}/src
             --budget-bytes ${ECHO_APP_RAM_BUDGET_BYTES}
+    )
+    add_test(NAME device_build
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+            -P ${PROJECT_SOURCE_DIR}/cmake/check_device_build.cmake
     )
 else()
     message(STATUS "arm-none-eabi-gcc not found: the target_audit test is skipped")
