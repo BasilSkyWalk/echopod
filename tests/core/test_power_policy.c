@@ -23,7 +23,6 @@ static void the_display_starts_on_and_unlocked(void)
 {
     PowerPolicy policy = fresh_policy();
     CHECK(policy.display_on);
-    CHECK(!policy.locked);
 }
 
 static void the_display_turns_off_after_the_timeout(void)
@@ -51,43 +50,63 @@ static void a_zero_timeout_keeps_the_display_on(void)
     CHECK(policy.display_on);
 }
 
-static void a_key_wakes_the_display_without_doing_anything_else(void)
+static void after_a_timeout_media_keys_work_without_waking(void)
 {
     PowerPolicy policy = fresh_policy();
     power_policy_update(&policy, START_MS + TIMEOUT_MS);
-    CHECK(send(&policy, KEY_PLAY, KEY_GESTURE_PRESS, START_MS + TIMEOUT_MS + 10).consumed);
-    CHECK(policy.display_on);
-    CHECK(!send(&policy, KEY_PLAY, KEY_GESTURE_PRESS, START_MS + TIMEOUT_MS + 20).consumed);
+    PowerKeyOutcome outcome =
+        send(&policy, KEY_VOLUME_UP, KEY_GESTURE_PRESS, START_MS + TIMEOUT_MS);
+    CHECK(outcome.consumed);
+    CHECK(outcome.background);
+    CHECK(!policy.display_on);
 }
 
-static void power_locks_and_unlocks(void)
+static void a_power_tap_turns_the_screen_off_and_on(void)
 {
     PowerPolicy policy = fresh_policy();
     CHECK(send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS).consumed);
-    CHECK(policy.locked);
     CHECK(!policy.display_on);
     CHECK(send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS + 10).consumed);
-    CHECK(!policy.locked);
     CHECK(policy.display_on);
 }
 
-static void power_only_wakes_a_display_that_timed_out(void)
+static void power_wakes_a_screen_that_timed_out(void)
 {
     PowerPolicy policy = fresh_policy();
     power_policy_update(&policy, START_MS + TIMEOUT_MS);
     CHECK(send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS + TIMEOUT_MS + 10).consumed);
     CHECK(policy.display_on);
-    CHECK(!policy.locked);
 }
 
-static void a_locked_player_ignores_other_keys(void)
+static void with_the_screen_off_play_and_volume_go_to_the_player(void)
 {
     PowerPolicy policy = fresh_policy();
     send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS);
-    CHECK(send(&policy, KEY_PLAY, KEY_GESTURE_PRESS, START_MS + 10).consumed);
-    CHECK(send(&policy, KEY_VOLUME_UP, KEY_GESTURE_REPEAT, START_MS + 20).consumed);
-    CHECK(policy.locked);
+    CHECK(send(&policy, KEY_PLAY, KEY_GESTURE_PRESS, START_MS + 10).background);
+    CHECK(send(&policy, KEY_VOLUME_UP, KEY_GESTURE_PRESS, START_MS + 20).background);
+    CHECK(send(&policy, KEY_VOLUME_DOWN, KEY_GESTURE_LONG_PRESS, START_MS + 30).background);
     CHECK(!policy.display_on);
+}
+
+static void with_the_screen_off_menu_and_back_do_nothing(void)
+{
+    PowerPolicy policy = fresh_policy();
+    send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS);
+    PowerKeyOutcome menu = send(&policy, KEY_MENU, KEY_GESTURE_PRESS, START_MS + 10);
+    PowerKeyOutcome back = send(&policy, KEY_BACK, KEY_GESTURE_LONG_PRESS, START_MS + 20);
+    CHECK(menu.consumed);
+    CHECK(!menu.background);
+    CHECK(back.consumed);
+    CHECK(!back.background);
+    CHECK(!policy.display_on);
+}
+
+static void with_the_screen_on_keys_reach_the_screen(void)
+{
+    PowerPolicy policy = fresh_policy();
+    PowerKeyOutcome outcome = send(&policy, KEY_PLAY, KEY_GESTURE_PRESS, START_MS + 10);
+    CHECK(!outcome.consumed);
+    CHECK(!outcome.background);
 }
 
 static void holding_power_asks_for_shutdown(void)
@@ -131,13 +150,11 @@ static void a_wake_turns_the_display_on_and_restarts_the_timeout(void)
     CHECK(policy.display_on);
 }
 
-static void a_wake_unlocks_a_locked_player(void)
+static void a_wake_after_a_power_tap_turns_the_screen_on(void)
 {
     PowerPolicy policy = fresh_policy();
     send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS + 10);
-    CHECK(policy.locked);
     power_policy_wake(&policy, START_MS + 20);
-    CHECK(!policy.locked);
     CHECK(policy.display_on);
 }
 
@@ -148,15 +165,17 @@ int main(void)
         TEST_CASE(the_display_turns_off_after_the_timeout),
         TEST_CASE(activity_restarts_the_timeout),
         TEST_CASE(a_zero_timeout_keeps_the_display_on),
-        TEST_CASE(a_key_wakes_the_display_without_doing_anything_else),
-        TEST_CASE(power_locks_and_unlocks),
-        TEST_CASE(power_only_wakes_a_display_that_timed_out),
-        TEST_CASE(a_locked_player_ignores_other_keys),
+        TEST_CASE(after_a_timeout_media_keys_work_without_waking),
+        TEST_CASE(a_power_tap_turns_the_screen_off_and_on),
+        TEST_CASE(power_wakes_a_screen_that_timed_out),
+        TEST_CASE(with_the_screen_off_play_and_volume_go_to_the_player),
+        TEST_CASE(with_the_screen_off_menu_and_back_do_nothing),
+        TEST_CASE(with_the_screen_on_keys_reach_the_screen),
         TEST_CASE(holding_power_asks_for_shutdown),
         TEST_CASE(the_sleep_timer_fires_once_and_turns_the_display_off),
         TEST_CASE(a_cancelled_sleep_timer_never_fires),
         TEST_CASE(a_wake_turns_the_display_on_and_restarts_the_timeout),
-        TEST_CASE(a_wake_unlocks_a_locked_player),
+        TEST_CASE(a_wake_after_a_power_tap_turns_the_screen_on),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

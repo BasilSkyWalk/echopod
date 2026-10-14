@@ -46,7 +46,7 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 
 ## Power
 
-- `core/power_policy` decides what keys mean for power: Power locks or unlocks, a long Power asks for shutdown, any key wakes a screen that timed out and is then consumed, and a locked player ignores every other key. It also owns the screen timeout and the sleep timer.
+- `core/power_policy` decides what keys mean for power. A tap of Power turns the screen off or on, and a long Power asks for shutdown. With the screen off (after a tap or a timeout), ▶‖ and vol± are background keys: the app maps them as on Now Playing (tap vol± for volume, hold vol± to skip, ▶‖ to pause) and runs them without waking the screen. ≡ and ↩ do nothing. While the screen is off, the volume keys use tap-hold-repeat on every screen, so a hold skips. The policy also owns the screen timeout and the sleep timer.
 - The app runs each key event through the policy before the screen sees it. When the policy turns the display on or off, the app calls `hal_display_set_power` and stops rendering while the screen is off. Settings are saved each time the screen goes off.
 - Shutdown (long Power, or the sleep timer running out) saves the resume file and settings, turns the screen off and calls `hal_power_off()`. The simulator then quits; the device cuts power.
 

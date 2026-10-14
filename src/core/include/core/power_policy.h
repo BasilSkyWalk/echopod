@@ -7,7 +7,6 @@
 
 typedef struct PowerPolicy {
     bool display_on;
-    bool locked;
     bool sleep_timer_active;
     uint32_t last_activity_ms;
     uint32_t timeout_ms;
@@ -17,6 +16,7 @@ typedef struct PowerPolicy {
 typedef struct PowerKeyOutcome {
     bool consumed;
     bool shutdown;
+    bool background;
 } PowerKeyOutcome;
 
 void power_policy_init(PowerPolicy *policy, uint32_t timeout_ms, uint32_t now_ms);

@@ -87,10 +87,15 @@ static void read_input(void)
     }
 }
 
+static void use_screen_key_behaviors(void);
+
 static void set_display(bool on)
 {
     app.display_on = on;
     hal_display_set_power(on);
+    if (screen_stack_depth(&app.stack) > 0) {
+        use_screen_key_behaviors();
+    }
 }
 
 static void save_settings(void)
@@ -115,8 +120,8 @@ static void shut_down(void)
 
 static void use_screen_key_behaviors(void)
 {
-    KeyBehavior volume =
-        top_screen()->hold_volume_keys ? KEY_BEHAVIOR_TAP_HOLD_REPEAT : KEY_BEHAVIOR_REPEAT;
+    bool hold = !app.display_on || top_screen()->hold_volume_keys;
+    KeyBehavior volume = hold ? KEY_BEHAVIOR_TAP_HOLD_REPEAT : KEY_BEHAVIOR_REPEAT;
     key_tracker_set_behavior(&app.keys, KEY_VOLUME_UP, volume);
     key_tracker_set_behavior(&app.keys, KEY_VOLUME_DOWN, volume);
 }
@@ -130,6 +135,29 @@ static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
     }
 }
 
+static void run_background(KeyEvent event)
+{
+    switch (now_playing_command_for(event, false)) {
+    case NOW_PLAYING_TOGGLE_PAUSE:
+        player_toggle_pause(&app.player);
+        break;
+    case NOW_PLAYING_NEXT:
+        player_skip(&app.player, 1);
+        break;
+    case NOW_PLAYING_PREVIOUS:
+        player_skip(&app.player, -1);
+        break;
+    case NOW_PLAYING_VOLUME_UP:
+        player_change_volume(&app.player, 1);
+        break;
+    case NOW_PLAYING_VOLUME_DOWN:
+        player_change_volume(&app.player, -1);
+        break;
+    default:
+        break;
+    }
+}
+
 static void dispatch_key_events(uint32_t now_ms)
 {
     KeyEvent event;
@@ -137,6 +165,8 @@ static void dispatch_key_events(uint32_t now_ms)
         PowerKeyOutcome outcome = power_policy_key(&app.power, event, now_ms);
         if (outcome.shutdown) {
             shut_down();
+        } else if (outcome.background) {
+            run_background(event);
         } else if (!outcome.consumed) {
             dispatch_to_screen(event, now_ms);
         }

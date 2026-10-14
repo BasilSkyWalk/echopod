@@ -2,26 +2,25 @@
 
 #include "core/deadline.h"
 
-static PowerKeyOutcome outcome(bool consumed, bool shutdown)
+static PowerKeyOutcome outcome(bool consumed, bool shutdown, bool background)
 {
-    return (PowerKeyOutcome){.consumed = consumed, .shutdown = shutdown};
+    return (PowerKeyOutcome){.consumed = consumed, .shutdown = shutdown, .background = background};
 }
 
 static PowerKeyOutcome power_key(PowerPolicy *policy, KeyGesture gesture)
 {
     if (gesture == KEY_GESTURE_LONG_PRESS) {
-        return outcome(true, true);
+        return outcome(true, true, false);
     }
-    if (gesture != KEY_GESTURE_PRESS) {
-        return outcome(true, false);
+    if (gesture == KEY_GESTURE_PRESS) {
+        policy->display_on = !policy->display_on;
     }
-    if (!policy->locked && !policy->display_on) {
-        policy->display_on = true;
-        return outcome(true, false);
-    }
-    policy->locked = !policy->locked;
-    policy->display_on = !policy->locked;
-    return outcome(true, false);
+    return outcome(true, false, false);
+}
+
+static bool is_media_key(Key key)
+{
+    return key == KEY_VOLUME_UP || key == KEY_VOLUME_DOWN || key == KEY_PLAY;
 }
 
 void power_policy_init(PowerPolicy *policy, uint32_t timeout_ms, uint32_t now_ms)
@@ -41,14 +40,10 @@ PowerKeyOutcome power_policy_key(PowerPolicy *policy, KeyEvent event, uint32_t n
     if (event.key == KEY_POWER) {
         return power_key(policy, event.gesture);
     }
-    if (policy->locked) {
-        return outcome(true, false);
+    if (policy->display_on) {
+        return outcome(false, false, false);
     }
-    if (!policy->display_on) {
-        policy->display_on = true;
-        return outcome(true, false);
-    }
-    return outcome(false, false);
+    return outcome(true, false, is_media_key(event.key));
 }
 
 void power_policy_start_sleep_timer(PowerPolicy *policy, uint32_t duration_ms, uint32_t now_ms)
@@ -65,7 +60,6 @@ void power_policy_cancel_sleep_timer(PowerPolicy *policy)
 void power_policy_wake(PowerPolicy *policy, uint32_t now_ms)
 {
     policy->last_activity_ms = now_ms;
-    policy->locked = false;
     policy->display_on = true;
 }
 

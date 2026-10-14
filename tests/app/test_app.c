@@ -385,13 +385,16 @@ static void the_screen_turns_off_after_the_timeout(void)
     CHECK_EQUAL(presents, fake_hal_present_count());
 }
 
-static void a_key_wakes_the_screen_without_acting(void)
+static void after_a_timeout_volume_changes_without_waking(void)
 {
-    start_app();
+    start_app_with_library();
+    play_first_album_track();
+    uint8_t volume = app_player_status().volume;
     wait_ms(DEFAULT_TIMEOUT_MS);
-    tap(KEY_PLAY);
-    CHECK(fake_hal_display_on());
-    CHECK(title_is("Echo Mini"));
+    CHECK(!fake_hal_display_on());
+    tap(KEY_VOLUME_UP);
+    CHECK_EQUAL(volume + 1, app_player_status().volume);
+    CHECK(!fake_hal_display_on());
 }
 
 static void the_timeout_setting_is_used(void)
@@ -405,18 +408,30 @@ static void the_timeout_setting_is_used(void)
     CHECK(!fake_hal_display_on());
 }
 
-static void power_locks_and_unlocks(void)
+static void with_the_screen_off_media_keys_keep_working(void)
 {
-    start_app();
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    CHECK(!title_is("Now Playing"));
     tap(KEY_POWER);
     CHECK(!fake_hal_display_on());
+    uint8_t volume = app_player_status().volume;
+    tap(KEY_VOLUME_UP);
+    CHECK_EQUAL(volume + 1, app_player_status().volume);
     tap(KEY_PLAY);
+    CHECK_EQUAL(PLAYER_PAUSED, app_player_status().state);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(PLAYER_PLAYING, app_player_status().state);
+    hold(KEY_VOLUME_UP);
+    CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
+    const char *title = app_screen_title();
+    tap(KEY_MENU);
+    tap(KEY_BACK);
+    CHECK(title_is(title));
     CHECK(!fake_hal_display_on());
-    CHECK(title_is("Echo Mini"));
     tap(KEY_POWER);
     CHECK(fake_hal_display_on());
-    tap(KEY_PLAY);
-    CHECK(title_is("Music"));
 }
 
 static void holding_power_saves_and_turns_the_player_off(void)
@@ -780,9 +795,9 @@ int main(void)
         TEST_CASE(gain_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),
         TEST_CASE(the_screen_turns_off_after_the_timeout),
-        TEST_CASE(a_key_wakes_the_screen_without_acting),
+        TEST_CASE(after_a_timeout_volume_changes_without_waking),
         TEST_CASE(the_timeout_setting_is_used),
-        TEST_CASE(power_locks_and_unlocks),
+        TEST_CASE(with_the_screen_off_media_keys_keep_working),
         TEST_CASE(holding_power_saves_and_turns_the_player_off),
         TEST_CASE(the_sleep_timer_turns_the_player_off),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),
