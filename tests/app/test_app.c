@@ -691,6 +691,33 @@ static void diagnostics_shows_the_firmware_version_from_the_hal(void)
     CHECK(strcmp("1e8bebb", value) == 0);
 }
 
+static uint16_t cover_probe(void)
+{
+    return fake_hal_pixel(DEFAULT_THEME.metrics.padding + 56, 108);
+}
+
+static void now_playing_shows_the_album_cover(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    step();
+    step();
+    CHECK_EQUAL(0xF800, cover_probe());
+}
+
+static void now_playing_without_a_cover_keeps_the_text_layout(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_ALBUMS_INDEX);
+    move_down(1);
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+    step();
+    step();
+    CHECK(title_is("Now Playing"));
+    CHECK_EQUAL(DEFAULT_THEME.colors.background, cover_probe());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -710,6 +737,8 @@ int main(void)
         TEST_CASE(folders_can_be_browsed_down_to_an_album),
         TEST_CASE(without_a_library_the_lists_explain_what_is_missing),
         TEST_CASE(selecting_a_track_plays_it_and_shows_now_playing),
+        TEST_CASE(now_playing_shows_the_album_cover),
+        TEST_CASE(now_playing_without_a_cover_keeps_the_text_layout),
         TEST_CASE(now_playing_keys_control_the_player),
         TEST_CASE(lists_still_move_as_soon_as_a_volume_key_goes_down),
         TEST_CASE(the_home_menu_opens_now_playing),

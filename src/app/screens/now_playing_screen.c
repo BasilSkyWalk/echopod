@@ -4,12 +4,15 @@
 
 #include "core/format.h"
 #include "core/string_builder.h"
+#include "gfx/image.h"
 #include "ui/header.h"
 #include "ui/icons.h"
 #include "ui/label.h"
 #include "ui/marquee.h"
 
 enum {
+    COVER_TOP = 30,
+    COVER_GAP = 12,
     TITLE_TOP = 30,
     ARTIST_TOP = 56,
     ALBUM_TOP = 80,
@@ -203,6 +206,7 @@ static void load_texts(NowPlayingScreen *now_playing, uint16_t track_index)
     if (library_read_group(library, LIBRARY_ARTISTS, track.artist, &artist)) {
         library_read_string(library, artist.name, now_playing->artist, NOW_PLAYING_TEXT_CAPACITY);
     }
+    now_playing->album_index = track.album;
     if (library_read_album(library, track.album, &album)) {
         library_read_string(library, album.title, now_playing->album, NOW_PLAYING_TEXT_CAPACITY);
     }
@@ -240,7 +244,44 @@ static void enter(void *context, uint32_t now_ms)
 
 static void update(void *context, uint32_t now_ms)
 {
-    refresh(context, now_ms);
+    NowPlayingScreen *now_playing = context;
+    refresh(now_playing, now_ms);
+    if (now_playing->config.covers != NULL && now_playing->status.has_track) {
+        cover_cache_load_full(now_playing->config.covers, now_playing->album_index);
+    }
+}
+
+static bool current_cover(const NowPlayingScreen *now_playing, Image *image)
+{
+    const CoverCache *covers = now_playing->config.covers;
+    return covers != NULL && now_playing->has_text &&
+           cover_cache_full(covers, now_playing->album_index, image) == COVER_LOADED;
+}
+
+static int text_left(const NowPlayingScreen *now_playing)
+{
+    Image ignored;
+    int padding = now_playing->config.theme->metrics.padding;
+    return current_cover(now_playing, &ignored) ? padding + COVER_FULL_SIZE + COVER_GAP : padding;
+}
+
+static Rect column_area(const NowPlayingScreen *now_playing, int top, int height)
+{
+    const Theme *theme = now_playing->config.theme;
+    int left = text_left(now_playing);
+    return (Rect){left, top, theme->metrics.screen_width - left - theme->metrics.padding, height};
+}
+
+static void draw_cover(const NowPlayingScreen *now_playing, Canvas *canvas)
+{
+    Image cover;
+    if (!current_cover(now_playing, &cover)) {
+        return;
+    }
+    int left = now_playing->config.theme->metrics.padding;
+    image_draw_quad(
+        canvas, cover,
+        (Quad){left, COVER_FULL_SIZE, COVER_TOP, COVER_FULL_SIZE, COVER_TOP, COVER_FULL_SIZE});
 }
 
 static Rect line_area(const Theme *theme, int top, int height)
@@ -269,15 +310,16 @@ static void draw_track_text(const NowPlayingScreen *now_playing, Canvas *canvas)
     TextStyle title = {.font = theme->fonts.title, .color = theme->colors.text};
     TextStyle artist = {.font = theme->fonts.body, .color = theme->colors.text};
     TextStyle album = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
-    draw_text_line(now_playing, canvas,
-                   (Label){line_area(theme, TITLE_TOP, TEXT_LINE_HEIGHT), now_playing->title},
-                   title);
-    draw_text_line(now_playing, canvas,
-                   (Label){line_area(theme, ARTIST_TOP, TEXT_LINE_HEIGHT), now_playing->artist},
-                   artist);
-    draw_text_line(now_playing, canvas,
-                   (Label){line_area(theme, ALBUM_TOP, TEXT_LINE_HEIGHT), now_playing->album},
-                   album);
+    draw_text_line(
+        now_playing, canvas,
+        (Label){column_area(now_playing, TITLE_TOP, TEXT_LINE_HEIGHT), now_playing->title}, title);
+    draw_text_line(
+        now_playing, canvas,
+        (Label){column_area(now_playing, ARTIST_TOP, TEXT_LINE_HEIGHT), now_playing->artist},
+        artist);
+    draw_text_line(
+        now_playing, canvas,
+        (Label){column_area(now_playing, ALBUM_TOP, TEXT_LINE_HEIGHT), now_playing->album}, album);
 }
 
 static uint32_t shown_position(const NowPlayingScreen *now_playing)
@@ -289,7 +331,7 @@ static uint32_t shown_position(const NowPlayingScreen *now_playing)
 static void draw_progress(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
-    Rect bar = line_area(theme, PROGRESS_TOP, PROGRESS_HEIGHT);
+    Rect bar = column_area(now_playing, PROGRESS_TOP, PROGRESS_HEIGHT);
     int filled = now_playing_progress_width(shown_position(now_playing),
                                             now_playing->status.duration_ms, bar.width);
     Color fill = now_playing->scrubbing ? theme->colors.text : theme->colors.selection_background;
@@ -314,7 +356,7 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
     char remaining[TIME_CAPACITY] = "-";
     format_duration(position_ms, elapsed, sizeof elapsed);
     format_duration(remaining_ms, remaining + 1, sizeof remaining - 1);
-    Rect area = line_area(theme, TIMES_TOP, SMALL_LINE_HEIGHT);
+    Rect area = column_area(now_playing, TIMES_TOP, SMALL_LINE_HEIGHT);
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
     label_draw(canvas, style, (Label){.area = area, .text = elapsed});
     draw_right_aligned(canvas, style, area, remaining);
@@ -386,6 +428,7 @@ static void draw(void *context, Canvas *canvas)
         draw_nothing_playing(theme, canvas);
         return;
     }
+    draw_cover(now_playing, canvas);
     draw_track_text(now_playing, canvas);
     draw_progress(now_playing, canvas);
     draw_times(now_playing, canvas);

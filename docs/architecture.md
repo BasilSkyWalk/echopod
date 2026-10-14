@@ -74,6 +74,8 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 
 ## Cover Flow
 
+- Now Playing shows the playing album's full cover (112 px) on the left, below the header, with the text, progress and times in a column to its right. It loads the cover through the same `CoverCache` full slot in `update`. Without a cover it keeps the full-width text layout.
+
 - Albums run by album artist, then by year, the same order as Album Artists. The screen keeps up to 1,024 album indices (2 KB).
 - `ui/cover_flow` holds the geometry and the motion, in fixed point (256 = one cover). The center cover is flat and 112 px. Neighbours are 42 px wide trapezoids, 84 px tall on the side facing the center and 64 px on the far side, spaced 32 px apart. Between those positions, every measure is interpolated, so a cover grows and flattens as it slides in. The position eases toward the selected album with a 70 ms time constant, at no less than about 4 covers per second, and never overshoots.
 - Covers are drawn farthest first, so nearer covers overlap them. `gfx/image` draws a cover column by column with nearest-neighbour sampling, clipped to the current strip.

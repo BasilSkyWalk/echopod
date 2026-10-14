@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "core/key_tracker.h"
+#include "cover_cache.h"
 #include "library/library.h"
 #include "player.h"
 #include "ui/screen.h"
@@ -40,6 +41,7 @@ typedef struct NowPlayingConfig {
     Player *player;
     const Library *library;
     const Theme *theme;
+    CoverCache *covers;
 } NowPlayingConfig;
 
 typedef struct NowPlayingScreen {
@@ -50,6 +52,7 @@ typedef struct NowPlayingScreen {
     uint32_t scrub_position_ms;
     bool has_text;
     uint16_t text_track;
+    uint16_t album_index;
     uint32_t text_changed_ms;
     uint32_t now_ms;
     char title[NOW_PLAYING_TEXT_CAPACITY];

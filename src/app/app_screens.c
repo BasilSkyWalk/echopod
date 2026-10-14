@@ -206,8 +206,10 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
     const Theme *theme = context.theme;
     MessageConfig no_library = {
         .title = "No library", .message = "Run the PC indexer to build one", .theme = theme};
-    NowPlayingConfig now_playing = {
-        .player = context.player, .library = &context.store->library, .theme = theme};
+    NowPlayingConfig now_playing = {.player = context.player,
+                                    .library = &context.store->library,
+                                    .theme = theme,
+                                    .covers = context.covers};
     message_screen_init(&screens->no_library, no_library);
     now_playing_screen_init(&screens->now_playing, now_playing);
     build_music(screens, context);
