@@ -11,6 +11,7 @@
 #include "screens/cover_flow_screen.h"
 #include "screens/font_sample_screen.h"
 #include "screens/now_playing_screen.h"
+#include "screens/stopwatch_screen.h"
 #include "screens/test_pattern_screen.h"
 #include "settings/settings.h"
 #include "settings_screens.h"
@@ -22,13 +23,17 @@
 enum {
     HOME_ITEM_COUNT = 4,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 5,
+    DIAGNOSTICS_ITEM_COUNT = 7,
     START_PATH_CAPACITY = 2
 };
 
 typedef struct AppOptions {
     bool show_frame_time;
 } AppOptions;
+
+typedef struct ClockOption {
+    bool failed;
+} ClockOption;
 
 typedef struct BrowseEntry {
     BrowsePool *pool;
@@ -52,6 +57,8 @@ typedef struct AppScreens {
     BrowseEntry browse_entries[MUSIC_ITEM_COUNT];
     TestPatternScreen test_pattern;
     FontSampleScreen font_sample;
+    StopwatchScreen stopwatch;
+    ClockOption clock;
     MenuItem home_items[HOME_ITEM_COUNT];
     MenuItem music_items[MUSIC_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];

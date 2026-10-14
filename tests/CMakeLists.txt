@@ -100,13 +100,18 @@ echo_add_unit_test(NAME test_now_playing_screen
     LIBRARIES echo_app
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+echo_add_unit_test(NAME test_stopwatch_screen
+    SOURCES app/test_stopwatch_screen.c app/fake_hal.c
+    LIBRARIES echo_app
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 echo_add_unit_test(NAME test_test_pattern_screen
     SOURCES app/test_test_pattern_screen.c app/fake_hal.c
     LIBRARIES echo_app
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
-foreach(device_test key_ladder key_scanner msc panel sd_card tick_clock updater usb_device)
+foreach(device_test key_ladder key_scanner msc panel pll sd_card tick_clock updater usb_device)
     echo_add_unit_test(NAME test_${device_test}
         SOURCES device/test_${device_test}.c
         LIBRARIES echo_device_logic

@@ -17,5 +17,6 @@ typedef struct TickClock {
 
 void tick_clock_init(TickClock *clock, uint32_t ticks_per_microsecond, uint32_t counter);
 void tick_clock_update(TickClock *clock, uint32_t counter);
+void tick_clock_set_rate(TickClock *clock, uint32_t ticks_per_microsecond, uint32_t counter);
 uint32_t tick_clock_milliseconds(const TickClock *clock);
 uint32_t tick_clock_microseconds(const TickClock *clock);

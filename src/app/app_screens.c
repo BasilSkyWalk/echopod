@@ -85,6 +85,28 @@ static const char *firmware_value(const void *context)
     return hal_system_version();
 }
 
+enum {
+    BOOT_CLOCK_MHZ = 24,
+    FAST_CLOCK_MHZ = 96
+};
+
+static ScreenAction toggle_clock(void *context)
+{
+    ClockOption *clock = context;
+    uint32_t target = hal_system_clock_mhz() == BOOT_CLOCK_MHZ ? FAST_CLOCK_MHZ : BOOT_CLOCK_MHZ;
+    clock->failed = !hal_system_set_clock_mhz(target);
+    return screen_action_none();
+}
+
+static const char *clock_value(const void *context)
+{
+    const ClockOption *clock = context;
+    if (clock->failed) {
+        return "No lock";
+    }
+    return hal_system_clock_mhz() == FAST_CLOCK_MHZ ? "96 MHz" : "24 MHz";
+}
+
 static MenuItem open_item(const char *label, Screen *target)
 {
     return (MenuItem){.label = label, .select = menu_open_screen, .context = target, .value = NULL};
@@ -188,6 +210,13 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
     };
     screens->diagnostics_items[4] =
         (MenuItem){.label = "Firmware", .select = NULL, .context = NULL, .value = firmware_value};
+    screens->clock = (ClockOption){.failed = false};
+    screens->diagnostics_items[5] = (MenuItem){.label = "CPU clock",
+                                               .select = toggle_clock,
+                                               .context = &screens->clock,
+                                               .value = clock_value};
+    screens->diagnostics_items[6] =
+        open_item("Stopwatch", stopwatch_screen_init(&screens->stopwatch, theme));
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

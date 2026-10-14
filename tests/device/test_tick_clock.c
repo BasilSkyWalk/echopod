@@ -58,6 +58,18 @@ static void many_wraps_add_up_to_whole_seconds(void)
     CHECK_EQUAL(1000000, tick_clock_microseconds(&clock));
 }
 
+static void a_new_rate_keeps_the_time_counted_so_far(void)
+{
+    TickClock clock = started_clock(COUNTER_TOP);
+    tick_clock_update(&clock, COUNTER_TOP - 24 * 1500);
+    tick_clock_set_rate(&clock, 96, COUNTER_TOP - 24 * 2000);
+    CHECK_EQUAL(2000, tick_clock_microseconds(&clock));
+    CHECK_EQUAL(2, tick_clock_milliseconds(&clock));
+    tick_clock_update(&clock, COUNTER_TOP - 24 * 2000 - 96 * 1000);
+    CHECK_EQUAL(3000, tick_clock_microseconds(&clock));
+    CHECK_EQUAL(3, tick_clock_milliseconds(&clock));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -66,6 +78,7 @@ int main(void)
         TEST_CASE(a_counter_wrap_is_counted),
         TEST_CASE(partial_ticks_carry_over_between_updates),
         TEST_CASE(many_wraps_add_up_to_whole_seconds),
+        TEST_CASE(a_new_rate_keeps_the_time_counted_so_far),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

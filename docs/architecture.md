@@ -29,7 +29,7 @@ platform/sim        platform/device
 | library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader, browse queries, the favorites set and the covers file reader (see `docs/library-format.md`) |
 | playback | `src/playback` | core, library | Play queue (list order, songs shuffle, album shuffle, repeat, gapless look-ahead) and the resume file format |
 | settings | `src/settings` | core, playback | The settings values, their defaults and option tables, and the settings file format |
-| hal | `src/hal` | core (types only) | Hardware interfaces: display (with power and brightness), input, clock, files, audio (with gain and output), power (battery, power off) |
+| hal | `src/hal` | core (types only) | Hardware interfaces: display (with power and brightness), input, clock, files, audio (with gain and output), power (battery, power off), system (firmware tag, CPU clock) |
 | app | `src/app` | core, gfx, fonts, ui, library, playback, settings, hal | Default theme, screen tree, library, settings and favorites stores, cover cache, player controller, browse, Cover Flow, Settings and Now Playing screens, frame overlay, the main step |
 | platform | `platform/*` | app, hal, OS/SDK | Implements hal and owns `main()` |
 
@@ -179,6 +179,7 @@ Written only from `docs/device-facts.md` (the clean-room rule in `NOTES.md`).
   - if no computer answers, or the controller fails to start, `board/usb_report` shows three notices (a key press moves on): the core ID and OTG control after power-up; the failed init step (with `0x10` set when internal storage started) and GHWCFG4; then GINTSTS and OTG control after the wait. This is temporary, while USB is brought up on hardware
   - the session ends when every LUN that was present has been ejected, or the cable is pulled. If the session wrote to the card, the file HAL forgets its mount and open files, and `app_start` reloads the app from the changed card. Then `board/update` looks for `/HIFIEC90.IMG` on internal storage and installs it if it's valid and differs from slot 1, showing progress and the result (a key press dismisses it). Finally `app_wake` restarts the screen timeout. The new firmware starts at the next power cycle, because a warm reboot doesn't work on this hardware
 - **Firmware tag:** `hal_system_version` (`hal/system.h`) reads the build tag from slot 1's header on the device and returns "simulator" in the simulator. Diagnostics shows it as Firmware.
+- **CPU clock:** `hal_system_clock_mhz` and `hal_system_set_clock_mhz` (`hal/system.h`). On the device, `board/clock_switch.c` follows stock's PLL order (`docs/device-facts.md` 4.5) with the register words from `device/pll` (96 and 200 MHz). It waits up to 200 ms for lock and stays at 24 MHz without it. After a switch it rescales the SysTick clock (`tick_clock_set_rate`). The clock isn't saved, so every start is at 24 MHz. SysTick wraps every 175 ms at 96 MHz, so the clock must be read at least that often. Diagnostics → CPU clock switches between 24 and 96 MHz, and Diagnostics → Stopwatch counts seconds to check the rate against a phone.
 - **Stubs for now:** file writes from the app, audio, battery (unknown), and brightness (backlight on or off only).
 
 ## Simulator audio

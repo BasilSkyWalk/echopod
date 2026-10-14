@@ -1,6 +1,7 @@
 add_executable(echo_device
     board/audio.c
     board/clock.c
+    board/clock_switch.c
     board/cru.c
     board/display.c
     board/emmc.c

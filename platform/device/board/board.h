@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 void board_clock_start(void);
+void board_clock_set_rate(uint32_t ticks_per_microsecond);
 void board_delay_ms(uint32_t milliseconds);
 void board_delay_us(uint32_t microseconds);
 void board_display_start(void);

@@ -8,6 +8,7 @@
 #include "fixture_library.h"
 #include "frame_overlay.h"
 #include "hal/display.h"
+#include "hal/system.h"
 #include "settings/settings.h"
 #include "settings_store.h"
 #include "ui/status_bar.h"
@@ -42,6 +43,8 @@ enum {
     SHORT_TIMEOUT_MS = 10000,
     NOW_PLAYING_IDLE_MS = 10000,
     DIAGNOSTICS_KEY_TEST_INDEX = 0,
+    DIAGNOSTICS_CPU_CLOCK_INDEX = 5,
+    DIAGNOSTICS_STOPWATCH_INDEX = 6,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 600,
@@ -902,6 +905,46 @@ static void waking_while_paused_keeps_the_screen(void)
     CHECK(!title_is("Now Playing"));
 }
 
+static void open_diagnostics_row(int index)
+{
+    move_down(HOME_DIAGNOSTICS_INDEX);
+    tap(KEY_PLAY);
+    move_down(index);
+}
+
+static void the_cpu_clock_switches_between_24_and_96_mhz(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_CPU_CLOCK_INDEX);
+    CHECK_EQUAL(24, hal_system_clock_mhz());
+    tap(KEY_PLAY);
+    CHECK_EQUAL(96, hal_system_clock_mhz());
+    tap(KEY_PLAY);
+    CHECK_EQUAL(24, hal_system_clock_mhz());
+}
+
+static void a_clock_that_does_not_lock_stays_at_24_mhz(void)
+{
+    start_app();
+    fake_hal_refuse_clock_switch();
+    open_diagnostics_row(DIAGNOSTICS_CPU_CLOCK_INDEX);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(24, hal_system_clock_mhz());
+    CHECK(title_is("Diagnostics"));
+}
+
+static void the_stopwatch_stays_open_while_playing(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    hold_back();
+    open_diagnostics_row(DIAGNOSTICS_STOPWATCH_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("Stopwatch"));
+    wait_ms(NOW_PLAYING_IDLE_MS + 1000);
+    CHECK(title_is("Stopwatch"));
+}
+
 static void menu_opens_now_playing_from_anywhere_while_playing(void)
 {
     start_app_with_library();
@@ -953,6 +996,9 @@ int main(void)
         TEST_CASE(the_key_test_stays_open_while_playing),
         TEST_CASE(waking_the_screen_shows_now_playing_while_playing),
         TEST_CASE(waking_while_paused_keeps_the_screen),
+        TEST_CASE(the_cpu_clock_switches_between_24_and_96_mhz),
+        TEST_CASE(a_clock_that_does_not_lock_stays_at_24_mhz),
+        TEST_CASE(the_stopwatch_stays_open_while_playing),
         TEST_CASE(menu_does_nothing_while_nothing_plays),
         TEST_CASE(now_playing_shows_the_album_cover),
         TEST_CASE(now_playing_without_a_cover_keeps_the_text_layout),

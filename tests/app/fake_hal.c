@@ -64,6 +64,8 @@ typedef struct FakeHal {
     FakeAudio audio;
     WrittenFile written[FILE_CAPACITY];
     int write_count;
+    uint32_t clock_mhz;
+    bool refuse_clock_switch;
 } FakeHal;
 
 static FakeHal fake;
@@ -81,6 +83,25 @@ void fake_hal_set_version(const char *version)
 const char *hal_system_version(void)
 {
     return fake.version != NULL ? fake.version : "test";
+}
+
+void fake_hal_refuse_clock_switch(void)
+{
+    fake.refuse_clock_switch = true;
+}
+
+uint32_t hal_system_clock_mhz(void)
+{
+    return fake.clock_mhz != 0 ? fake.clock_mhz : 24;
+}
+
+bool hal_system_set_clock_mhz(uint32_t mhz)
+{
+    if (fake.refuse_clock_switch) {
+        return false;
+    }
+    fake.clock_mhz = mhz;
+    return true;
 }
 
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size)

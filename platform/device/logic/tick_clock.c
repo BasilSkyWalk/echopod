@@ -24,6 +24,14 @@ void tick_clock_update(TickClock *clock, uint32_t counter)
     clock->millisecond_ticks %= ticks_per_millisecond;
 }
 
+void tick_clock_set_rate(TickClock *clock, uint32_t ticks_per_microsecond, uint32_t counter)
+{
+    tick_clock_update(clock, counter);
+    clock->ticks_per_microsecond = ticks_per_microsecond;
+    clock->microsecond_ticks = 0;
+    clock->millisecond_ticks = 0;
+}
+
 uint32_t tick_clock_milliseconds(const TickClock *clock)
 {
     return clock->milliseconds;

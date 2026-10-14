@@ -19,6 +19,11 @@ void board_clock_start(void)
     tick_clock_init(&clock, TICKS_PER_MICROSECOND, register_read(SYSTICK_CURRENT));
 }
 
+void board_clock_set_rate(uint32_t ticks_per_microsecond)
+{
+    tick_clock_set_rate(&clock, ticks_per_microsecond, register_read(SYSTICK_CURRENT));
+}
+
 static void update(void)
 {
     tick_clock_update(&clock, register_read(SYSTICK_CURRENT));

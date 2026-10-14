@@ -9,6 +9,7 @@ add_library(echo_device_logic STATIC
     key_scanner.c
     msc.c
     panel.c
+    pll.c
     sd_card.c
     tick_clock.c
     updater.c
