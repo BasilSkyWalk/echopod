@@ -9,8 +9,8 @@ typedef struct LadderBand {
 } LadderBand;
 
 static const LadderBand LADDER_BANDS[] = {
-    {0, 69, KEY_VOLUME_DOWN}, {70, 183, KEY_VOLUME_UP}, {200, 319, KEY_PLAY},
-    {320, 409, KEY_MENU},     {450, 549, KEY_BACK},
+    {0, 69, KEY_VOLUME_UP}, {70, 183, KEY_VOLUME_DOWN}, {200, 319, KEY_PLAY},
+    {320, 409, KEY_MENU},   {450, 549, KEY_BACK},
 };
 
 bool key_ladder_decode(uint16_t reading, Key *key)
