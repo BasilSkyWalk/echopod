@@ -16,8 +16,8 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | 1f | Cover Flow and cover export script | 4–6 d | no | done |
 | 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | done 2026-10-14: maskrom detection, plus writing the stock 3.7.0 image back with `wl`, both pass on macOS; stock boots after |
 | 3a | First device image: our UI on our own display, key, SD/eMMC and power-off drivers, plus USB mass storage and an updater | 1–2 wk | yes | done 2026-10-14 on the test unit: boot, keys, power-off, internal storage, SD card (exFAT, read/write over USB), USB mass storage, our updater, the library and covers from the card, a firmware tag |
-| 3b | UX polish on the device: smooth Cover Flow (faster pushes, partial redraws), screen-off controls, Smart Play, start-up and shut-down screens, control feedback, a cleaner Now Playing, slide transitions, an Up Next queue | 1–2 wk | yes | in progress |
-| 3 | Device gaps: PLL, IRQs/SysTick, DMA audio, FAT writes, battery, backlight PWM, key timing, sleep | 3–8 wk | yes | todo |
+| 3b | UX polish on the device: smooth Cover Flow (faster pushes, partial redraws), screen-off controls, Smart Play, start-up and shut-down screens, control feedback, a cleaner Now Playing, slide transitions, an Up Next queue | 1–2 wk | yes | in progress: faster Cover Flow (`-O2`, frame split), screen-off controls, Smart Play, start-up and goodbye screens, auto Now Playing (idle and wake), control feedback done; cleaner Now Playing, slide transitions and Up Next still to do |
+| 3 | Device gaps: PLL, IRQs/SysTick, DMA audio, FAT writes, battery, backlight PWM, key timing, sleep | 3–8 wk | yes | in progress: PLL (48 MHz boot clock found, 96/200 MHz switch works, starts at 96 MHz), DAC bring-up and test tones, DMA ring to I2S work on hardware; first FLAC playback build plays but badly (see NOTES, Next session); FAT writes, battery, backlight PWM still todo |
 | 4 | Our app on the device; memory and Cover Flow tuning | 1–2 wk | yes | todo |
 
 ## Features
@@ -26,7 +26,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 
 | Feature | Status | Notes |
 |---|---|---|
-| FLAC / MP3 / WAV playback | sim | dr_libs in the simulator; the device backend wraps ReChord's player (Phase 3/4) |
+| FLAC / MP3 / WAV playback | in progress | dr_libs in the simulator. On the device: our own FLAC decoder (`src/codec`, bit-exact on the test files) and a DMA ring engine; the first device build plays badly (NOTES, Next session). MP3/WAV not on the device |
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
 | Gapless | sim | Token-based hand-over through the audio HAL |
 | Resume after power-off | sim | `/.echo/resume.bin`; needs FAT writes on the device |
