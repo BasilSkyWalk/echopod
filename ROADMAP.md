@@ -14,8 +14,8 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | 1d | Simulator playback: queue, shuffle/repeat, gapless, resume | 3–4 d | no | done |
 | 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | done |
 | 1f | Cover Flow and cover export script | 4–6 d | no | done |
-| 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | done 2026-10-14: maskrom, `ld` and `td` pass on macOS; stock boots after. No writes |
-| 3a | First device image: our UI on our own display, key, SD/eMMC-read and power-off drivers, written from `docs/device-facts.md`, plus USB mass storage and an updater. No audio and no saving | 1–2 wk | yes | in progress: image builder done; display, keys, clock, power-off, SD card reads (FAT16/FAT32), internal storage, USB mass storage and the updater written and building, not yet run on the device. Next: the recovery write test (Phase 2b), then the first install |
+| 2 | Recovery dry run on our unit (maskrom detect only, no writes), stock backup | 1–2 d | yes | done 2026-10-14: maskrom detection, plus writing the stock 3.7.0 image back with `wl`, both pass on macOS; stock boots after |
+| 3a | First device image: our UI on our own display, key, SD/eMMC-read and power-off drivers, written from `docs/device-facts.md`, plus USB mass storage and an updater. No audio and no saving | 1–2 wk | yes | in progress: image builder done; display, keys, clock, power-off, SD card reads (FAT16/FAT32), internal storage, USB mass storage and the updater written and building, not yet run on the device. Recovery confirmed; next is the first install on the test unit |
 | 3 | Device gaps: PLL, IRQs/SysTick, DMA audio, FAT writes, battery, backlight PWM, key timing, sleep | 3–8 wk | yes | todo |
 | 4 | Our app on the device; memory and Cover Flow tuning | 1–2 wk | yes | todo |
 

@@ -79,7 +79,7 @@ Send back:
 
 The dry run showed the Mac can talk to the player in maskrom. This part proves the actual recovery: writing FiiO's stock 3.7.0 firmware back through maskrom. That's the same firmware the player runs now, so a success leaves it as it was. Do this before any of our images is installed, because getting back from ours depends on it.
 
-The sequence (`ld`, `td`, `wl 0`, `rd`) is the one ReChord used for every recovery, on Ubuntu (`docs/device-facts.md` 2.3). It hasn't been run on macOS.
+The sequence (`ld`, `td`, `wl 0`, `rd`) is the one ReChord used for every recovery, on Ubuntu (`docs/device-facts.md` 2.3). Verified on macOS with the test unit on 2026-10-14: `wl` prints about 2,049 progress lines up to 100%, and `rd` prints `Reset Device OK.`
 
 ## 1. Before you start
 
