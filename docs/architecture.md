@@ -10,11 +10,11 @@ platform/sim        platform/device (later)
          implement  hal  (interfaces only)
                      |
                     app          composition root: theme, screen tree, main step
-                  /  |   \
-                ui  fonts  hal
-                 \   |
-                  gfx
-                   |
+              /   /   |    \
+            ui  fonts library hal
+             \   |     |
+              gfx      |
+                \      |
                   core
 ```
 
@@ -24,8 +24,9 @@ platform/sim        platform/device (later)
 | gfx | `src/gfx` | core | RGB565 colors and blending, rectangles, clipped canvases, strip rendering, 4-bit anti-aliased text |
 | fonts | `src/fonts` | gfx | Generated glyph tables (see Generated code) |
 | ui | `src/ui` | core, gfx | Screen interface and stack, navigation intents, list view, menus, messages, header, labels, marquee, theme type |
-| hal | `src/hal` | core (types only) | Hardware interfaces: display, input, clock, and later fs, audio and power |
-| app | `src/app` | core, gfx, fonts, ui, hal | Default theme, screen tree, app screens, frame overlay, the main step |
+| library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader and browse queries (see `docs/library-format.md`) |
+| hal | `src/hal` | core (types only) | Hardware interfaces: display, input, clock, files, and later audio and power |
+| app | `src/app` | core, gfx, fonts, ui, library, hal | Default theme, screen tree, library store, browse screens, app screens, frame overlay, the main step |
 | platform | `platform/*` | app, hal, OS/SDK | Implements hal and owns `main()` |
 
 The CMake targets enforce these rules. Each module exposes only its own `include/<module>/` directory, and a module can only include headers from targets it links. Anything in a module's own directory, outside `include/`, is private.
@@ -35,6 +36,13 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 - A `Screen` is a title plus callbacks: `enter`, `handle_key`, `update` and `draw`. `handle_key` returns a `ScreenAction` (none, push, pop, or pop to root), and the app applies it to the `ScreenStack`. Screens never reach into the stack themselves.
 - Raw key transitions come from `hal`. `core/key_tracker` turns them into gestures (press, long press, repeat), and `ui/navigation` maps gestures to intents (previous, next, select, back, home). Remapping buttons is a change in one place.
 - Screen instances are static and owned by the app's `AppScreens`. There is no heap.
+
+## Library
+
+- The PC indexer builds the database (`tools/library_index.py`) and writes it to `/.echo/library.db` on the card.
+- On the device, `app/library_store` opens the database through `hal_file_*`, puts a block cache in front, and validates it with `library_open`.
+- Browse queries (`library/library_browse`) answer three questions for any view: how many rows there are, what row N is, and what selecting it opens. They read records and strings on demand and never load the database into RAM.
+- Browse screens come from a fixed pool of 6 levels. They share one cache of the visible rows' text, which is refreshed in `update` (never during `draw`) whenever the visible rows change.
 
 ## Rendering
 
@@ -91,11 +99,21 @@ The panel keeps its own image memory, so we never hold a full framebuffer. The s
 | `sim_headless_smoke` | that the simulator runs headless and saves a screenshot |
 | `tools_unit_tests` | Python tests for the PC tools |
 | `fonts_up_to_date` | that the generated fonts match their sources |
+| `library_fixture_up_to_date` | that `tests/fixtures/small_library.db`, written by the Python indexer and read by the C tests, matches the indexer |
 | `no_comments` | that no code file contains a comment |
 | `format` | that every C file matches `clang-format` |
 | `target_audit` | the Cortex-M3 cross-compile: heap symbols, flash and static RAM |
 
 Host builds run under UndefinedBehaviorSanitizer. AddressSanitizer is opt-in (`ECHO_ADDRESS_SANITIZER`) because it hangs at startup on macOS 27 with Apple clang 17.
+
+## Simulator storage
+
+`--card DIR` maps the card root `/` to a host folder, which is only ever read. `--system-dir DIR` maps `/.echo/` to a separate folder, so the database can live in `build/` without touching your music folder:
+
+```sh
+.venv/bin/python tools/library_index.py --music ~/Music --output build/library/library.db
+build/dev/platform/sim/echo_sim --card ~/Music --system-dir build/library
+```
 
 ## Simulator automation
 

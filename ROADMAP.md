@@ -10,7 +10,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | 0.5 | Repo setup, toolchains, cross-build check on macOS | 0.5–1 d | no | done, except the ReChord cross-build (blocked, see NOTES) |
 | 1a | SDL simulator, HAL, frame-time counter, memory-budget enforcement | 2–3 d | no | done |
 | 1b | UI toolkit: screen stack, lists, marquee, bitmap fonts from TTF | 3–5 d | no | done |
-| 1c | PC indexer, DB format, browse screens | 4–6 d | no | todo |
+| 1c | PC indexer, DB format, browse screens | 4–6 d | no | done |
 | 1d | Simulator playback: queue, shuffle/repeat, gapless, resume | 3–4 d | no | todo |
 | 1e | Now Playing, settings, favorites, M3U, configurable home | 4–6 d | no | todo |
 | 1f | Cover Flow and cover export script | 4–6 d | no | todo |
@@ -28,11 +28,11 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
 | Gapless | todo | ReChord's player design is host-tested |
 | Resume after power-off | todo | Needs FS writes on the device |
-| Library DB from SD scan | todo | |
-| Browse: Artist / Album Artist / Album / Genre / Folder / All Songs | todo | |
+| Library DB from SD scan | sim | Built on the PC (`tools/library_index.py`); an on-device rescan comes later |
+| Browse: Artist / Album Artist / Album / Genre / Folder / All Songs | sim | Selecting a track does nothing until 1d |
 | Now Playing: art, info, progress, seek | todo | |
 | Queue, shuffle, repeat | todo | ReChord has only a FIFO queue |
-| Volume and button mapping, lock/hold | todo | No hold switch documented; key repeat and long-press missing |
+| Volume and button mapping, lock/hold | todo | Power short press = lock/unlock, long press = off. Gestures and navigation mapping done in sim |
 | Settings: brightness, screen timeout, sleep timer, gain, output | todo | Brightness needs PWM; output needs jack/route control |
 | Battery, charging, power management | todo | No driver yet |
 | USB mass storage | todo | Works in ReChord (full speed, SD read-only) |
@@ -75,5 +75,5 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | Tool | Status |
 |---|---|
 | Font builder (Python) | done |
-| Library indexer (Python) | todo |
+| Library indexer (Python) | done |
 | Cover exporter (raw RGB565 thumbnails + index) | todo |

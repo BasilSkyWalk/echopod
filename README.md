@@ -15,6 +15,15 @@ ctest --preset dev
 ./build/dev/platform/sim/echo_sim
 ```
 
+### Use your music library
+
+```sh
+.venv/bin/python tools/library_index.py --music /path/to/music --output build/library/library.db
+./build/dev/platform/sim/echo_sim --card /path/to/music --system-dir build/library
+```
+
+The indexer only reads the music folder. On the device, the database goes in `/.echo/library.db` on the card. The format is described in `docs/library-format.md`.
+
 ### Simulator keys
 
 | Device button | Keyboard |
@@ -34,6 +43,8 @@ ctest --preset dev
 | `--frames N` | Quit after N frames |
 | `--headless` | No window |
 | `--screenshot FILE.bmp` | Save the last frame on exit |
+| `--card DIR` | Use DIR as the card root (read only) |
+| `--system-dir DIR` | Read `/.echo/` (the library database) from DIR |
 | `--keys LIST` | Play a key script, e.g. `down,down,play,back:long` (`up`, `down`, `play`, `menu`, `back`, `power`, each optionally `:long`) |
 
 Headless runs use a virtual clock, so scripted screenshots are deterministic.
