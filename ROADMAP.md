@@ -32,7 +32,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | Browse: Artist / Album Artist / Album / Genre / Folder / All Songs / Playlists / Favorites | sim | Selecting a track plays the list from it |
 | Now Playing: art, info, progress, seek | in progress | Info, progress, times, state, modes, volume and seek done; art in 1f |
 | Queue, shuffle, repeat | sim | Shuffle Songs/Albums, Repeat One/All, seeded |
-| Volume and button mapping, lock/hold | sim | Power short press = lock/unlock, long press = off; wake on any key. Mapping is provisional until the button labels are known |
+| Volume and button mapping, lock/hold | sim | Rocker = volume (hold on Now Playing = previous/next track). Power short press = lock/unlock, long press = off; wake on any key |
 | Settings: brightness, screen timeout, sleep timer, gain, output | sim | Saved in `/.echo/settings.bin`. On the device, brightness needs PWM, gain the CS43131 and output jack routing |
 | Battery, charging, power management | in progress | Header battery icon, screen timeout, lock and power-off work in the sim. No battery driver yet |
 | USB mass storage | todo | Works in ReChord (full speed, SD read-only) |
