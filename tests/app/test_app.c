@@ -40,6 +40,8 @@ enum {
     MUSIC_FAVORITES_INDEX = 8,
     DEFAULT_TIMEOUT_MS = 30000,
     SHORT_TIMEOUT_MS = 10000,
+    NOW_PLAYING_IDLE_MS = 10000,
+    DIAGNOSTICS_KEY_TEST_INDEX = 0,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 600,
@@ -839,6 +841,67 @@ static void play_on_another_track_starts_it(void)
     CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
 }
 
+static void idling_in_the_menus_returns_to_now_playing(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    wait_ms(NOW_PLAYING_IDLE_MS - 100);
+    CHECK(!title_is("Now Playing"));
+    tap(KEY_VOLUME_DOWN);
+    wait_ms(NOW_PLAYING_IDLE_MS - 100);
+    CHECK(!title_is("Now Playing"));
+    wait_ms(200);
+    CHECK(title_is("Now Playing"));
+}
+
+static void a_paused_track_stays_in_the_menus(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_PLAY);
+    tap(KEY_BACK);
+    wait_ms(NOW_PLAYING_IDLE_MS + 1000);
+    CHECK(!title_is("Now Playing"));
+}
+
+static void the_key_test_stays_open_while_playing(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    hold_back();
+    move_down(HOME_DIAGNOSTICS_INDEX);
+    tap(KEY_PLAY);
+    move_down(DIAGNOSTICS_KEY_TEST_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("Key test"));
+    wait_ms(NOW_PLAYING_IDLE_MS + 1000);
+    CHECK(title_is("Key test"));
+}
+
+static void waking_the_screen_shows_now_playing_while_playing(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    tap(KEY_POWER);
+    CHECK(!fake_hal_display_on());
+    tap(KEY_POWER);
+    CHECK(fake_hal_display_on());
+    CHECK(title_is("Now Playing"));
+}
+
+static void waking_while_paused_keeps_the_screen(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_PLAY);
+    tap(KEY_BACK);
+    tap(KEY_POWER);
+    tap(KEY_POWER);
+    CHECK(!title_is("Now Playing"));
+}
+
 static void menu_opens_now_playing_from_anywhere_while_playing(void)
 {
     start_app_with_library();
@@ -885,6 +948,11 @@ int main(void)
         TEST_CASE(play_on_the_playing_track_opens_now_playing_without_restarting),
         TEST_CASE(play_on_another_track_starts_it),
         TEST_CASE(menu_opens_now_playing_from_anywhere_while_playing),
+        TEST_CASE(idling_in_the_menus_returns_to_now_playing),
+        TEST_CASE(a_paused_track_stays_in_the_menus),
+        TEST_CASE(the_key_test_stays_open_while_playing),
+        TEST_CASE(waking_the_screen_shows_now_playing_while_playing),
+        TEST_CASE(waking_while_paused_keeps_the_screen),
         TEST_CASE(menu_does_nothing_while_nothing_plays),
         TEST_CASE(now_playing_shows_the_album_cover),
         TEST_CASE(now_playing_without_a_cover_keeps_the_text_layout),

@@ -71,6 +71,7 @@ typedef struct AppState {
     Fade goodbye;
     bool saying_goodbye;
     uint32_t now_ms;
+    uint32_t last_key_ms;
     AppOptions options;
     bool display_on;
     bool powered_off;
@@ -80,6 +81,7 @@ static AppState app;
 
 static const FadeTiming SPLASH_TIMING = {.fade_ms = 600, .hold_ms = 500, .rising = true};
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
+static const uint32_t NOW_PLAYING_IDLE_MS = 10000;
 static const char SPLASH_TEXT[] = "Echo Mini";
 static const char GOODBYE_TEXT[] = "Goodbye";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
@@ -181,6 +183,30 @@ static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
     }
 }
 
+static bool may_show_now_playing(void)
+{
+    PlayerStatus status = player_status(&app.player);
+    Screen *top = top_screen();
+    return status.has_track && status.state == PLAYER_PLAYING &&
+           top != &app.screens.now_playing.screen && !top->stays_when_idle;
+}
+
+static void show_now_playing(uint32_t now_ms)
+{
+    if (may_show_now_playing() &&
+        screen_stack_apply(&app.stack, screen_action_push(&app.screens.now_playing.screen),
+                           now_ms)) {
+        use_screen_key_behaviors();
+    }
+}
+
+static void return_to_now_playing_when_idle(uint32_t now_ms)
+{
+    if (app.display_on && !fade_running() && now_ms - app.last_key_ms >= NOW_PLAYING_IDLE_MS) {
+        show_now_playing(now_ms);
+    }
+}
+
 static void run_background(KeyEvent event)
 {
     switch (now_playing_command_for(event, false)) {
@@ -208,6 +234,7 @@ static void dispatch_key_events(uint32_t now_ms)
 {
     KeyEvent event;
     while (!app.powered_off && key_tracker_next_event(&app.keys, &event)) {
+        app.last_key_ms = now_ms;
         PowerKeyOutcome outcome = power_policy_key(&app.power, event, now_ms);
         if (outcome.shutdown) {
             shut_down();
@@ -231,6 +258,8 @@ static void update_power(uint32_t now_ms)
     set_display(app.power.display_on);
     if (!app.display_on) {
         save_settings();
+    } else {
+        show_now_playing(now_ms);
     }
 }
 
@@ -417,6 +446,7 @@ void app_start(void)
     app.saying_goodbye = false;
     app.splash = (Fade){.active = false};
     app.now_ms = now_ms;
+    app.last_key_ms = now_ms;
     settings_store_load(&app.settings);
     start_playback();
     start_hardware(now_ms);
@@ -448,6 +478,7 @@ void app_step(void)
     if (app.powered_off) {
         return;
     }
+    return_to_now_playing_when_idle(now_ms);
     toast_update(&app.toast, now_ms);
     update_screen(now_ms);
     frame_stats_record(&app.update_stats, hal_clock_microseconds() - started_us);
