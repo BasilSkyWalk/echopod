@@ -1,12 +1,15 @@
 add_executable(echo_device
     board/audio.c
     board/clock.c
+    board/cru.c
     board/display.c
     board/gpio.c
     board/input.c
     board/libc.c
     board/main.c
+    board/mmc.c
     board/power.c
+    board/sd.c
     board/startup.c
     board/storage.c
 )

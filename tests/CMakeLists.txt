@@ -104,12 +104,18 @@ echo_add_unit_test(NAME test_test_pattern_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
-foreach(device_test key_ladder key_scanner panel tick_clock)
+foreach(device_test key_ladder key_scanner panel sd_card tick_clock)
     echo_add_unit_test(NAME test_${device_test}
         SOURCES device/test_${device_test}.c
         LIBRARIES echo_device_logic
     )
 endforeach()
+
+echo_add_unit_test(NAME test_fat
+    SOURCES device/test_fat.c device/sparse_card.c
+    LIBRARIES echo_device_logic
+)
+target_compile_definitions(test_fat PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 
 if(ECHO_BUILD_SIM)
     echo_add_unit_test(NAME test_sim_options

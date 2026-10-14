@@ -1,0 +1,48 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "device/block_device.h"
+
+enum {
+    FAT_SECTOR_SIZE = 512,
+    FAT_LONG_NAME_CAPACITY = 260
+};
+
+typedef enum FatType {
+    FAT_TYPE_16 = 16,
+    FAT_TYPE_32 = 32
+} FatType;
+
+typedef struct FatFile {
+    uint32_t first_cluster;
+    uint32_t size;
+    uint32_t cursor_index;
+    uint32_t cursor_cluster;
+    bool directory;
+} FatFile;
+
+typedef struct FatVolume {
+    BlockDevice device;
+    FatType type;
+    uint32_t volume_start;
+    uint32_t fat_start;
+    uint32_t root_start;
+    uint32_t root_sectors;
+    uint32_t root_cluster;
+    uint32_t data_start;
+    uint32_t cluster_count;
+    uint32_t cluster_shift;
+    uint32_t sector_lba;
+    uint32_t fat_sector_lba;
+    bool sector_valid;
+    bool fat_sector_valid;
+    uint32_t sector[FAT_SECTOR_SIZE / 4];
+    uint32_t fat_sector[FAT_SECTOR_SIZE / 4];
+    uint16_t long_name[FAT_LONG_NAME_CAPACITY];
+} FatVolume;
+
+bool fat_mount(FatVolume *volume, BlockDevice device);
+bool fat_open(FatVolume *volume, const char *path, FatFile *file);
+bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, uint32_t length);
