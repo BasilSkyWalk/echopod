@@ -7,7 +7,6 @@
 #include "device/block_device.h"
 #include "emmc.h"
 #include "hal/clock.h"
-#include "mmc.h"
 #include "sd.h"
 #include "usb.h"
 #include "usb_report.h"
@@ -79,27 +78,28 @@ static void append_count(StringBuilder *builder, char label, uint32_t value)
     string_builder_append_char(builder, ' ');
 }
 
+static void append_history(StringBuilder *line)
+{
+    MscHistory history = msc_history(&msc);
+    for (uint32_t index = 0; index < history.count; index++) {
+        MscHistoryEntry entry = history.entries[index];
+        usb_report_append_hex(line, entry.opcode, 2);
+        string_builder_append_unsigned(line, entry.status);
+        string_builder_append_char(line, entry.lun == 0 ? ' ' : '+');
+    }
+}
+
 static void show_counters(MscStats stats)
 {
-    MmcFailure failure = mmc_last_failure();
     char title[COUNTER_TEXT_CAPACITY];
     char message[COUNTER_TEXT_CAPACITY];
     StringBuilder top = string_builder_make(title, sizeof title);
     string_builder_append(&top, "USB ");
     append_count(&top, 'R', stats.sectors_read);
     append_count(&top, 'W', stats.sectors_written);
+    append_count(&top, 'E', stats.read_failures + stats.write_failures);
     StringBuilder line = string_builder_make(message, sizeof message);
-    append_count(&line, 'r', stats.read_failures);
-    append_count(&line, 'w', stats.write_failures);
-    string_builder_append_char(&line, '@');
-    usb_report_append_hex(&line, stats.last_failed_lba, 5);
-    string_builder_append_char(&line, ' ');
-    append_count(&line, 'm', (uint32_t)failure.step);
-    usb_report_append_hex(&line, failure.status, 4);
-    string_builder_append_char(&line, ' ');
-    usb_report_append_hex(&line, failure.interrupts, 4);
-    string_builder_append_char(&line, ' ');
-    append_count(&line, 'd', emmc_fifo_depth_words());
+    append_history(&line);
     app_show_notice(title, message);
 }
 

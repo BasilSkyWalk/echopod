@@ -8,7 +8,8 @@ enum {
     MSC_SECTOR_SIZE = 512,
     MSC_PACKET_SIZE = 64,
     MSC_PRODUCT_LENGTH = 16,
-    MSC_RESPONSE_CAPACITY = 36
+    MSC_RESPONSE_CAPACITY = 36,
+    MSC_HISTORY_CAPACITY = 8
 };
 
 typedef struct MscLun {
@@ -43,6 +44,17 @@ typedef struct MscStats {
     uint32_t last_failed_lba;
 } MscStats;
 
+typedef struct MscHistoryEntry {
+    uint8_t opcode;
+    uint8_t lun;
+    uint8_t status;
+} MscHistoryEntry;
+
+typedef struct MscHistory {
+    MscHistoryEntry entries[MSC_HISTORY_CAPACITY];
+    uint8_t count;
+} MscHistory;
+
 typedef struct Msc {
     MscLun luns[MSC_MAX_LUNS];
     uint8_t lun_count;
@@ -61,6 +73,10 @@ typedef struct Msc {
     uint8_t ejected;
     bool data_out;
     MscStats stats;
+    uint8_t opcode;
+    uint8_t history_next;
+    uint8_t history_count;
+    MscHistoryEntry history[MSC_HISTORY_CAPACITY];
     uint8_t response[MSC_RESPONSE_CAPACITY];
     uint32_t response_length;
     uint32_t sector[MSC_SECTOR_SIZE / 4];
@@ -72,3 +88,4 @@ void msc_receive(Msc *msc, const uint8_t *packet, uint32_t length);
 bool msc_next_in(Msc *msc, uint8_t *packet, uint32_t *length);
 bool msc_ejected(const Msc *msc, uint8_t lun);
 MscStats msc_stats(const Msc *msc);
+MscHistory msc_history(const Msc *msc);

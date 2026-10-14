@@ -400,6 +400,59 @@ static void a_failed_write_skips_the_rest_of_the_command(void)
     CHECK_EQUAL(1, msc_stats(msc).write_failures);
 }
 
+static void inquiry_for_a_vital_product_data_page_is_an_invalid_field(void)
+{
+    static const uint8_t block[6] = {0x12, 0x01, 0x80, 0, 255, 0};
+    Msc *msc = started();
+    send_command(msc, 255, true, 0, block, 6);
+    Exchange *exchange = collect(msc);
+    check_csw(exchange, 1, 255);
+    Exchange *sensed = sense(msc);
+    CHECK_EQUAL(0x05, sensed->data[2]);
+    CHECK_EQUAL(0x24, sensed->data[12]);
+}
+
+static void history_keeps_the_last_commands_other_than_reads_writes_and_ready_checks(void)
+{
+    static const uint8_t inquiry[6] = {0x12, 0, 0, 0, 36, 0};
+    static const uint8_t ready[6] = {0x00};
+    static const uint8_t mode[6] = {0x1A, 0, 0x3F, 0, 4, 0};
+    uint8_t read[10];
+    Msc *msc = started();
+    read_10_block(read, 0x28, 0, 1);
+    send_command(msc, 36, true, 0, inquiry, 6);
+    collect(msc);
+    send_command(msc, 0, false, 0, ready, 6);
+    collect(msc);
+    send_command(msc, 512, true, 0, read, 10);
+    collect(msc);
+    send_command(msc, 4, true, 1, mode, 6);
+    collect(msc);
+    MscHistory history = msc_history(msc);
+    CHECK_EQUAL(2, history.count);
+    CHECK_EQUAL(0x12, history.entries[0].opcode);
+    CHECK_EQUAL(0, history.entries[0].status);
+    CHECK_EQUAL(0x1A, history.entries[1].opcode);
+    CHECK_EQUAL(1, history.entries[1].lun);
+}
+
+static void history_holds_the_most_recent_entries(void)
+{
+    static const uint8_t mode[6] = {0x1A, 0, 0x3F, 0, 4, 0};
+    static const uint8_t inquiry[6] = {0x12, 0, 0, 0, 36, 0};
+    Msc *msc = started();
+    for (int index = 0; index < MSC_HISTORY_CAPACITY + 3; index++) {
+        send_command(msc, 4, true, 0, mode, 6);
+        collect(msc);
+    }
+    send_command(msc, 36, true, 0, inquiry, 6);
+    collect(msc);
+    MscHistory history = msc_history(msc);
+    CHECK_EQUAL(MSC_HISTORY_CAPACITY, history.count);
+    CHECK_EQUAL(0x12, history.entries[MSC_HISTORY_CAPACITY - 1].opcode);
+    CHECK_EQUAL(0x1A, history.entries[0].opcode);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -423,6 +476,9 @@ int main(void)
         TEST_CASE(a_reset_drops_a_transfer_in_progress),
         TEST_CASE(counters_record_commands_sectors_and_failures),
         TEST_CASE(a_failed_write_skips_the_rest_of_the_command),
+        TEST_CASE(inquiry_for_a_vital_product_data_page_is_an_invalid_field),
+        TEST_CASE(history_keeps_the_last_commands_other_than_reads_writes_and_ready_checks),
+        TEST_CASE(history_holds_the_most_recent_entries),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

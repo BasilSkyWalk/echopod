@@ -34,12 +34,14 @@ enum {
     CODE_UNRECOVERED_READ = 0x11,
     CODE_INVALID_COMMAND = 0x20,
     CODE_OUT_OF_RANGE = 0x21,
+    CODE_INVALID_FIELD = 0x24,
     CODE_INVALID_LUN = 0x25,
     CODE_WRITE_PROTECTED = 0x27,
     CODE_MEDIUM_NOT_PRESENT = 0x3A,
     WRITE_PROTECT_BIT = 0x80,
     START_STOP_LOAD_EJECT = 0x02,
-    START_STOP_START = 0x01
+    START_STOP_START = 0x01,
+    INQUIRY_EVPD = 0x01
 };
 
 static const uint8_t INQUIRY_HEADER[8] = {0x00, 0x80, 0x02, 0x02, 31, 0, 0, 0};
@@ -92,6 +94,33 @@ MscStats msc_stats(const Msc *msc)
     return msc->stats;
 }
 
+MscHistory msc_history(const Msc *msc)
+{
+    MscHistory history = {.count = msc->history_count};
+    uint32_t first = (uint32_t)(msc->history_next + MSC_HISTORY_CAPACITY - msc->history_count);
+    for (uint32_t index = 0; index < msc->history_count; index++) {
+        history.entries[index] = msc->history[(first + index) % MSC_HISTORY_CAPACITY];
+    }
+    return history;
+}
+
+static bool is_routine(uint8_t opcode)
+{
+    return opcode == SCSI_READ_10 || opcode == SCSI_WRITE_10 || opcode == SCSI_TEST_UNIT_READY;
+}
+
+static void remember(Msc *msc)
+{
+    if (is_routine(msc->opcode)) {
+        return;
+    }
+    msc->history[msc->history_next] = (MscHistoryEntry){msc->opcode, msc->lun, msc->status};
+    msc->history_next = (uint8_t)((msc->history_next + 1) % MSC_HISTORY_CAPACITY);
+    if (msc->history_count < MSC_HISTORY_CAPACITY) {
+        msc->history_count++;
+    }
+}
+
 bool msc_ejected(const Msc *msc, uint8_t lun)
 {
     return (msc->ejected & (1u << lun)) != 0;
@@ -124,8 +153,12 @@ static void fill_text(uint8_t *bytes, const char *text, uint32_t length)
     }
 }
 
-static void inquiry(Msc *msc, const MscLun *lun)
+static void inquiry(Msc *msc, const MscLun *lun, const uint8_t *block)
 {
+    if ((block[1] & INQUIRY_EVPD) != 0) {
+        set_sense(msc, SENSE_ILLEGAL_REQUEST, CODE_INVALID_FIELD);
+        return;
+    }
     for (uint32_t index = 0; index < sizeof INQUIRY_HEADER; index++) {
         msc->response[index] = INQUIRY_HEADER[index];
     }
@@ -266,7 +299,7 @@ static void execute(Msc *msc, const uint8_t *block)
     }
     const MscLun *lun = &msc->luns[msc->lun];
     if (block[0] == SCSI_INQUIRY) {
-        inquiry(msc, lun);
+        inquiry(msc, lun, block);
     } else if (block[0] == SCSI_REQUEST_SENSE) {
         request_sense(msc);
     } else if (block[0] == SCSI_START_STOP_UNIT) {
@@ -281,6 +314,7 @@ static void execute(Msc *msc, const uint8_t *block)
 static void begin_command(Msc *msc, const uint8_t *cbw)
 {
     msc->stats.commands++;
+    msc->opcode = cbw[CBW_BLOCK];
     msc->tag = le32(cbw + 4);
     msc->expected = le32(cbw + 8);
     msc->lun = cbw[CBW_LUN] & 0x0F;
@@ -402,6 +436,7 @@ static void status_packet(Msc *msc, uint8_t *packet, uint32_t *length)
     put_le32(packet + 8, residue(msc));
     packet[12] = msc->status;
     *length = CSW_LENGTH;
+    remember(msc);
     msc->phase = MSC_PHASE_COMMAND;
 }
 
