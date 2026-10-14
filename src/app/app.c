@@ -51,6 +51,10 @@ static const KeyConfig KEY_CONFIG = {
 typedef struct AppState {
     KeyTracker keys;
     FrameStats frame_stats;
+    FrameStats update_stats;
+    FrameStats draw_stats;
+    FrameStats send_stats;
+    uint32_t send_us;
     ScreenStack stack;
     LibraryStore library;
     Player player;
@@ -245,7 +249,6 @@ static void draw_fade(Canvas *canvas, const Fade *fade, const char *text)
     Color color =
         color_blend(theme->colors.background, theme->colors.text, fade_alpha(fade, app.now_ms));
     TextStyle style = {.font = theme->fonts.title, .color = color};
-    canvas_fill_rect(canvas, screen, theme->colors.background);
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, screen, text), .text = text});
 }
@@ -276,7 +279,13 @@ static void draw_frame(void *context, Canvas *canvas)
     }
     toast_draw(&state->toast, canvas, &DEFAULT_THEME);
     if (state->options.show_frame_time) {
-        frame_overlay_draw(canvas, &DEFAULT_THEME, &state->frame_stats);
+        FrameBreakdown breakdown = {
+            .total_us = frame_stats_average_us(&state->frame_stats),
+            .update_us = frame_stats_average_us(&state->update_stats),
+            .draw_us = frame_stats_average_us(&state->draw_stats),
+            .send_us = frame_stats_average_us(&state->send_stats),
+        };
+        frame_overlay_draw(canvas, &DEFAULT_THEME, breakdown);
     }
 }
 
@@ -288,7 +297,9 @@ static void write_to_display(void *context, Rect area, const Color *pixels)
         return;
     }
     const Color *first_row = pixels + (size_t)(changed.y - area.y) * (size_t)area.width;
+    uint32_t started_us = hal_clock_microseconds();
     hal_display_write(changed.x, changed.y, changed.width, changed.height, first_row);
+    app.send_us += hal_clock_microseconds() - started_us;
 }
 
 static StatusPlayback playback_of(PlayerState state)
@@ -331,8 +342,13 @@ static void render(FrameDrawer drawer)
 
 static void render_frame(void)
 {
+    uint32_t started_us = hal_clock_microseconds();
+    app.send_us = 0;
     app.status_bar = current_status_bar();
     render((FrameDrawer){.draw = draw_frame, .context = &app});
+    uint32_t render_us = hal_clock_microseconds() - started_us;
+    frame_stats_record(&app.send_stats, app.send_us);
+    frame_stats_record(&app.draw_stats, render_us - app.send_us);
 }
 
 static void draw_notice(void *context, Canvas *canvas)
@@ -392,6 +408,9 @@ void app_start(void)
     frame_diff_init(&app.frame_diff, row_hashes, HAL_DISPLAY_HEIGHT);
     key_tracker_init(&app.keys, &KEY_CONFIG);
     frame_stats_reset(&app.frame_stats);
+    frame_stats_reset(&app.update_stats);
+    frame_stats_reset(&app.draw_stats);
+    frame_stats_reset(&app.send_stats);
     app.options = (AppOptions){.show_frame_time = false};
     app.toast = (Toast){.visible = false};
     app.powered_off = false;
@@ -431,6 +450,7 @@ void app_step(void)
     }
     toast_update(&app.toast, now_ms);
     update_screen(now_ms);
+    frame_stats_record(&app.update_stats, hal_clock_microseconds() - started_us);
     if (app.display_on) {
         render_frame();
     }

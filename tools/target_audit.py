@@ -9,7 +9,7 @@ HEAP_SYMBOLS = {"malloc", "calloc", "realloc", "free"}
 TARGET_FLAGS = [
     "-mcpu=cortex-m3",
     "-mthumb",
-    "-Os",
+    "-O2",
     "-std=c11",
     "-ffreestanding",
     "-fno-common",

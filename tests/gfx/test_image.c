@@ -1,3 +1,6 @@
+#include <stdbool.h>
+#include <stddef.h>
+
 #include "check.h"
 #include "gfx/canvas.h"
 #include "gfx/image.h"
@@ -73,6 +76,67 @@ static void a_slanted_quad_shrinks_toward_its_far_edge(void)
     CHECK_EQUAL(0x1000, canvas_pixel_at(&canvas, 2, 1));
 }
 
+static Color sample(Image image, Quad quad, int x, int y)
+{
+    int offset = x - quad.left;
+    int top = quad.left_top + (quad.right_top - quad.left_top) * offset / quad.width;
+    int height = quad.left_height + (quad.right_height - quad.left_height) * offset / quad.width;
+    if (y < top || y >= top + height) {
+        return BACKGROUND;
+    }
+    int source_x = offset * image.width / quad.width;
+    int source_y = (y - top) * image.height / height;
+    return image.pixels[source_y * image.width + source_x];
+}
+
+static bool quad_matches_samples(Rect bounds, Image image, Quad quad)
+{
+    Canvas canvas = make_canvas(bounds);
+    image_draw_quad(&canvas, image, quad);
+    for (int y = bounds.y; y < bounds.y + bounds.height; y++) {
+        for (int x = bounds.x; x < bounds.x + bounds.width; x++) {
+            bool inside = x >= quad.left && x < quad.left + quad.width;
+            Color expected = inside ? sample(image, quad, x, y) : BACKGROUND;
+            if (canvas_pixel_at(&canvas, x, y) != expected) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static void every_pixel_comes_from_its_source_pixel(void)
+{
+    static Color numbered[5 * 7];
+    for (int index = 0; index < 5 * 7; index++) {
+        numbered[index] = (Color)(0x0200 + index);
+    }
+    Image image = {.pixels = numbered, .width = 5, .height = 7};
+    Rect strips[] = {{0, 0, WIDTH, HEIGHT}, {0, 3, WIDTH, 4}, {0, 7, WIDTH, 3}};
+    Quad quads[] = {
+        flat(1, 0, 13, 10),
+        flat(0, 2, 16, 3),
+        flat(4, -2, 3, 9),
+        {.left = 1,
+         .width = 11,
+         .left_top = 0,
+         .left_height = 10,
+         .right_top = 3,
+         .right_height = 4},
+        {.left = -3,
+         .width = 14,
+         .left_top = 4,
+         .left_height = 2,
+         .right_top = -1,
+         .right_height = 13},
+    };
+    for (size_t strip = 0; strip < sizeof strips / sizeof strips[0]; strip++) {
+        for (size_t quad = 0; quad < sizeof quads / sizeof quads[0]; quad++) {
+            CHECK(quad_matches_samples(strips[strip], image, quads[quad]));
+        }
+    }
+}
+
 static void drawing_stays_inside_the_clip(void)
 {
     Canvas canvas = make_canvas((Rect){0, 4, WIDTH, 3});
@@ -109,6 +173,7 @@ int main(void)
         TEST_CASE(an_image_at_its_own_size_is_copied),
         TEST_CASE(a_larger_quad_scales_the_image_up),
         TEST_CASE(a_slanted_quad_shrinks_toward_its_far_edge),
+        TEST_CASE(every_pixel_comes_from_its_source_pixel),
         TEST_CASE(drawing_stays_inside_the_clip),
         TEST_CASE(a_quad_can_be_filled_with_a_color),
         TEST_CASE(an_empty_quad_draws_nothing),

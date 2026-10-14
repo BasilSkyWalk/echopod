@@ -193,6 +193,11 @@ uint32_t hal_clock_milliseconds(void)
     return fake.now_ms;
 }
 
+uint32_t fake_hal_microseconds(void)
+{
+    return fake.now_us;
+}
+
 uint32_t hal_clock_microseconds(void)
 {
     fake.now_us += fake.microseconds_per_read;

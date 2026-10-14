@@ -46,10 +46,26 @@ static void draw_column(Canvas *canvas, Column column, const Image *image, int q
     Rect clip = canvas->clip;
     int first = max_of(column.top, clip.y);
     int last = min_of(column.top + column.height, clip.y + clip.height);
-    const Color *source = &image->pixels[column.offset * image->width / quad_width];
+    if (first >= last) {
+        return;
+    }
+    int stride = canvas->bounds.width;
+    int whole_step = image->height / column.height * image->width;
+    int remainder_step = image->height % column.height;
+    int scaled = (first - column.top) * image->height;
+    int remainder = scaled % column.height;
+    const Color *source = &image->pixels[column.offset * image->width / quad_width] +
+                          scaled / column.height * image->width;
+    Color *target = pixel_address(canvas, column.x, first);
     for (int y = first; y < last; y++) {
-        int source_y = (y - column.top) * image->height / column.height;
-        *pixel_address(canvas, column.x, y) = source[source_y * image->width];
+        *target = *source;
+        target += stride;
+        source += whole_step;
+        remainder += remainder_step;
+        if (remainder >= column.height) {
+            remainder -= column.height;
+            source += image->width;
+        }
     }
 }
 

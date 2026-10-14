@@ -24,7 +24,16 @@ void frame_diff_forget(FrameDiff *diff)
 
 static uint32_t row_hash(const Color *row, int width)
 {
-    uint32_t hash = hash_update(HASH_START, row, (size_t)width * sizeof row[0]);
+    uint32_t hash = HASH_START;
+    int index = 0;
+    for (; index + 1 < width; index += 2) {
+        hash ^= (uint32_t)row[index] | (uint32_t)row[index + 1] << 16;
+        hash *= HASH_PRIME;
+    }
+    if (index < width) {
+        hash ^= row[index];
+        hash *= HASH_PRIME;
+    }
     return hash == UNKNOWN ? REPLACEMENT : hash;
 }
 

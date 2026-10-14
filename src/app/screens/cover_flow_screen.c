@@ -277,11 +277,8 @@ static void draw_empty(const Theme *theme, Canvas *canvas)
 static void draw(void *context, Canvas *canvas)
 {
     const CoverFlowScreen *flow = context;
-    const Theme *theme = flow->config.theme;
-    Rect screen = {0, 0, theme->metrics.screen_width, theme->metrics.screen_height};
-    canvas_fill_rect(canvas, screen, theme->colors.background);
     if (flow->count == 0) {
-        draw_empty(theme, canvas);
+        draw_empty(flow->config.theme, canvas);
         return;
     }
     int order[COVER_FLOW_MAX_VISIBLE];

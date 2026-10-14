@@ -12,11 +12,12 @@
     },
     {
       "name": "device",
-      "displayName": "Device firmware (Cortex-M3, MinSizeRel)",
+      "displayName": "Device firmware (Cortex-M3, Release -O2)",
       "binaryDir": "${sourceDir}/build/device",
       "toolchainFile": "${sourceDir}/cmake/arm-none-eabi.cmake",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "-O2",
         "ECHO_BUILD_SIM": "OFF",
         "ECHO_BUILD_TESTS": "OFF",
         "ECHO_BUILD_DEVICE": "ON"

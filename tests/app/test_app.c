@@ -197,6 +197,15 @@ static void the_frame_overlay_is_off_until_enabled_in_diagnostics(void)
     CHECK(overlay_visible());
 }
 
+static void the_frame_overlay_splits_the_frame_time(void)
+{
+    char text[FRAME_OVERLAY_TEXT_CAPACITY];
+    FrameBreakdown breakdown = {
+        .total_us = 190400, .update_us = 12000, .draw_us = 119600, .send_us = 58200};
+    frame_overlay_format(breakdown, text, sizeof text);
+    CHECK(strcmp("190 u12 d120 s58", text) == 0);
+}
+
 static void open_music_entry(int index)
 {
     tap(KEY_PLAY);
@@ -698,8 +707,11 @@ static void each_step_records_its_duration(void)
 {
     start_app();
     fake_hal_set_microseconds_per_read(4000);
+    uint32_t before_us = fake_hal_microseconds();
     step();
-    CHECK_EQUAL(4000, frame_stats_latest_us(app_frame_stats()));
+    uint32_t first_read_us = before_us + 4000;
+    CHECK_EQUAL(fake_hal_microseconds() - first_read_us, frame_stats_latest_us(app_frame_stats()));
+    CHECK(frame_stats_latest_us(app_frame_stats()) > 0);
 }
 
 static void a_notice_is_drawn_at_once_over_the_current_screen(void)
@@ -862,6 +874,7 @@ int main(void)
         TEST_CASE(back_returns_to_the_previous_screen),
         TEST_CASE(a_long_back_returns_home_from_deep_screens),
         TEST_CASE(the_frame_overlay_is_off_until_enabled_in_diagnostics),
+        TEST_CASE(the_frame_overlay_splits_the_frame_time),
         TEST_CASE(diagnostics_shows_the_firmware_version_from_the_hal),
         TEST_CASE(albums_open_from_the_library),
         TEST_CASE(an_artist_leads_to_their_albums),

@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 #include "check.h"
 #include "gfx/frame_diff.h"
 
@@ -61,6 +63,38 @@ static void only_the_changed_rows_are_sent(void)
     CHECK_EQUAL(1, changed.height);
 }
 
+static bool single_pixel_change_is_noticed(int width, int x)
+{
+    FrameDiff diff = fresh();
+    Rect strip = {0, 0, width, STRIP};
+    Rect changed;
+    fill(0x1234);
+    frame_diff_changed(&diff, strip, pixels, &changed);
+    pixels[2 * width + x] = 0x1235;
+    return frame_diff_changed(&diff, strip, pixels, &changed) && changed.y == 2 &&
+           changed.height == 1;
+}
+
+static void a_change_in_any_one_pixel_is_noticed(void)
+{
+    for (int x = 0; x < WIDTH; x++) {
+        CHECK(single_pixel_change_is_noticed(WIDTH, x));
+        CHECK(single_pixel_change_is_noticed(WIDTH - 1, x % (WIDTH - 1)));
+    }
+}
+
+static void swapping_two_pixels_is_noticed(void)
+{
+    FrameDiff diff = fresh();
+    Rect changed;
+    fill(0x1234);
+    pixels[4] = 0x0001;
+    frame_diff_changed(&diff, strip_at(0), pixels, &changed);
+    pixels[4] = 0x1234;
+    pixels[5] = 0x0001;
+    CHECK(frame_diff_changed(&diff, strip_at(0), pixels, &changed));
+}
+
 static void separate_changed_rows_are_sent_as_one_span(void)
 {
     FrameDiff diff = fresh();
@@ -101,6 +135,8 @@ int main(void)
         TEST_CASE(the_first_frame_sends_every_row),
         TEST_CASE(an_unchanged_strip_sends_nothing),
         TEST_CASE(only_the_changed_rows_are_sent),
+        TEST_CASE(a_change_in_any_one_pixel_is_noticed),
+        TEST_CASE(swapping_two_pixels_is_noticed),
         TEST_CASE(separate_changed_rows_are_sent_as_one_span),
         TEST_CASE(forgetting_sends_everything_again),
         TEST_CASE(a_strip_past_the_tracked_rows_is_always_sent),
