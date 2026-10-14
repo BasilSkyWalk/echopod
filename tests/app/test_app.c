@@ -763,6 +763,51 @@ static void restarting_the_app_sends_a_whole_frame_again(void)
     CHECK_EQUAL(pixels + FULL_FRAME_PIXELS, fake_hal_pixels_written());
 }
 
+static void play_on_the_playing_track_opens_now_playing_without_restarting(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    CHECK(!title_is("Now Playing"));
+    int plays = fake_hal_audio_play_count();
+    tap(KEY_PLAY);
+    CHECK(title_is("Now Playing"));
+    CHECK_EQUAL(plays, fake_hal_audio_play_count());
+}
+
+static void play_on_another_track_starts_it(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    move_down(1);
+    int plays = fake_hal_audio_play_count();
+    tap(KEY_PLAY);
+    CHECK(title_is("Now Playing"));
+    CHECK_EQUAL(plays + 1, fake_hal_audio_play_count());
+    CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
+}
+
+static void menu_opens_now_playing_from_anywhere_while_playing(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    hold_back();
+    CHECK(title_is("Echo Mini"));
+    tap(KEY_MENU);
+    CHECK(title_is("Now Playing"));
+    int depth = app_screen_depth();
+    tap(KEY_MENU);
+    CHECK_EQUAL(depth, app_screen_depth());
+}
+
+static void menu_does_nothing_while_nothing_plays(void)
+{
+    start_app_with_library();
+    tap(KEY_MENU);
+    CHECK(title_is("Echo Mini"));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -785,6 +830,10 @@ int main(void)
         TEST_CASE(folders_can_be_browsed_down_to_an_album),
         TEST_CASE(without_a_library_the_lists_explain_what_is_missing),
         TEST_CASE(selecting_a_track_plays_it_and_shows_now_playing),
+        TEST_CASE(play_on_the_playing_track_opens_now_playing_without_restarting),
+        TEST_CASE(play_on_another_track_starts_it),
+        TEST_CASE(menu_opens_now_playing_from_anywhere_while_playing),
+        TEST_CASE(menu_does_nothing_while_nothing_plays),
         TEST_CASE(now_playing_shows_the_album_cover),
         TEST_CASE(now_playing_without_a_cover_keeps_the_text_layout),
         TEST_CASE(now_playing_keys_control_the_player),

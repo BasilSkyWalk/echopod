@@ -126,10 +126,18 @@ static void use_screen_key_behaviors(void)
     key_tracker_set_behavior(&app.keys, KEY_VOLUME_DOWN, volume);
 }
 
+static bool opens_now_playing(KeyEvent event)
+{
+    return event.key == KEY_MENU && event.gesture == KEY_GESTURE_PRESS &&
+           player_status(&app.player).has_track && top_screen() != &app.screens.now_playing.screen;
+}
+
 static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
 {
     Screen *screen = top_screen();
-    ScreenAction action = screen->handle_key(screen->context, event, now_ms);
+    ScreenAction action = opens_now_playing(event)
+                              ? screen_action_push(&app.screens.now_playing.screen)
+                              : screen->handle_key(screen->context, event, now_ms);
     if (screen_stack_apply(&app.stack, action, now_ms)) {
         use_screen_key_behaviors();
     }

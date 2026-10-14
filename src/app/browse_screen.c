@@ -121,9 +121,20 @@ static const char *row_detail(const void *context, int index)
     return detail[0] != '\0' ? detail : NULL;
 }
 
+static bool is_loaded_track(const BrowseScreen *browse, int index)
+{
+    BrowseItem item;
+    PlayerStatus status = player_status(browse->pool->config.player);
+    return status.has_track && status.state != PLAYER_IDLE && item_at(browse, index, &item) &&
+           item.kind == BROWSE_ITEM_TRACK && item.index == status.track;
+}
+
 static ScreenAction play_from(BrowseScreen *browse, int index)
 {
     BrowsePoolConfig *config = &browse->pool->config;
+    if (is_loaded_track(browse, index)) {
+        return screen_action_push(config->now_playing);
+    }
     uint32_t seed = hal_clock_microseconds();
     if (!player_play_list(config->player, browse->query, (uint32_t)index, seed)) {
         return screen_action_none();
