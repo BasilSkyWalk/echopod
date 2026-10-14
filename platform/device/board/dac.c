@@ -85,7 +85,8 @@ enum {
     TONE_MCLK_HZ = 11288960,
     TONE_RATE_BYTE = 1,
     TONE_PERIOD_SAMPLES = 100,
-    TONE_AMPLITUDE = 3000,
+    TONE_AMPLITUDE = 9000,
+    DURATION_CHECK_SAMPLES = 64,
     TONE_SEGMENT_MS = 2000,
     TONE_GAP_MS = 400,
     DMA_TONE_WORDS = 4000,
@@ -286,12 +287,19 @@ static void set_i2s_divider(uint32_t divider)
     register_write(I2S_XFER, 1);
 }
 
+static bool fifo_full(void)
+{
+    return (register_read(I2S_FIFOLR) & FIFO_LEVEL_MASK) >= FIFO_FULL_LEVEL;
+}
+
 static bool feed(int16_t left, int16_t right)
 {
-    uint32_t start = hal_clock_milliseconds();
-    while ((register_read(I2S_FIFOLR) & FIFO_LEVEL_MASK) >= FIFO_FULL_LEVEL) {
-        if (hal_clock_milliseconds() - start >= FIFO_TIMEOUT_MS) {
-            return false;
+    if (fifo_full()) {
+        uint32_t start = hal_clock_milliseconds();
+        while (fifo_full()) {
+            if (hal_clock_milliseconds() - start >= FIFO_TIMEOUT_MS) {
+                return false;
+            }
         }
     }
     register_write(I2S_TXDR, (uint32_t)(uint16_t)left | (uint32_t)(uint16_t)right << 16);
@@ -302,14 +310,16 @@ static bool play_for(const int16_t *samples, int count, uint32_t duration_ms)
 {
     uint32_t start = hal_clock_milliseconds();
     int index = 0;
-    while (hal_clock_milliseconds() - start < duration_ms) {
+    for (uint32_t fed = 0;; fed++) {
+        if (fed % DURATION_CHECK_SAMPLES == 0 && hal_clock_milliseconds() - start >= duration_ms) {
+            return true;
+        }
         int16_t sample = samples != NULL ? samples[index] : 0;
         if (!feed(sample, sample)) {
             return false;
         }
-        index = (index + 1) % count;
+        index = index + 1 < count ? index + 1 : 0;
     }
-    return true;
 }
 
 static void stop_i2s(void)
