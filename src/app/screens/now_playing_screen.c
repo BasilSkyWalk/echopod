@@ -5,6 +5,7 @@
 #include "core/format.h"
 #include "core/string_builder.h"
 #include "gfx/image.h"
+#include "settings/settings.h"
 #include "ui/header.h"
 #include "ui/icons.h"
 #include "ui/label.h"
@@ -25,6 +26,8 @@ enum {
     ICON_SIZE = 10,
     ICON_GAP = 8,
     TIME_CAPACITY = 16,
+    BADGE_SIZE = 40,
+    BADGE_ICON_SIZE = 18,
     STATUS_CAPACITY = 64
 };
 
@@ -104,6 +107,39 @@ int now_playing_progress_width(uint32_t position_ms, uint32_t duration_ms, int w
         return width;
     }
     return (int)((uint64_t)position_ms * (uint64_t)width / duration_ms);
+}
+
+NowPlayingFeedback now_playing_feedback_for(NowPlayingCommand command, PlayerState after)
+{
+    switch (command) {
+    case NOW_PLAYING_VOLUME_UP:
+    case NOW_PLAYING_VOLUME_DOWN:
+        return NOW_PLAYING_FEEDBACK_VOLUME;
+    case NOW_PLAYING_NEXT:
+        return NOW_PLAYING_FEEDBACK_NEXT;
+    case NOW_PLAYING_PREVIOUS:
+        return NOW_PLAYING_FEEDBACK_PREVIOUS;
+    case NOW_PLAYING_TOGGLE_PAUSE:
+        return after == PLAYER_PAUSED ? NOW_PLAYING_FEEDBACK_PAUSE : NOW_PLAYING_FEEDBACK_PLAY;
+    default:
+        return NOW_PLAYING_FEEDBACK_NONE;
+    }
+}
+
+bool now_playing_feedback_visible(NowPlayingFeedback feedback, uint32_t started_ms, uint32_t now_ms)
+{
+    if (feedback == NOW_PLAYING_FEEDBACK_NONE) {
+        return false;
+    }
+    uint32_t duration = feedback == NOW_PLAYING_FEEDBACK_VOLUME ? NOW_PLAYING_VOLUME_FEEDBACK_MS
+                                                                : NOW_PLAYING_BADGE_MS;
+    return now_ms - started_ms < duration;
+}
+
+int now_playing_volume_width(uint8_t volume, int width)
+{
+    uint8_t level = volume < SETTINGS_VOLUME_MAX ? volume : SETTINGS_VOLUME_MAX;
+    return level * width / SETTINGS_VOLUME_MAX;
 }
 
 static void move_scrub(NowPlayingScreen *now_playing, int32_t delta_ms)
@@ -228,9 +264,14 @@ static void refresh(NowPlayingScreen *now_playing, uint32_t now_ms)
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
-    ScreenAction action =
-        run_command(now_playing, now_playing_command_for(event, now_playing->scrubbing));
+    NowPlayingCommand command = now_playing_command_for(event, now_playing->scrubbing);
+    ScreenAction action = run_command(now_playing, command);
     refresh(now_playing, now_ms);
+    NowPlayingFeedback feedback = now_playing_feedback_for(command, now_playing->status.state);
+    if (feedback != NOW_PLAYING_FEEDBACK_NONE) {
+        now_playing->feedback = feedback;
+        now_playing->feedback_started_ms = now_ms;
+    }
     return action;
 }
 
@@ -239,7 +280,15 @@ static void enter(void *context, uint32_t now_ms)
     NowPlayingScreen *now_playing = context;
     now_playing->has_text = false;
     now_playing->scrubbing = false;
+    now_playing->feedback = NOW_PLAYING_FEEDBACK_NONE;
     refresh(now_playing, now_ms);
+}
+
+static bool showing(const NowPlayingScreen *now_playing, NowPlayingFeedback feedback)
+{
+    return now_playing->feedback == feedback &&
+           now_playing_feedback_visible(feedback, now_playing->feedback_started_ms,
+                                        now_playing->now_ms);
 }
 
 static void update(void *context, uint32_t now_ms)
@@ -332,9 +381,12 @@ static void draw_progress(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
     Rect bar = column_area(now_playing, PROGRESS_TOP, PROGRESS_HEIGHT);
-    int filled = now_playing_progress_width(shown_position(now_playing),
-                                            now_playing->status.duration_ms, bar.width);
-    Color fill = now_playing->scrubbing ? theme->colors.text : theme->colors.selection_background;
+    bool volume = showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME);
+    int filled = volume ? now_playing_volume_width(now_playing->status.volume, bar.width)
+                        : now_playing_progress_width(shown_position(now_playing),
+                                                     now_playing->status.duration_ms, bar.width);
+    Color fill =
+        now_playing->scrubbing || volume ? theme->colors.text : theme->colors.selection_background;
     canvas_fill_rect(canvas, bar, theme->colors.divider);
     canvas_fill_rect(canvas, (Rect){bar.x, bar.y, filled, bar.height}, fill);
 }
@@ -356,6 +408,12 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
     char remaining[TIME_CAPACITY] = "-";
     format_duration(position_ms, elapsed, sizeof elapsed);
     format_duration(remaining_ms, remaining + 1, sizeof remaining - 1);
+    if (showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME)) {
+        StringBuilder label = string_builder_make(elapsed, sizeof elapsed);
+        string_builder_append(&label, "Volume");
+        StringBuilder level = string_builder_make(remaining, sizeof remaining);
+        string_builder_append_unsigned(&level, now_playing->status.volume);
+    }
     Rect area = column_area(now_playing, TIMES_TOP, SMALL_LINE_HEIGHT);
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
     label_draw(canvas, style, (Label){.area = area, .text = elapsed});
@@ -410,6 +468,44 @@ static void draw_status(const NowPlayingScreen *now_playing, Canvas *canvas)
     draw_right_aligned(canvas, style, area, volume);
 }
 
+static void draw_badge_icon(Canvas *canvas, NowPlayingFeedback feedback, Rect area, Color color)
+{
+    switch (feedback) {
+    case NOW_PLAYING_FEEDBACK_NEXT:
+        icon_draw_next(canvas, area, color);
+        return;
+    case NOW_PLAYING_FEEDBACK_PREVIOUS:
+        icon_draw_previous(canvas, area, color);
+        return;
+    case NOW_PLAYING_FEEDBACK_PAUSE:
+        icon_draw_pause(canvas, area, color);
+        return;
+    case NOW_PLAYING_FEEDBACK_PLAY:
+        icon_draw_play(canvas, area, color);
+        return;
+    default:
+        return;
+    }
+}
+
+static void draw_badge(const NowPlayingScreen *now_playing, Canvas *canvas)
+{
+    Image cover;
+    NowPlayingFeedback feedback = now_playing->feedback;
+    if (feedback == NOW_PLAYING_FEEDBACK_VOLUME || !showing(now_playing, feedback) ||
+        !current_cover(now_playing, &cover)) {
+        return;
+    }
+    const Theme *theme = now_playing->config.theme;
+    int center_x = theme->metrics.padding + COVER_FULL_SIZE / 2;
+    int center_y = COVER_TOP + COVER_FULL_SIZE / 2;
+    Rect badge = {center_x - BADGE_SIZE / 2, center_y - BADGE_SIZE / 2, BADGE_SIZE, BADGE_SIZE};
+    Rect icon = {center_x - BADGE_ICON_SIZE / 2, center_y - BADGE_ICON_SIZE / 2, BADGE_ICON_SIZE,
+                 BADGE_ICON_SIZE};
+    canvas_fill_rect(canvas, badge, theme->colors.background);
+    draw_badge_icon(canvas, feedback, icon, theme->colors.text);
+}
+
 static void draw_nothing_playing(const Theme *theme, Canvas *canvas)
 {
     TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
@@ -429,6 +525,7 @@ static void draw(void *context, Canvas *canvas)
         return;
     }
     draw_cover(now_playing, canvas);
+    draw_badge(now_playing, canvas);
     draw_track_text(now_playing, canvas);
     draw_progress(now_playing, canvas);
     draw_times(now_playing, canvas);
@@ -441,6 +538,8 @@ Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig 
     now_playing->has_text = false;
     now_playing->scrubbing = false;
     now_playing->scrub_position_ms = 0;
+    now_playing->feedback = NOW_PLAYING_FEEDBACK_NONE;
+    now_playing->feedback_started_ms = 0;
     now_playing->status = (PlayerStatus){.state = PLAYER_IDLE};
     now_playing->screen = (Screen){
         .title = "Now Playing",

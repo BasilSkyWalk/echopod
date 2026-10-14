@@ -76,6 +76,47 @@ static void power_is_left_to_the_system(void)
     CHECK_EQUAL(NOW_PLAYING_NONE, command(KEY_POWER, KEY_GESTURE_LONG_PRESS));
 }
 
+static void volume_changes_show_the_volume_bar(void)
+{
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_VOLUME,
+                now_playing_feedback_for(NOW_PLAYING_VOLUME_UP, PLAYER_PLAYING));
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_VOLUME,
+                now_playing_feedback_for(NOW_PLAYING_VOLUME_DOWN, PLAYER_PAUSED));
+}
+
+static void skips_and_pauses_show_a_badge_for_the_new_state(void)
+{
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_NEXT,
+                now_playing_feedback_for(NOW_PLAYING_NEXT, PLAYER_PLAYING));
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_PREVIOUS,
+                now_playing_feedback_for(NOW_PLAYING_PREVIOUS, PLAYER_PLAYING));
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_PAUSE,
+                now_playing_feedback_for(NOW_PLAYING_TOGGLE_PAUSE, PLAYER_PAUSED));
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_PLAY,
+                now_playing_feedback_for(NOW_PLAYING_TOGGLE_PAUSE, PLAYER_PLAYING));
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_NONE,
+                now_playing_feedback_for(NOW_PLAYING_LEAVE, PLAYER_PLAYING));
+    CHECK_EQUAL(NOW_PLAYING_FEEDBACK_NONE,
+                now_playing_feedback_for(NOW_PLAYING_SCRUB_START, PLAYER_PLAYING));
+}
+
+static void the_volume_bar_stays_longer_than_a_badge(void)
+{
+    CHECK(now_playing_feedback_visible(NOW_PLAYING_FEEDBACK_VOLUME, 1000, 2499));
+    CHECK(!now_playing_feedback_visible(NOW_PLAYING_FEEDBACK_VOLUME, 1000, 2500));
+    CHECK(now_playing_feedback_visible(NOW_PLAYING_FEEDBACK_NEXT, 1000, 1699));
+    CHECK(!now_playing_feedback_visible(NOW_PLAYING_FEEDBACK_NEXT, 1000, 1700));
+    CHECK(!now_playing_feedback_visible(NOW_PLAYING_FEEDBACK_NONE, 1000, 1000));
+}
+
+static void the_volume_bar_fills_in_proportion_to_the_level(void)
+{
+    CHECK_EQUAL(0, now_playing_volume_width(0, 100));
+    CHECK_EQUAL(50, now_playing_volume_width(25, 100));
+    CHECK_EQUAL(100, now_playing_volume_width(50, 100));
+    CHECK_EQUAL(100, now_playing_volume_width(80, 100));
+}
+
 static void progress_fills_in_proportion_to_the_position(void)
 {
     CHECK_EQUAL(0, now_playing_progress_width(0, 200000, 300));
@@ -101,6 +142,10 @@ int main(void)
         TEST_CASE(menu_is_free_for_later),
         TEST_CASE(back_leaves_and_a_long_back_goes_home),
         TEST_CASE(power_is_left_to_the_system),
+        TEST_CASE(volume_changes_show_the_volume_bar),
+        TEST_CASE(skips_and_pauses_show_a_badge_for_the_new_state),
+        TEST_CASE(the_volume_bar_stays_longer_than_a_badge),
+        TEST_CASE(the_volume_bar_fills_in_proportion_to_the_level),
         TEST_CASE(progress_fills_in_proportion_to_the_position),
         TEST_CASE(progress_stays_inside_the_bar),
     };

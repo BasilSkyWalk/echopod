@@ -34,8 +34,19 @@ typedef enum NowPlayingCommand {
 
 enum {
     NOW_PLAYING_SCRUB_STEP_MS = 5000,
-    NOW_PLAYING_SCRUB_FAST_STEP_MS = 15000
+    NOW_PLAYING_SCRUB_FAST_STEP_MS = 15000,
+    NOW_PLAYING_VOLUME_FEEDBACK_MS = 1500,
+    NOW_PLAYING_BADGE_MS = 700
 };
+
+typedef enum NowPlayingFeedback {
+    NOW_PLAYING_FEEDBACK_NONE,
+    NOW_PLAYING_FEEDBACK_VOLUME,
+    NOW_PLAYING_FEEDBACK_NEXT,
+    NOW_PLAYING_FEEDBACK_PREVIOUS,
+    NOW_PLAYING_FEEDBACK_PAUSE,
+    NOW_PLAYING_FEEDBACK_PLAY
+} NowPlayingFeedback;
 
 typedef struct NowPlayingConfig {
     Player *player;
@@ -55,6 +66,8 @@ typedef struct NowPlayingScreen {
     uint16_t album_index;
     uint32_t text_changed_ms;
     uint32_t now_ms;
+    NowPlayingFeedback feedback;
+    uint32_t feedback_started_ms;
     char title[NOW_PLAYING_TEXT_CAPACITY];
     char artist[NOW_PLAYING_TEXT_CAPACITY];
     char album[NOW_PLAYING_TEXT_CAPACITY];
@@ -63,4 +76,8 @@ typedef struct NowPlayingScreen {
 NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing);
 uint32_t now_playing_scrub_target(uint32_t position_ms, uint32_t duration_ms, int32_t delta_ms);
 int now_playing_progress_width(uint32_t position_ms, uint32_t duration_ms, int width);
+NowPlayingFeedback now_playing_feedback_for(NowPlayingCommand command, PlayerState after);
+bool now_playing_feedback_visible(NowPlayingFeedback feedback, uint32_t started_ms,
+                                  uint32_t now_ms);
+int now_playing_volume_width(uint8_t volume, int width);
 Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig config);
