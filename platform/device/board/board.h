@@ -4,6 +4,7 @@
 
 void board_clock_start(void);
 void board_delay_ms(uint32_t milliseconds);
+void board_delay_us(uint32_t microseconds);
 void board_display_start(void);
 void board_input_start(void);
 void board_input_poll(void);

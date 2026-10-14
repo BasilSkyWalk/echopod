@@ -25,3 +25,4 @@ PowerKeyOutcome power_policy_key(PowerPolicy *policy, KeyEvent event, uint32_t n
 void power_policy_start_sleep_timer(PowerPolicy *policy, uint32_t duration_ms, uint32_t now_ms);
 void power_policy_cancel_sleep_timer(PowerPolicy *policy);
 bool power_policy_update(PowerPolicy *policy, uint32_t now_ms);
+void power_policy_wake(PowerPolicy *policy, uint32_t now_ms);

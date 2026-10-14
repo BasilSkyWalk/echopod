@@ -3,6 +3,7 @@ add_executable(echo_device
     board/clock.c
     board/cru.c
     board/display.c
+    board/emmc.c
     board/gpio.c
     board/input.c
     board/libc.c
@@ -12,6 +13,8 @@ add_executable(echo_device
     board/sd.c
     board/startup.c
     board/storage.c
+    board/usb.c
+    board/usb_session.c
 )
 set(ECHO_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/echo_device.ld)
 set_target_properties(echo_device PROPERTIES

@@ -120,6 +120,27 @@ static void a_cancelled_sleep_timer_never_fires(void)
     CHECK(!power_policy_update(&policy, START_MS + SLEEP_MS));
 }
 
+static void a_wake_turns_the_display_on_and_restarts_the_timeout(void)
+{
+    PowerPolicy policy = fresh_policy();
+    power_policy_update(&policy, START_MS + TIMEOUT_MS);
+    CHECK(!policy.display_on);
+    power_policy_wake(&policy, START_MS + 2 * TIMEOUT_MS);
+    CHECK(policy.display_on);
+    power_policy_update(&policy, START_MS + 3 * TIMEOUT_MS - 1);
+    CHECK(policy.display_on);
+}
+
+static void a_wake_unlocks_a_locked_player(void)
+{
+    PowerPolicy policy = fresh_policy();
+    send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS + 10);
+    CHECK(policy.locked);
+    power_policy_wake(&policy, START_MS + 20);
+    CHECK(!policy.locked);
+    CHECK(policy.display_on);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -134,6 +155,8 @@ int main(void)
         TEST_CASE(holding_power_asks_for_shutdown),
         TEST_CASE(the_sleep_timer_fires_once_and_turns_the_display_off),
         TEST_CASE(a_cancelled_sleep_timer_never_fires),
+        TEST_CASE(a_wake_turns_the_display_on_and_restarts_the_timeout),
+        TEST_CASE(a_wake_unlocks_a_locked_player),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

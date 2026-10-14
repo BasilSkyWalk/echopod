@@ -18,6 +18,7 @@
 #include "library_store.h"
 #include "player.h"
 #include "settings_store.h"
+#include "ui/message_screen.h"
 #include "ui/screen_stack.h"
 #include "ui/status_bar.h"
 #include "ui/toast.h"
@@ -57,6 +58,7 @@ typedef struct AppState {
     Toast toast;
     StatusBarState status_bar;
     AppScreens screens;
+    MessageScreen notice;
     AppOptions options;
     bool display_on;
     bool powered_off;
@@ -205,9 +207,8 @@ static StatusBarState current_status_bar(void)
     };
 }
 
-static void render_frame(void)
+static void render(FrameDrawer drawer)
 {
-    app.status_bar = current_status_bar();
     StripRenderer renderer = {
         .strip_pixels = strip_pixels,
         .screen_width = HAL_DISPLAY_WIDTH,
@@ -215,10 +216,21 @@ static void render_frame(void)
         .strip_height = STRIP_HEIGHT,
         .background = DEFAULT_THEME.colors.background,
     };
-    FrameDrawer drawer = {.draw = draw_frame, .context = &app};
     FrameSink sink = {.write = write_to_display, .context = NULL};
     strip_renderer_render(&renderer, drawer, sink);
     hal_display_present();
+}
+
+static void render_frame(void)
+{
+    app.status_bar = current_status_bar();
+    render((FrameDrawer){.draw = draw_frame, .context = &app});
+}
+
+static void draw_notice(void *context, Canvas *canvas)
+{
+    Screen *screen = context;
+    screen->draw(screen->context, canvas);
 }
 
 static void start_playback(void)
@@ -303,6 +315,21 @@ void app_step(void)
         render_frame();
     }
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
+}
+
+void app_show_notice(const char *title, const char *message)
+{
+    MessageConfig config = {.title = title, .message = message, .theme = &DEFAULT_THEME};
+    Screen *screen = message_screen_init(&app.notice, config);
+    if (!app.display_on) {
+        set_display(true);
+    }
+    render((FrameDrawer){.draw = draw_notice, .context = screen});
+}
+
+void app_wake(void)
+{
+    power_policy_wake(&app.power, hal_clock_milliseconds());
 }
 
 const FrameStats *app_frame_stats(void)

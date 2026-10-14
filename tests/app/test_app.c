@@ -647,9 +647,46 @@ static void each_step_records_its_duration(void)
     CHECK_EQUAL(4000, frame_stats_latest_us(app_frame_stats()));
 }
 
+static void a_notice_is_drawn_at_once_over_the_current_screen(void)
+{
+    start_app();
+    step();
+    int presents = fake_hal_present_count();
+    long pixels = fake_hal_pixels_written();
+    app_show_notice("USB", "Connected to a computer");
+    CHECK_EQUAL(presents + 1, fake_hal_present_count());
+    CHECK_EQUAL(pixels + HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT, fake_hal_pixels_written());
+    CHECK(title_is("Echo Mini"));
+}
+
+static void a_notice_turns_the_display_on(void)
+{
+    start_app();
+    wait_ms(DEFAULT_TIMEOUT_MS);
+    CHECK(!fake_hal_display_on());
+    app_show_notice("USB", "Connected to a computer");
+    CHECK(fake_hal_display_on());
+}
+
+static void waking_keeps_the_screen_on_for_a_full_timeout(void)
+{
+    start_app();
+    step();
+    now_ms += DEFAULT_TIMEOUT_MS * 4;
+    fake_hal_set_milliseconds(now_ms);
+    app_wake();
+    wait_ms(DEFAULT_TIMEOUT_MS - 1000);
+    CHECK(fake_hal_display_on());
+    wait_ms(1000);
+    CHECK(!fake_hal_display_on());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(a_notice_is_drawn_at_once_over_the_current_screen),
+        TEST_CASE(a_notice_turns_the_display_on),
+        TEST_CASE(waking_keeps_the_screen_on_for_a_full_timeout),
         TEST_CASE(a_step_writes_one_full_frame_and_presents_it),
         TEST_CASE(the_home_menu_is_the_root),
         TEST_CASE(selecting_music_opens_the_music_menu),

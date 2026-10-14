@@ -42,3 +42,10 @@ void board_delay_ms(uint32_t milliseconds)
     while (hal_clock_milliseconds() - start < milliseconds) {
     }
 }
+
+void board_delay_us(uint32_t microseconds)
+{
+    uint32_t start = hal_clock_microseconds();
+    while (hal_clock_microseconds() - start < microseconds) {
+    }
+}

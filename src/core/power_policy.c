@@ -62,6 +62,13 @@ void power_policy_cancel_sleep_timer(PowerPolicy *policy)
     policy->sleep_timer_active = false;
 }
 
+void power_policy_wake(PowerPolicy *policy, uint32_t now_ms)
+{
+    policy->last_activity_ms = now_ms;
+    policy->locked = false;
+    policy->display_on = true;
+}
+
 static bool timed_out(const PowerPolicy *policy, uint32_t now_ms)
 {
     return policy->timeout_ms > 0 && now_ms - policy->last_activity_ms >= policy->timeout_ms;

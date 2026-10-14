@@ -28,6 +28,7 @@
 #define CMD_UPDATE_CLOCK 0x80202000u
 #define CMD_INITIALISE (1u << 15)
 #define CMD_DATA_READ 0x340u
+#define CMD_WRITE (1u << 10)
 #define CMD_CHECK_CRC (1u << 8)
 #define CMD_LONG (1u << 7)
 #define CMD_RESPONSE (1u << 6)
@@ -54,6 +55,9 @@
 #define TMOUT_VALUE 0xFFFFFF40u
 #define CLKENA_ON 0x00010001u
 #define CTYPE_4_BIT 0x1u
+#define CTYPE_8_BIT 0x10000u
+#define FIFOTH_RX_WATERMARK_SHIFT 16
+#define FIFOTH_RX_WATERMARK_MASK 0xFFFu
 
 #define CRU_MMC_DIVIDERS 0x30u
 
@@ -63,7 +67,12 @@ enum {
     COMMAND_TIMEOUT_MS = 100,
     BUSY_TIMEOUT_MS = 1000,
     DATA_TIMEOUT_MS = 500,
-    IDENTIFY_DIVIDER_REGISTER = 1
+    IDENTIFY_DIVIDER_REGISTER = 1,
+    FALLBACK_FIFO_DEPTH = 16,
+    MINIMUM_FIFO_DEPTH = 8,
+    MAXIMUM_FIFO_DEPTH = 1024,
+    POWER_OFF_US = 10,
+    POWER_ON_US = 600
 };
 
 static uint32_t read_register(const MmcHost *host, uint32_t offset)
@@ -104,10 +113,18 @@ static bool update_clock(const MmcHost *host)
     return wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS);
 }
 
+static uint32_t fifo_depth(const MmcHost *host)
+{
+    uint32_t watermark = read_register(host, MMC_FIFOTH) >> FIFOTH_RX_WATERMARK_SHIFT;
+    uint32_t depth = (watermark & FIFOTH_RX_WATERMARK_MASK) + 1;
+    return depth < MINIMUM_FIFO_DEPTH || depth > MAXIMUM_FIFO_DEPTH ? FALLBACK_FIFO_DEPTH : depth;
+}
+
 void mmc_reset_controller(const MmcHost *host)
 {
     write_register(host, MMC_CTRL, CTRL_RESET_ALL);
     wait_clear(host, MMC_CTRL, CTRL_RESET_ALL, COMMAND_TIMEOUT_MS);
+    *host->fifo_depth = fifo_depth(host);
     write_register(host, MMC_FIFOTH, FIFOTH_VALUE);
     write_register(host, MMC_CTYPE, 0);
     write_register(host, MMC_CLKSRC, 0);
@@ -129,9 +146,18 @@ void mmc_set_clock(const MmcHost *host, SdClock clock)
     update_clock(host);
 }
 
+void mmc_power_cycle(const MmcHost *host)
+{
+    write_register(host, MMC_PWREN, 0);
+    board_delay_us(POWER_OFF_US);
+    write_register(host, MMC_PWREN, 1);
+    board_delay_us(POWER_ON_US);
+}
+
 void mmc_set_bus_width(const MmcHost *host, uint8_t bits)
 {
-    write_register(host, MMC_CTYPE, bits == 4 ? CTYPE_4_BIT : 0);
+    uint32_t type = bits == 8 ? CTYPE_8_BIT : bits == 4 ? CTYPE_4_BIT : 0;
+    write_register(host, MMC_CTYPE, type);
 }
 
 void mmc_stop_clock(const MmcHost *host)
@@ -234,4 +260,41 @@ bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32
               (read_register(host, MMC_RINTSTS) & INT_DATA_FAILED) == 0;
     write_register(host, MMC_RINTSTS, INT_ALL);
     return ok;
+}
+
+static bool fill_fifo(const MmcHost *host, const uint32_t *words)
+{
+    uint32_t sent = 0;
+    uint32_t start = hal_clock_milliseconds();
+    while (sent < BLOCK_WORDS) {
+        if ((read_register(host, MMC_RINTSTS) & INT_DATA_ABORT) != 0 ||
+            hal_clock_milliseconds() - start > DATA_TIMEOUT_MS) {
+            return false;
+        }
+        uint32_t status = read_register(host, MMC_STATUS);
+        uint32_t count = (status >> STATUS_FIFO_COUNT_SHIFT) & STATUS_FIFO_COUNT_MASK;
+        uint32_t depth = *host->fifo_depth;
+        uint32_t space = count < depth ? depth - count : 0;
+        while (space-- > 0 && sent < BLOCK_WORDS) {
+            write_register(host, MMC_FIFO, words[sent++]);
+        }
+    }
+    return true;
+}
+
+bool mmc_write_block(const MmcHost *host, uint8_t index, uint32_t address, const uint32_t *words)
+{
+    if (!prepare_data(host)) {
+        return false;
+    }
+    write_register(host, MMC_BLKSIZ, BLOCK_BYTES);
+    write_register(host, MMC_BYTCNT, BLOCK_BYTES);
+    write_register(host, MMC_RINTSTS, INT_ALL);
+    write_register(host, MMC_CMDARG, address);
+    write_register(host, MMC_CMD, CMD_BASE | CMD_DATA_READ | CMD_WRITE | index);
+    bool ok = wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS) && fill_fifo(host, words) &&
+              wait_any(host, MMC_RINTSTS, INT_DATA_FINISHED, DATA_TIMEOUT_MS) &&
+              (read_register(host, MMC_RINTSTS) & INT_DATA_FAILED) == 0;
+    write_register(host, MMC_RINTSTS, INT_ALL);
+    return ok && wait_clear(host, MMC_STATUS, STATUS_CARD_BUSY, BUSY_TIMEOUT_MS);
 }

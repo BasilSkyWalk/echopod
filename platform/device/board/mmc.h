@@ -9,11 +9,14 @@ typedef struct MmcHost {
     uint32_t base;
     uint32_t cru_identify;
     uint32_t cru_transfer;
+    uint32_t *fifo_depth;
 } MmcHost;
 
 void mmc_reset_controller(const MmcHost *host);
+void mmc_power_cycle(const MmcHost *host);
 bool mmc_command(const MmcHost *host, SdCommand command, uint32_t response[4]);
 bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32_t *words);
+bool mmc_write_block(const MmcHost *host, uint8_t index, uint32_t address, const uint32_t *words);
 void mmc_set_clock(const MmcHost *host, SdClock clock);
 void mmc_set_bus_width(const MmcHost *host, uint8_t bits);
 void mmc_stop_clock(const MmcHost *host);

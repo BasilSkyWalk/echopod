@@ -43,6 +43,5 @@ SECTIONS
 
 ASSERT(ADDR(.code) == 0x03050000, "the code vector table must be at 0x03050000")
 ASSERT(ADDR(.data) == 0x03004000, "the entry vector must be at 0x03004000")
-ASSERT(SIZEOF(.data) >= 8, "the .data image must start with the entry vector")
-ASSERT(SIZEOF(.data) <= 180, "only up to 180 bytes of .data is proven to boot")
+ASSERT(SIZEOF(.data) == 8, "only the entry vector may be in .data: make initialised globals const")
 ASSERT(device_bss_end <= 0x0304C000, ".data and .bss must end below 0x0304C000")

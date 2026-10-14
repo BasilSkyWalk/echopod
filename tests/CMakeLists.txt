@@ -104,13 +104,17 @@ echo_add_unit_test(NAME test_test_pattern_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
-foreach(device_test key_ladder key_scanner panel sd_card tick_clock)
+foreach(device_test key_ladder key_scanner msc panel sd_card tick_clock usb_device)
     echo_add_unit_test(NAME test_${device_test}
         SOURCES device/test_${device_test}.c
         LIBRARIES echo_device_logic
     )
 endforeach()
 
+echo_add_unit_test(NAME test_emmc_layout
+    SOURCES device/test_emmc_layout.c device/fake_disk.c
+    LIBRARIES echo_device_logic
+)
 echo_add_unit_test(NAME test_fat
     SOURCES device/test_fat.c device/sparse_card.c
     LIBRARIES echo_device_logic

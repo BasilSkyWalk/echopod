@@ -1,0 +1,95 @@
+#include "usb_session.h"
+
+#include <stddef.h>
+
+#include "app/app.h"
+#include "device/block_device.h"
+#include "emmc.h"
+#include "sd.h"
+#include "usb.h"
+
+enum {
+    HOST_TIMEOUT_MS = 3000,
+    SERIAL_DIGITS = 8,
+    INTERNAL_LUN = 0,
+    CARD_LUN = 1,
+    LUN_COUNT = 2
+};
+
+static EmmcInfo internal;
+static UsbPort port;
+static Msc msc;
+
+static bool internal_read(void *context, uint32_t lba, uint32_t count, void *buffer)
+{
+    (void)context;
+    return emmc_read(NULL, internal.layout.volume_start + lba, count, buffer);
+}
+
+static bool internal_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
+{
+    (void)context;
+    return emmc_write(NULL, internal.layout.volume_start + lba, count, buffer);
+}
+
+static bool card_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
+{
+    (void)context;
+    (void)lba;
+    (void)count;
+    (void)buffer;
+    return false;
+}
+
+static void serial_text(uint32_t serial, char *text)
+{
+    static const char DIGITS[] = "0123456789ABCDEF";
+    for (int index = 0; index < SERIAL_DIGITS; index++) {
+        text[index] = DIGITS[(serial >> (28 - 4 * index)) & 0xFu];
+    }
+    text[SERIAL_DIGITS] = '\0';
+}
+
+static void prepare_luns(void)
+{
+    BlockDevice card;
+    bool internal_ready = emmc_start(&internal);
+    bool card_ready = sd_start(&card);
+    MscLun luns[LUN_COUNT] = {
+        {internal_read, internal_write, NULL, internal.layout.volume_sectors, true, internal_ready,
+         "Internal storage"},
+        {sd_read, card_write, NULL, sd_sector_count(), false, card_ready, "SD card"},
+    };
+    msc_init(&msc, luns, LUN_COUNT);
+    char serial[SERIAL_DIGITS + 1];
+    serial_text(internal.serial, serial);
+    port = (UsbPort){.msc = &msc};
+    usb_device_init(&port.device, serial, LUN_COUNT);
+}
+
+static UsbSessionEnd serve(void)
+{
+    while (usb_vbus_present()) {
+        usb_poll(&port);
+        if (msc_ejected(&msc, INTERNAL_LUN)) {
+            return USB_SESSION_EJECTED;
+        }
+    }
+    return USB_SESSION_UNPLUGGED;
+}
+
+UsbSessionEnd usb_session_run(void)
+{
+    prepare_luns();
+    usb_power_up();
+    UsbSessionEnd end = USB_SESSION_FAILED;
+    if (usb_connect(&port)) {
+        end = USB_SESSION_NO_HOST;
+        if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
+            app_show_notice("USB", "Connected to a computer. Eject Internal storage to finish.");
+            end = serve();
+        }
+    }
+    usb_power_down();
+    return end;
+}

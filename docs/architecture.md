@@ -156,6 +156,9 @@ Written only from `docs/device-facts.md` (the clean-room rule in `NOTES.md`).
   - `panel`: the init streams for both panel variants, and the window and pixel commands, sent through a `PanelBus`
   - `tick_clock`: milliseconds and microseconds from the 24-bit SysTick down-counter
   - `sd_card`: the SD setup protocol (v1 and v2 cards, the ACMD41 retries, the RCA, capacity from the CSD register, the 4-bit bus), driven through an `SdHost`
+  - `emmc_layout`: finds the firmware slots (from the IDB's system size) and scans for the user volume on internal storage. It also answers which internal-storage writes are allowed: only the user volume and the two firmware slots, never the IDB, the SAVE block or the gap
+  - `usb_device`: the descriptors and standard requests for a full-speed, bulk-only mass-storage device (`1209:0001`, the pid.codes test ID), plus GET_MAX_LUN and the mass-storage reset
+  - `msc`: the bulk-only transport and SCSI commands over up to two LUNs. A reply shorter than the host asked for is padded with zeros and reported in the residue instead of stalling. Ejecting a LUN marks only that LUN absent
   - `fat`: a read-only FAT16 and FAT32 reader over a `BlockDevice`. It reads unpartitioned cards or MBR partition 0, follows long file names (UTF-16, including surrogate pairs), matches path components exactly by code point and ASCII letters in either case, and reads at any offset through a per-file cluster cursor
 - `platform/device/board` is device-only. It holds the register helpers, GPIO and pin mux, startup (the vector tables and the steps in facts 3.1), the linker script, a minimal `memcpy`/`memset`, and the HAL implementations.
 - **Build:** `cmake --preset device && cmake --build --preset device` cross-compiles to `build/device/platform/device/echo_device.elf`. Then `tools/make_image.py` packs it into `build/device/HIFIEC90.IMG`, using header bytes from the RECHO 0.9.2 file at `ECHO_REFERENCE_IMG` (outside the repo). Without that file, only the ELF is built.
@@ -165,7 +168,11 @@ Written only from `docs/device-facts.md` (the clean-room rule in `NOTES.md`).
   - `.bss` ends below `0x0304C000`.
   - Nothing loaded is left out of the image.
 - **Run model:** fully polled, with interrupts off. SysTick runs freely at the 24 MHz core clock, wrapping about every 0.7 s, so the clock has to be read at least that often. The display driver samples the keys before and after every strip it pushes, so key presses aren't missed during slow frames.
-- **Storage:** `board/mmc` drives the DW-MMC controller (commands, polled single-block reads, the card clock) and `board/sd` powers the SD slot and checks card detect. The file HAL mounts the card on the first open and can hold 8 files open at once; it reads only for now.
+- **Storage:** `board/mmc` drives the DW-MMC controller (commands, polled single-block reads and writes, the card clock) and `board/sd` powers the SD slot and checks card detect. `board/emmc` starts internal storage (8-bit bus at 24 MHz) on first use and refuses any write outside what `emmc_layout` allows. The file HAL mounts the card on the first open and can hold 8 files open at once; it reads only for now.
+- **USB:** the main loop watches VBUS. When the cable is plugged in, `board/usb_session` powers the PHY and the polled DWC2 core (`board/usb`) and waits up to 3 s for a host; no host means a charger, and the app carries on. With a host:
+  - the app shows a notice, and its steps pause
+  - LUN 0 is the internal-storage user volume, read/write; LUN 1 is the SD card, read-only
+  - the session ends when LUN 0 is ejected or the cable is pulled; then `app_wake` restarts the screen timeout
 - **Stubs for now:** file writes, audio, battery (unknown), and brightness (backlight on or off only).
 
 ## Simulator audio

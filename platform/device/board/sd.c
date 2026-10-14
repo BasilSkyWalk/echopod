@@ -31,9 +31,12 @@ enum {
 };
 
 static const GpioPin CARD_DETECT = {0, 11};
-static const MmcHost SD_HOST = {SD_BASE, CRU_SD_IDENTIFY, CRU_SD_TRANSFER};
+static uint32_t sd_fifo_depth;
+static const MmcHost SD_HOST = {SD_BASE, CRU_SD_IDENTIFY, CRU_SD_TRANSFER, &sd_fifo_depth};
 
 static SdCard card;
+static bool ready;
+static bool tried;
 
 static bool host_command(void *context, SdCommand command, uint32_t response[4])
 {
@@ -105,9 +108,12 @@ static bool read_aligned(uint32_t lba, uint32_t *words)
     return mmc_read_block(&SD_HOST, CMD_READ_SINGLE_BLOCK, sd_card_address(&card, lba), words);
 }
 
-static bool read_sectors(void *context, uint32_t lba, uint32_t count, void *buffer)
+bool sd_read(void *context, uint32_t lba, uint32_t count, void *buffer)
 {
     (void)context;
+    if (!ready) {
+        return false;
+    }
     uint8_t *bytes = buffer;
     for (uint32_t index = 0; index < count; index++) {
         if (lba + index >= card.sector_count ||
@@ -118,16 +124,27 @@ static bool read_sectors(void *context, uint32_t lba, uint32_t count, void *buff
     return true;
 }
 
-bool sd_start(BlockDevice *device)
+static bool start_card(void)
 {
     start_card_detect();
     if (!host_card_present(NULL)) {
         return false;
     }
     power_controller();
-    if (!sd_card_init(&card, &HOST)) {
-        return false;
+    return sd_card_init(&card, &HOST);
+}
+
+bool sd_start(BlockDevice *device)
+{
+    if (!tried) {
+        tried = true;
+        ready = start_card();
     }
-    *device = (BlockDevice){read_sectors, NULL};
-    return true;
+    *device = (BlockDevice){sd_read, NULL};
+    return ready;
+}
+
+uint32_t sd_sector_count(void)
+{
+    return ready ? card.sector_count : 0;
 }
