@@ -45,6 +45,7 @@ enum {
     DIAGNOSTICS_KEY_TEST_INDEX = 0,
     DIAGNOSTICS_CPU_CLOCK_INDEX = 5,
     DIAGNOSTICS_STOPWATCH_INDEX = 6,
+    DIAGNOSTICS_TEST_TONE_INDEX = 7,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 600,
@@ -912,7 +913,7 @@ static void open_diagnostics_row(int index)
     move_down(index);
 }
 
-static void the_cpu_clock_switches_between_24_and_96_mhz(void)
+static void the_cpu_clock_cycles_through_24_96_and_200_mhz(void)
 {
     start_app();
     open_diagnostics_row(DIAGNOSTICS_CPU_CLOCK_INDEX);
@@ -920,7 +921,19 @@ static void the_cpu_clock_switches_between_24_and_96_mhz(void)
     tap(KEY_PLAY);
     CHECK_EQUAL(96, hal_system_clock_mhz());
     tap(KEY_PLAY);
+    CHECK_EQUAL(200, hal_system_clock_mhz());
+    tap(KEY_PLAY);
     CHECK_EQUAL(24, hal_system_clock_mhz());
+}
+
+static void the_test_tone_plays_once_per_press(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_TEST_TONE_INDEX);
+    CHECK_EQUAL(0, fake_hal_test_tone_count());
+    tap(KEY_PLAY);
+    CHECK_EQUAL(1, fake_hal_test_tone_count());
+    CHECK(title_is("Diagnostics"));
 }
 
 static void a_clock_that_does_not_lock_stays_at_24_mhz(void)
@@ -996,7 +1009,8 @@ int main(void)
         TEST_CASE(the_key_test_stays_open_while_playing),
         TEST_CASE(waking_the_screen_shows_now_playing_while_playing),
         TEST_CASE(waking_while_paused_keeps_the_screen),
-        TEST_CASE(the_cpu_clock_switches_between_24_and_96_mhz),
+        TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
+        TEST_CASE(the_test_tone_plays_once_per_press),
         TEST_CASE(a_clock_that_does_not_lock_stays_at_24_mhz),
         TEST_CASE(the_stopwatch_stays_open_while_playing),
         TEST_CASE(menu_does_nothing_while_nothing_plays),

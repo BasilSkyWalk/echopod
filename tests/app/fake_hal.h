@@ -13,6 +13,7 @@ void fake_hal_set_milliseconds(uint32_t now_ms);
 void fake_hal_set_microseconds_per_read(uint32_t step_us);
 uint32_t fake_hal_microseconds(void);
 void fake_hal_refuse_clock_switch(void);
+int fake_hal_test_tone_count(void);
 void fake_hal_queue_transition(Key key, bool pressed, uint32_t time_ms);
 uint16_t fake_hal_pixel(int x, int y);
 const char *fake_hal_audio_playing_path(void);

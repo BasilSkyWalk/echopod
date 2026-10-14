@@ -118,6 +118,15 @@ static bool run_from_pll(uint32_t mhz)
     return true;
 }
 
+uint32_t board_pclk_hz(void)
+{
+    PllSetting setting;
+    if (pll_mhz == 0 || !pll_setting_for(pll_mhz, &setting)) {
+        return BOOT_CLOCK_MHZ * 1000000u;
+    }
+    return setting.pclk_hz;
+}
+
 uint32_t hal_system_clock_mhz(void)
 {
     return pll_mhz != 0 ? pll_mhz : BOOT_CLOCK_MHZ;

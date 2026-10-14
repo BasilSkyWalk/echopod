@@ -300,6 +300,11 @@ void hal_audio_set_output(HalAudioOutput output)
     unlock();
 }
 
+HalToneResult hal_audio_test_tone(void)
+{
+    return HAL_TONE_PLAYED;
+}
+
 HalAudioStatus hal_audio_status(void)
 {
     lock();

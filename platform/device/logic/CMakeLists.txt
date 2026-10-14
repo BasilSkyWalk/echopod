@@ -1,4 +1,6 @@
 add_library(echo_device_logic STATIC
+    audio_math.c
+    dac_sequence.c
     emmc_layout.c
     exfat.c
     fat.c

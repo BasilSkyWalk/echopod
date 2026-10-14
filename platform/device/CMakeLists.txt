@@ -3,6 +3,7 @@ add_executable(echo_device
     board/clock.c
     board/clock_switch.c
     board/cru.c
+    board/dac.c
     board/display.c
     board/emmc.c
     board/gpio.c

@@ -85,26 +85,68 @@ static const char *firmware_value(const void *context)
     return hal_system_version();
 }
 
+typedef struct ClockStep {
+    uint32_t mhz;
+    const char *label;
+} ClockStep;
+
+static const ClockStep CLOCK_STEPS[] = {{24, "24 MHz"}, {96, "96 MHz"}, {200, "200 MHz"}};
+
 enum {
-    BOOT_CLOCK_MHZ = 24,
-    FAST_CLOCK_MHZ = 96
+    CLOCK_STEP_COUNT = sizeof CLOCK_STEPS / sizeof CLOCK_STEPS[0]
 };
 
-static ScreenAction toggle_clock(void *context)
+static int clock_step_index(void)
+{
+    for (int index = 0; index < CLOCK_STEP_COUNT; index++) {
+        if (CLOCK_STEPS[index].mhz == hal_system_clock_mhz()) {
+            return index;
+        }
+    }
+    return 0;
+}
+
+static ScreenAction cycle_clock(void *context)
 {
     ClockOption *clock = context;
-    uint32_t target = hal_system_clock_mhz() == BOOT_CLOCK_MHZ ? FAST_CLOCK_MHZ : BOOT_CLOCK_MHZ;
-    clock->failed = !hal_system_set_clock_mhz(target);
+    int next = (clock_step_index() + 1) % CLOCK_STEP_COUNT;
+    clock->failed = !hal_system_set_clock_mhz(CLOCK_STEPS[next].mhz);
     return screen_action_none();
 }
 
 static const char *clock_value(const void *context)
 {
     const ClockOption *clock = context;
-    if (clock->failed) {
-        return "No lock";
+    return clock->failed ? "No lock" : CLOCK_STEPS[clock_step_index()].label;
+}
+
+static ScreenAction play_test_tone(void *context)
+{
+    ToneOption *tone = context;
+    tone->result = hal_audio_test_tone();
+    tone->tried = true;
+    return screen_action_none();
+}
+
+static const char *tone_value(const void *context)
+{
+    const ToneOption *tone = context;
+    if (!tone->tried) {
+        return "";
     }
-    return hal_system_clock_mhz() == FAST_CLOCK_MHZ ? "96 MHz" : "24 MHz";
+    switch (tone->result) {
+    case HAL_TONE_PLAYED:
+        return "Played";
+    case HAL_TONE_NO_DAC:
+        return "No DAC";
+    case HAL_TONE_SETUP_FAILED:
+        return "Setup failed";
+    case HAL_TONE_NOT_READY:
+        return "Not ready";
+    case HAL_TONE_STALLED:
+        return "I2S stalled";
+    }
+    return "";
 }
 
 static MenuItem open_item(const char *label, Screen *target)
@@ -212,11 +254,16 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         (MenuItem){.label = "Firmware", .select = NULL, .context = NULL, .value = firmware_value};
     screens->clock = (ClockOption){.failed = false};
     screens->diagnostics_items[5] = (MenuItem){.label = "CPU clock",
-                                               .select = toggle_clock,
+                                               .select = cycle_clock,
                                                .context = &screens->clock,
                                                .value = clock_value};
     screens->diagnostics_items[6] =
         open_item("Stopwatch", stopwatch_screen_init(&screens->stopwatch, theme));
+    screens->tone = (ToneOption){.tried = false, .result = HAL_TONE_PLAYED};
+    screens->diagnostics_items[7] = (MenuItem){.label = "Test tone",
+                                               .select = play_test_tone,
+                                               .context = &screens->tone,
+                                               .value = tone_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }
