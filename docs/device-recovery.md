@@ -74,3 +74,73 @@ Send back:
 | `ld` lists nothing, but `system_profiler` shows the device | Note it and stop. It may be a macOS USB permission or driver issue. |
 | `td` hangs or times out | Unplug, press RST, and stop. ReChord's Linux guide disables USB autosuspend, which has no macOS switch; a Linux machine or live USB may be needed. |
 | The player won't start normally after step 5 | Press RST, wait 10 s, try Power again. If it still won't start, stop and tell me before doing anything else. |
+
+# Recovery write test (Phase 2b)
+
+The dry run showed the Mac can talk to the player in maskrom. This part proves the actual recovery: writing FiiO's stock 3.7.0 firmware back through maskrom. That's the same firmware the player runs now, so a success leaves it as it was. Do this before any of our images is installed, because getting back from ours depends on it.
+
+The sequence (`ld`, `td`, `wl 0`, `rd`) is the one ReChord used for every recovery, on Ubuntu (`docs/device-facts.md` 2.3). It hasn't been run on macOS.
+
+## 1. Before you start
+
+1. Internal storage may be wiped. Copy anything you want to keep off the player first (it was empty on 2026-10-14).
+2. Remove the microSD card.
+3. Check the stock image. The hash must match exactly:
+
+   ```sh
+   shasum -a 256 ~/echo-mini-blobs/stock-3.7.0/"ECHO MINI V3.7.0"/HIFIEC37.IMG
+   ```
+
+   Expected: `eba715acbc55875fd3be4b9b1f5f58c777bca130049320043ffc09bc2866b228`. If it differs, stop.
+4. Use the same cable and Mac port as the dry run, connected directly, not through a hub. Keep the Mac awake and plugged in.
+
+## 2. Enter maskrom and check
+
+Same as in the dry run:
+1. Press RST about 1 s and release.
+2. Hold every button except Power, plug in USB, and release after 2–3 s.
+
+Then run:
+
+```sh
+cd ~/echo-mini-fw/external/rkdeveloptool
+./rkdeveloptool ld
+./rkdeveloptool td
+```
+
+Continue only if `ld` says `Maskrom` and `td` says `Test Device OK.`
+
+## 3. Write the stock image
+
+```sh
+./rkdeveloptool wl 0 ~/echo-mini-blobs/stock-3.7.0/"ECHO MINI V3.7.0"/HIFIEC37.IMG
+```
+
+- It writes 32 MiB in small transfers, so it may take a while. Don't unplug, don't let the Mac sleep, and don't run anything else until it finishes.
+- Save the full output, the last lines especially.
+
+If it succeeded:
+
+```sh
+./rkdeveloptool rd
+```
+
+## 4. Check
+
+The player should restart into stock firmware. If it stays black after `rd`, unplug USB, press RST, then press Power. Then:
+- Settings shows version 3.7.0.
+- Over USB, the ECHO MINI drive appears on the Mac.
+
+## Rules
+
+- Never run `db`. Never write anything except the whole stock image (no `ul`, `ef`, `wlx`, unpacked parts or RKAF tools).
+- If any command fails or hangs (more than about a minute with no progress, or an error), the session is wedged:
+  1. Press Ctrl+C, unplug, and press RST.
+  2. Enter maskrom again and start over from `ld`.
+  3. If `wl` fails twice the same way, stop and send me the output. The fallback is the same commands from a Linux machine or live USB, which is what ReChord's recoveries used.
+- A failed `wl` can leave the player unable to start until a later `wl` succeeds. That's expected, and it's why this is tested now, with the known-good stock image, rather than after one of ours.
+
+## Report
+
+- the output of `ld`, `td`, `wl` and `rd`
+- whether the player started stock 3.7.0 afterwards, and whether the drive appears over USB
