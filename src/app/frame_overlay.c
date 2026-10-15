@@ -6,7 +6,9 @@
 
 enum {
     OVERLAY_WIDTH = 120,
-    OVERLAY_HEIGHT = 18,
+    OVERLAY_LINE_HEIGHT = 18,
+    OVERLAY_LINES = 2,
+    OVERLAY_HEIGHT = OVERLAY_LINE_HEIGHT * OVERLAY_LINES,
     OVERLAY_MARGIN = 4,
     MICROSECONDS_PER_MILLISECOND = 1000
 };
@@ -41,16 +43,37 @@ void frame_overlay_format(FrameBreakdown breakdown, char *text, size_t capacity)
     append_milliseconds(&builder, " s", breakdown.send_us);
 }
 
-void frame_overlay_draw(Canvas *canvas, const Theme *theme, FrameBreakdown breakdown)
+void frame_overlay_format_audio(HalAudioStats stats, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append(&builder, "b");
+    string_builder_append_unsigned(&builder, stats.buffered_ms);
+    string_builder_append(&builder, " x");
+    string_builder_append_unsigned(&builder, stats.underruns);
+    append_milliseconds(&builder, " d", stats.decode_max_us);
+    append_milliseconds(&builder, " c", stats.read_max_us);
+}
+
+static void draw_line(Canvas *canvas, const Theme *theme, Rect area, const char *text)
+{
+    TextStyle style = {.font = theme->fonts.small, .color = OVERLAY_TEXT};
+    label_draw(canvas, style,
+               (Label){.area = label_centered_area(style.font, area, text), .text = text});
+}
+
+void frame_overlay_draw(Canvas *canvas, const Theme *theme, FrameBreakdown breakdown,
+                        HalAudioStats stats)
 {
     Rect area = frame_overlay_area();
     if (rect_is_empty(rect_intersection(area, canvas->clip))) {
         return;
     }
     char text[FRAME_OVERLAY_TEXT_CAPACITY];
-    frame_overlay_format(breakdown, text, sizeof text);
-    TextStyle style = {.font = theme->fonts.small, .color = OVERLAY_TEXT};
     canvas_fill_rect(canvas, area, frame_overlay_background());
-    label_draw(canvas, style,
-               (Label){.area = label_centered_area(style.font, area, text), .text = text});
+    Rect line = {area.x, area.y, area.width, OVERLAY_LINE_HEIGHT};
+    frame_overlay_format(breakdown, text, sizeof text);
+    draw_line(canvas, theme, line, text);
+    line.y += OVERLAY_LINE_HEIGHT;
+    frame_overlay_format_audio(stats, text, sizeof text);
+    draw_line(canvas, theme, line, text);
 }

@@ -116,6 +116,7 @@ static bool start_track(AudioEngine *engine, const char *path, uint32_t start_ms
 {
     close_file(engine);
     reset_positions(engine);
+    engine->stats = (AudioEngineStats){0};
     engine->failed = false;
     if (!open_track(engine, path, start_ms)) {
         engine->state = AUDIO_ENGINE_STOPPED;
@@ -271,6 +272,7 @@ static void decode_one(AudioEngine *engine)
     engine->skip_frames = 0;
     engine->pending_offset = skip;
     engine->pending_frames = decoder->block_samples - skip;
+    engine->stats.frames++;
 }
 
 static void drop_finished_segments(AudioEngine *engine)
@@ -284,16 +286,24 @@ static void drop_finished_segments(AudioEngine *engine)
     }
 }
 
-void audio_engine_pump(AudioEngine *engine, uint32_t consumed)
+void audio_engine_observe(AudioEngine *engine, uint32_t consumed)
 {
     engine->consumed = consumed;
     if ((int32_t)(engine->produced - engine->consumed) < 0) {
+        if (engine->decoding) {
+            engine->stats.underruns++;
+        }
         engine->produced = engine->consumed;
     }
     drop_finished_segments(engine);
     if (engine->ended && (int32_t)(engine->consumed - engine->end_at) >= 0) {
         engine->state = AUDIO_ENGINE_STOPPED;
     }
+}
+
+void audio_engine_pump(AudioEngine *engine, uint32_t consumed)
+{
+    audio_engine_observe(engine, consumed);
     if (engine->rate_pending) {
         return;
     }
@@ -338,6 +348,11 @@ uint32_t audio_engine_rate(const AudioEngine *engine)
 uint32_t audio_engine_buffered(const AudioEngine *engine, uint32_t consumed)
 {
     return engine->produced - consumed;
+}
+
+AudioEngineStats audio_engine_stats(const AudioEngine *engine)
+{
+    return engine->stats;
 }
 
 AudioEngineStatus audio_engine_status(const AudioEngine *engine)

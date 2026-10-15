@@ -27,6 +27,7 @@
 #define CMD_BASE 0xA0002000u
 #define CMD_UPDATE_CLOCK 0x80202000u
 #define CMD_INITIALISE (1u << 15)
+#define CMD_STOP_ABORT (1u << 14)
 #define CMD_DATA_READ 0x340u
 #define CMD_WRITE (1u << 10)
 #define CMD_CHECK_CRC (1u << 8)
@@ -64,6 +65,9 @@
 enum {
     BLOCK_WORDS = 128,
     BLOCK_BYTES = 512,
+    CMD_READ_SINGLE_BLOCK_INDEX = 17,
+    CMD_READ_MULTIPLE_BLOCK = 18,
+    CMD_STOP_TRANSMISSION = 12,
     COMMAND_TIMEOUT_MS = 100,
     BUSY_TIMEOUT_MS = 1000,
     DATA_TIMEOUT_MS = 500,
@@ -240,18 +244,18 @@ static bool prepare_data(const MmcHost *host)
     return true;
 }
 
-static bool drain_fifo(const MmcHost *host, uint32_t *words)
+static bool drain_fifo(const MmcHost *host, uint32_t *words, uint32_t total)
 {
     uint32_t received = 0;
     uint32_t start = hal_clock_milliseconds();
-    while (received < BLOCK_WORDS) {
+    while (received < total) {
         if ((read_register(host, MMC_RINTSTS) & INT_DATA_ABORT) != 0 ||
             hal_clock_milliseconds() - start > DATA_TIMEOUT_MS) {
             return false;
         }
         uint32_t status = read_register(host, MMC_STATUS);
         uint32_t count = (status >> STATUS_FIFO_COUNT_SHIFT) & STATUS_FIFO_COUNT_MASK;
-        while (count-- > 0 && received < BLOCK_WORDS) {
+        while (count-- > 0 && received < total) {
             words[received++] = read_register(host, MMC_FIFO);
         }
     }
@@ -260,20 +264,21 @@ static bool drain_fifo(const MmcHost *host, uint32_t *words)
 
 static bool failed(const MmcHost *host, MmcStep step);
 
-bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32_t *words)
+static bool read_data(const MmcHost *host, uint8_t index, uint32_t address, uint32_t count,
+                      uint32_t *words)
 {
     if (!prepare_data(host)) {
         return failed(host, MMC_STEP_BUSY_BEFORE);
     }
     write_register(host, MMC_BLKSIZ, BLOCK_BYTES);
-    write_register(host, MMC_BYTCNT, BLOCK_BYTES);
+    write_register(host, MMC_BYTCNT, BLOCK_BYTES * count);
     write_register(host, MMC_RINTSTS, INT_ALL);
     write_register(host, MMC_CMDARG, address);
     write_register(host, MMC_CMD, CMD_BASE | CMD_DATA_READ | index);
     if (!wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS)) {
         return failed(host, MMC_STEP_COMMAND_START);
     }
-    if (!drain_fifo(host, words)) {
+    if (!drain_fifo(host, words, BLOCK_WORDS * count)) {
         return failed(host, MMC_STEP_FIFO);
     }
     if (!wait_any(host, MMC_RINTSTS, INT_DATA_FINISHED, DATA_TIMEOUT_MS)) {
@@ -284,6 +289,41 @@ bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32
     }
     write_register(host, MMC_RINTSTS, INT_ALL);
     return true;
+}
+
+bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32_t *words)
+{
+    return read_data(host, index, address, 1, words);
+}
+
+static bool stop_transmission(const MmcHost *host, uint32_t argument)
+{
+    write_register(host, MMC_RINTSTS, INT_ALL);
+    write_register(host, MMC_CMDARG, argument);
+    write_register(host, MMC_CMD,
+                   CMD_BASE | CMD_STOP_ABORT | CMD_RESPONSE | CMD_CHECK_CRC |
+                       CMD_STOP_TRANSMISSION);
+    SdCommand stop = {CMD_STOP_TRANSMISSION, argument, SD_RESPONSE_SHORT_BUSY, false};
+    if (!wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS) ||
+        !wait_any(host, MMC_RINTSTS, INT_COMMAND_DONE, COMMAND_TIMEOUT_MS) ||
+        command_failed(stop, read_register(host, MMC_RINTSTS))) {
+        return failed(host, MMC_STEP_STOP);
+    }
+    if (!wait_clear(host, MMC_STATUS, STATUS_CARD_BUSY, BUSY_TIMEOUT_MS)) {
+        return failed(host, MMC_STEP_BUSY_AFTER);
+    }
+    write_register(host, MMC_RINTSTS, INT_ALL);
+    return true;
+}
+
+bool mmc_read_blocks(const MmcHost *host, uint32_t address, uint32_t count, uint32_t stop_argument,
+                     uint32_t *words)
+{
+    if (count == 1) {
+        return read_data(host, CMD_READ_SINGLE_BLOCK_INDEX, address, 1, words);
+    }
+    bool read = read_data(host, CMD_READ_MULTIPLE_BLOCK, address, count, words);
+    return stop_transmission(host, stop_argument) && read;
 }
 
 static bool fill_fifo(const MmcHost *host, const uint32_t *words)

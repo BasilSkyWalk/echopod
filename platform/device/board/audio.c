@@ -19,7 +19,8 @@ enum {
     IDLE_SHUTDOWN_MS = 3000,
     TONE_RATE_HZ = 44100,
     TONE_PERIOD_SAMPLES = 100,
-    TONE_AMPLITUDE = 9000
+    TONE_AMPLITUDE = 9000,
+    MILLISECONDS_PER_SECOND = 1000
 };
 
 static FlacDecoder decoder;
@@ -37,11 +38,36 @@ static uint32_t ring_words;
 static bool stopped_waiting;
 static uint32_t stopped_since_ms;
 static bool tone_active;
+static HalAudioStats stats;
+static uint32_t read_us_pending;
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
     const HalFile *open = context;
-    return hal_file_read(*open, offset, buffer, length);
+    uint32_t started_us = hal_clock_microseconds();
+    bool read = hal_file_read(*open, offset, buffer, length);
+    read_us_pending += hal_clock_microseconds() - started_us;
+    return read;
+}
+
+static uint32_t larger(uint32_t a, uint32_t b)
+{
+    return a > b ? a : b;
+}
+
+static void pump(uint32_t consumed_words)
+{
+    uint32_t frames = audio_engine_stats(&engine).frames;
+    read_us_pending = 0;
+    uint32_t started_us = hal_clock_microseconds();
+    audio_engine_pump(&engine, consumed_words);
+    if (audio_engine_stats(&engine).frames == frames) {
+        return;
+    }
+    stats.decode_us = hal_clock_microseconds() - started_us;
+    stats.decode_max_us = larger(stats.decode_max_us, stats.decode_us);
+    stats.read_us = read_us_pending;
+    stats.read_max_us = larger(stats.read_max_us, stats.read_us);
 }
 
 static bool open_file(void *context, const char *path, FlacInput *input)
@@ -145,8 +171,9 @@ static bool start_output(void)
     if (!ensure_path(audio_engine_rate(&engine))) {
         return false;
     }
+    stats = (HalAudioStats){0};
     for (int round = 0; round < PREFILL_ROUNDS; round++) {
-        audio_engine_pump(&engine, 0);
+        pump(0);
     }
     stopped_waiting = false;
     return start_transfer(RING_WORDS);
@@ -249,7 +276,7 @@ HalAudioStatus hal_audio_status(void)
 {
     ensure_engine();
     update_consumed();
-    audio_engine_pump(&engine, consumed);
+    audio_engine_observe(&engine, consumed);
     AudioEngineStatus status = audio_engine_status(&engine);
     return (HalAudioStatus){.state = state_of(status.state),
                             .token = status.token,
@@ -294,9 +321,24 @@ void hal_audio_service(void)
         return;
     }
     update_consumed();
-    audio_engine_pump(&engine, consumed);
+    pump(consumed);
     change_rate();
     shut_down_when_idle();
+}
+
+HalAudioStats hal_audio_stats(void)
+{
+    HalAudioStats result = stats;
+    if (!engine_ready || !transferring || tone_active) {
+        return result;
+    }
+    result.underruns = audio_engine_stats(&engine).underruns;
+    uint32_t rate = audio_engine_rate(&engine);
+    if (rate > 0) {
+        result.buffered_ms = (uint32_t)((uint64_t)audio_engine_buffered(&engine, consumed) *
+                                        MILLISECONDS_PER_SECOND / rate);
+    }
+    return result;
 }
 
 HalToneResult hal_audio_dma_tone_start(void)

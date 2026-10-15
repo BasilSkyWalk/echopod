@@ -208,13 +208,22 @@ bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, u
         return false;
     }
     uint8_t *out = buffer;
+    uint32_t last_sector = (file->size - 1) / FAT_SECTOR_SIZE;
     while (length > 0) {
         uint32_t within = offset % FAT_SECTOR_SIZE;
         uint32_t chunk = FAT_SECTOR_SIZE - within < length ? FAT_SECTOR_SIZE - within : length;
+        uint32_t sector_index = offset / FAT_SECTOR_SIZE;
         uint32_t lba = 0;
-        if (!fat_file_sector(volume, file, offset / FAT_SECTOR_SIZE, &lba) ||
-            !fat_read_sector(volume, lba)) {
+        if (!fat_file_sector(volume, file, sector_index, &lba)) {
             return false;
+        }
+        if (!fat_sector_cached(volume, lba)) {
+            uint32_t ahead = last_sector - sector_index + 1;
+            uint32_t run = fat_run_length(volume, file, sector_index,
+                                          ahead < FAT_CACHE_SECTORS ? ahead : FAT_CACHE_SECTORS);
+            if (run == 0 || !fat_read_run(volume, lba, run)) {
+                return false;
+            }
         }
         const uint8_t *source = fat_cached_sector(volume) + within;
         for (uint32_t index = 0; index < chunk; index++) {

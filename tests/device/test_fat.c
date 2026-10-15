@@ -268,6 +268,40 @@ static void exfat_reads_at_offsets_cross_cluster_boundaries(void)
     sparse_card_free(&card->sparse);
 }
 
+static void a_long_read_of_consecutive_sectors_takes_one_block_read(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    uint8_t bytes[4096];
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    card->sparse.calls = 0;
+    card->sparse.reads = 0;
+    CHECK(fat_read(&card->volume, &file, 0, bytes, 4096));
+    check_pattern(bytes, 5, 0, 4096);
+    CHECK_EQUAL(1u, card->sparse.calls);
+    CHECK_EQUAL(8u, card->sparse.reads);
+    CHECK(fat_read(&card->volume, &file, 4096, bytes, 4096));
+    check_pattern(bytes, 5, 4096, 4096);
+    CHECK_EQUAL(2u, card->sparse.calls);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_read_that_starts_inside_the_cached_run_reads_only_the_rest(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    uint8_t bytes[4096];
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    CHECK(fat_read(&card->volume, &file, 0, bytes, 4096));
+    card->sparse.calls = 0;
+    card->sparse.reads = 0;
+    CHECK(fat_read(&card->volume, &file, 3000, bytes, 4096));
+    check_pattern(bytes, 5, 3000, 4096);
+    CHECK_EQUAL(1u, card->sparse.calls);
+    CHECK_EQUAL(8u, card->sparse.reads);
+    sparse_card_free(&card->sparse);
+}
+
 static void exfat_names_match_like_fat_names(void)
 {
     Card *card = mounted("exfat_mbr");
@@ -303,6 +337,8 @@ int main(void)
         TEST_CASE(exfat_files_read_back_their_bytes),
         TEST_CASE(an_exfat_folder_with_a_cluster_chain_is_searched_to_its_end),
         TEST_CASE(exfat_reads_at_offsets_cross_cluster_boundaries),
+        TEST_CASE(a_long_read_of_consecutive_sectors_takes_one_block_read),
+        TEST_CASE(a_read_that_starts_inside_the_cached_run_reads_only_the_rest),
         TEST_CASE(exfat_names_match_like_fat_names),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

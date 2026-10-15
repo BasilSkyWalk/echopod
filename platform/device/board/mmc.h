@@ -13,7 +13,8 @@ typedef enum MmcStep {
     MMC_STEP_DATA_WAIT,
     MMC_STEP_DATA_ERROR,
     MMC_STEP_BUSY_AFTER,
-    MMC_STEP_TRANSFER_STATE
+    MMC_STEP_TRANSFER_STATE,
+    MMC_STEP_STOP
 } MmcStep;
 
 typedef struct MmcFailure {
@@ -34,6 +35,8 @@ void mmc_reset_controller(const MmcHost *host);
 void mmc_power_cycle(const MmcHost *host);
 bool mmc_command(const MmcHost *host, SdCommand command, uint32_t response[4]);
 bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32_t *words);
+bool mmc_read_blocks(const MmcHost *host, uint32_t address, uint32_t count, uint32_t stop_argument,
+                     uint32_t *words);
 bool mmc_write_block(const MmcHost *host, uint8_t index, uint32_t address, const uint32_t *words);
 void mmc_set_clock(const MmcHost *host, SdClock clock);
 void mmc_set_bus_width(const MmcHost *host, uint8_t bits);

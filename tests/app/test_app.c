@@ -221,6 +221,15 @@ static void the_frame_overlay_splits_the_frame_time(void)
     CHECK(strcmp("190 u12 d120 s58", text) == 0);
 }
 
+static void the_frame_overlay_shows_the_audio_numbers(void)
+{
+    char text[FRAME_OVERLAY_TEXT_CAPACITY];
+    HalAudioStats stats = {
+        .buffered_ms = 340, .underruns = 2, .decode_max_us = 38400, .read_max_us = 11600};
+    frame_overlay_format_audio(stats, text, sizeof text);
+    CHECK(strcmp("b340 x2 d38 c12", text) == 0);
+}
+
 static void open_music_entry(int index)
 {
     tap(KEY_PLAY);
@@ -1016,6 +1025,7 @@ int main(void)
         TEST_CASE(a_long_back_returns_home_from_deep_screens),
         TEST_CASE(the_frame_overlay_is_off_until_enabled_in_diagnostics),
         TEST_CASE(the_frame_overlay_splits_the_frame_time),
+        TEST_CASE(the_frame_overlay_shows_the_audio_numbers),
         TEST_CASE(diagnostics_shows_the_firmware_version_from_the_hal),
         TEST_CASE(albums_open_from_the_library),
         TEST_CASE(an_artist_leads_to_their_albums),

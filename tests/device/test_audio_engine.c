@@ -278,9 +278,51 @@ static void the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size(void)
     CHECK(audio_engine_buffered(&engine, 0) >= RING_WORDS - 4608);
 }
 
+static void observing_the_dma_position_never_decodes(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+    pump_until_full(0);
+    uint32_t produced = audio_engine_buffered(&engine, 0);
+    audio_engine_observe(&engine, 4410);
+    CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+    CHECK_EQUAL(produced - 4410, audio_engine_buffered(&engine, 4410));
+    audio_engine_pump(&engine, 4410);
+    CHECK(audio_engine_buffered(&engine, 4410) > produced - 4410);
+}
+
+static void the_dma_overtaking_the_decoder_counts_an_underrun(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "constant_and_noise", 0, 7));
+    pump_until_full(0);
+    CHECK_EQUAL(0u, audio_engine_stats(&engine).underruns);
+    audio_engine_pump(&engine, RING_WORDS + 100);
+    CHECK_EQUAL(1u, audio_engine_stats(&engine).underruns);
+    CHECK(audio_engine_buffered(&engine, RING_WORDS + 100) <= RING_WORDS);
+    audio_engine_pump(&engine, RING_WORDS + 200);
+    CHECK_EQUAL(1u, audio_engine_stats(&engine).underruns);
+}
+
+static void every_decoded_frame_is_counted(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+    CHECK_EQUAL(0u, audio_engine_stats(&engine).frames);
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(1u, audio_engine_stats(&engine).frames);
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(2u, audio_engine_stats(&engine).frames);
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(2u, audio_engine_stats(&engine).frames);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(observing_the_dma_position_never_decodes),
+        TEST_CASE(the_dma_overtaking_the_decoder_counts_an_underrun),
+        TEST_CASE(every_decoded_frame_is_counted),
         TEST_CASE(playing_fills_the_ring_with_the_track),
         TEST_CASE(the_position_follows_what_the_dma_consumed),
         TEST_CASE(twenty_four_bit_audio_is_rounded_to_sixteen),

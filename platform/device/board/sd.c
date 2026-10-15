@@ -29,7 +29,6 @@ enum {
     GATE_SD_BUS = 0x18,
     GATE_SD_CARD_CLOCK = 0x6B,
     RESET_SD = 0x12,
-    CMD_READ_SINGLE_BLOCK = 17,
     CMD_WRITE_BLOCK = 24,
     CMD_SEND_STATUS = 13,
     STATUS_TRIES = 1000,
@@ -110,25 +109,14 @@ static void power_controller(void)
     board_delay_ms(POWER_SETTLE_MS);
 }
 
-static bool read_aligned(uint32_t lba, uint32_t *words)
-{
-    return mmc_read_block(&SD_HOST, CMD_READ_SINGLE_BLOCK, sd_card_address(&card, lba), words);
-}
-
 bool sd_read(void *context, uint32_t lba, uint32_t count, void *buffer)
 {
     (void)context;
-    if (!ready) {
+    if (!ready || count == 0 || lba >= card.sector_count || count > card.sector_count - lba) {
         return false;
     }
-    uint8_t *bytes = buffer;
-    for (uint32_t index = 0; index < count; index++) {
-        if (lba >= card.sector_count || index >= card.sector_count - lba ||
-            !read_aligned(lba + index, (uint32_t *)(void *)(bytes + index * 512u))) {
-            return false;
-        }
-    }
-    return true;
+    return mmc_read_blocks(&SD_HOST, sd_card_address(&card, lba), count,
+                           sd_card_rca_argument(&card), buffer);
 }
 
 static bool start_card(void)

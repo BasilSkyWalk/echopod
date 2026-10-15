@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "gfx/canvas.h"
+#include "hal/audio.h"
 #include "ui/theme.h"
 
 enum {
@@ -20,4 +21,6 @@ typedef struct FrameBreakdown {
 Rect frame_overlay_area(void);
 Color frame_overlay_background(void);
 void frame_overlay_format(FrameBreakdown breakdown, char *text, size_t capacity);
-void frame_overlay_draw(Canvas *canvas, const Theme *theme, FrameBreakdown breakdown);
+void frame_overlay_format_audio(HalAudioStats stats, char *text, size_t capacity);
+void frame_overlay_draw(Canvas *canvas, const Theme *theme, FrameBreakdown breakdown,
+                        HalAudioStats stats);

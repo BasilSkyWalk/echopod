@@ -315,7 +315,7 @@ static void draw_frame(void *context, Canvas *canvas)
             .draw_us = frame_stats_average_us(&state->draw_stats),
             .send_us = frame_stats_average_us(&state->send_stats),
         };
-        frame_overlay_draw(canvas, &DEFAULT_THEME, breakdown);
+        frame_overlay_draw(canvas, &DEFAULT_THEME, breakdown, hal_audio_stats());
     }
 }
 

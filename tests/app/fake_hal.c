@@ -414,6 +414,11 @@ void hal_audio_service(void)
     fake.audio_service_count++;
 }
 
+HalAudioStats hal_audio_stats(void)
+{
+    return (HalAudioStats){0};
+}
+
 HalToneDetail hal_audio_tone_detail(void)
 {
     return (HalToneDetail){.stage = 0, .pending = 0};

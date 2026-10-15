@@ -41,6 +41,11 @@ typedef struct AudioEngineStatus {
     bool failed;
 } AudioEngineStatus;
 
+typedef struct AudioEngineStats {
+    uint32_t underruns;
+    uint32_t frames;
+} AudioEngineStats;
+
 typedef struct AudioEngine {
     AudioEngineConfig config;
     AudioEngineState state;
@@ -62,6 +67,7 @@ typedef struct AudioEngine {
     uint32_t next_token;
     char next_path[AUDIO_ENGINE_PATH_CAPACITY];
     uint32_t gain;
+    AudioEngineStats stats;
 } AudioEngine;
 
 void audio_engine_init(AudioEngine *engine, AudioEngineConfig config);
@@ -72,7 +78,9 @@ bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms);
 void audio_engine_pause(AudioEngine *engine);
 void audio_engine_resume(AudioEngine *engine);
 void audio_engine_stop(AudioEngine *engine);
+void audio_engine_observe(AudioEngine *engine, uint32_t consumed);
 void audio_engine_pump(AudioEngine *engine, uint32_t consumed);
+AudioEngineStats audio_engine_stats(const AudioEngine *engine);
 bool audio_engine_wants_rate(const AudioEngine *engine, uint32_t *rate);
 void audio_engine_restart(AudioEngine *engine);
 uint32_t audio_engine_rate(const AudioEngine *engine);

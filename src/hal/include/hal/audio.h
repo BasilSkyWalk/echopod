@@ -31,6 +31,15 @@ typedef struct HalAudioStatus {
     bool failed;
 } HalAudioStatus;
 
+typedef struct HalAudioStats {
+    uint32_t buffered_ms;
+    uint32_t underruns;
+    uint32_t decode_us;
+    uint32_t decode_max_us;
+    uint32_t read_us;
+    uint32_t read_max_us;
+} HalAudioStats;
+
 typedef enum HalToneResult {
     HAL_TONE_PLAYED,
     HAL_TONE_NO_DAC,
@@ -59,6 +68,7 @@ void hal_audio_set_volume(uint8_t level);
 void hal_audio_set_gain(HalAudioGain gain);
 void hal_audio_set_output(HalAudioOutput output);
 HalAudioStatus hal_audio_status(void);
+HalAudioStats hal_audio_stats(void);
 void hal_audio_service(void);
 HalToneResult hal_audio_test_tone(void);
 HalToneDetail hal_audio_tone_detail(void);

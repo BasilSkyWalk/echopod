@@ -7,6 +7,7 @@
 
 enum {
     FAT_SECTOR_SIZE = 512,
+    FAT_CACHE_SECTORS = 8,
     FAT_LONG_NAME_CAPACITY = 260
 };
 
@@ -36,11 +37,12 @@ typedef struct FatVolume {
     uint32_t data_start;
     uint32_t cluster_count;
     uint32_t cluster_shift;
-    uint32_t sector_lba;
+    uint32_t cache_lba;
+    uint32_t cache_count;
+    uint32_t cache_index;
     uint32_t fat_sector_lba;
-    bool sector_valid;
     bool fat_sector_valid;
-    uint32_t sector[FAT_SECTOR_SIZE / 4];
+    uint32_t cache[FAT_CACHE_SECTORS * FAT_SECTOR_SIZE / 4];
     uint32_t fat_sector[FAT_SECTOR_SIZE / 4];
     uint16_t long_name[FAT_LONG_NAME_CAPACITY];
 } FatVolume;

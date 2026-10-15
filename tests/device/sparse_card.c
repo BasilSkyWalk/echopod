@@ -77,6 +77,7 @@ static bool read_sectors(void *context, uint32_t lba, uint32_t count, void *buff
         return false;
     }
     card->reads += count;
+    card->calls++;
     memcpy(buffer, card->bytes + (size_t)lba * SECTOR_SIZE, (size_t)count * SECTOR_SIZE);
     return true;
 }

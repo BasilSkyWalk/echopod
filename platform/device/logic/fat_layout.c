@@ -28,17 +28,37 @@ uint32_t fat_le32(const uint8_t *bytes)
 
 const uint8_t *fat_cached_sector(const FatVolume *volume)
 {
-    return (const uint8_t *)volume->sector;
+    return (const uint8_t *)volume->cache + volume->cache_index * FAT_SECTOR_SIZE;
+}
+
+bool fat_sector_cached(FatVolume *volume, uint32_t lba)
+{
+    if (lba < volume->cache_lba || lba - volume->cache_lba >= volume->cache_count) {
+        return false;
+    }
+    volume->cache_index = lba - volume->cache_lba;
+    return true;
+}
+
+bool fat_read_run(FatVolume *volume, uint32_t lba, uint32_t count)
+{
+    if (fat_sector_cached(volume, lba)) {
+        return true;
+    }
+    count = count < FAT_CACHE_SECTORS ? count : FAT_CACHE_SECTORS;
+    volume->cache_lba = lba;
+    volume->cache_index = 0;
+    volume->cache_count = 0;
+    if (!volume->device.read(volume->device.context, lba, count, volume->cache)) {
+        return false;
+    }
+    volume->cache_count = count;
+    return true;
 }
 
 bool fat_read_sector(FatVolume *volume, uint32_t lba)
 {
-    if (volume->sector_valid && volume->sector_lba == lba) {
-        return true;
-    }
-    volume->sector_lba = lba;
-    volume->sector_valid = volume->device.read(volume->device.context, lba, 1, volume->sector);
-    return volume->sector_valid;
+    return fat_read_run(volume, lba, 1);
 }
 
 static bool is_exfat_boot_sector(const uint8_t *sector)
@@ -219,6 +239,21 @@ FatFile fat_root_directory(const FatVolume *volume)
 {
     uint32_t first = volume->type == FAT_TYPE_16 ? 0 : volume->root_cluster;
     return (FatFile){.first_cluster = first, .size = UINT32_MAX, .directory = true};
+}
+
+uint32_t fat_run_length(FatVolume *volume, FatFile *file, uint32_t sector_index, uint32_t limit)
+{
+    uint32_t first = 0;
+    if (!fat_file_sector(volume, file, sector_index, &first)) {
+        return 0;
+    }
+    uint32_t length = 1;
+    uint32_t lba = first;
+    while (length < limit && fat_file_sector(volume, file, sector_index + length, &lba) &&
+           lba == first + length) {
+        length++;
+    }
+    return length;
 }
 
 const uint8_t *fat_read_entry(FatVolume *volume, FatFile *directory, uint32_t index)
