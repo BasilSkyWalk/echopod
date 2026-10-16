@@ -56,7 +56,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | ReplayGain | todo | ReChord's player supports track/album (host-tested) |
 | Lyrics (.lrc) | todo | |
 | USB DAC mode | todo | |
-| Bluetooth | in progress | External module with its own stack: GPIO2.7 power, UART1 115,200 ASCII commands, audio likely analog from the DAC (facts 13). Step 1: Diagnostics → Bluetooth (power, ready check, scan list) |
+| Bluetooth | in progress | External module with its own stack: GPIO2.7 power, UART1 115,200 ASCII commands, audio likely analog from the DAC (facts 13). Step 1 done on hardware (`d0df057`): power, ready check and scan list work. Next: pairing |
 
 ## Platform
 
