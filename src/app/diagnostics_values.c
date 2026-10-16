@@ -216,3 +216,26 @@ void diagnostics_boot_hold_text(HalPowerHold hold, char *text, size_t capacity)
     string_builder_append(&builder, hold.output ? " output" : " input");
     string_builder_append(&builder, hold.high ? " high" : " low");
 }
+
+void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!info.warm) {
+        string_builder_append(&builder, "Cold start");
+        return;
+    }
+    if (info.fault_status != 0 || info.hard_fault_status != 0) {
+        string_builder_append(&builder, "Fault at ");
+        append_hex(&builder, info.fault_pc, 8);
+        return;
+    }
+    string_builder_append_char(&builder, '#');
+    string_builder_append_unsigned(&builder, info.starts);
+    if (info.previous_power_off) {
+        string_builder_append(&builder, " after power-off");
+        return;
+    }
+    string_builder_append(&builder, " reset after ");
+    string_builder_append_unsigned(&builder, info.previous_uptime_ms / 1000u);
+    string_builder_append(&builder, " s");
+}

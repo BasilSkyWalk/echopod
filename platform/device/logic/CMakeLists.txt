@@ -18,6 +18,7 @@ add_library(echo_device_logic STATIC
     msc.c
     panel.c
     pll.c
+    start_record.c
     sd_card.c
     tick_clock.c
     updater.c

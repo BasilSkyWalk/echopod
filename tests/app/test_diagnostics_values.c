@@ -209,11 +209,30 @@ static void the_boot_hold_row_shows_how_the_rom_left_the_pin(void)
     CHECK(text_is("fn2 output low", text));
 }
 
+static void the_last_start_row_tells_cold_starts_resets_and_faults_apart(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_start_text((HalStartInfo){.warm = false, .starts = 1}, text, sizeof text);
+    CHECK(text_is("Cold start", text));
+    diagnostics_start_text((HalStartInfo){.warm = true, .starts = 3, .previous_uptime_ms = 61400},
+                           text, sizeof text);
+    CHECK(text_is("#3 reset after 61 s", text));
+    diagnostics_start_text((HalStartInfo){.warm = true, .starts = 2, .previous_power_off = true},
+                           text, sizeof text);
+    CHECK(text_is("#2 after power-off", text));
+    diagnostics_start_text(
+        (HalStartInfo){
+            .warm = true, .starts = 2, .fault_status = 0x00020000u, .fault_pc = 0x0305ABCDu},
+        text, sizeof text);
+    CHECK(text_is("Fault at 0305ABCD", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
+        TEST_CASE(the_last_start_row_tells_cold_starts_resets_and_faults_apart),
         TEST_CASE(the_boot_hold_row_shows_how_the_rom_left_the_pin),
         TEST_CASE(the_battery_row_shows_millivolts_and_the_charger_state),
         TEST_CASE(the_core_1_row_is_empty_until_run),

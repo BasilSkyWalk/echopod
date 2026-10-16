@@ -25,6 +25,18 @@ typedef struct HalLoopCycles {
 
 HalLoopCycles hal_system_loop_cycles(void);
 
+typedef struct HalStartInfo {
+    bool warm;
+    uint32_t starts;
+    uint32_t previous_uptime_ms;
+    bool previous_power_off;
+    uint32_t fault_status;
+    uint32_t hard_fault_status;
+    uint32_t fault_pc;
+} HalStartInfo;
+
+HalStartInfo hal_system_start_info(void);
+
 typedef enum HalCore1Status {
     HAL_CORE1_RAN,
     HAL_CORE1_UNAVAILABLE,

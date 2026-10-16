@@ -58,6 +58,7 @@ void hal_power_off(void)
     }
     gpio_output(BACKLIGHT, false);
     __asm__ volatile("cpsid i" ::: "memory");
+    board_start_record_power_off();
     gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
     gpio_output(POWER_HOLD, false);
     for (;;) {

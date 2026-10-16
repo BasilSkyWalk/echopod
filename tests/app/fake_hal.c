@@ -537,3 +537,8 @@ HalPowerHold hal_power_boot_hold(void)
 {
     return (HalPowerHold){.function = 0, .output = true, .high = true};
 }
+
+HalStartInfo hal_system_start_info(void)
+{
+    return (HalStartInfo){.warm = false, .starts = 1};
+}

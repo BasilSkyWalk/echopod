@@ -31,6 +31,13 @@ SECTIONS
         device_bss_end = .;
     } > DATA_RAM
 
+    .noinit (NOLOAD) :
+    {
+        *(.noinit .noinit.*)
+        . = ALIGN(4);
+        device_noinit_end = .;
+    } > DATA_RAM
+
     .comment 0 : { *(.comment) }
     .ARM.attributes 0 : { *(.ARM.attributes) }
 
@@ -44,4 +51,4 @@ SECTIONS
 ASSERT(ADDR(.code) == 0x03050000, "the code vector table must be at 0x03050000")
 ASSERT(ADDR(.data) == 0x03004000, "the entry vector must be at 0x03004000")
 ASSERT(SIZEOF(.data) == 8, "only the entry vector may be in .data: make initialised globals const")
-ASSERT(device_bss_end <= 0x0304C000, ".data and .bss must end below 0x0304C000")
+ASSERT(device_noinit_end <= 0x0304C000, ".data, .bss and .noinit must end below 0x0304C000")

@@ -16,6 +16,7 @@ add_executable(echo_device
     board/mmc.c
     board/power.c
     board/sd.c
+    board/start_info.c
     board/startup.c
     board/storage.c
     board/system.c

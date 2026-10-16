@@ -277,7 +277,8 @@ def check_sections(sections):
     if ".code" not in sections or ".data" not in sections:
         raise ImageError("the ELF needs .code and .data sections")
     stray = [name for name, section in sections.items()
-             if section.flags & SHF_ALLOC and section.size and name not in FIRMWARE_SECTIONS]
+             if section.flags & SHF_ALLOC and section.size and section.kind != SHT_NOBITS
+             and name not in FIRMWARE_SECTIONS]
     if stray:
         raise ImageError("loaded sections the image would drop: " + ", ".join(sorted(stray)))
     if sections[".code"].address != CODE_BASE or sections[".data"].address != DATA_BASE:

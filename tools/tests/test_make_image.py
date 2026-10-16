@@ -394,5 +394,21 @@ class RealReferenceTest(unittest.TestCase):
             self.assertEqual([], make_image.validate_image(output.read_bytes()))
 
 
+class SectionCheckTest(unittest.TestCase):
+    def sections_with(self, name, kind):
+        code = make_image.Section(1, make_image.SHF_ALLOC, 0x03050000, b"\0" * 4, 4)
+        data = make_image.Section(1, make_image.SHF_ALLOC, 0x03004000, b"\0" * 8, 8)
+        content = b"" if kind == make_image.SHT_NOBITS else b"\0" * 32
+        extra = make_image.Section(kind, make_image.SHF_ALLOC, 0x03044000, content, 32)
+        return {".code": code, ".data": data, name: extra}
+
+    def test_an_uninitialised_section_outside_the_image_is_allowed(self):
+        make_image.check_sections(self.sections_with(".noinit", make_image.SHT_NOBITS))
+
+    def test_a_loaded_section_outside_the_image_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            make_image.check_sections(self.sections_with(".stray", 1))
+
+
 if __name__ == "__main__":
     unittest.main()
