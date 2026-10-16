@@ -29,8 +29,8 @@ The indexer and the cover exporter only read the music folder. The exporter uses
 
 | Device button | Keyboard |
 |---|---|
-| Volume up | Up arrow |
-| Volume down | Down arrow |
+| Volume up (moves menus down) | Down arrow |
+| Volume down (moves menus up) | Up arrow |
 | Play | Return or Space |
 | Menu | M or Tab |
 | Back | Backspace or Escape |
@@ -56,7 +56,7 @@ Headless runs use a virtual clock, so scripted screenshots are deterministic.
 
 | Button | In lists | On Now Playing | While seeking |
 |---|---|---|---|
-| Volume up / down | Previous / next item (wraps on a single press, not while held) | Tap for volume; hold Vol+ for the next track, Vol− for the previous one | Back / forward 5 s per tap, 15 s steps while held |
+| Volume up / down | Next / previous item (wraps on a single press, not while held) | Tap for volume; hold Vol+ for the next track, Vol− for the previous one | Forward / back 5 s per tap, 15 s steps while held |
 | Play | Select (a song plays the list from that song); hold on an album to add or remove it from Favorites | Play / pause; hold to seek | Jump to the chosen time |
 | Menu | | | |
 | Back | Back; hold to go home | Back; hold to go home | Cancel |

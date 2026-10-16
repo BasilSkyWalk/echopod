@@ -72,8 +72,8 @@ static void the_current_option_is_marked(void)
 static void selecting_chooses_the_option_and_leaves(void)
 {
     Screen *screen = open_choice(0);
-    press(screen, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
-    press(screen, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
+    press(screen, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
+    press(screen, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
     ScreenAction action = press(screen, KEY_PLAY, KEY_GESTURE_PRESS);
     CHECK_EQUAL(2, chosen_value);
     CHECK_EQUAL(SCREEN_ACTION_POP, action.type);

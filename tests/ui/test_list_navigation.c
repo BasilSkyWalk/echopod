@@ -63,26 +63,26 @@ static ScreenAction send(ListView *view, Key key, KeyGesture gesture)
 static void next_and_previous_move_the_selection(void)
 {
     ListView view = fresh_list();
-    CHECK_EQUAL(SCREEN_ACTION_NONE, send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS).type);
-    send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT);
-    send(&view, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
+    CHECK_EQUAL(SCREEN_ACTION_NONE, send(&view, KEY_VOLUME_UP, KEY_GESTURE_PRESS).type);
+    send(&view, KEY_VOLUME_UP, KEY_GESTURE_REPEAT);
+    send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
     CHECK_EQUAL(1, view.selected);
 }
 
 static void a_press_wraps_but_a_repeat_does_not(void)
 {
     ListView view = fresh_list();
-    send(&view, KEY_VOLUME_UP, KEY_GESTURE_REPEAT);
+    send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT);
     CHECK_EQUAL(0, view.selected);
-    send(&view, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
+    send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
     CHECK_EQUAL(ITEM_COUNT - 1, view.selected);
 }
 
 static void select_hands_the_selected_index_to_the_owner(void)
 {
     ListView view = fresh_list();
-    send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
-    send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
+    send(&view, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
+    send(&view, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
     ScreenAction action = send(&view, KEY_PLAY, KEY_GESTURE_PRESS);
     CHECK_EQUAL(2, selected_index);
     CHECK(action.target == &target);
@@ -92,7 +92,7 @@ static void holding_play_hands_the_index_to_the_hold_action(void)
 {
     ListView view = fresh_list();
     held_index = -1;
-    send(&view, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
+    send(&view, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
     send(&view, KEY_PLAY, KEY_GESTURE_LONG_PRESS);
     CHECK_EQUAL(1, held_index);
     CHECK_EQUAL(-1, selected_index);

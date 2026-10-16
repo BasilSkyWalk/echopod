@@ -17,14 +17,14 @@ static void check_no_key(uint16_t reading)
     CHECK(!key_ladder_decode(reading, &key));
 }
 
-static void readings_up_to_69_are_the_upper_rocker_end(void)
+static void readings_up_to_69_are_volume_down(void)
 {
-    check_band(0, 69, KEY_VOLUME_UP);
+    check_band(0, 69, KEY_VOLUME_DOWN);
 }
 
-static void readings_from_70_to_183_are_the_lower_rocker_end(void)
+static void readings_from_70_to_183_are_volume_up(void)
 {
-    check_band(70, 183, KEY_VOLUME_DOWN);
+    check_band(70, 183, KEY_VOLUME_UP);
 }
 
 static void readings_from_200_to_319_are_play(void)
@@ -66,8 +66,8 @@ static void the_mask_of_each_ladder_reading_has_one_key_bit(void)
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(readings_up_to_69_are_the_upper_rocker_end),
-        TEST_CASE(readings_from_70_to_183_are_the_lower_rocker_end),
+        TEST_CASE(readings_up_to_69_are_volume_down),
+        TEST_CASE(readings_from_70_to_183_are_volume_up),
         TEST_CASE(readings_from_200_to_319_are_play),
         TEST_CASE(readings_from_320_to_409_are_menu),
         TEST_CASE(readings_from_450_to_549_are_back),

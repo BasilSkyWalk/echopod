@@ -6,19 +6,19 @@ static Navigation navigate(Key key, KeyGesture gesture)
     return navigation_from_key((KeyEvent){.key = key, .gesture = gesture});
 }
 
-static void volume_up_moves_to_the_previous_item(void)
+static void volume_down_moves_to_the_previous_item(void)
 {
-    CHECK_EQUAL(NAVIGATION_PREVIOUS, navigate(KEY_VOLUME_UP, KEY_GESTURE_PRESS).intent);
-    CHECK(!navigate(KEY_VOLUME_UP, KEY_GESTURE_PRESS).repeated);
-    CHECK_EQUAL(NAVIGATION_PREVIOUS, navigate(KEY_VOLUME_UP, KEY_GESTURE_REPEAT).intent);
-    CHECK(navigate(KEY_VOLUME_UP, KEY_GESTURE_REPEAT).repeated);
+    CHECK_EQUAL(NAVIGATION_PREVIOUS, navigate(KEY_VOLUME_DOWN, KEY_GESTURE_PRESS).intent);
+    CHECK(!navigate(KEY_VOLUME_DOWN, KEY_GESTURE_PRESS).repeated);
+    CHECK_EQUAL(NAVIGATION_PREVIOUS, navigate(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT).intent);
+    CHECK(navigate(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT).repeated);
 }
 
-static void volume_down_moves_to_the_next_item(void)
+static void volume_up_moves_to_the_next_item(void)
 {
-    CHECK_EQUAL(NAVIGATION_NEXT, navigate(KEY_VOLUME_DOWN, KEY_GESTURE_PRESS).intent);
-    CHECK_EQUAL(NAVIGATION_NEXT, navigate(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT).intent);
-    CHECK(navigate(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT).repeated);
+    CHECK_EQUAL(NAVIGATION_NEXT, navigate(KEY_VOLUME_UP, KEY_GESTURE_PRESS).intent);
+    CHECK_EQUAL(NAVIGATION_NEXT, navigate(KEY_VOLUME_UP, KEY_GESTURE_REPEAT).intent);
+    CHECK(navigate(KEY_VOLUME_UP, KEY_GESTURE_REPEAT).repeated);
 }
 
 static void play_selects_and_a_long_play_asks_for_options(void)
@@ -60,8 +60,8 @@ static void other_keys_stay_on_the_screen(void)
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(volume_up_moves_to_the_previous_item),
-        TEST_CASE(volume_down_moves_to_the_next_item),
+        TEST_CASE(volume_down_moves_to_the_previous_item),
+        TEST_CASE(volume_up_moves_to_the_next_item),
         TEST_CASE(play_selects_and_a_long_play_asks_for_options),
         TEST_CASE(back_goes_back_and_a_long_back_goes_home),
         TEST_CASE(menu_and_power_do_not_navigate),

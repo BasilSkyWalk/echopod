@@ -127,14 +127,14 @@ static void restart_app(void)
 static void move_down(int times)
 {
     for (int count = 0; count < times; count++) {
-        tap(KEY_VOLUME_DOWN);
+        tap(KEY_VOLUME_UP);
     }
 }
 
 static void move_up(int times)
 {
     for (int count = 0; count < times; count++) {
-        tap(KEY_VOLUME_UP);
+        tap(KEY_VOLUME_DOWN);
     }
 }
 
@@ -329,7 +329,7 @@ static void lists_still_move_as_soon_as_a_volume_key_goes_down(void)
     tap(KEY_BACK);
     tap(KEY_BACK);
     CHECK(title_is("Albums"));
-    fake_hal_queue_transition(KEY_VOLUME_DOWN, true, now_ms);
+    fake_hal_queue_transition(KEY_VOLUME_UP, true, now_ms);
     now_ms += 10;
     step();
     tap(KEY_PLAY);
@@ -822,7 +822,7 @@ static void moving_the_selection_sends_only_part_of_the_screen(void)
     start_app();
     step();
     long pixels = fake_hal_pixels_written();
-    tap(KEY_VOLUME_DOWN);
+    tap(KEY_VOLUME_UP);
     long sent = fake_hal_pixels_written() - pixels;
     CHECK(sent > 0);
     CHECK(sent < FULL_FRAME_PIXELS / 2);

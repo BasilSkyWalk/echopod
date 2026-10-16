@@ -51,7 +51,7 @@ static ScreenAction press(Screen *screen, Key key, KeyGesture gesture)
 static void next(Screen *screen, int times)
 {
     for (int step = 0; step < times; step++) {
-        press(screen, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
+        press(screen, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
     }
 }
 
@@ -79,14 +79,14 @@ static void moving_next_then_selecting_opens_the_second_screen(void)
 static void previous_on_the_first_item_wraps_to_the_last_on_a_press(void)
 {
     Screen *screen = open_menu();
-    press(screen, KEY_VOLUME_UP, KEY_GESTURE_PRESS);
+    press(screen, KEY_VOLUME_DOWN, KEY_GESTURE_PRESS);
     CHECK(press(screen, KEY_PLAY, KEY_GESTURE_PRESS).target == &last_target);
 }
 
 static void a_repeated_previous_does_not_wrap(void)
 {
     Screen *screen = open_menu();
-    press(screen, KEY_VOLUME_UP, KEY_GESTURE_REPEAT);
+    press(screen, KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT);
     CHECK(press(screen, KEY_PLAY, KEY_GESTURE_PRESS).target == &first_target);
 }
 

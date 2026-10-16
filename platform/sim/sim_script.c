@@ -9,8 +9,8 @@ typedef struct KeyName {
 } KeyName;
 
 static const KeyName KEY_NAMES[] = {
-    {"up", KEY_VOLUME_UP}, {"down", KEY_VOLUME_DOWN}, {"play", KEY_PLAY},
-    {"menu", KEY_MENU},    {"back", KEY_BACK},        {"power", KEY_POWER},
+    {"up", KEY_VOLUME_DOWN}, {"down", KEY_VOLUME_UP}, {"play", KEY_PLAY},
+    {"menu", KEY_MENU},      {"back", KEY_BACK},      {"power", KEY_POWER},
 };
 
 static const char LONG_SUFFIX[] = ":long";

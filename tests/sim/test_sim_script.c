@@ -6,8 +6,8 @@ static void key_names_map_to_device_keys(void)
     SimScript script;
     CHECK(sim_script_parse("up,down,play,menu,back,power", &script));
     CHECK_EQUAL(6, script.count);
-    CHECK_EQUAL(KEY_VOLUME_UP, script.steps[0].key);
-    CHECK_EQUAL(KEY_VOLUME_DOWN, script.steps[1].key);
+    CHECK_EQUAL(KEY_VOLUME_DOWN, script.steps[0].key);
+    CHECK_EQUAL(KEY_VOLUME_UP, script.steps[1].key);
     CHECK_EQUAL(KEY_PLAY, script.steps[2].key);
     CHECK_EQUAL(KEY_MENU, script.steps[3].key);
     CHECK_EQUAL(KEY_BACK, script.steps[4].key);
@@ -57,7 +57,7 @@ static void taps_press_and_release_then_leave_a_gap(void)
     CHECK_EQUAL(10 + SIM_SCRIPT_TAP_FRAMES, events[1].frame);
     CHECK(!events[1].pressed);
     CHECK_EQUAL(10 + SIM_SCRIPT_TAP_FRAMES + SIM_SCRIPT_GAP_FRAMES, events[2].frame);
-    CHECK_EQUAL(KEY_VOLUME_DOWN, events[2].key);
+    CHECK_EQUAL(KEY_VOLUME_UP, events[2].key);
 }
 
 static void long_presses_hold_for_the_hold_time(void)
