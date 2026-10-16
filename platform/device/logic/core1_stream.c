@@ -173,13 +173,14 @@ static uint32_t next_generation(Core1Source *source)
     return source->generation;
 }
 
-static bool open_stream(void *context, const char *path, uint32_t start_ms, FlacInfo *info)
+static bool open_stream(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     Core1Source *source = context;
     stop_streaming(source);
-    if (!flac_source_open_at(&source->flac, path, start_ms, info)) {
+    if (!flac_source_open_at(&source->flac, path, start_ms, track)) {
         return false;
     }
+    const FlacInfo *info = &track->stream;
     FlacDecoder *decoder = source->flac.decoder;
     source->input = decoder->bits.input;
     source->start_offset = flac_position(decoder);

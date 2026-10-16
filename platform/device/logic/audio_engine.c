@@ -72,10 +72,11 @@ static void close_file(AudioEngine *engine)
 
 static bool open_track(AudioEngine *engine, const char *path, uint32_t start_ms)
 {
-    FlacInfo info;
-    if (!engine->config.source.open(engine->config.source.context, path, start_ms, &info)) {
+    AudioTrackInfo track;
+    if (!engine->config.source.open(engine->config.source.context, path, start_ms, &track)) {
         return false;
     }
+    FlacInfo info = track.stream;
     engine->decoding = true;
     if (!rate_supported(info.sample_rate)) {
         close_file(engine);
@@ -84,6 +85,7 @@ static bool open_track(AudioEngine *engine, const char *path, uint32_t start_ms)
     engine->skip_frames =
         (uint32_t)((uint64_t)start_ms * info.sample_rate / MILLISECONDS_PER_SECOND);
     engine->decode_rate = info.sample_rate;
+    engine->decode_track = track;
     engine->holding_frame = false;
     engine->pending_frames = 0;
     engine->pending_offset = 0;
@@ -104,6 +106,7 @@ static void push_segment(AudioEngine *engine, const char *path, uint32_t token, 
     segment->start = start;
     segment->base_ms = base_ms;
     segment->rate = engine->decode_rate;
+    segment->track = engine->decode_track;
     copy_path(segment->path, path);
 }
 
@@ -380,7 +383,8 @@ AudioEngineStatus audio_engine_status(const AudioEngine *engine)
     return (AudioEngineStatus){.state = engine->state,
                                .token = segment->token,
                                .position_ms = position,
-                               .failed = engine->failed};
+                               .failed = engine->failed,
+                               .track = segment->track};
 }
 
 const char *audio_engine_current_path(const AudioEngine *engine)

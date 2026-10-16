@@ -91,12 +91,13 @@ typedef struct ScriptedSource {
 
 static ScriptedSource scripted;
 
-static bool scripted_open(void *context, const char *path, uint32_t start_ms, FlacInfo *info)
+static bool scripted_open(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     (void)context;
     (void)path;
     (void)start_ms;
-    *info = (FlacInfo){.sample_rate = 44100, .channels = 2, .bits_per_sample = 16, .max_block = 16};
+    *track = (AudioTrackInfo){
+        .stream = {.sample_rate = 44100, .channels = 2, .bits_per_sample = 16, .max_block = 16}};
     return true;
 }
 
@@ -248,6 +249,29 @@ static void a_queued_track_follows_without_a_gap(void)
     AudioEngineStatus status = audio_engine_status(&engine);
     CHECK_EQUAL(4u, status.token);
     CHECK_EQUAL(10u, status.position_ms);
+}
+
+static void the_status_describes_the_playing_tracks_stream(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "lpc_24_96k_stereo", 0, 1));
+    AudioTrackInfo track = audio_engine_status(&engine).track;
+    CHECK_EQUAL(96000u, track.stream.sample_rate);
+    CHECK_EQUAL(24, track.stream.bits_per_sample);
+    CHECK_EQUAL(2, track.stream.channels);
+    CHECK_EQUAL(5000u, track.stream.total_samples);
+    CHECK_EQUAL(25502u, track.audio_bytes);
+}
+
+static void the_stream_description_follows_the_audio_into_the_next_track(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_16_44k_stereo", 4);
+    pump_until_full(0);
+    CHECK_EQUAL(9451u, audio_engine_status(&engine).track.audio_bytes);
+    audio_engine_pump(&engine, 3001 + 441);
+    CHECK_EQUAL(18719u, audio_engine_status(&engine).track.audio_bytes);
 }
 
 static void a_next_track_at_another_rate_waits_for_the_ring_to_drain(void)
@@ -430,6 +454,8 @@ int main(void)
         TEST_CASE(twenty_four_bit_audio_is_rounded_to_sixteen),
         TEST_CASE(the_end_of_a_track_without_a_next_one_stops_and_goes_silent),
         TEST_CASE(a_queued_track_follows_without_a_gap),
+        TEST_CASE(the_status_describes_the_playing_tracks_stream),
+        TEST_CASE(the_stream_description_follows_the_audio_into_the_next_track),
         TEST_CASE(a_next_track_at_another_rate_waits_for_the_ring_to_drain),
         TEST_CASE(starting_part_way_skips_to_that_sample),
         TEST_CASE(seeking_restarts_the_ring_at_the_new_place),

@@ -17,7 +17,8 @@ void flac_source_close(FlacSource *source)
     }
 }
 
-bool flac_source_open_at(FlacSource *source, const char *path, uint32_t start_ms, FlacInfo *info)
+bool flac_source_open_at(FlacSource *source, const char *path, uint32_t start_ms,
+                         AudioTrackInfo *track)
 {
     flac_source_close(source);
     FlacInput input;
@@ -36,13 +37,14 @@ bool flac_source_open_at(FlacSource *source, const char *path, uint32_t start_ms
         flac_source_close(source);
         return false;
     }
-    *info = decoder->info;
+    *track = (AudioTrackInfo){.stream = decoder->info,
+                              .audio_bytes = input.size - decoder->audio_offset};
     return true;
 }
 
-static bool open_source(void *context, const char *path, uint32_t start_ms, FlacInfo *info)
+static bool open_source(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
-    return flac_source_open_at(context, path, start_ms, info);
+    return flac_source_open_at(context, path, start_ms, track);
 }
 
 static AudioFrameResult next_frame(void *context, AudioFrame *frame)

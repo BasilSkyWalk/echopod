@@ -32,8 +32,13 @@ typedef struct AudioFrame {
     uint8_t bits;
 } AudioFrame;
 
+typedef struct AudioTrackInfo {
+    FlacInfo stream;
+    uint32_t audio_bytes;
+} AudioTrackInfo;
+
 typedef struct AudioSource {
-    bool (*open)(void *context, const char *path, uint32_t start_ms, FlacInfo *info);
+    bool (*open)(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track);
     AudioFrameResult (*next)(void *context, AudioFrame *frame);
     void (*release)(void *context);
     void (*close)(void *context);
@@ -51,6 +56,7 @@ typedef struct AudioSegment {
     uint32_t start;
     uint32_t base_ms;
     uint32_t rate;
+    AudioTrackInfo track;
     char path[AUDIO_ENGINE_PATH_CAPACITY];
 } AudioSegment;
 
@@ -59,6 +65,7 @@ typedef struct AudioEngineStatus {
     uint32_t token;
     uint32_t position_ms;
     bool failed;
+    AudioTrackInfo track;
 } AudioEngineStatus;
 
 typedef struct AudioEngineStats {
@@ -76,6 +83,7 @@ typedef struct AudioEngine {
     int segment_count;
     bool decoding;
     uint32_t decode_rate;
+    AudioTrackInfo decode_track;
     AudioFrame frame;
     bool holding_frame;
     uint32_t pending_frames;

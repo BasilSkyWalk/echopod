@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "board.h"
+#include "core/format.h"
 #include "core1_region.h"
 #include "dac.h"
 #include "device/audio_engine.h"
@@ -114,12 +115,12 @@ static AudioSource chosen_source(void)
                        : flac_source_interface(&software_source);
 }
 
-static bool open_chosen(void *context, const char *path, uint32_t start_ms, FlacInfo *info)
+static bool open_chosen(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     (void)context;
     using_core1 = board_core1_start_stream();
     AudioSource source = chosen_source();
-    return source.open(source.context, path, start_ms, info);
+    return source.open(source.context, path, start_ms, track);
 }
 
 static AudioFrameResult next_chosen(void *context, AudioFrame *frame)
@@ -331,6 +332,21 @@ static HalAudioState state_of(AudioEngineState state)
     return HAL_AUDIO_STOPPED;
 }
 
+static HalAudioFormat format_of(AudioTrackInfo track)
+{
+    FlacInfo stream = track.stream;
+    if (stream.sample_rate == 0) {
+        return (HalAudioFormat){.codec = HAL_AUDIO_CODEC_UNKNOWN};
+    }
+    return (HalAudioFormat){
+        .codec = HAL_AUDIO_CODEC_FLAC,
+        .sample_rate = stream.sample_rate,
+        .bits_per_sample = stream.bits_per_sample,
+        .channels = stream.channels,
+        .bitrate_kbps = average_kbps(track.audio_bytes, stream.total_samples, stream.sample_rate),
+    };
+}
+
 HalAudioStatus hal_audio_status(void)
 {
     ensure_engine();
@@ -340,7 +356,8 @@ HalAudioStatus hal_audio_status(void)
     return (HalAudioStatus){.state = state_of(status.state),
                             .token = status.token,
                             .position_ms = status.position_ms,
-                            .failed = status.failed};
+                            .failed = status.failed,
+                            .format = format_of(status.track)};
 }
 
 static void change_rate(void)

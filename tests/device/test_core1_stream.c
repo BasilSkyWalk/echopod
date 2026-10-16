@@ -128,18 +128,18 @@ static bool streams_exactly(const char *name, int channels, uint32_t ring_bytes)
 {
     start(ring_bytes);
     Fixture pcm = load(name, "pcm");
-    FlacInfo info;
+    AudioTrackInfo info;
     bool ok = pcm.size > 0 && interface.open(interface.context, name, 0, &info);
     uint32_t next_sample = 0;
     AudioFrame frame;
     AudioFrameResult result = AUDIO_FRAME_READY;
     while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
         ok = frame.first_sample == next_sample && frame_matches(&pcm, &frame, channels) &&
-             frame.bits == info.bits_per_sample;
+             frame.bits == info.stream.bits_per_sample;
         next_sample += frame.samples;
         interface.release(interface.context);
     }
-    ok = ok && result == AUDIO_FRAME_END && next_sample == info.total_samples;
+    ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples;
     interface.close(interface.context);
     free(pcm.bytes);
     return ok;
@@ -169,7 +169,7 @@ static void a_ring_smaller_than_the_track_wraps_and_stays_exact(void)
 static void core_1_waits_while_its_slots_are_full(void)
 {
     start(BIG_RING_BYTES);
-    FlacInfo info;
+    AudioTrackInfo info;
     CHECK(interface.open(interface.context, "fixed_16_mono", 0, &info));
     AudioFrame frame;
     CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
@@ -191,7 +191,7 @@ static void reopening_part_way_drops_the_old_frames(void)
 {
     start(BIG_RING_BYTES);
     Fixture pcm = load("fixed_16_mono", "pcm");
-    FlacInfo info;
+    AudioTrackInfo info;
     CHECK(interface.open(interface.context, "fixed_16_mono", 0, &info));
     AudioFrame frame;
     CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
@@ -212,7 +212,7 @@ static void reopening_part_way_drops_the_old_frames(void)
 static void closing_idles_core_1_and_closes_the_file(void)
 {
     start(BIG_RING_BYTES);
-    FlacInfo info;
+    AudioTrackInfo info;
     CHECK(interface.open(interface.context, "fixed_16_mono", 0, &info));
     interface.close(interface.context);
     CHECK_EQUAL(0u, control.generation);
@@ -223,7 +223,7 @@ static void closing_idles_core_1_and_closes_the_file(void)
 static void a_missing_track_does_not_start_core_1(void)
 {
     start(BIG_RING_BYTES);
-    FlacInfo info;
+    AudioTrackInfo info;
     CHECK(!interface.open(interface.context, "missing", 0, &info));
     CHECK_EQUAL(0u, control.generation);
 }
