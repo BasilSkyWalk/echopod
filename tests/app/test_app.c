@@ -456,6 +456,18 @@ static void saved_settings_are_restored_at_start(void)
     CHECK_EQUAL(settings_defaults().brightness + 2, fake_hal_display_brightness());
 }
 
+static void the_cpu_runs_fast_only_while_the_screen_is_on(void)
+{
+    start_app();
+    step();
+    CHECK_EQUAL(200, hal_system_clock_mhz());
+    tap(KEY_POWER);
+    CHECK(!fake_hal_display_on());
+    CHECK_EQUAL(96, hal_system_clock_mhz());
+    tap(KEY_POWER);
+    CHECK_EQUAL(200, hal_system_clock_mhz());
+}
+
 static void the_screen_turns_off_after_the_timeout(void)
 {
     start_app();
@@ -1002,13 +1014,13 @@ static void the_cpu_clock_cycles_through_24_96_and_200_mhz(void)
 {
     start_app();
     open_diagnostics_row(DIAGNOSTICS_CPU_CLOCK_INDEX);
+    CHECK_EQUAL(200, hal_system_clock_mhz());
+    tap(KEY_PLAY);
     CHECK_EQUAL(24, hal_system_clock_mhz());
     tap(KEY_PLAY);
     CHECK_EQUAL(96, hal_system_clock_mhz());
     tap(KEY_PLAY);
     CHECK_EQUAL(200, hal_system_clock_mhz());
-    tap(KEY_PLAY);
-    CHECK_EQUAL(24, hal_system_clock_mhz());
 }
 
 static void the_test_tone_plays_once_per_press(void)
@@ -1063,13 +1075,13 @@ static void the_core_1_decode_test_runs_once_per_press(void)
     CHECK(title_is("Diagnostics"));
 }
 
-static void a_clock_that_does_not_lock_stays_at_24_mhz(void)
+static void a_clock_that_does_not_lock_stays_where_it_was(void)
 {
     start_app();
     fake_hal_refuse_clock_switch();
     open_diagnostics_row(DIAGNOSTICS_CPU_CLOCK_INDEX);
     tap(KEY_PLAY);
-    CHECK_EQUAL(24, hal_system_clock_mhz());
+    CHECK_EQUAL(200, hal_system_clock_mhz());
     CHECK(title_is("Diagnostics"));
 }
 
@@ -1147,7 +1159,7 @@ int main(void)
         TEST_CASE(the_loop_benchmark_runs_once_per_press),
         TEST_CASE(the_core_1_test_runs_once_per_press),
         TEST_CASE(the_core_1_decode_test_runs_once_per_press),
-        TEST_CASE(a_clock_that_does_not_lock_stays_at_24_mhz),
+        TEST_CASE(a_clock_that_does_not_lock_stays_where_it_was),
         TEST_CASE(the_stopwatch_stays_open_after_waking),
         TEST_CASE(menu_does_nothing_while_nothing_plays),
         TEST_CASE(now_playing_shows_the_album_cover),
@@ -1159,6 +1171,7 @@ int main(void)
         TEST_CASE(brightness_is_applied_and_saved),
         TEST_CASE(gain_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),
+        TEST_CASE(the_cpu_runs_fast_only_while_the_screen_is_on),
         TEST_CASE(the_screen_turns_off_after_the_timeout),
         TEST_CASE(after_a_timeout_volume_changes_without_waking),
         TEST_CASE(the_timeout_setting_is_used),
