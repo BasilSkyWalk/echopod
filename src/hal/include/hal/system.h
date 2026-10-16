@@ -17,3 +17,10 @@ typedef struct HalBootClocks {
 } HalBootClocks;
 
 HalBootClocks hal_system_boot_clocks(void);
+
+typedef struct HalLoopCycles {
+    uint32_t register_centi;
+    uint32_t memory_centi;
+} HalLoopCycles;
+
+HalLoopCycles hal_system_loop_cycles(void);

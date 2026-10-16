@@ -102,3 +102,22 @@ void diagnostics_clock_text(uint32_t mhz, bool failed, char *text, size_t capaci
     string_builder_append_unsigned(&builder, mhz);
     string_builder_append(&builder, " MHz");
 }
+
+static void append_centi(StringBuilder *builder, const char *prefix, uint32_t centi)
+{
+    string_builder_append(builder, prefix);
+    string_builder_append_unsigned(builder, centi / 100);
+    string_builder_append_char(builder, '.');
+    string_builder_append_char(builder, (char)('0' + centi / 10 % 10));
+    string_builder_append_char(builder, (char)('0' + centi % 10));
+}
+
+void diagnostics_loop_text(bool run, HalLoopCycles cycles, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!run) {
+        return;
+    }
+    append_centi(&builder, "r", cycles.register_centi);
+    append_centi(&builder, " m", cycles.memory_centi);
+}

@@ -102,6 +102,23 @@ static const char *clock_value(const void *context)
     return clock_text;
 }
 
+static char loop_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static ScreenAction run_loop_benchmark(void *context)
+{
+    LoopOption *loop = context;
+    loop->cycles = hal_system_loop_cycles();
+    loop->run = true;
+    return screen_action_none();
+}
+
+static const char *loop_value(const void *context)
+{
+    const LoopOption *loop = context;
+    diagnostics_loop_text(loop->run, loop->cycles, loop_text, sizeof loop_text);
+    return loop_text;
+}
+
 static ScreenAction play_test_tone(void *context)
 {
     ToneOption *tone = context;
@@ -292,6 +309,11 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         .label = "Boot clocks", .select = NULL, .context = NULL, .value = boot_clocks_value};
     screens->diagnostics_items[10] =
         (MenuItem){.label = "Boot PLL", .select = NULL, .context = NULL, .value = boot_pll_value};
+    screens->loop = (LoopOption){.run = false};
+    screens->diagnostics_items[11] = (MenuItem){.label = "Loop cycles",
+                                                .select = run_loop_benchmark,
+                                                .context = &screens->loop,
+                                                .value = loop_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

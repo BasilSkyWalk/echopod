@@ -67,6 +67,7 @@ typedef struct FakeHal {
     uint32_t clock_mhz;
     bool refuse_clock_switch;
     int test_tone_count;
+    int loop_bench_count;
     bool dma_tone_running;
     int audio_service_count;
 } FakeHal;
@@ -495,4 +496,15 @@ const uint8_t *fake_hal_file_bytes(const char *path, uint32_t *size)
     }
     *size = 0;
     return NULL;
+}
+
+int fake_hal_loop_bench_count(void)
+{
+    return fake.loop_bench_count;
+}
+
+HalLoopCycles hal_system_loop_cycles(void)
+{
+    fake.loop_bench_count++;
+    return (HalLoopCycles){.register_centi = 300, .memory_centi = 700};
 }

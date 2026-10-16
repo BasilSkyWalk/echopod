@@ -10,6 +10,7 @@ add_executable(echo_device
     board/gpio.c
     board/input.c
     board/libc.c
+    board/loop_bench.c
     board/main.c
     board/mmc.c
     board/power.c

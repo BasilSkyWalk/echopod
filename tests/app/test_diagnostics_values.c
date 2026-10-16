@@ -92,10 +92,30 @@ static void the_clock_row_shows_the_actual_speed(void)
     CHECK(text_is("No lock", text));
 }
 
+static void the_loop_row_is_empty_until_run(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_loop_text(false, (HalLoopCycles){0}, text, sizeof text);
+    CHECK(text_is("", text));
+}
+
+static void the_loop_row_shows_cycles_per_iteration(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_loop_text(true, (HalLoopCycles){.register_centi = 302, .memory_centi = 1507}, text,
+                          sizeof text);
+    CHECK(text_is("r3.02 m15.07", text));
+    diagnostics_loop_text(true, (HalLoopCycles){.register_centi = 400, .memory_centi = 5}, text,
+                          sizeof text);
+    CHECK(text_is("r4.00 m0.05", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(an_untried_tone_shows_nothing),
+        TEST_CASE(the_loop_row_is_empty_until_run),
+        TEST_CASE(the_loop_row_shows_cycles_per_iteration),
         TEST_CASE(a_running_tone_shows_the_read_position),
         TEST_CASE(a_tone_that_ended_by_itself_says_so),
         TEST_CASE(a_failed_start_names_the_step),
