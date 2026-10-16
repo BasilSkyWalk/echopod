@@ -163,6 +163,13 @@ if(ECHO_BUILD_SIM)
         SOURCES sim/test_sim_script.c
         LIBRARIES echo_sim_options
     )
+    echo_add_unit_test(NAME test_sim_decoder
+        SOURCES sim/test_sim_decoder.c
+        LIBRARIES echo_sim_decoder
+    )
+    target_compile_definitions(test_sim_decoder PRIVATE
+        ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    )
     add_test(NAME sim_headless_smoke
         COMMAND echo_sim --headless --frames 30 --screenshot ${CMAKE_BINARY_DIR}/sim_smoke.bmp
     )

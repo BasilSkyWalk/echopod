@@ -6,6 +6,7 @@
 #include "dr_flac.h"
 #include "dr_mp3.h"
 #include "dr_wav.h"
+#include "hal/audio.h"
 
 typedef enum SimCodec {
     SIM_CODEC_NONE,
@@ -21,6 +22,8 @@ typedef struct SimDecoder {
     drwav wav;
     uint32_t sample_rate;
     uint32_t channels;
+    uint32_t bits_per_sample;
+    uint64_t audio_bytes;
     uint64_t total_frames;
     uint64_t frame;
 } SimDecoder;
@@ -29,3 +32,4 @@ bool sim_decoder_open(SimDecoder *decoder, const char *host_path);
 uint64_t sim_decoder_read_stereo(SimDecoder *decoder, float *frames, uint64_t count);
 bool sim_decoder_seek(SimDecoder *decoder, uint64_t frame);
 void sim_decoder_close(SimDecoder *decoder);
+HalAudioFormat sim_decoder_format(const SimDecoder *decoder);

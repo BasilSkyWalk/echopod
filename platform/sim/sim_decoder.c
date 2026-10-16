@@ -1,9 +1,11 @@
 #include "sim_decoder.h"
 
 #include <stddef.h>
-#include <strings.h>
-
 #include <string.h>
+#include <strings.h>
+#include <sys/stat.h>
+
+#include "core/format.h"
 
 enum {
     MAX_FRAMES_PER_READ = 1024,
@@ -35,6 +37,12 @@ static SimCodec codec_for(const char *path)
     return SIM_CODEC_NONE;
 }
 
+static uint64_t file_size(const char *path)
+{
+    struct stat info;
+    return stat(path, &info) == 0 ? (uint64_t)info.st_size : 0;
+}
+
 static bool open_flac(SimDecoder *decoder, const char *path)
 {
     decoder->flac = drflac_open_file(path, NULL);
@@ -43,6 +51,8 @@ static bool open_flac(SimDecoder *decoder, const char *path)
     }
     decoder->sample_rate = decoder->flac->sampleRate;
     decoder->channels = decoder->flac->channels;
+    decoder->bits_per_sample = decoder->flac->bitsPerSample;
+    decoder->audio_bytes = file_size(path) - decoder->flac->firstFLACFramePosInBytes;
     decoder->total_frames = decoder->flac->totalPCMFrameCount;
     return true;
 }
@@ -54,6 +64,8 @@ static bool open_mp3(SimDecoder *decoder, const char *path)
     }
     decoder->sample_rate = decoder->mp3.sampleRate;
     decoder->channels = decoder->mp3.channels;
+    decoder->bits_per_sample = 0;
+    decoder->audio_bytes = file_size(path);
     decoder->total_frames = drmp3_get_pcm_frame_count(&decoder->mp3);
     return true;
 }
@@ -65,6 +77,8 @@ static bool open_wav(SimDecoder *decoder, const char *path)
     }
     decoder->sample_rate = decoder->wav.sampleRate;
     decoder->channels = decoder->wav.channels;
+    decoder->bits_per_sample = decoder->wav.bitsPerSample;
+    decoder->audio_bytes = decoder->wav.dataChunkDataSize;
     decoder->total_frames = decoder->wav.totalPCMFrameCount;
     return true;
 }
@@ -168,4 +182,34 @@ void sim_decoder_close(SimDecoder *decoder)
         break;
     }
     decoder->codec = SIM_CODEC_NONE;
+}
+
+static HalAudioCodec hal_codec(SimCodec codec)
+{
+    switch (codec) {
+    case SIM_CODEC_FLAC:
+        return HAL_AUDIO_CODEC_FLAC;
+    case SIM_CODEC_MP3:
+        return HAL_AUDIO_CODEC_MP3;
+    case SIM_CODEC_WAV:
+        return HAL_AUDIO_CODEC_WAV;
+    case SIM_CODEC_NONE:
+        return HAL_AUDIO_CODEC_UNKNOWN;
+    }
+    return HAL_AUDIO_CODEC_UNKNOWN;
+}
+
+HalAudioFormat sim_decoder_format(const SimDecoder *decoder)
+{
+    if (decoder->codec == SIM_CODEC_NONE) {
+        return (HalAudioFormat){.codec = HAL_AUDIO_CODEC_UNKNOWN};
+    }
+    return (HalAudioFormat){
+        .codec = hal_codec(decoder->codec),
+        .sample_rate = decoder->sample_rate,
+        .bits_per_sample = (uint8_t)decoder->bits_per_sample,
+        .channels = (uint8_t)decoder->channels,
+        .bitrate_kbps = average_kbps((uint32_t)decoder->audio_bytes,
+                                     (uint32_t)decoder->total_frames, decoder->sample_rate),
+    };
 }
