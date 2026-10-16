@@ -24,6 +24,12 @@ static const char *item_value(const void *context, int index)
     return item->value != NULL ? item->value(item->context) : NULL;
 }
 
+static bool item_opens(const void *context, int index)
+{
+    const MenuScreen *menu = context;
+    return menu->config.items[index].opens;
+}
+
 static ScreenAction select_item(void *context, int index)
 {
     MenuScreen *menu = context;
@@ -62,8 +68,11 @@ static void draw(void *context, Canvas *canvas)
 Screen *menu_screen_init(MenuScreen *menu, MenuConfig config)
 {
     *menu = (MenuScreen){.config = config};
-    menu->model = (ListModel){
-        .context = menu, .count = item_count, .label = item_label, .detail = item_value};
+    menu->model = (ListModel){.context = menu,
+                              .count = item_count,
+                              .label = item_label,
+                              .detail = item_value,
+                              .opens = item_opens};
     list_view_init(&menu->list, &menu->model, config.theme, 0);
     menu->screen = (Screen){
         .title = config.title,

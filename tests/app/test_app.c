@@ -7,6 +7,7 @@
 #include "fake_hal.h"
 #include "fixture_library.h"
 #include "frame_overlay.h"
+#include "gfx/text.h"
 #include "hal/display.h"
 #include "hal/system.h"
 #include "settings/settings.h"
@@ -285,6 +286,39 @@ static void open_music_entry(int index)
     tap(KEY_PLAY);
 }
 
+static bool columns_have_ink(int row, int first, int last)
+{
+    int top = DEFAULT_THEME.metrics.header_height + row * DEFAULT_THEME.metrics.row_height;
+    for (int y = top; y < top + DEFAULT_THEME.metrics.row_height; y++) {
+        for (int x = first; x < last; x++) {
+            if (fake_hal_pixel(x, y) != DEFAULT_THEME.colors.background) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static bool row_shows_a_chevron(int row)
+{
+    int right = HAL_DISPLAY_WIDTH - DEFAULT_THEME.metrics.padding;
+    int chevron = text_width(DEFAULT_THEME.fonts.title, "\xE2\x80\xBA");
+    int gap = DEFAULT_THEME.metrics.detail_gap;
+    return columns_have_ink(row, right - chevron, right) &&
+           !columns_have_ink(row, right - chevron - gap, right - chevron);
+}
+
+static void album_rows_show_a_chevron_and_track_rows_do_not(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_ALBUMS_INDEX);
+    wait_ms(SLIDE_DURATION_MS);
+    CHECK(row_shows_a_chevron(1));
+    tap(KEY_PLAY);
+    wait_ms(SLIDE_DURATION_MS);
+    CHECK(!row_shows_a_chevron(1));
+}
+
 static void albums_open_from_the_library(void)
 {
     start_app_with_library();
@@ -459,7 +493,7 @@ static void saved_settings_are_restored_at_start(void)
 
 static uint16_t scrollbar_probe(void)
 {
-    return fake_hal_pixel(HAL_DISPLAY_WIDTH - 2, 40);
+    return fake_hal_pixel(HAL_DISPLAY_WIDTH - DEFAULT_THEME.metrics.scrollbar_inset - 1, 40);
 }
 
 static void a_new_screen_slides_in_from_the_right(void)
@@ -1173,6 +1207,7 @@ int main(void)
         TEST_CASE(the_frame_overlay_shows_zero_before_any_block),
         TEST_CASE(diagnostics_shows_the_firmware_version_from_the_hal),
         TEST_CASE(albums_open_from_the_library),
+        TEST_CASE(album_rows_show_a_chevron_and_track_rows_do_not),
         TEST_CASE(an_artist_leads_to_their_albums),
         TEST_CASE(back_returns_to_the_previous_list),
         TEST_CASE(folders_can_be_browsed_down_to_an_album),

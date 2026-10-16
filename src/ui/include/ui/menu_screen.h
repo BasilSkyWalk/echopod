@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "ui/list_view.h"
@@ -11,6 +12,7 @@ typedef struct MenuItem {
     ScreenAction (*select)(void *context);
     void *context;
     const char *(*value)(const void *context);
+    bool opens;
 } MenuItem;
 
 typedef struct MenuConfig {

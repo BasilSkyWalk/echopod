@@ -45,23 +45,23 @@ static const char *year_value(const void *context)
 }
 
 static const MenuItem LONG_NAME_ITEMS[] = {
-    {"Sigur Rós — Ágætis byrjun", NULL, "1999", year_value},
+    {"Sigur Rós — Ágætis byrjun", NULL, "1999", year_value, false},
     {"Godspeed You! Black Emperor — Lift Your Skinny Fists Like Antennas to Heaven", NULL, "2000",
-     year_value},
-    {"Björk — Homogenic", NULL, "1997", year_value},
-    {"Sufjan Stevens — Illinois (Come On Feel the Illinoise)", NULL, "2005", year_value},
-    {"Motörhead — Ace of Spades", NULL, "1980", year_value},
-    {"Jóhann Jóhannsson — Orphée", NULL, "2016", year_value},
-    {"Ólafur Arnalds — re:member", NULL, "2018", year_value},
-    {"Röyksopp — Melody A.M.", NULL, "2001", year_value},
-    {"Café Tacvba — Re", NULL, "1994", year_value},
-    {"Beyoncé — Lemonade", NULL, "2016", year_value},
-    {"Mötley Crüe — Dr. Feelgood", NULL, "1989", year_value},
-    {"Daft Punk — Random Access Memories", NULL, "2013", year_value},
-    {"Explosions in the Sky — The Earth Is Not a Cold Dead Place", NULL, "2003", year_value},
-    {"Hania Rani — Esja", NULL, "2019", year_value},
-    {"Nils Frahm — All Melody", NULL, "2018", year_value},
-    {"The Avalanches — Since I Left You", NULL, "2000", year_value},
+     year_value, false},
+    {"Björk — Homogenic", NULL, "1997", year_value, false},
+    {"Sufjan Stevens — Illinois (Come On Feel the Illinoise)", NULL, "2005", year_value, false},
+    {"Motörhead — Ace of Spades", NULL, "1980", year_value, false},
+    {"Jóhann Jóhannsson — Orphée", NULL, "2016", year_value, false},
+    {"Ólafur Arnalds — re:member", NULL, "2018", year_value, false},
+    {"Röyksopp — Melody A.M.", NULL, "2001", year_value, false},
+    {"Café Tacvba — Re", NULL, "1994", year_value, false},
+    {"Beyoncé — Lemonade", NULL, "2016", year_value, false},
+    {"Mötley Crüe — Dr. Feelgood", NULL, "1989", year_value, false},
+    {"Daft Punk — Random Access Memories", NULL, "2013", year_value, false},
+    {"Explosions in the Sky — The Earth Is Not a Cold Dead Place", NULL, "2003", year_value, false},
+    {"Hania Rani — Esja", NULL, "2019", year_value, false},
+    {"Nils Frahm — All Melody", NULL, "2018", year_value, false},
+    {"The Avalanches — Since I Left You", NULL, "2000", year_value, false},
 };
 
 enum {
@@ -249,7 +249,11 @@ static const char *dma_tone_value(const void *context)
 
 static MenuItem open_item(const char *label, Screen *target)
 {
-    return (MenuItem){.label = label, .select = menu_open_screen, .context = target, .value = NULL};
+    return (MenuItem){.label = label,
+                      .select = menu_open_screen,
+                      .context = target,
+                      .value = NULL,
+                      .opens = true};
 }
 
 static Screen *build_menu(MenuScreen *menu, const char *title, const MenuItem *items, int count,
@@ -291,7 +295,8 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
     return (MenuItem){.label = entry->label,
                       .select = open_browse,
                       .context = &screens->browse_entries[index],
-                      .value = NULL};
+                      .value = NULL,
+                      .opens = true};
 }
 
 static void build_music(AppScreens *screens, AppScreensContext context)

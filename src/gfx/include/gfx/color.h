@@ -16,3 +16,4 @@ typedef uint16_t Color;
 Color color_from_rgb(uint8_t red, uint8_t green, uint8_t blue);
 Color color_blend(Color background, Color foreground, uint8_t alpha);
 Color color_scale(Color color, unsigned light);
+Color color_between(Color from, Color to, int step, int steps);

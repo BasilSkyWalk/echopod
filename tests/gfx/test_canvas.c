@@ -123,6 +123,23 @@ static void a_canvas_shifted_back_keeps_the_original_clip(void)
     CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 2, 10));
 }
 
+static void a_gradient_runs_from_its_top_color_to_its_bottom_color(void)
+{
+    Canvas canvas = make_strip_canvas();
+    canvas_fill_gradient(&canvas, (Rect){0, 10, 4, 3}, 0x0000, 0xFFFF);
+    CHECK_EQUAL(0x0000, canvas_pixel_at(&canvas, 0, 10));
+    CHECK_EQUAL(0xFFFF, canvas_pixel_at(&canvas, 3, 12));
+    Color middle = canvas_pixel_at(&canvas, 2, 11);
+    CHECK(middle != 0x0000 && middle != 0xFFFF);
+}
+
+static void a_gradient_keeps_its_colors_when_clipped(void)
+{
+    Canvas canvas = make_strip_canvas();
+    canvas_fill_gradient(&canvas, (Rect){0, 8, 4, 5}, 0x0000, 0xFFFF);
+    CHECK_EQUAL(0xFFFF, canvas_pixel_at(&canvas, 1, 12));
+}
+
 static void blending_a_pixel_mixes_with_what_is_there(void)
 {
     Canvas canvas = make_strip_canvas();
@@ -155,6 +172,8 @@ int main(void)
         TEST_CASE(a_shifted_canvas_moves_what_is_drawn_sideways),
         TEST_CASE(a_shifted_canvas_only_paints_its_own_area),
         TEST_CASE(a_canvas_shifted_back_keeps_the_original_clip),
+        TEST_CASE(a_gradient_runs_from_its_top_color_to_its_bottom_color),
+        TEST_CASE(a_gradient_keeps_its_colors_when_clipped),
         TEST_CASE(blending_a_pixel_mixes_with_what_is_there),
         TEST_CASE(blending_respects_the_clip),
     };

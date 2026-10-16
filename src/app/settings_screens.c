@@ -200,7 +200,8 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
         screens->items[index] = (MenuItem){.label = CHOICES[index].title,
                                            .select = open_choice,
                                            .context = &screens->entries[index],
-                                           .value = choice_value};
+                                           .value = choice_value,
+                                           .opens = true};
     }
     MenuConfig menu = {"Settings", screens->items, SETTINGS_ITEM_COUNT, theme};
     return menu_screen_init(&screens->menu, menu);

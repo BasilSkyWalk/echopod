@@ -53,6 +53,14 @@ void canvas_fill_rect(Canvas *canvas, Rect area, Color color)
     }
 }
 
+void canvas_fill_gradient(Canvas *canvas, Rect area, Color top, Color bottom)
+{
+    for (int row = 0; row < area.height; row++) {
+        Color color = color_between(top, bottom, row, area.height - 1);
+        canvas_fill_rect(canvas, (Rect){area.x, area.y + row, area.width, 1}, color);
+    }
+}
+
 void canvas_blend_pixel(Canvas *canvas, Point point, Color color, uint8_t alpha)
 {
     if (!contains(canvas->clip, point)) {

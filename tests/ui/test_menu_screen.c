@@ -25,11 +25,11 @@ static const char *toggle_value(const void *context)
 }
 
 static const MenuItem ITEMS[] = {
-    {"A", menu_open_screen, &first_target, NULL},
-    {"B", menu_open_screen, &second_target, NULL},
-    {"A", NULL, NULL, NULL},
-    {"B", toggle, &toggled, toggle_value},
-    {"A", menu_open_screen, &last_target, NULL},
+    {"A", menu_open_screen, &first_target, NULL, true},
+    {"B", menu_open_screen, &second_target, NULL, false},
+    {"A", NULL, NULL, NULL, false},
+    {"B", toggle, &toggled, toggle_value, false},
+    {"A", menu_open_screen, &last_target, NULL, true},
 };
 
 static MenuScreen menu;
@@ -124,10 +124,24 @@ static void the_header_and_the_list_are_drawn(void)
     CHECK(ui_test_area_has_only(&canvas, first_row, TEST_THEME.colors.selection_background));
 }
 
+static void items_that_open_a_screen_show_a_chevron(void)
+{
+    Screen *screen = open_menu();
+    Canvas canvas = ui_test_canvas();
+    screen->update(screen->context, 100);
+    screen->draw(screen->context, &canvas);
+    Rect first_right = {TEST_SCREEN_WIDTH - 8, TEST_HEADER_HEIGHT, 5, TEST_ROW_HEIGHT};
+    Rect second_right = {TEST_SCREEN_WIDTH - 8, TEST_HEADER_HEIGHT + TEST_ROW_HEIGHT, 5,
+                         TEST_ROW_HEIGHT};
+    CHECK(!ui_test_area_has_only(&canvas, first_right, TEST_THEME.colors.selection_background));
+    CHECK(ui_test_area_has_only(&canvas, second_right, TEST_THEME.colors.background));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_menu_title_is_the_screen_title),
+        TEST_CASE(items_that_open_a_screen_show_a_chevron),
         TEST_CASE(selecting_the_first_item_opens_its_screen),
         TEST_CASE(moving_next_then_selecting_opens_the_second_screen),
         TEST_CASE(previous_on_the_first_item_wraps_to_the_last_on_a_press),

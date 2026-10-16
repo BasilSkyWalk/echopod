@@ -11,6 +11,7 @@ typedef struct ListModel {
     int (*count)(const void *context);
     const char *(*label)(const void *context, int index);
     const char *(*detail)(const void *context, int index);
+    bool (*opens)(const void *context, int index);
 } ListModel;
 
 typedef struct ListView {

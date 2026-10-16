@@ -72,3 +72,23 @@ Color color_scale(Color color, unsigned light)
     uint32_t scaled = (spread * (light >> SPREAD_LIGHT_DROP)) >> SPREAD_LIGHT_BITS & SPREAD_MASK;
     return (Color)(scaled | scaled >> SPREAD_SHIFT);
 }
+
+static unsigned channel_between(unsigned from, unsigned to, int step, int steps)
+{
+    int difference = (int)to - (int)from;
+    return (unsigned)((int)from + difference * step / steps);
+}
+
+Color color_between(Color from, Color to, int step, int steps)
+{
+    if (steps <= 0) {
+        return to;
+    }
+    Channels first = split(from);
+    Channels last = split(to);
+    return join((Channels){
+        .red = channel_between(first.red, last.red, step, steps),
+        .green = channel_between(first.green, last.green, step, steps),
+        .blue = channel_between(first.blue, last.blue, step, steps),
+    });
+}

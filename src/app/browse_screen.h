@@ -27,6 +27,7 @@ typedef struct BrowseRows {
     int count;
     char labels[BROWSE_ROWS][BROWSE_LABEL_CAPACITY];
     char details[BROWSE_ROWS][BROWSE_DETAIL_CAPACITY];
+    bool opens[BROWSE_ROWS];
 } BrowseRows;
 
 typedef struct BrowsePool BrowsePool;

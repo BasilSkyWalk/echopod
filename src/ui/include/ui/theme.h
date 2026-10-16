@@ -11,14 +11,17 @@ typedef struct ThemeColors {
     Color text_secondary;
     Color text_tertiary;
     Color selection_background;
+    Color selection_top;
+    Color selection_shine;
     Color selection_text;
     Color header_background;
+    Color header_top;
     Color header_text;
     Color divider;
-    Color scrollbar_track;
     Color scrollbar_thumb;
     Color danger;
     Color success;
+    Color chevron;
 } ThemeColors;
 
 typedef struct ThemeFonts {
@@ -35,6 +38,7 @@ typedef struct ThemeMetrics {
     int row_height;
     int padding;
     int scrollbar_width;
+    int scrollbar_inset;
     int detail_gap;
     int status_icon_size;
 } ThemeMetrics;

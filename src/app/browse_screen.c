@@ -111,12 +111,14 @@ static void load_row(BrowseScreen *browse, BrowseRows *rows, int row, int index)
                        BROWSE_DETAIL_CAPACITY};
     BrowseItem item;
     rows->details[row][0] = '\0';
+    rows->opens[row] = false;
     if (!item_at(browse, index, &item) ||
         !browse_item_text(browse->pool->config.library, browse->query, item, text)) {
         rows->labels[row][0] = '\0';
         rows->details[row][0] = '\0';
         return;
     }
+    rows->opens[row] = item.kind != BROWSE_ITEM_TRACK;
     if (is_favorite(browse, item)) {
         mark_favorite(rows->details[row]);
     }
@@ -164,6 +166,13 @@ static const char *row_detail(const void *context, int index)
 {
     const char *detail = cached_text(context, index, true);
     return detail[0] != '\0' ? detail : NULL;
+}
+
+static bool row_opens(const void *context, int index)
+{
+    const BrowseRows *rows = cached_rows(context);
+    int row = rows != NULL ? index - rows->first : -1;
+    return rows != NULL && row >= 0 && row < rows->count && rows->opens[row];
 }
 
 static bool is_loaded_track(const BrowseScreen *browse, int index)
@@ -304,8 +313,11 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     browse->favorites_only = false;
     browse->count = browse_count(pool->config.library, query);
     browse_title(pool->config.library, query, browse->title, sizeof browse->title);
-    browse->model = (ListModel){
-        .context = browse, .count = row_count, .label = row_label, .detail = row_detail};
+    browse->model = (ListModel){.context = browse,
+                                .count = row_count,
+                                .label = row_label,
+                                .detail = row_detail,
+                                .opens = row_opens};
     list_view_init(&browse->list, &browse->model, pool->config.theme, 0);
     browse->screen = (Screen){
         .title = browse->title,

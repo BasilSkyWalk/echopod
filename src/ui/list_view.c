@@ -5,8 +5,11 @@
 #include "ui/label.h"
 
 enum {
-    MIN_THUMB_HEIGHT = 6
+    MIN_THUMB_HEIGHT = 6,
+    SHINE_HEIGHT = 1
 };
+
+static const char CHEVRON[] = "\xE2\x80\xBA";
 
 typedef struct Row {
     int index;
@@ -93,6 +96,21 @@ static TextStyle row_style(const ListView *view, bool selected, Color normal)
     return (TextStyle){.font = view->theme->fonts.body, .color = color};
 }
 
+static Row draw_chevron(const ListView *view, Canvas *canvas, Row row)
+{
+    const ListModel *model = view->model;
+    if (model->opens == NULL || !model->opens(model->context, row.index)) {
+        return row;
+    }
+    Color color = row.selected ? view->theme->colors.selection_text : view->theme->colors.chevron;
+    TextStyle style = {.font = view->theme->fonts.title, .color = color};
+    int width = text_width(style.font, CHEVRON);
+    Rect area = {row.text.x + row.text.width - width, row.text.y, width, row.text.height};
+    label_draw(canvas, style, (Label){.area = area, .text = CHEVRON});
+    row.text.width -= width + view->theme->metrics.detail_gap;
+    return row;
+}
+
 static Row draw_detail(const ListView *view, Canvas *canvas, Row row)
 {
     const ListModel *model = view->model;
@@ -126,21 +144,26 @@ static void draw_label(const ListView *view, Canvas *canvas, Row row, uint32_t n
 static void draw_row(const ListView *view, Canvas *canvas, Row row, uint32_t now_ms)
 {
     if (row.selected) {
-        canvas_fill_rect(canvas, row.area, view->theme->colors.selection_background);
+        const ThemeColors *colors = &view->theme->colors;
+        Rect shine = {row.area.x, row.area.y, row.area.width, SHINE_HEIGHT};
+        Rect bar = {row.area.x, row.area.y + SHINE_HEIGHT, row.area.width,
+                    row.area.height - SHINE_HEIGHT};
+        canvas_fill_rect(canvas, shine, colors->selection_shine);
+        canvas_fill_gradient(canvas, bar, colors->selection_top, colors->selection_background);
     }
-    draw_label(view, canvas, draw_detail(view, canvas, row), now_ms);
+    draw_label(view, canvas, draw_detail(view, canvas, draw_chevron(view, canvas, row)), now_ms);
 }
 
 static void draw_scrollbar(const ListView *view, Canvas *canvas, Rect area)
 {
     const Theme *theme = view->theme;
     int hidden = item_count(view) - view->visible_rows;
+    int inset = theme->metrics.scrollbar_inset;
+    Rect track = {area.x + area.width - inset - theme->metrics.scrollbar_width, area.y + inset,
+                  theme->metrics.scrollbar_width, area.height - 2 * inset};
     int thumb_height =
-        max_of(MIN_THUMB_HEIGHT, area.height * view->visible_rows / item_count(view));
-    int thumb_top = area.y + (area.height - thumb_height) * view->top / hidden;
-    Rect track = {area.x + area.width - theme->metrics.scrollbar_width, area.y,
-                  theme->metrics.scrollbar_width, area.height};
-    canvas_fill_rect(canvas, track, theme->colors.scrollbar_track);
+        max_of(MIN_THUMB_HEIGHT, track.height * view->visible_rows / item_count(view));
+    int thumb_top = track.y + (track.height - thumb_height) * view->top / hidden;
     canvas_fill_rect(canvas, (Rect){track.x, thumb_top, track.width, thumb_height},
                      theme->colors.scrollbar_thumb);
 }
@@ -159,7 +182,7 @@ void list_view_draw(const ListView *view, Canvas *canvas, Rect area, uint32_t no
     canvas_fill_rect(canvas, area, view->theme->colors.background);
     Rect rows = area;
     if (item_count(view) > view->visible_rows) {
-        rows.width -= view->theme->metrics.scrollbar_width;
+        rows.width -= view->theme->metrics.scrollbar_width + view->theme->metrics.scrollbar_inset;
         draw_scrollbar(view, canvas, area);
     }
     for (int position = 0; position < view->visible_rows; position++) {

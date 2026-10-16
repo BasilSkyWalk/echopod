@@ -12,6 +12,17 @@ static void the_header_is_filled_with_its_background(void)
     CHECK(ui_test_area_has_only(&canvas, body, TEST_THEME.colors.header_background));
 }
 
+static void the_header_shades_from_its_top_color_down(void)
+{
+    Theme theme = TEST_THEME;
+    theme.colors.header_top = 0xFFFF;
+    Canvas canvas = ui_test_canvas();
+    header_draw(&canvas, &theme, "");
+    CHECK_EQUAL(0xFFFF, canvas_pixel_at(&canvas, 0, 0));
+    CHECK_EQUAL(theme.colors.header_background,
+                canvas_pixel_at(&canvas, 0, TEST_HEADER_HEIGHT - 2));
+}
+
 static void a_divider_separates_the_header_from_the_content(void)
 {
     Canvas canvas = ui_test_canvas();
@@ -44,6 +55,7 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_header_is_filled_with_its_background),
+        TEST_CASE(the_header_shades_from_its_top_color_down),
         TEST_CASE(a_divider_separates_the_header_from_the_content),
         TEST_CASE(the_title_is_centred),
         TEST_CASE(a_long_title_stays_clear_of_the_header_insets),

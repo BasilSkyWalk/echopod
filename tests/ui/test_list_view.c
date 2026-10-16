@@ -6,6 +6,7 @@
 typedef struct FakeItems {
     int count;
     const char *detail_at_one;
+    bool opens_at_one;
 } FakeItems;
 
 static int fake_count(const void *context)
@@ -26,14 +27,23 @@ static const char *fake_detail(const void *context, int index)
     return index == 1 ? items->detail_at_one : NULL;
 }
 
+static bool fake_opens(const void *context, int index)
+{
+    const FakeItems *items = context;
+    return index == 1 && items->opens_at_one;
+}
+
 static FakeItems items;
 static ListModel model;
 
 static ListView list_of(int count)
 {
     items = (FakeItems){.count = count, .detail_at_one = NULL};
-    model = (ListModel){
-        .context = &items, .count = fake_count, .label = fake_label, .detail = fake_detail};
+    model = (ListModel){.context = &items,
+                        .count = fake_count,
+                        .label = fake_label,
+                        .detail = fake_detail,
+                        .opens = fake_opens};
     ListView view;
     list_view_init(&view, &model, &TEST_THEME, 0);
     return view;
@@ -170,10 +180,52 @@ static void the_selected_row_is_highlighted(void)
     CHECK(ui_test_area_has_only(&canvas, row_rect(2), TEST_THEME.colors.background));
 }
 
+static void the_selected_row_has_a_shine_line_and_shades_down(void)
+{
+    Theme theme = TEST_THEME;
+    theme.colors.selection_top = 0xFFFF;
+    theme.colors.selection_shine = 0x07E0;
+    ListView view = list_of(10);
+    view.theme = &theme;
+    move_times(&view, 1, 1);
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(&theme), 100);
+    Rect row = row_rect(1);
+    CHECK_EQUAL(0x07E0, canvas_pixel_at(&canvas, 0, row.y));
+    CHECK_EQUAL(theme.colors.selection_background,
+                canvas_pixel_at(&canvas, 0, row.y + row.height - 1));
+    Color below_shine = canvas_pixel_at(&canvas, 0, row.y + 1);
+    CHECK(below_shine != 0x07E0 && below_shine != theme.colors.selection_background);
+}
+
+static void the_scrollbar_thumb_sits_inset_without_a_track(void)
+{
+    Rect content = theme_content_area(&TEST_THEME);
+    ListView long_list = list_of(10);
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&long_list, &canvas, content, 100);
+    Rect edge = {TEST_SCREEN_WIDTH - TEST_THEME.metrics.scrollbar_inset, content.y,
+                 TEST_THEME.metrics.scrollbar_inset, content.height};
+    CHECK(ui_test_area_has_only(&canvas, edge, TEST_THEME.colors.background));
+}
+
+static void a_row_that_opens_something_shows_a_chevron(void)
+{
+    ListView view = list_of(3);
+    items.opens_at_one = true;
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
+    Rect right_of_row_one = {TEST_SCREEN_WIDTH - 8, row_rect(1).y, 8, TEST_ROW_HEIGHT};
+    Rect right_of_row_two = {TEST_SCREEN_WIDTH - 8, row_rect(2).y, 8, TEST_ROW_HEIGHT};
+    CHECK(!ui_test_area_has_only(&canvas, right_of_row_one, TEST_THEME.colors.background));
+    CHECK(ui_test_area_has_only(&canvas, right_of_row_two, TEST_THEME.colors.background));
+}
+
 static void the_scrollbar_appears_only_when_items_overflow(void)
 {
     Rect content = theme_content_area(&TEST_THEME);
-    Rect right_edge = {TEST_SCREEN_WIDTH - 1, content.y, 1, content.height};
+    int thumb_x = TEST_SCREEN_WIDTH - TEST_THEME.metrics.scrollbar_inset - 1;
+    Rect right_edge = {thumb_x, content.y, 1, content.height};
     ListView long_list = list_of(10);
     Canvas canvas = ui_test_canvas();
     list_view_draw(&long_list, &canvas, content, 100);
@@ -212,6 +264,9 @@ int main(void)
         TEST_CASE(selecting_past_the_end_picks_the_last_item),
         TEST_CASE(the_selected_row_is_highlighted),
         TEST_CASE(the_scrollbar_appears_only_when_items_overflow),
+        TEST_CASE(the_selected_row_has_a_shine_line_and_shades_down),
+        TEST_CASE(the_scrollbar_thumb_sits_inset_without_a_track),
+        TEST_CASE(a_row_that_opens_something_shows_a_chevron),
         TEST_CASE(a_detail_is_drawn_in_the_secondary_color_at_the_right),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
