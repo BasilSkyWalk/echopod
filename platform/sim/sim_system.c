@@ -31,3 +31,8 @@ HalLoopCycles hal_system_loop_cycles(void)
 {
     return (HalLoopCycles){0};
 }
+
+HalCore1Test hal_system_core1_test(void)
+{
+    return (HalCore1Test){.status = HAL_CORE1_UNAVAILABLE};
+}

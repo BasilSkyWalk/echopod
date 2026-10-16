@@ -110,11 +110,49 @@ static void the_loop_row_shows_cycles_per_iteration(void)
     CHECK(text_is("r4.00 m0.05", text));
 }
 
+static void the_core_1_row_is_empty_until_run(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_core1_text(false, (HalCore1Test){0}, text, sizeof text);
+    CHECK(text_is("", text));
+}
+
+static void a_core_1_run_shows_its_clock_and_loop_cycles(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalCore1Test test = {.status = HAL_CORE1_RAN,
+                         .mhz = 100,
+                         .cycles = {.register_centi = 300, .memory_centi = 912}};
+    diagnostics_core1_text(true, test, text, sizeof text);
+    CHECK(text_is("100 r3.00 m9.12", text));
+}
+
+static void core_1_failures_name_the_step(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    static const struct {
+        HalCore1Status status;
+        const char *text;
+    } cases[] = {
+        {HAL_CORE1_UNAVAILABLE, "Not here"}, {HAL_CORE1_NEEDS_PLL, "Needs 96+ MHz"},
+        {HAL_CORE1_NO_POWER, "No power"},    {HAL_CORE1_NO_REPLY, "No reply"},
+        {HAL_CORE1_BAD_REPLY, "Bad reply"},  {HAL_CORE1_NO_STOP, "No stop"},
+    };
+    for (size_t index = 0; index < sizeof cases / sizeof cases[0]; index++) {
+        diagnostics_core1_text(true, (HalCore1Test){.status = cases[index].status}, text,
+                               sizeof text);
+        CHECK(text_is(cases[index].text, text));
+    }
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
+        TEST_CASE(the_core_1_row_is_empty_until_run),
+        TEST_CASE(a_core_1_run_shows_its_clock_and_loop_cycles),
+        TEST_CASE(core_1_failures_name_the_step),
         TEST_CASE(the_loop_row_shows_cycles_per_iteration),
         TEST_CASE(a_running_tone_shows_the_read_position),
         TEST_CASE(a_tone_that_ended_by_itself_says_so),

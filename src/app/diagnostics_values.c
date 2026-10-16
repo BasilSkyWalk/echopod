@@ -121,3 +121,39 @@ void diagnostics_loop_text(bool run, HalLoopCycles cycles, char *text, size_t ca
     append_centi(&builder, "r", cycles.register_centi);
     append_centi(&builder, " m", cycles.memory_centi);
 }
+
+static const char *core1_failure_text(HalCore1Status status)
+{
+    switch (status) {
+    case HAL_CORE1_RAN:
+        return "";
+    case HAL_CORE1_UNAVAILABLE:
+        return "Not here";
+    case HAL_CORE1_NEEDS_PLL:
+        return "Needs 96+ MHz";
+    case HAL_CORE1_NO_POWER:
+        return "No power";
+    case HAL_CORE1_NO_REPLY:
+        return "No reply";
+    case HAL_CORE1_BAD_REPLY:
+        return "Bad reply";
+    case HAL_CORE1_NO_STOP:
+        return "No stop";
+    }
+    return "";
+}
+
+void diagnostics_core1_text(bool run, HalCore1Test test, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!run) {
+        return;
+    }
+    if (test.status != HAL_CORE1_RAN) {
+        string_builder_append(&builder, core1_failure_text(test.status));
+        return;
+    }
+    string_builder_append_unsigned(&builder, test.mhz);
+    append_centi(&builder, " r", test.cycles.register_centi);
+    append_centi(&builder, " m", test.cycles.memory_centi);
+}

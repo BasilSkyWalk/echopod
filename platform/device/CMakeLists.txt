@@ -2,6 +2,7 @@ add_executable(echo_device
     board/audio.c
     board/clock.c
     board/clock_switch.c
+    board/core1.c
     board/cru.c
     board/dac.c
     board/dmac.c
@@ -23,6 +24,43 @@ add_executable(echo_device
     board/usb_report.c
     board/usb_session.c
 )
+set(ECHO_CORE1_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1.ld)
+add_executable(echo_core1
+    core1/main.c
+    core1/startup.c
+    board/loop_bench.c
+)
+set_target_properties(echo_core1 PROPERTIES
+    SUFFIX .elf
+    LINK_DEPENDS ${ECHO_CORE1_LINKER_SCRIPT}
+)
+target_include_directories(echo_core1 PRIVATE board)
+target_link_libraries(echo_core1 PRIVATE echo_device_logic echo_options)
+target_link_options(echo_core1 PRIVATE
+    -T${ECHO_CORE1_LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1.map
+)
+set(ECHO_CORE1_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1.bin)
+set(ECHO_CORE1_OBJECT ${CMAKE_CURRENT_BINARY_DIR}/core1_image.o)
+add_custom_command(
+    OUTPUT ${ECHO_CORE1_BINARY}
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:echo_core1> core1.bin
+    DEPENDS echo_core1
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    VERBATIM
+)
+add_custom_command(
+    OUTPUT ${ECHO_CORE1_OBJECT}
+    COMMAND ${CMAKE_OBJCOPY} -I binary -O elf32-littlearm -B arm
+        --rename-section .data=.rodata.core1_image,alloc,load,readonly,data,contents
+        core1.bin core1_image.o
+    DEPENDS ${ECHO_CORE1_BINARY}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    VERBATIM
+)
+set_source_files_properties(${ECHO_CORE1_OBJECT} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+target_sources(echo_device PRIVATE ${ECHO_CORE1_OBJECT})
+
 set(ECHO_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/echo_device.ld)
 set_target_properties(echo_device PROPERTIES
     SUFFIX .elf

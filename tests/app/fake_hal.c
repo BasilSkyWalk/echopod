@@ -68,6 +68,7 @@ typedef struct FakeHal {
     bool refuse_clock_switch;
     int test_tone_count;
     int loop_bench_count;
+    int core1_test_count;
     bool dma_tone_running;
     int audio_service_count;
 } FakeHal;
@@ -507,4 +508,15 @@ HalLoopCycles hal_system_loop_cycles(void)
 {
     fake.loop_bench_count++;
     return (HalLoopCycles){.register_centi = 300, .memory_centi = 700};
+}
+
+int fake_hal_core1_test_count(void)
+{
+    return fake.core1_test_count;
+}
+
+HalCore1Test hal_system_core1_test(void)
+{
+    fake.core1_test_count++;
+    return (HalCore1Test){.status = HAL_CORE1_RAN, .mhz = 100};
 }
