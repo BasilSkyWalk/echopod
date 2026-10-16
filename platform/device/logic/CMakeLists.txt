@@ -3,6 +3,7 @@ add_library(echo_device_logic STATIC
     audio_math.c
     core1_control.c
     dac_sequence.c
+    flac_source.c
     dma_loop.c
     emmc_layout.c
     exfat.c

@@ -52,34 +52,39 @@ void audio_engine_set_volume(AudioEngine *engine, uint8_t level)
     engine->gain = gain;
 }
 
+static void release_frame(AudioEngine *engine)
+{
+    if (engine->holding_frame) {
+        engine->config.source.release(engine->config.source.context);
+        engine->holding_frame = false;
+    }
+    engine->pending_frames = 0;
+}
+
 static void close_file(AudioEngine *engine)
 {
     if (engine->decoding) {
-        engine->config.close(engine->config.context);
+        release_frame(engine);
+        engine->config.source.close(engine->config.source.context);
         engine->decoding = false;
     }
 }
 
 static bool open_track(AudioEngine *engine, const char *path, uint32_t start_ms)
 {
-    FlacInput input;
-    FlacDecoder *decoder = engine->config.decoder;
-    if (!engine->config.open(engine->config.context, path, &input)) {
+    FlacInfo info;
+    if (!engine->config.source.open(engine->config.source.context, path, start_ms, &info)) {
         return false;
     }
     engine->decoding = true;
-    if (flac_open(decoder, input) != FLAC_OK || !rate_supported(decoder->info.sample_rate)) {
+    if (!rate_supported(info.sample_rate)) {
         close_file(engine);
         return false;
     }
-    uint32_t target =
-        (uint32_t)((uint64_t)start_ms * decoder->info.sample_rate / MILLISECONDS_PER_SECOND);
-    engine->skip_frames = target;
-    if (target > 0 && flac_seek(decoder, target) != FLAC_OK) {
-        close_file(engine);
-        return false;
-    }
-    engine->decode_rate = decoder->info.sample_rate;
+    engine->skip_frames =
+        (uint32_t)((uint64_t)start_ms * info.sample_rate / MILLISECONDS_PER_SECOND);
+    engine->decode_rate = info.sample_rate;
+    engine->holding_frame = false;
     engine->pending_frames = 0;
     engine->pending_offset = 0;
     return true;
@@ -212,10 +217,9 @@ static void write_word(AudioEngine *engine, uint32_t word)
 
 static void copy_pending(AudioEngine *engine)
 {
-    const FlacDecoder *decoder = engine->config.decoder;
-    const int32_t *left = flac_channel(decoder, 0);
-    const int32_t *right = flac_channel(decoder, decoder->info.channels > 1 ? 1 : 0);
-    int bits = decoder->info.bits_per_sample;
+    const int32_t *left = engine->frame.left;
+    const int32_t *right = engine->frame.right;
+    int bits = engine->frame.bits;
     while (engine->pending_frames > 0 && free_space(engine) > 0) {
         uint32_t index = engine->pending_offset;
         int32_t l = to_output(left[index], bits, engine->gain);
@@ -223,6 +227,9 @@ static void copy_pending(AudioEngine *engine)
         write_word(engine, (uint32_t)(uint16_t)l | (uint32_t)(uint16_t)r << 16);
         engine->pending_offset++;
         engine->pending_frames--;
+    }
+    if (engine->pending_frames == 0) {
+        release_frame(engine);
     }
 }
 
@@ -250,13 +257,16 @@ static void finish_decoding(AudioEngine *engine)
 
 static void decode_one(AudioEngine *engine)
 {
-    FlacDecoder *decoder = engine->config.decoder;
-    FlacResult result = flac_decode_frame(decoder);
-    if (result == FLAC_END) {
+    AudioFrame frame;
+    AudioFrameResult result = engine->config.source.next(engine->config.source.context, &frame);
+    if (result == AUDIO_FRAME_WAIT) {
+        return;
+    }
+    if (result == AUDIO_FRAME_END) {
         finish_decoding(engine);
         return;
     }
-    if (result != FLAC_OK) {
+    if (result != AUDIO_FRAME_READY) {
         engine->failed = true;
         close_file(engine);
         engine->ended = true;
@@ -264,13 +274,15 @@ static void decode_one(AudioEngine *engine)
         return;
     }
     uint32_t skip = 0;
-    if (engine->skip_frames > decoder->frame_first_sample) {
-        skip = engine->skip_frames - decoder->frame_first_sample;
-        skip = skip < decoder->block_samples ? skip : decoder->block_samples;
+    if (engine->skip_frames > frame.first_sample) {
+        skip = engine->skip_frames - frame.first_sample;
+        skip = skip < frame.samples ? skip : frame.samples;
     }
+    engine->frame = frame;
+    engine->holding_frame = true;
     engine->skip_frames = 0;
     engine->pending_offset = skip;
-    engine->pending_frames = decoder->block_samples - skip;
+    engine->pending_frames = frame.samples - skip;
     engine->stats.frames++;
 }
 

@@ -17,11 +17,31 @@ typedef enum AudioEngineState {
     AUDIO_ENGINE_PAUSED
 } AudioEngineState;
 
-typedef struct AudioEngineConfig {
-    bool (*open)(void *context, const char *path, FlacInput *input);
+typedef enum AudioFrameResult {
+    AUDIO_FRAME_READY,
+    AUDIO_FRAME_WAIT,
+    AUDIO_FRAME_END,
+    AUDIO_FRAME_ERROR
+} AudioFrameResult;
+
+typedef struct AudioFrame {
+    const int32_t *left;
+    const int32_t *right;
+    uint32_t first_sample;
+    uint32_t samples;
+    uint8_t bits;
+} AudioFrame;
+
+typedef struct AudioSource {
+    bool (*open)(void *context, const char *path, uint32_t start_ms, FlacInfo *info);
+    AudioFrameResult (*next)(void *context, AudioFrame *frame);
+    void (*release)(void *context);
     void (*close)(void *context);
     void *context;
-    FlacDecoder *decoder;
+} AudioSource;
+
+typedef struct AudioEngineConfig {
+    AudioSource source;
     uint32_t *ring;
     uint32_t ring_words;
 } AudioEngineConfig;
@@ -56,6 +76,8 @@ typedef struct AudioEngine {
     int segment_count;
     bool decoding;
     uint32_t decode_rate;
+    AudioFrame frame;
+    bool holding_frame;
     uint32_t pending_frames;
     uint32_t pending_offset;
     uint32_t skip_frames;

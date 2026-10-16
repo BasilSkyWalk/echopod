@@ -4,6 +4,7 @@
 
 #include "check.h"
 #include "device/audio_engine.h"
+#include "device/flac_source.h"
 
 enum {
     RING_WORDS = 8192,
@@ -16,6 +17,7 @@ typedef struct Fixture {
 } Fixture;
 
 static FlacDecoder decoder;
+static FlacSource source;
 static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
 static Fixture opened;
@@ -69,12 +71,75 @@ static void close_file(void *context)
 static void start_engine(void)
 {
     open_count = 0;
-    audio_engine_init(&engine, (AudioEngineConfig){.open = open_file,
-                                                   .close = close_file,
-                                                   .context = NULL,
-                                                   .decoder = &decoder,
+    flac_source_init(&source,
+                     (FlacFileOpener){.open = open_file, .close = close_file, .context = NULL},
+                     &decoder);
+    audio_engine_init(&engine, (AudioEngineConfig){.source = flac_source_interface(&source),
                                                    .ring = ring,
                                                    .ring_words = RING_WORDS});
+    audio_engine_set_volume(&engine, FULL_VOLUME);
+}
+
+typedef struct ScriptedSource {
+    int32_t left[16];
+    int32_t right[16];
+    int waits_before_frame;
+    int frames_left;
+    int releases;
+    int closes;
+} ScriptedSource;
+
+static ScriptedSource scripted;
+
+static bool scripted_open(void *context, const char *path, uint32_t start_ms, FlacInfo *info)
+{
+    (void)context;
+    (void)path;
+    (void)start_ms;
+    *info = (FlacInfo){.sample_rate = 44100, .channels = 2, .bits_per_sample = 16, .max_block = 16};
+    return true;
+}
+
+static AudioFrameResult scripted_next(void *context, AudioFrame *frame)
+{
+    ScriptedSource *source_state = context;
+    if (source_state->waits_before_frame > 0) {
+        source_state->waits_before_frame--;
+        return AUDIO_FRAME_WAIT;
+    }
+    if (source_state->frames_left == 0) {
+        return AUDIO_FRAME_END;
+    }
+    source_state->frames_left--;
+    *frame = (AudioFrame){.left = source_state->left,
+                          .right = source_state->right,
+                          .first_sample = 0,
+                          .samples = 16,
+                          .bits = 16};
+    return AUDIO_FRAME_READY;
+}
+
+static void scripted_release(void *context)
+{
+    ((ScriptedSource *)context)->releases++;
+}
+
+static void scripted_close(void *context)
+{
+    ((ScriptedSource *)context)->closes++;
+}
+
+static void start_scripted_engine(int waits, int frames)
+{
+    scripted = (ScriptedSource){.waits_before_frame = waits, .frames_left = frames};
+    for (int index = 0; index < 16; index++) {
+        scripted.left[index] = index + 1;
+        scripted.right[index] = -(index + 1);
+    }
+    AudioSource interface = {scripted_open, scripted_next, scripted_release, scripted_close,
+                             &scripted};
+    audio_engine_init(
+        &engine, (AudioEngineConfig){.source = interface, .ring = ring, .ring_words = RING_WORDS});
     audio_engine_set_volume(&engine, FULL_VOLUME);
 }
 
@@ -325,10 +390,38 @@ static void the_current_path_is_the_track_being_played(void)
     CHECK(strcmp("lpc_16_44k_stereo", audio_engine_current_path(&engine)) == 0);
 }
 
+static void a_source_that_is_not_ready_leaves_the_ring_alone(void)
+{
+    start_scripted_engine(2, 1);
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(0u, audio_engine_buffered(&engine, 0));
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(0u, audio_engine_buffered(&engine, 0));
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(16u, audio_engine_buffered(&engine, 0));
+    CHECK_EQUAL(word_of(1, -1), ring[0]);
+    CHECK_EQUAL(word_of(16, -16), ring[15]);
+}
+
+static void a_frame_is_released_once_its_samples_are_in_the_ring(void)
+{
+    start_scripted_engine(0, 2);
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(1, scripted.releases);
+    audio_engine_pump(&engine, 0);
+    CHECK_EQUAL(2, scripted.releases);
+    audio_engine_stop(&engine);
+    CHECK_EQUAL(1, scripted.closes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_current_path_is_the_track_being_played),
+        TEST_CASE(a_source_that_is_not_ready_leaves_the_ring_alone),
+        TEST_CASE(a_frame_is_released_once_its_samples_are_in_the_ring),
         TEST_CASE(observing_the_dma_position_never_decodes),
         TEST_CASE(the_dma_overtaking_the_decoder_counts_an_underrun),
         TEST_CASE(every_decoded_frame_is_counted),

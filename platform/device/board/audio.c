@@ -7,6 +7,7 @@
 #include "device/audio_engine.h"
 #include "device/audio_math.h"
 #include "device/dma_loop.h"
+#include "device/flac_source.h"
 #include "dmac.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -25,6 +26,7 @@ enum {
 };
 
 static FlacDecoder decoder;
+static FlacSource source;
 static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
 static DmaItem items[RING_BLOCKS];
@@ -97,10 +99,10 @@ static void ensure_engine(void)
     if (engine_ready) {
         return;
     }
-    audio_engine_init(&engine, (AudioEngineConfig){.open = open_file,
-                                                   .close = close_file,
-                                                   .context = NULL,
-                                                   .decoder = &decoder,
+    flac_source_init(&source,
+                     (FlacFileOpener){.open = open_file, .close = close_file, .context = NULL},
+                     &decoder);
+    audio_engine_init(&engine, (AudioEngineConfig){.source = flac_source_interface(&source),
                                                    .ring = ring,
                                                    .ring_words = RING_WORDS});
     engine_ready = true;
