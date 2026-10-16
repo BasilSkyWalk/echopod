@@ -6,7 +6,7 @@
 
 enum {
     COVER_FLOW_ONE = 256,
-    COVER_FLOW_REACH = 4,
+    COVER_FLOW_REACH = 3,
     COVER_FLOW_MAX_VISIBLE = 2 * COVER_FLOW_REACH + 1
 };
 
@@ -21,6 +21,8 @@ typedef struct CoverFlowLayout {
     int side_far_height;
     uint16_t side_near_light;
     uint16_t side_far_light;
+    int32_t fade_start;
+    int32_t fade_end;
 } CoverFlowLayout;
 
 Quad cover_flow_quad(const CoverFlowLayout *layout, int32_t relative);

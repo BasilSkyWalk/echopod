@@ -41,6 +41,37 @@ static Color *pixel_address(Canvas *canvas, int x, int y)
     return &canvas->pixels[(y - bounds.y) * bounds.width + (x - bounds.x)];
 }
 
+typedef struct Sampler {
+    const Color *source;
+    int whole_step;
+    int remainder_step;
+    int remainder;
+    int rows;
+} Sampler;
+
+static Sampler sampler_at(const Column *column, const Image *image, int quad_width, int skip)
+{
+    int scaled = skip * image->height;
+    return (Sampler){
+        .source = &image->pixels[column->offset * image->width / quad_width] +
+                  scaled / column->height * image->width,
+        .whole_step = image->height / column->height * image->width,
+        .remainder_step = image->height % column->height,
+        .remainder = scaled % column->height,
+        .rows = column->height,
+    };
+}
+
+static void sampler_down(Sampler *sampler, int width)
+{
+    sampler->source += sampler->whole_step;
+    sampler->remainder += sampler->remainder_step;
+    if (sampler->remainder >= sampler->rows) {
+        sampler->remainder -= sampler->rows;
+        sampler->source += width;
+    }
+}
+
 static void draw_column(Canvas *canvas, Column column, const Image *image, int quad_width)
 {
     Rect clip = canvas->clip;
@@ -50,22 +81,12 @@ static void draw_column(Canvas *canvas, Column column, const Image *image, int q
         return;
     }
     int stride = canvas->bounds.width;
-    int whole_step = image->height / column.height * image->width;
-    int remainder_step = image->height % column.height;
-    int scaled = (first - column.top) * image->height;
-    int remainder = scaled % column.height;
-    const Color *source = &image->pixels[column.offset * image->width / quad_width] +
-                          scaled / column.height * image->width;
+    Sampler sampler = sampler_at(&column, image, quad_width, first - column.top);
     Color *target = pixel_address(canvas, column.x, first);
     for (int y = first; y < last; y++) {
-        *target = *source;
+        *target = *sampler.source;
         target += stride;
-        source += whole_step;
-        remainder += remainder_step;
-        if (remainder >= column.height) {
-            remainder -= column.height;
-            source += image->width;
-        }
+        sampler_down(&sampler, image->width);
     }
 }
 
@@ -80,10 +101,16 @@ static void draw_lit_column(Canvas *canvas, Column column, const Image *image, i
     Rect clip = canvas->clip;
     int first = max_of(column.top, clip.y);
     int last = min_of(column.top + column.height, clip.y + clip.height);
-    const Color *source_column = &image->pixels[column.offset * image->width / quad_width];
+    if (first >= last) {
+        return;
+    }
+    int stride = canvas->bounds.width;
+    Sampler sampler = sampler_at(&column, image, quad_width, first - column.top);
+    Color *target = pixel_address(canvas, column.x, first);
     for (int y = first; y < last; y++) {
-        int row = (y - column.top) * image->height / column.height;
-        *pixel_address(canvas, column.x, y) = color_scale(source_column[row * image->width], light);
+        *target = color_scale(*sampler.source, light);
+        target += stride;
+        sampler_down(&sampler, image->width);
     }
 }
 
@@ -94,12 +121,23 @@ static void draw_reflected_column(Canvas *canvas, Column column, const Image *im
     int top = column.top + column.height;
     int first = max_of(top, clip.y);
     int last = min_of(top + rows, clip.y + clip.height);
-    const Color *source_column = &image->pixels[column.offset * image->width / quad_width];
+    if (first >= last) {
+        return;
+    }
+    int skip = first - top;
+    int stride = canvas->bounds.width;
+    const Color *column_start = &image->pixels[column.offset * image->width / quad_width];
+    int last_row = (image->height - 1) * image->width;
+    Sampler sampler = sampler_at(&column, image, quad_width, skip);
+    uint32_t fade_step = ((uint32_t)light << COLOR_LIGHT_SHIFT) / (uint32_t)rows;
+    uint32_t faded = ((uint32_t)light << COLOR_LIGHT_SHIFT) - fade_step * (uint32_t)skip;
+    Color *target = pixel_address(canvas, column.x, first);
     for (int y = first; y < last; y++) {
-        int step = y - top;
-        int row = max_of(image->height - 1 - step * image->height / column.height, 0);
-        unsigned faded = light * (unsigned)(rows - step) / (unsigned)rows;
-        *pixel_address(canvas, column.x, y) = color_scale(source_column[row * image->width], faded);
+        int mirrored = max_of(last_row - (int)(sampler.source - column_start), 0);
+        *target = color_scale(column_start[mirrored], faded >> COLOR_LIGHT_SHIFT);
+        target += stride;
+        sampler_down(&sampler, image->width);
+        faded -= fade_step;
     }
 }
 

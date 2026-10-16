@@ -17,6 +17,8 @@ static const CoverFlowLayout LAYOUT = {
     .side_far_height = 60,
     .side_near_light = 240,
     .side_far_light = 140,
+    .fade_start = 2 * ONE,
+    .fade_end = 2 * ONE + ONE / 2,
 };
 
 static int abs_of(int value)
@@ -86,6 +88,17 @@ static void side_covers_darken_away_from_the_centre(void)
     CHECK_EQUAL(240, left.right);
 }
 
+static void covers_past_the_last_side_slot_fade_out(void)
+{
+    CHECK_EQUAL(140, cover_flow_light(&LAYOUT, 2 * ONE).right);
+    QuadLight fading = cover_flow_light(&LAYOUT, 2 * ONE + ONE / 4);
+    CHECK(fading.right > 0 && fading.right < 140);
+    CHECK(fading.left > 0 && fading.left < 240);
+    QuadLight gone = cover_flow_light(&LAYOUT, -(2 * ONE + ONE / 2));
+    CHECK_EQUAL(0, gone.left);
+    CHECK_EQUAL(0, gone.right);
+}
+
 static void light_fades_smoothly_as_a_cover_leaves_the_centre(void)
 {
     QuadLight half = cover_flow_light(&LAYOUT, ONE / 2);
@@ -145,6 +158,7 @@ int main(void)
         TEST_CASE(the_centre_cover_is_fully_lit),
         TEST_CASE(side_covers_darken_away_from_the_centre),
         TEST_CASE(light_fades_smoothly_as_a_cover_leaves_the_centre),
+        TEST_CASE(covers_past_the_last_side_slot_fade_out),
         TEST_CASE(the_centre_cover_is_flat_and_full_size),
         TEST_CASE(a_cover_to_the_right_faces_the_centre),
         TEST_CASE(a_cover_to_the_left_is_mirrored),

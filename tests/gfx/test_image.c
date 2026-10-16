@@ -188,6 +188,45 @@ static void light_runs_from_the_left_edge_to_the_right(void)
     CHECK_EQUAL(color_scale(0xFFFF, COLOR_LIGHT_FULL * 3 / 4), canvas_pixel_at(&canvas, 3, 1));
 }
 
+static bool lit_matches_plain(Quad quad, unsigned light)
+{
+    static Color plain[WIDTH * HEIGHT];
+    Canvas canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
+    image_draw_quad(&canvas, TWO_BY_TWO, quad);
+    for (int index = 0; index < WIDTH * HEIGHT; index++) {
+        plain[index] = pixels[index];
+    }
+    canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
+    image_draw_quad_lit(&canvas, TWO_BY_TWO, quad, (QuadLight){(uint16_t)light, (uint16_t)light});
+    for (int index = 0; index < WIDTH * HEIGHT; index++) {
+        Color expected = plain[index] == BACKGROUND ? BACKGROUND : color_scale(plain[index], light);
+        if (pixels[index] != expected) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void a_lit_quad_samples_the_image_like_a_plain_one(void)
+{
+    CHECK(lit_matches_plain(flat(1, 1, 7, 7), 200));
+    CHECK(lit_matches_plain(flat(2, 0, 3, 9), 100));
+    Quad slanted = {
+        .left = 0, .width = 9, .left_top = 0, .left_height = 10, .right_top = 3, .right_height = 4};
+    CHECK(lit_matches_plain(slanted, 255));
+}
+
+static void a_reflection_of_a_tall_quad_walks_up_the_image(void)
+{
+    Canvas canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
+    QuadLight light = {COLOR_LIGHT_FULL, COLOR_LIGHT_FULL};
+    image_draw_reflection(&canvas, TWO_BY_TWO, flat(0, 0, 2, 4), light, 4);
+    CHECK_EQUAL(0x3000, canvas_pixel_at(&canvas, 0, 4));
+    CHECK_EQUAL(color_scale(0x3000, COLOR_LIGHT_FULL * 3 / 4), canvas_pixel_at(&canvas, 0, 5));
+    CHECK_EQUAL(color_scale(0x1000, COLOR_LIGHT_FULL / 2), canvas_pixel_at(&canvas, 0, 6));
+    CHECK_EQUAL(color_scale(0x1000, COLOR_LIGHT_FULL / 4), canvas_pixel_at(&canvas, 0, 7));
+}
+
 static void a_reflection_mirrors_the_image_below_and_fades(void)
 {
     Canvas canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
@@ -222,6 +261,8 @@ int main(void)
         TEST_CASE(light_runs_from_the_left_edge_to_the_right),
         TEST_CASE(a_reflection_mirrors_the_image_below_and_fades),
         TEST_CASE(a_reflection_stays_inside_the_clip),
+        TEST_CASE(a_lit_quad_samples_the_image_like_a_plain_one),
+        TEST_CASE(a_reflection_of_a_tall_quad_walks_up_the_image),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

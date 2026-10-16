@@ -13,7 +13,6 @@ enum {
     TITLE_TOP = 126,
     ARTIST_TOP = 148,
     LINE_HEIGHT = 20,
-    PLACEHOLDER_REACH = 3 * COVER_FLOW_ONE,
     REFLECTION_ROWS = 34,
     REFLECTION_LIGHT = 80,
     FLOOR_LEVEL = 16
@@ -24,12 +23,14 @@ static const CoverFlowLayout LAYOUT = {
     .center_top = 8,
     .center_size = COVER_FULL_SIZE,
     .side_offset = 86,
-    .side_spacing = 24,
-    .side_width = 44,
+    .side_spacing = 30,
+    .side_width = 46,
     .side_near_height = 104,
     .side_far_height = 78,
     .side_near_light = 230,
     .side_far_light = 140,
+    .fade_start = 2 * COVER_FLOW_ONE,
+    .fade_end = 2 * COVER_FLOW_ONE + COVER_FLOW_ONE / 2,
 };
 
 static const Color BACKDROP = COLOR_RGB(0, 0, 0);
@@ -239,14 +240,17 @@ static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position
 {
     int32_t relative = (int32_t)position * COVER_FLOW_ONE - flow->position;
     Quad quad = cover_flow_quad(&LAYOUT, relative);
+    QuadLight light = cover_flow_light(&LAYOUT, relative);
+    if (light.left == 0 && light.right == 0) {
+        return;
+    }
     Image image;
     if (cover_image(flow, position, &image)) {
-        QuadLight light = cover_flow_light(&LAYOUT, relative);
         image_draw_quad_lit(canvas, image, quad, light);
         QuadLight reflected = {(uint16_t)(light.left * REFLECTION_LIGHT / COLOR_LIGHT_FULL),
                                (uint16_t)(light.right * REFLECTION_LIGHT / COLOR_LIGHT_FULL)};
         image_draw_reflection(canvas, image, quad, reflected, REFLECTION_ROWS);
-    } else if (relative <= PLACEHOLDER_REACH && relative >= -PLACEHOLDER_REACH) {
+    } else {
         image_fill_quad(canvas, quad, flow->config.theme->colors.divider);
     }
 }
