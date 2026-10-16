@@ -203,6 +203,9 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
                                            .value = choice_value,
                                            .opens = true};
     }
-    MenuConfig menu = {"Settings", screens->items, SETTINGS_ITEM_COUNT, theme};
+    MenuConfig menu = {.title = "Settings",
+                       .items = screens->items,
+                       .item_count = SETTINGS_ITEM_COUNT,
+                       .theme = theme};
     return menu_screen_init(&screens->menu, menu);
 }

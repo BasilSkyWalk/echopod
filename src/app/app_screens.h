@@ -8,6 +8,7 @@
 #include "diagnostics_values.h"
 #include "favorites_store.h"
 #include "hal/audio.h"
+#include "home_art.h"
 #include "library_store.h"
 #include "player.h"
 #include "screens/cover_flow_screen.h"
@@ -93,6 +94,7 @@ typedef struct AppScreens {
     Core1Option core1;
     Core1DecodeOption core1_decode;
     MenuItem home_items[HOME_ITEM_COUNT];
+    HomeArt home_art;
     MenuItem music_items[MUSIC_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];
 } AppScreens;

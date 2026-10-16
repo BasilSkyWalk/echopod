@@ -178,12 +178,59 @@ static void an_item_appears_once_it_is_shown(void)
     CHECK(press(screen, KEY_PLAY, KEY_GESTURE_PRESS).target == &second_target);
 }
 
+static Rect panel_area_seen;
+static int panel_updates;
+
+static void record_panel_update(void *context, uint32_t now_ms)
+{
+    (void)context;
+    (void)now_ms;
+    panel_updates++;
+}
+
+static void paint_panel(void *context, Canvas *canvas, Rect area)
+{
+    (void)context;
+    panel_area_seen = area;
+    canvas_fill_rect(canvas, area, TEST_THEME.colors.danger);
+}
+
+static void a_side_panel_takes_the_right_of_the_content(void)
+{
+    enum {
+        PANEL_WIDTH = 12
+    };
+    panel_updates = 0;
+    MenuConfig config = {.title = "Menu",
+                         .items = ITEMS,
+                         .item_count = 5,
+                         .theme = &TEST_THEME,
+                         .panel = {.width = PANEL_WIDTH,
+                                   .update = record_panel_update,
+                                   .draw = paint_panel,
+                                   .context = NULL}};
+    Screen *screen = menu_screen_init(&menu, config);
+    screen->enter(screen->context, 0);
+    screen->update(screen->context, 100);
+    Canvas canvas = ui_test_canvas();
+    screen->draw(screen->context, &canvas);
+    Rect content = theme_content_area(&TEST_THEME);
+    CHECK_EQUAL(1, panel_updates);
+    CHECK_EQUAL(TEST_SCREEN_WIDTH - PANEL_WIDTH, panel_area_seen.x);
+    CHECK_EQUAL(content.y, panel_area_seen.y);
+    CHECK_EQUAL(PANEL_WIDTH, panel_area_seen.width);
+    CHECK_EQUAL(content.height, panel_area_seen.height);
+    Rect first_row_left = {0, TEST_HEADER_HEIGHT, TEST_SCREEN_WIDTH - PANEL_WIDTH, 1};
+    CHECK(!ui_test_area_has_color(&canvas, first_row_left, TEST_THEME.colors.danger));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_menu_title_is_the_screen_title),
         TEST_CASE(items_that_open_a_screen_show_a_chevron),
         TEST_CASE(a_hidden_item_is_skipped),
+        TEST_CASE(a_side_panel_takes_the_right_of_the_content),
         TEST_CASE(an_item_appears_once_it_is_shown),
         TEST_CASE(selecting_the_first_item_opens_its_screen),
         TEST_CASE(moving_next_then_selecting_opens_the_second_screen),

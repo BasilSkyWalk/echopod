@@ -269,7 +269,8 @@ static MenuItem open_item(const char *label, Screen *target)
 static Screen *build_menu(MenuScreen *menu, const char *title, const MenuItem *items, int count,
                           const Theme *theme)
 {
-    return menu_screen_init(menu, (MenuConfig){title, items, count, theme});
+    return menu_screen_init(
+        menu, (MenuConfig){.title = title, .items = items, .item_count = count, .theme = theme});
 }
 
 static Screen *browse_screen_for(BrowseEntry *entry)
@@ -421,7 +422,16 @@ static void build_home(AppScreens *screens, AppScreensContext context)
     screens->home_items[3] = open_item("Now Playing", &screens->now_playing.screen);
     screens->home_items[3].shown = player_has_track;
     screens->home_items[3].shown_context = context.player;
-    build_menu(&screens->home, "Echo Mini", screens->home_items, HOME_ITEM_COUNT, theme);
+    home_art_init(&screens->home_art, context.covers, context.store, context.player, theme);
+    MenuConfig home = {.title = "Echo Mini",
+                       .items = screens->home_items,
+                       .item_count = HOME_ITEM_COUNT,
+                       .theme = theme,
+                       .panel = {.width = HOME_ART_WIDTH,
+                                 .update = home_art_update,
+                                 .draw = home_art_draw,
+                                 .context = &screens->home_art}};
+    menu_screen_init(&screens->home, home);
 }
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context)

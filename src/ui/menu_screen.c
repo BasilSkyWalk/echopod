@@ -76,14 +76,27 @@ static void update(void *context, uint32_t now_ms)
 {
     MenuScreen *menu = context;
     menu->now_ms = now_ms;
+    const MenuPanel *panel = &menu->config.panel;
+    if (panel->width > 0 && panel->update != NULL) {
+        panel->update(panel->context, now_ms);
+    }
 }
 
 static void draw(void *context, Canvas *canvas)
 {
     const MenuScreen *menu = context;
     const Theme *theme = menu->config.theme;
+    const MenuPanel *panel = &menu->config.panel;
+    Rect content = theme_content_area(theme);
     header_draw(canvas, theme, menu->config.title);
-    list_view_draw(&menu->list, canvas, theme_content_area(theme), menu->now_ms);
+    if (panel->width <= 0 || panel->draw == NULL) {
+        list_view_draw(&menu->list, canvas, content, menu->now_ms);
+        return;
+    }
+    Rect list = {content.x, content.y, content.width - panel->width, content.height};
+    Rect side = {list.x + list.width, content.y, panel->width, content.height};
+    list_view_draw(&menu->list, canvas, list, menu->now_ms);
+    panel->draw(panel->context, canvas, side);
 }
 
 Screen *menu_screen_init(MenuScreen *menu, MenuConfig config)

@@ -44,6 +44,7 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 - Screen instances are static and owned by the app's `AppScreens`. There is no heap.
 - A long Play is `NAVIGATION_OPTIONS`. Lists hand it to their `hold` action; in browse lists it toggles an album's favorite.
 - Smart Play: in a browse list, ▶‖ on the track the player already has loaded (playing or paused) pushes Now Playing without restarting it. ≡ pushes Now Playing from any screen while the player has a track, and does nothing on Now Playing itself.
+- Lists draw the selected row as a highlight line over a gradient, a › chevron on rows that open another screen (`ListModel.opens`), and a slim inset scrollbar thumb. Menu items can be hidden by a `shown` callback, and a menu can give the right of its content to a side panel (`MenuPanel`). Home uses that for `home_art`: the playing album's cover with a reflection, or library covers cycling every 5 s when nothing is loaded; Home lists Now Playing last and only while the player has a track.
 - Settings is a menu whose rows show their current value. Every row opens the same `ChoiceScreen`, re-initialized from a table of `SettingChoice` entries (title, options, current, choose), and the current option gets a ✓.
 
 ## Power

@@ -419,6 +419,46 @@ static void lists_still_move_as_soon_as_a_volume_key_goes_down(void)
     CHECK(!title_is("Back In Black"));
 }
 
+enum {
+    HOME_ART_CYCLE_MS = 5000
+};
+
+static uint16_t home_art_probe(void)
+{
+    return fake_hal_pixel(HAL_DISPLAY_WIDTH - 72, 88);
+}
+
+static void home_art_shows_a_library_cover_when_idle(void)
+{
+    start_app_with_library();
+    step();
+    step();
+    CHECK_EQUAL(RED_COVER, home_art_probe());
+}
+
+static void home_art_moves_on_and_skips_albums_without_a_cover(void)
+{
+    start_app_with_library();
+    step();
+    wait_ms(HOME_ART_CYCLE_MS);
+    step();
+    CHECK_EQUAL(BLUE_COVER, home_art_probe());
+}
+
+static void home_art_keeps_the_playing_album(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    hold_back();
+    wait_ms(SLIDE_DURATION_MS);
+    for (int cycle = 0; cycle < 3; cycle++) {
+        wait_ms(HOME_ART_CYCLE_MS);
+    }
+    step();
+    CHECK(title_is("Echo Mini"));
+    CHECK_EQUAL(RED_COVER, home_art_probe());
+}
+
 static void the_home_menu_shows_now_playing_last_once_a_track_is_loaded(void)
 {
     start_app_with_library();
@@ -1247,6 +1287,9 @@ int main(void)
         TEST_CASE(lists_still_move_as_soon_as_a_volume_key_goes_down),
         TEST_CASE(the_home_menu_shows_now_playing_last_once_a_track_is_loaded),
         TEST_CASE(the_home_menu_hides_now_playing_with_nothing_loaded),
+        TEST_CASE(home_art_shows_a_library_cover_when_idle),
+        TEST_CASE(home_art_moves_on_and_skips_albums_without_a_cover),
+        TEST_CASE(home_art_keeps_the_playing_album),
         TEST_CASE(settings_choose_shuffle_and_repeat),
         TEST_CASE(brightness_is_applied_and_saved),
         TEST_CASE(gain_is_applied),

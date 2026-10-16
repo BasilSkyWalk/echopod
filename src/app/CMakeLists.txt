@@ -8,6 +8,7 @@ add_library(echo_app STATIC
     diagnostics_values.c
     draw_profile.c
     frame_overlay.c
+    home_art.c
     library_store.c
     player.c
     settings_screens.c

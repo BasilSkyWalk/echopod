@@ -17,11 +17,19 @@ typedef struct MenuItem {
     const void *shown_context;
 } MenuItem;
 
+typedef struct MenuPanel {
+    int width;
+    void (*update)(void *context, uint32_t now_ms);
+    void (*draw)(void *context, Canvas *canvas, Rect area);
+    void *context;
+} MenuPanel;
+
 typedef struct MenuConfig {
     const char *title;
     const MenuItem *items;
     int item_count;
     const Theme *theme;
+    MenuPanel panel;
 } MenuConfig;
 
 typedef struct MenuScreen {
