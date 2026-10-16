@@ -20,14 +20,15 @@ enum {
     START_MS = 1000,
     KEY_HOLD_MS = 30,
     FULL_FRAME_PIXELS = HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT,
-    HOME_DIAGNOSTICS_INDEX = 3,
+    HOME_DIAGNOSTICS_INDEX = 2,
     DIAGNOSTICS_FRAME_TIME_INDEX = 3,
     DIAGNOSTICS_FIRMWARE_INDEX = 4,
     MUSIC_ARTISTS_INDEX = 1,
     MUSIC_ALBUMS_INDEX = 3,
     MUSIC_FOLDERS_INDEX = 5,
     BJORK_POSITION = 3,
-    HOME_SETTINGS_INDEX = 2,
+    HOME_SETTINGS_INDEX = 1,
+    HOME_NOW_PLAYING_INDEX = 3,
     SETTINGS_REPEAT_INDEX = 1,
     SETTINGS_SLEEP_INDEX = 2,
     SETTINGS_TIMEOUT_INDEX = 3,
@@ -418,12 +419,23 @@ static void lists_still_move_as_soon_as_a_volume_key_goes_down(void)
     CHECK(!title_is("Back In Black"));
 }
 
-static void the_home_menu_opens_now_playing(void)
+static void the_home_menu_shows_now_playing_last_once_a_track_is_loaded(void)
 {
     start_app_with_library();
-    move_down(1);
+    play_first_album_track();
+    hold_back();
+    CHECK(title_is("Echo Mini"));
+    move_down(HOME_NOW_PLAYING_INDEX);
     tap(KEY_PLAY);
     CHECK(title_is("Now Playing"));
+}
+
+static void the_home_menu_hides_now_playing_with_nothing_loaded(void)
+{
+    start_app_with_library();
+    move_down(HOME_NOW_PLAYING_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("Music"));
 }
 
 static void open_setting(int index)
@@ -1233,7 +1245,8 @@ int main(void)
         TEST_CASE(now_playing_without_a_cover_keeps_the_text_layout),
         TEST_CASE(now_playing_keys_control_the_player),
         TEST_CASE(lists_still_move_as_soon_as_a_volume_key_goes_down),
-        TEST_CASE(the_home_menu_opens_now_playing),
+        TEST_CASE(the_home_menu_shows_now_playing_last_once_a_track_is_loaded),
+        TEST_CASE(the_home_menu_hides_now_playing_with_nothing_loaded),
         TEST_CASE(settings_choose_shuffle_and_repeat),
         TEST_CASE(brightness_is_applied_and_saved),
         TEST_CASE(gain_is_applied),

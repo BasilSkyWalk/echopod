@@ -45,23 +45,28 @@ static const char *year_value(const void *context)
 }
 
 static const MenuItem LONG_NAME_ITEMS[] = {
-    {"Sigur Rós — Ágætis byrjun", NULL, "1999", year_value, false},
-    {"Godspeed You! Black Emperor — Lift Your Skinny Fists Like Antennas to Heaven", NULL, "2000",
-     year_value, false},
-    {"Björk — Homogenic", NULL, "1997", year_value, false},
-    {"Sufjan Stevens — Illinois (Come On Feel the Illinoise)", NULL, "2005", year_value, false},
-    {"Motörhead — Ace of Spades", NULL, "1980", year_value, false},
-    {"Jóhann Jóhannsson — Orphée", NULL, "2016", year_value, false},
-    {"Ólafur Arnalds — re:member", NULL, "2018", year_value, false},
-    {"Röyksopp — Melody A.M.", NULL, "2001", year_value, false},
-    {"Café Tacvba — Re", NULL, "1994", year_value, false},
-    {"Beyoncé — Lemonade", NULL, "2016", year_value, false},
-    {"Mötley Crüe — Dr. Feelgood", NULL, "1989", year_value, false},
-    {"Daft Punk — Random Access Memories", NULL, "2013", year_value, false},
-    {"Explosions in the Sky — The Earth Is Not a Cold Dead Place", NULL, "2003", year_value, false},
-    {"Hania Rani — Esja", NULL, "2019", year_value, false},
-    {"Nils Frahm — All Melody", NULL, "2018", year_value, false},
-    {"The Avalanches — Since I Left You", NULL, "2000", year_value, false},
+    {.label = "Sigur Rós — Ágætis byrjun", .context = "1999", .value = year_value},
+    {.label = "Godspeed You! Black Emperor — Lift Your Skinny Fists Like Antennas to Heaven",
+     .context = "2000",
+     .value = year_value},
+    {.label = "Björk — Homogenic", .context = "1997", .value = year_value},
+    {.label = "Sufjan Stevens — Illinois (Come On Feel the Illinoise)",
+     .context = "2005",
+     .value = year_value},
+    {.label = "Motörhead — Ace of Spades", .context = "1980", .value = year_value},
+    {.label = "Jóhann Jóhannsson — Orphée", .context = "2016", .value = year_value},
+    {.label = "Ólafur Arnalds — re:member", .context = "2018", .value = year_value},
+    {.label = "Röyksopp — Melody A.M.", .context = "2001", .value = year_value},
+    {.label = "Café Tacvba — Re", .context = "1994", .value = year_value},
+    {.label = "Beyoncé — Lemonade", .context = "2016", .value = year_value},
+    {.label = "Mötley Crüe — Dr. Feelgood", .context = "1989", .value = year_value},
+    {.label = "Daft Punk — Random Access Memories", .context = "2013", .value = year_value},
+    {.label = "Explosions in the Sky — The Earth Is Not a Cold Dead Place",
+     .context = "2003",
+     .value = year_value},
+    {.label = "Hania Rani — Esja", .context = "2019", .value = year_value},
+    {.label = "Nils Frahm — All Melody", .context = "2018", .value = year_value},
+    {.label = "The Avalanches — Since I Left You", .context = "2000", .value = year_value},
 };
 
 enum {
@@ -247,6 +252,11 @@ static const char *dma_tone_value(const void *context)
     return dma_tone_text;
 }
 
+static bool player_has_track(const void *context)
+{
+    return player_status(context).has_track;
+}
+
 static MenuItem open_item(const char *label, Screen *target)
 {
     return (MenuItem){.label = label,
@@ -402,12 +412,15 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                DIAGNOSTICS_ITEM_COUNT, theme);
 }
 
-static void build_home(AppScreens *screens, const Theme *theme)
+static void build_home(AppScreens *screens, AppScreensContext context)
 {
+    const Theme *theme = context.theme;
     screens->home_items[0] = open_item("Music", &screens->music.screen);
-    screens->home_items[1] = open_item("Now Playing", &screens->now_playing.screen);
-    screens->home_items[2] = open_item("Settings", &screens->settings.menu.screen);
-    screens->home_items[3] = open_item("Diagnostics", &screens->diagnostics.screen);
+    screens->home_items[1] = open_item("Settings", &screens->settings.menu.screen);
+    screens->home_items[2] = open_item("Diagnostics", &screens->diagnostics.screen);
+    screens->home_items[3] = open_item("Now Playing", &screens->now_playing.screen);
+    screens->home_items[3].shown = player_has_track;
+    screens->home_items[3].shown_context = context.player;
     build_menu(&screens->home, "Echo Mini", screens->home_items, HOME_ITEM_COUNT, theme);
 }
 
@@ -425,7 +438,7 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
     build_music(screens, context);
     build_settings(screens, context);
     build_diagnostics(screens, context.options, theme);
-    build_home(screens, theme);
+    build_home(screens, context);
     return &screens->home.screen;
 }
 

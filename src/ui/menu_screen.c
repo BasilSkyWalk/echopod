@@ -5,35 +5,56 @@
 #include "ui/header.h"
 #include "ui/list_navigation.h"
 
+static bool is_shown(const MenuItem *item)
+{
+    return item->shown == NULL || item->shown(item->shown_context);
+}
+
 static int item_count(const void *context)
 {
     const MenuScreen *menu = context;
-    return menu->config.item_count;
+    int count = 0;
+    for (int index = 0; index < menu->config.item_count; index++) {
+        count += is_shown(&menu->config.items[index]) ? 1 : 0;
+    }
+    return count;
+}
+
+static const MenuItem *shown_item(const MenuScreen *menu, int position)
+{
+    int remaining = position;
+    for (int index = 0; index < menu->config.item_count; index++) {
+        const MenuItem *item = &menu->config.items[index];
+        if (!is_shown(item)) {
+            continue;
+        }
+        if (remaining == 0) {
+            return item;
+        }
+        remaining--;
+    }
+    return &menu->config.items[menu->config.item_count - 1];
 }
 
 static const char *item_label(const void *context, int index)
 {
-    const MenuScreen *menu = context;
-    return menu->config.items[index].label;
+    return shown_item(context, index)->label;
 }
 
 static const char *item_value(const void *context, int index)
 {
-    const MenuScreen *menu = context;
-    const MenuItem *item = &menu->config.items[index];
+    const MenuItem *item = shown_item(context, index);
     return item->value != NULL ? item->value(item->context) : NULL;
 }
 
 static bool item_opens(const void *context, int index)
 {
-    const MenuScreen *menu = context;
-    return menu->config.items[index].opens;
+    return shown_item(context, index)->opens;
 }
 
 static ScreenAction select_item(void *context, int index)
 {
-    MenuScreen *menu = context;
-    const MenuItem *item = &menu->config.items[index];
+    const MenuItem *item = shown_item(context, index);
     return item->select != NULL ? item->select(item->context) : screen_action_none();
 }
 

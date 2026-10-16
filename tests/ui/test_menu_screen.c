@@ -25,11 +25,11 @@ static const char *toggle_value(const void *context)
 }
 
 static const MenuItem ITEMS[] = {
-    {"A", menu_open_screen, &first_target, NULL, true},
-    {"B", menu_open_screen, &second_target, NULL, false},
-    {"A", NULL, NULL, NULL, false},
-    {"B", toggle, &toggled, toggle_value, false},
-    {"A", menu_open_screen, &last_target, NULL, true},
+    {.label = "A", .select = menu_open_screen, .context = &first_target, .opens = true},
+    {.label = "B", .select = menu_open_screen, .context = &second_target},
+    {.label = "A"},
+    {.label = "B", .select = toggle, .context = &toggled, .value = toggle_value},
+    {.label = "A", .select = menu_open_screen, .context = &last_target, .opens = true},
 };
 
 static MenuScreen menu;
@@ -137,11 +137,54 @@ static void items_that_open_a_screen_show_a_chevron(void)
     CHECK(ui_test_area_has_only(&canvas, second_right, TEST_THEME.colors.background));
 }
 
+static bool second_shown;
+
+static bool is_second_shown(const void *context)
+{
+    (void)context;
+    return second_shown;
+}
+
+static const MenuItem SOMETIMES_ITEMS[] = {
+    {.label = "A", .select = menu_open_screen, .context = &first_target},
+    {.label = "B", .select = menu_open_screen, .context = &second_target, .shown = is_second_shown},
+    {.label = "A", .select = menu_open_screen, .context = &last_target},
+};
+
+static Screen *open_sometimes_menu(bool shown)
+{
+    second_shown = shown;
+    MenuConfig config = {
+        .title = "Menu", .items = SOMETIMES_ITEMS, .item_count = 3, .theme = &TEST_THEME};
+    Screen *screen = menu_screen_init(&menu, config);
+    screen->enter(screen->context, 0);
+    return screen;
+}
+
+static void a_hidden_item_is_skipped(void)
+{
+    Screen *screen = open_sometimes_menu(false);
+    CHECK_EQUAL(2, menu.model.count(menu.model.context));
+    next(screen, 1);
+    CHECK(press(screen, KEY_PLAY, KEY_GESTURE_PRESS).target == &last_target);
+}
+
+static void an_item_appears_once_it_is_shown(void)
+{
+    Screen *screen = open_sometimes_menu(false);
+    second_shown = true;
+    CHECK_EQUAL(3, menu.model.count(menu.model.context));
+    next(screen, 1);
+    CHECK(press(screen, KEY_PLAY, KEY_GESTURE_PRESS).target == &second_target);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_menu_title_is_the_screen_title),
         TEST_CASE(items_that_open_a_screen_show_a_chevron),
+        TEST_CASE(a_hidden_item_is_skipped),
+        TEST_CASE(an_item_appears_once_it_is_shown),
         TEST_CASE(selecting_the_first_item_opens_its_screen),
         TEST_CASE(moving_next_then_selecting_opens_the_second_screen),
         TEST_CASE(previous_on_the_first_item_wraps_to_the_last_on_a_press),

@@ -13,6 +13,8 @@ typedef struct MenuItem {
     void *context;
     const char *(*value)(const void *context);
     bool opens;
+    bool (*shown)(const void *context);
+    const void *shown_context;
 } MenuItem;
 
 typedef struct MenuConfig {
