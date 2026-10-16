@@ -35,7 +35,8 @@ typedef enum HalCore1Status {
     HAL_CORE1_NO_STOP,
     HAL_CORE1_NO_TRACK,
     HAL_CORE1_NOT_FLAC,
-    HAL_CORE1_READ_FAILED
+    HAL_CORE1_READ_FAILED,
+    HAL_CORE1_BUSY
 } HalCore1Status;
 
 typedef struct HalCore1Test {

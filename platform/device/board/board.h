@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 void board_clock_start(void);
@@ -13,5 +14,10 @@ void board_display_start(void);
 void board_input_start(void);
 void board_input_poll(void);
 const char *board_audio_current_path(void);
+bool board_core1_start_stream(void);
+void board_core1_stop(void);
+bool board_core1_streaming(void);
+void board_audio_before_clock_change(void);
+void board_audio_after_clock_change(void);
 void board_wait_for_key(void);
 void board_main(void);

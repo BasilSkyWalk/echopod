@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "codec/flac.h"
+#include "core1_region.h"
 #include "device/core1_control.h"
 #include "device/tick_clock.h"
 #include "hal/system.h"
@@ -12,6 +13,7 @@
 void core1_main(void);
 
 static FlacDecoder decoder;
+static Core1Stream stream;
 static uint32_t input_bytes;
 
 static void start_systick(void)
@@ -95,4 +97,11 @@ void core1_main(void)
     __asm__ volatile("dsb" ::: "memory");
     register_write(CORE1_MAILBOX_B2A_COMMAND, CORE1_READY_COMMAND);
     register_write(CORE1_MAILBOX_B2A_DATA, 0);
+    if (register_read(CORE1_SHARED_COMMAND) != CORE1_COMMAND_STREAM) {
+        return;
+    }
+    core1_stream_init(&stream, core1_region(), &decoder);
+    for (;;) {
+        core1_stream_step(&stream);
+    }
 }

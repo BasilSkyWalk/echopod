@@ -227,8 +227,11 @@ static void the_frame_overlay_splits_the_frame_time(void)
 static void the_frame_overlay_shows_the_audio_numbers(void)
 {
     char text[FRAME_OVERLAY_TEXT_CAPACITY];
-    HalAudioStats stats = {
-        .buffered_ms = 340, .underruns = 2, .decode_total_us = 640000, .elapsed_us = 1000000};
+    HalAudioStats stats = {.buffered_ms = 340,
+                           .underruns = 2,
+                           .decode_total_us = 100000,
+                           .busy_us = 640000,
+                           .elapsed_us = 1000000};
     frame_overlay_format_audio(stats, text, sizeof text);
     CHECK(strcmp("b340 x2 L64%", text) == 0);
 }

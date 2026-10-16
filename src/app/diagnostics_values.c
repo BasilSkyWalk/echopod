@@ -145,6 +145,8 @@ static const char *core1_failure_text(HalCore1Status status)
         return "Not FLAC";
     case HAL_CORE1_READ_FAILED:
         return "Read failed";
+    case HAL_CORE1_BUSY:
+        return "Busy with music";
     }
     return "";
 }

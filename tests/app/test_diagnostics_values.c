@@ -137,6 +137,7 @@ static void core_1_failures_name_the_step(void)
         {HAL_CORE1_UNAVAILABLE, "Not here"}, {HAL_CORE1_NEEDS_PLL, "Needs 96+ MHz"},
         {HAL_CORE1_NO_POWER, "No power"},    {HAL_CORE1_NO_REPLY, "No reply"},
         {HAL_CORE1_BAD_REPLY, "Bad reply"},  {HAL_CORE1_NO_STOP, "No stop"},
+        {HAL_CORE1_BUSY, "Busy with music"},
     };
     for (size_t index = 0; index < sizeof cases / sizeof cases[0]; index++) {
         diagnostics_core1_text(true, (HalCore1Test){.status = cases[index].status}, text,

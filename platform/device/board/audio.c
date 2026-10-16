@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "board.h"
+#include "core1_region.h"
 #include "dac.h"
 #include "device/audio_engine.h"
 #include "device/audio_math.h"
@@ -17,7 +18,9 @@ enum {
     RING_BLOCKS = 4,
     BLOCK_WORDS = 4000,
     RING_WORDS = RING_BLOCKS * BLOCK_WORDS,
-    PREFILL_ROUNDS = 64,
+    PREFILL_WORDS = 8000,
+    PREFILL_TIMEOUT_MS = 1000,
+    FILL_BUDGET_BYTES = 8192,
     IDLE_SHUTDOWN_MS = 3000,
     TONE_RATE_HZ = 44100,
     TONE_PERIOD_SAMPLES = 100,
@@ -26,7 +29,12 @@ enum {
 };
 
 static FlacDecoder decoder;
-static FlacSource source;
+static FlacSource software_source;
+static Core1Source core1_source;
+static bool using_core1;
+static bool resume_after_clock_change;
+static bool paused_before_clock_change;
+static uint32_t position_before_clock_change;
 static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
 static DmaItem items[RING_BLOCKS];
@@ -51,7 +59,9 @@ static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t len
     board_input_poll();
     uint32_t started_us = hal_clock_microseconds();
     bool read = hal_file_read(*open, offset, buffer, length);
-    read_us_pending += hal_clock_microseconds() - started_us;
+    uint32_t read_us = hal_clock_microseconds() - started_us;
+    read_us_pending += read_us;
+    stats.read_total_us += read_us;
     return read;
 }
 
@@ -65,17 +75,21 @@ static void pump(uint32_t consumed_words)
     uint32_t frames = audio_engine_stats(&engine).frames;
     read_us_pending = 0;
     uint32_t decode_started_us = hal_clock_microseconds();
+    if (using_core1) {
+        core1_source_fill(&core1_source);
+    }
     audio_engine_pump(&engine, consumed_words);
+    uint32_t elapsed_us = hal_clock_microseconds() - decode_started_us;
+    stats.busy_us += elapsed_us;
     if (audio_engine_stats(&engine).frames == frames) {
         return;
     }
     stats.blocks++;
-    stats.decode_us = hal_clock_microseconds() - decode_started_us;
+    stats.decode_us = elapsed_us;
     stats.decode_max_us = larger(stats.decode_max_us, stats.decode_us);
     stats.decode_total_us += stats.decode_us;
     stats.read_us = read_us_pending;
     stats.read_max_us = larger(stats.read_max_us, stats.read_us);
-    stats.read_total_us += stats.read_us;
 }
 
 static bool open_file(void *context, const char *path, FlacInput *input)
@@ -94,17 +108,52 @@ static void close_file(void *context)
     hal_file_close(&file);
 }
 
+static AudioSource chosen_source(void)
+{
+    return using_core1 ? core1_source_interface(&core1_source)
+                       : flac_source_interface(&software_source);
+}
+
+static bool open_chosen(void *context, const char *path, uint32_t start_ms, FlacInfo *info)
+{
+    (void)context;
+    using_core1 = board_core1_start_stream();
+    AudioSource source = chosen_source();
+    return source.open(source.context, path, start_ms, info);
+}
+
+static AudioFrameResult next_chosen(void *context, AudioFrame *frame)
+{
+    (void)context;
+    AudioSource source = chosen_source();
+    return source.next(source.context, frame);
+}
+
+static void release_chosen(void *context)
+{
+    (void)context;
+    AudioSource source = chosen_source();
+    source.release(source.context);
+}
+
+static void close_chosen(void *context)
+{
+    (void)context;
+    AudioSource source = chosen_source();
+    source.close(source.context);
+}
+
 static void ensure_engine(void)
 {
     if (engine_ready) {
         return;
     }
-    flac_source_init(&source,
-                     (FlacFileOpener){.open = open_file, .close = close_file, .context = NULL},
-                     &decoder);
-    audio_engine_init(&engine, (AudioEngineConfig){.source = flac_source_interface(&source),
-                                                   .ring = ring,
-                                                   .ring_words = RING_WORDS});
+    FlacFileOpener files = {.open = open_file, .close = close_file, .context = NULL};
+    flac_source_init(&software_source, files, &decoder);
+    core1_source_init(&core1_source, core1_region(), files, &decoder, FILL_BUDGET_BYTES);
+    AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
+    audio_engine_init(
+        &engine, (AudioEngineConfig){.source = source, .ring = ring, .ring_words = RING_WORDS});
     engine_ready = true;
 }
 
@@ -179,7 +228,9 @@ static bool start_output(void)
     if (!ensure_path(audio_engine_rate(&engine))) {
         return false;
     }
-    for (int round = 0; round < PREFILL_ROUNDS; round++) {
+    uint32_t started_ms = hal_clock_milliseconds();
+    while (audio_engine_buffered(&engine, 0) < PREFILL_WORDS &&
+           hal_clock_milliseconds() - started_ms < PREFILL_TIMEOUT_MS) {
         pump(0);
     }
     stats = (HalAudioStats){0};
@@ -320,6 +371,8 @@ static void shut_down_when_idle(void)
     }
     if (now_ms - stopped_since_ms >= IDLE_SHUTDOWN_MS) {
         stop_path();
+        board_core1_stop();
+        using_core1 = false;
         stopped_waiting = false;
     }
 }
@@ -399,4 +452,33 @@ HalDmaToneStatus hal_audio_dma_tone_status(void)
 const char *board_audio_current_path(void)
 {
     return engine_ready ? audio_engine_current_path(&engine) : NULL;
+}
+
+void board_audio_before_clock_change(void)
+{
+    resume_after_clock_change = false;
+    if (!board_core1_streaming()) {
+        return;
+    }
+    if (engine_ready && transferring) {
+        HalAudioStatus status = hal_audio_status();
+        resume_after_clock_change = status.state != HAL_AUDIO_STOPPED;
+        paused_before_clock_change = status.state == HAL_AUDIO_PAUSED;
+        position_before_clock_change = status.position_ms;
+        audio_engine_stop(&engine);
+    }
+    board_core1_stop();
+    using_core1 = false;
+}
+
+void board_audio_after_clock_change(void)
+{
+    if (!resume_after_clock_change) {
+        return;
+    }
+    resume_after_clock_change = false;
+    hal_audio_seek(position_before_clock_change);
+    if (paused_before_clock_change) {
+        hal_audio_pause();
+    }
 }

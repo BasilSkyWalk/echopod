@@ -14,10 +14,12 @@ enum {
     STAGING_WORDS = 1024,
     WORD_BYTES = 4,
     DECODE_TIMEOUT_MS = 10000,
+    REPLY_TIMEOUT_MS = 200,
     MICROSECONDS_PER_SECOND = 1000000
 };
 
 static uint32_t staging[STAGING_WORDS];
+static bool streaming;
 static FlacBits header_bits;
 
 extern const uint8_t _binary_core1_bin_start[];
@@ -68,8 +70,51 @@ static HalCore1Status status_of(Core1Result result)
     return HAL_CORE1_BAD_REPLY;
 }
 
+bool board_core1_start_stream(void)
+{
+    if (streaming) {
+        return true;
+    }
+    uint32_t pll_mhz = hal_system_clock_mhz();
+    if (pll_mhz < LOWEST_PLL_MHZ) {
+        return false;
+    }
+    uint32_t divider = core1_divider_for(pll_mhz);
+    uint32_t length = (uint32_t)(_binary_core1_bin_end - _binary_core1_bin_start);
+    Core1Result result = core1_power_up(&BUS, pll_mhz, divider);
+    if (result == CORE1_OK) {
+        result = core1_load(&BUS, _binary_core1_bin_start, length);
+    }
+    if (result == CORE1_OK) {
+        register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_STREAM);
+        result = core1_run(&BUS, REPLY_TIMEOUT_MS);
+    }
+    if (result != CORE1_OK) {
+        core1_stop(&BUS);
+        return false;
+    }
+    streaming = true;
+    return true;
+}
+
+void board_core1_stop(void)
+{
+    if (streaming) {
+        core1_stop(&BUS);
+        streaming = false;
+    }
+}
+
+bool board_core1_streaming(void)
+{
+    return streaming;
+}
+
 HalCore1Test hal_system_core1_test(void)
 {
+    if (streaming) {
+        return (HalCore1Test){.status = HAL_CORE1_BUSY};
+    }
     uint32_t pll_mhz = hal_system_clock_mhz();
     if (pll_mhz < LOWEST_PLL_MHZ) {
         return (HalCore1Test){.status = HAL_CORE1_NEEDS_PLL};
@@ -161,6 +206,9 @@ static Core1Result run_decode(const HalFile *file, FlacInfo info, uint32_t audio
 
 HalCore1Decode hal_system_core1_decode_test(void)
 {
+    if (streaming) {
+        return (HalCore1Decode){.status = HAL_CORE1_BUSY};
+    }
     uint32_t pll_mhz = hal_system_clock_mhz();
     if (pll_mhz < LOWEST_PLL_MHZ) {
         return (HalCore1Decode){.status = HAL_CORE1_NEEDS_PLL};

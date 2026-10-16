@@ -177,8 +177,10 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     if (mhz == hal_system_clock_mhz()) {
         return true;
     }
+    board_audio_before_clock_change();
     dmac_suspend();
     bool switched = switch_clock(mhz);
     dmac_resume();
+    board_audio_after_clock_change();
     return switched;
 }

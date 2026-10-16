@@ -41,6 +41,7 @@ typedef struct HalAudioStats {
     uint32_t read_us;
     uint32_t read_max_us;
     uint32_t read_total_us;
+    uint32_t busy_us;
     uint32_t elapsed_us;
 } HalAudioStats;
 
