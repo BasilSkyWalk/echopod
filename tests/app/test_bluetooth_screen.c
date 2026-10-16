@@ -217,6 +217,28 @@ static void the_connected_device_is_ticked(void)
     CHECK(line_is(3, "› 1. WH-1000XM4"));
 }
 
+static void play_while_connected_toggles_the_stream(void)
+{
+    Screen *screen = open_with_two_devices();
+    fake_hal_bluetooth()->state = HAL_BLUETOOTH_CONNECTED;
+    screen->handle_key(screen->context, tap(KEY_PLAY), START_MS + 300);
+    CHECK_EQUAL(0, fake_hal_bluetooth_connect_count());
+    CHECK(fake_hal_bluetooth()->streaming);
+    screen->handle_key(screen->context, tap(KEY_PLAY), START_MS + 400);
+    CHECK(!fake_hal_bluetooth()->streaming);
+}
+
+static void the_state_line_shows_the_stream(void)
+{
+    Screen *screen = open_with_two_devices();
+    HalBluetoothStatus *status = fake_hal_bluetooth();
+    status->state = HAL_BLUETOOTH_CONNECTED;
+    status->connected = status->devices[0];
+    status->streaming = true;
+    screen->update(screen->context, START_MS + 200);
+    CHECK(line_is(0, "Connected · WH-1000XM4 · Streaming"));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -236,6 +258,8 @@ int main(void)
         TEST_CASE(holding_play_while_connected_disconnects),
         TEST_CASE(the_state_line_shows_the_pairing_result),
         TEST_CASE(the_connected_device_is_ticked),
+        TEST_CASE(play_while_connected_toggles_the_stream),
+        TEST_CASE(the_state_line_shows_the_stream),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

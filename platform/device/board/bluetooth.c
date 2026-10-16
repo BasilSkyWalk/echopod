@@ -223,3 +223,11 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
 {
     return &module.status;
 }
+
+void hal_bluetooth_set_stream(bool on)
+{
+    BtModuleFrame frame;
+    if (powered && bt_module_set_stream(&module, on, hal_clock_milliseconds(), &frame)) {
+        send(&frame);
+    }
+}

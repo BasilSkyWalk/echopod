@@ -109,3 +109,10 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
 {
     return &bluetooth.status;
 }
+
+void hal_bluetooth_set_stream(bool on)
+{
+    if (bluetooth.status.state == HAL_BLUETOOTH_CONNECTED) {
+        bluetooth.status.streaming = on;
+    }
+}

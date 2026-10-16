@@ -621,6 +621,11 @@ void hal_bluetooth_disconnect(void)
     fake.bluetooth_disconnect_count++;
 }
 
+void hal_bluetooth_set_stream(bool on)
+{
+    fake.bluetooth.streaming = on;
+}
+
 void hal_bluetooth_service(void)
 {
     fake.bluetooth_service_count++;

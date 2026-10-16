@@ -61,6 +61,7 @@ static void write_state(const HalBluetoothStatus *status, char *text)
     if (status->state == HAL_BLUETOOTH_CONNECTED) {
         append_part(&builder, status->connected.name);
     }
+    append_part(&builder, status->streaming ? "Streaming" : NULL);
     if (status->version != '\0') {
         string_builder_append(&builder, SEPARATOR);
         string_builder_append_char(&builder, 'v');
@@ -182,7 +183,12 @@ static void move_selection(BluetoothScreen *bluetooth, int step)
 
 static void pair_or_scan(BluetoothScreen *bluetooth)
 {
-    if (hal_bluetooth_status()->device_count > 0) {
+    const HalBluetoothStatus *status = hal_bluetooth_status();
+    if (status->state == HAL_BLUETOOTH_CONNECTED) {
+        hal_bluetooth_set_stream(!status->streaming);
+        return;
+    }
+    if (status->device_count > 0) {
         hal_bluetooth_connect(bluetooth->selected);
         return;
     }

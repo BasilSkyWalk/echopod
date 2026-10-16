@@ -10,11 +10,18 @@ enum {
     WORD_FRAME_SIZE = 4,
     COMMAND_SIZE = 5,
     ADDRESS_COMMAND_SIZE = 10,
+    STREAM_ON_LEVEL = 0x1E,
+    PLAY_NOTICE = 0x86,
+    PAUSE_NOTICE = 0x87,
     UNKNOWN_SIZE = 1
 };
 
 static void set_state(BtModule *module, HalBluetoothState state, uint32_t now_ms)
 {
+    if (state != HAL_BLUETOOTH_CONNECTED) {
+        module->status.streaming = false;
+        module->play_notice = 0;
+    }
     module->status.state = state;
     module->state_since_ms = now_ms;
     module->last_query_ms = now_ms;
@@ -402,6 +409,18 @@ static bool query_status(BtModule *module, uint32_t now_ms, BtModuleFrame *frame
     return command(frame, 'Q');
 }
 
+static bool send_play_notice(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
+{
+    if (module->play_notice == 0 ||
+        now_ms - module->stream_changed_ms < BT_MODULE_PLAY_NOTICE_DELAY_MS) {
+        return false;
+    }
+    *frame =
+        (BtModuleFrame){.bytes = {'C', module->play_notice, '0', '0', 0}, .length = COMMAND_SIZE};
+    module->play_notice = 0;
+    return true;
+}
+
 static bool wait_for_ready(BtModule *module, uint32_t now_ms)
 {
     if (now_ms - module->state_since_ms >= BT_MODULE_READY_TIMEOUT_MS) {
@@ -420,10 +439,24 @@ bool bt_module_poll(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
         return follow_scan(module, now_ms, frame);
     case HAL_BLUETOOTH_CONNECTING:
         return follow_connect(module, now_ms, frame);
-    case HAL_BLUETOOTH_READY:
     case HAL_BLUETOOTH_CONNECTED:
+        return send_play_notice(module, now_ms, frame) || query_status(module, now_ms, frame);
+    case HAL_BLUETOOTH_READY:
         return query_status(module, now_ms, frame);
     default:
         return false;
     }
+}
+
+bool bt_module_set_stream(BtModule *module, bool on, uint32_t now_ms, BtModuleFrame *frame)
+{
+    if (module->status.state != HAL_BLUETOOTH_CONNECTED) {
+        return false;
+    }
+    module->status.streaming = on;
+    module->play_notice = on ? PLAY_NOTICE : PAUSE_NOTICE;
+    module->stream_changed_ms = now_ms;
+    *frame = (BtModuleFrame){.bytes = {'C', 'Y', '0', on ? STREAM_ON_LEVEL : 0, 0},
+                             .length = COMMAND_SIZE};
+    return true;
 }

@@ -46,6 +46,7 @@ typedef struct HalBluetoothStatus {
     char version;
     char link_status;
     HalBluetoothPairing pairing;
+    bool streaming;
     HalBluetoothDevice connected;
     uint8_t device_count;
     HalBluetoothDevice devices[HAL_BLUETOOTH_DEVICE_CAPACITY];
@@ -56,5 +57,6 @@ void hal_bluetooth_set_power(bool on);
 void hal_bluetooth_scan(void);
 void hal_bluetooth_connect(uint8_t index);
 void hal_bluetooth_disconnect(void);
+void hal_bluetooth_set_stream(bool on);
 void hal_bluetooth_service(void);
 const HalBluetoothStatus *hal_bluetooth_status(void);

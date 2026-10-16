@@ -531,6 +531,60 @@ static void a_disconnect_cancels_a_pending_connect(void)
     CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
 }
 
+static bool frame_bytes_are(const BtModuleFrame *frame, const uint8_t *bytes, uint8_t length)
+{
+    return frame->length == length && memcmp(frame->bytes, bytes, length) == 0;
+}
+
+static void starting_the_stream_sends_cy0_1e_then_the_play_notice(void)
+{
+    static const uint8_t STREAM_ON[] = {'C', 'Y', '0', 0x1E, 0x00};
+    static const uint8_t PLAY_NOTICE[] = {'C', 0x86, '0', '0', 0x00};
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    CHECK(bt_module_set_stream(&module, true, START_MS + 500, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
+    CHECK(module.status.streaming);
+    CHECK(!poll(START_MS + 500 + BT_MODULE_PLAY_NOTICE_DELAY_MS - 1, &frame));
+    CHECK(poll(START_MS + 500 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(frame_bytes_are(&frame, PLAY_NOTICE, sizeof PLAY_NOTICE));
+    CHECK(!poll(START_MS + 500 + 2 * BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+}
+
+static void stopping_the_stream_sends_cy0_00_then_the_pause_notice(void)
+{
+    static const uint8_t STREAM_OFF[] = {'C', 'Y', '0', 0x00, 0x00};
+    static const uint8_t PAUSE_NOTICE[] = {'C', 0x87, '0', '0', 0x00};
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, START_MS + 500, &frame);
+    poll(START_MS + 700, &frame);
+    CHECK(bt_module_set_stream(&module, false, START_MS + 800, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_OFF, sizeof STREAM_OFF));
+    CHECK(!module.status.streaming);
+    CHECK(poll(START_MS + 800 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(frame_bytes_are(&frame, PAUSE_NOTICE, sizeof PAUSE_NOTICE));
+}
+
+static void streaming_needs_a_connection(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    CHECK(!bt_module_set_stream(&module, true, START_MS + 500, &frame));
+    CHECK(!module.status.streaming);
+}
+
+static void a_dropped_link_ends_the_stream(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, START_MS + 500, &frame);
+    poll(START_MS + 700, &frame);
+    receive_text("CQI", START_MS + 800);
+    settle(START_MS + 800);
+    CHECK(!module.status.streaming);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -573,6 +627,10 @@ int main(void)
         TEST_CASE(disconnecting_sends_ct00_and_ctok_confirms_it),
         TEST_CASE(disconnecting_needs_a_link),
         TEST_CASE(a_disconnect_cancels_a_pending_connect),
+        TEST_CASE(starting_the_stream_sends_cy0_1e_then_the_play_notice),
+        TEST_CASE(stopping_the_stream_sends_cy0_00_then_the_pause_notice),
+        TEST_CASE(streaming_needs_a_connection),
+        TEST_CASE(a_dropped_link_ends_the_stream),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
