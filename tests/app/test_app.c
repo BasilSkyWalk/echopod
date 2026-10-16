@@ -99,14 +99,24 @@ static void tap(Key key)
     step();
 }
 
-static void hold(Key key)
+static void hold_for(Key key, uint32_t duration_ms)
 {
     fake_hal_queue_transition(key, true, now_ms);
-    now_ms += 1000;
+    now_ms += duration_ms;
     step();
     fake_hal_queue_transition(key, false, now_ms);
     now_ms += 10;
     step();
+}
+
+static void hold(Key key)
+{
+    hold_for(key, 1000);
+}
+
+static void hold_power(void)
+{
+    hold_for(KEY_POWER, 2000);
 }
 
 static void hold_back(void)
@@ -502,7 +512,7 @@ static void holding_power_saves_and_turns_the_player_off(void)
     start_app_with_library();
     play_first_album_track();
     int writes = fake_hal_write_count();
-    hold(KEY_POWER);
+    hold_power();
     CHECK(fake_hal_write_count() > writes);
     CHECK_EQUAL(0, fake_hal_power_off_count());
     CHECK(fake_hal_display_on());
@@ -513,10 +523,41 @@ static void holding_power_saves_and_turns_the_player_off(void)
     CHECK_EQUAL(1, fake_hal_power_off_count());
 }
 
+static void a_one_second_power_hold_only_turns_the_screen_off(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    hold_for(KEY_POWER, 1000);
+    wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    CHECK(!fake_hal_display_on());
+}
+
+static void a_slightly_long_press_wakes_the_screen_without_switching_off(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_POWER);
+    CHECK(!fake_hal_display_on());
+    hold_for(KEY_POWER, 1000);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    CHECK(fake_hal_display_on());
+}
+
+static void a_volume_hold_under_a_second_changes_the_volume(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    uint8_t volume = fake_hal_audio_volume();
+    hold_for(KEY_VOLUME_UP, 800);
+    CHECK_EQUAL(volume + 1, fake_hal_audio_volume());
+    CHECK(playing_path_is(HELLS_BELLS_PATH));
+}
+
 static void keys_are_ignored_while_saying_goodbye(void)
 {
     start_app_with_library();
-    hold(KEY_POWER);
+    hold_power();
     const char *title = app_screen_title();
     tap(KEY_PLAY);
     CHECK(title_is(title));
@@ -1123,6 +1164,9 @@ int main(void)
         TEST_CASE(the_timeout_setting_is_used),
         TEST_CASE(with_the_screen_off_media_keys_keep_working),
         TEST_CASE(holding_power_saves_and_turns_the_player_off),
+        TEST_CASE(a_one_second_power_hold_only_turns_the_screen_off),
+        TEST_CASE(a_slightly_long_press_wakes_the_screen_without_switching_off),
+        TEST_CASE(a_volume_hold_under_a_second_changes_the_volume),
         TEST_CASE(keys_are_ignored_while_saying_goodbye),
         TEST_CASE(the_splash_ignores_keys_until_it_ends),
         TEST_CASE(the_splash_draws_over_the_home_screen),

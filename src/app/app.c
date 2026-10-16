@@ -47,6 +47,12 @@ static const KeyConfig KEY_CONFIG = {
             [KEY_BACK] = KEY_BEHAVIOR_TAP_OR_HOLD,
             [KEY_POWER] = KEY_BEHAVIOR_TAP_OR_HOLD,
         },
+    .long_press_ms =
+        {
+            [KEY_VOLUME_UP] = 1000,
+            [KEY_VOLUME_DOWN] = 1000,
+            [KEY_POWER] = 2000,
+        },
 };
 
 typedef struct AppState {

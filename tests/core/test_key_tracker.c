@@ -11,6 +11,7 @@ enum {
 static KeyTracker make_tracker(void)
 {
     KeyConfig config = {
+        .long_press_ms = {[KEY_POWER] = 2000},
         .timing = {LONG_PRESS_MS, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS},
         .behaviors =
             {
@@ -219,9 +220,39 @@ static void changing_a_behavior_leaves_other_keys_alone(void)
     CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_VOLUME_DOWN));
 }
 
+static void a_key_with_its_own_long_press_time_waits_for_it(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_key_down(&tracker, KEY_POWER, 1000);
+    key_tracker_update(&tracker, 2500);
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_POWER));
+    key_tracker_update(&tracker, 3000);
+    CHECK_EQUAL(KEY_GESTURE_LONG_PRESS, next_gesture(&tracker, KEY_POWER));
+}
+
+static void a_release_before_its_own_long_press_time_is_a_tap(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_key_down(&tracker, KEY_POWER, 1000);
+    key_tracker_update(&tracker, 2000);
+    key_tracker_key_up(&tracker, KEY_POWER, 2500);
+    CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_POWER));
+}
+
+static void keys_without_their_own_time_use_the_shared_one(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_key_down(&tracker, KEY_PLAY, 1000);
+    key_tracker_update(&tracker, 1000 + LONG_PRESS_MS);
+    CHECK_EQUAL(KEY_GESTURE_LONG_PRESS, next_gesture(&tracker, KEY_PLAY));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(a_key_with_its_own_long_press_time_waits_for_it),
+        TEST_CASE(a_release_before_its_own_long_press_time_is_a_tap),
+        TEST_CASE(keys_without_their_own_time_use_the_shared_one),
         TEST_CASE(tap_emits_press_on_release),
         TEST_CASE(holding_past_threshold_emits_one_long_press),
         TEST_CASE(release_after_long_press_emits_nothing),

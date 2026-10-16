@@ -35,6 +35,7 @@ typedef struct KeyTiming {
 typedef struct KeyConfig {
     KeyTiming timing;
     KeyBehavior behaviors[KEY_COUNT];
+    uint32_t long_press_ms[KEY_COUNT];
 } KeyConfig;
 
 typedef struct KeyState {

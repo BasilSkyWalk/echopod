@@ -12,10 +12,16 @@ static bool repeats_after_hold(const KeyTracker *tracker, Key key)
     return tracker->config.behaviors[key] == KEY_BEHAVIOR_TAP_HOLD_REPEAT;
 }
 
+static uint32_t long_press_ms(const KeyTracker *tracker, Key key)
+{
+    uint32_t own = tracker->config.long_press_ms[key];
+    return own != 0 ? own : tracker->config.timing.long_press_ms;
+}
+
 static bool long_press_due(const KeyTracker *tracker, Key key, uint32_t now_ms)
 {
     uint32_t held_for_ms = now_ms - tracker->states[key].pressed_at_ms;
-    return held_for_ms >= tracker->config.timing.long_press_ms;
+    return held_for_ms >= long_press_ms(tracker, key);
 }
 
 static void push_event(KeyTracker *tracker, Key key, KeyGesture gesture)
