@@ -23,10 +23,55 @@ static int min_of(int first, int second)
     return first < second ? first : second;
 }
 
+static BrowseRows *rows_of_level(BrowsePool *pool, int level)
+{
+    for (int slot = 0; slot < BROWSE_ROW_CACHES; slot++) {
+        if (pool->rows[slot].level == level) {
+            return &pool->rows[slot];
+        }
+    }
+    return NULL;
+}
+
+static const BrowseRows *cached_rows(const BrowseScreen *browse)
+{
+    const BrowsePool *pool = browse->pool;
+    for (int slot = 0; slot < BROWSE_ROW_CACHES; slot++) {
+        if (pool->rows[slot].level == browse->level) {
+            return &pool->rows[slot];
+        }
+    }
+    return NULL;
+}
+
+static BrowseRows *rows_to_fill(BrowseScreen *browse)
+{
+    BrowsePool *pool = browse->pool;
+    BrowseRows *rows = rows_of_level(pool, browse->level);
+    if (rows == NULL) {
+        rows = &pool->rows[0];
+        for (int slot = 1; slot < BROWSE_ROW_CACHES; slot++) {
+            if (pool->rows[slot].used < rows->used) {
+                rows = &pool->rows[slot];
+            }
+        }
+    }
+    rows->used = ++pool->row_uses;
+    return rows;
+}
+
+static void forget_rows(BrowseScreen *browse)
+{
+    BrowseRows *rows = rows_of_level(browse->pool, browse->level);
+    if (rows != NULL) {
+        rows->level = NO_LEVEL;
+    }
+}
+
 static bool rows_current(const BrowseScreen *browse)
 {
-    const BrowseRows *rows = &browse->pool->rows;
-    return rows->level == browse->level && rows->first == browse->list.top;
+    const BrowseRows *rows = cached_rows(browse);
+    return rows != NULL && rows->first == browse->list.top;
 }
 
 static uint32_t source_position(const BrowseScreen *browse, int index)
@@ -60,9 +105,8 @@ static void mark_favorite(char *detail)
     }
 }
 
-static void load_row(BrowseScreen *browse, int row, int index)
+static void load_row(BrowseScreen *browse, BrowseRows *rows, int row, int index)
 {
-    BrowseRows *rows = &browse->pool->rows;
     BrowseText text = {rows->labels[row], BROWSE_LABEL_CAPACITY, rows->details[row],
                        BROWSE_DETAIL_CAPACITY};
     BrowseItem item;
@@ -83,11 +127,12 @@ static void refresh_rows(BrowseScreen *browse)
     if (rows_current(browse)) {
         return;
     }
-    BrowseRows *rows = &browse->pool->rows;
+    BrowseRows *rows = rows_to_fill(browse);
+    rows->level = NO_LEVEL;
     int top = browse->list.top;
     int count = min_of(min_of(browse->list.visible_rows, BROWSE_ROWS), (int)browse->count - top);
     for (int row = 0; row < count; row++) {
-        load_row(browse, row, top + row);
+        load_row(browse, rows, row, top + row);
     }
     rows->level = browse->level;
     rows->first = top;
@@ -96,9 +141,9 @@ static void refresh_rows(BrowseScreen *browse)
 
 static const char *cached_text(const BrowseScreen *browse, int index, bool detail)
 {
-    const BrowseRows *rows = &browse->pool->rows;
-    int row = index - rows->first;
-    if (rows->level != browse->level || row < 0 || row >= rows->count) {
+    const BrowseRows *rows = cached_rows(browse);
+    int row = rows != NULL ? index - rows->first : -1;
+    if (rows == NULL || row < 0 || row >= rows->count) {
         return "";
     }
     return detail ? rows->details[row] : rows->labels[row];
@@ -182,7 +227,7 @@ static ScreenAction toggle_favorite(void *context, int index)
     if (config->toast != NULL) {
         toast_show(config->toast, favorites_store_message(result), browse->now_ms);
     }
-    browse->pool->rows.level = NO_LEVEL;
+    forget_rows(browse);
     if (browse->favorites_only) {
         collect_favorites(browse);
     }
@@ -200,7 +245,7 @@ static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 static void enter(void *context, uint32_t now_ms)
 {
     BrowseScreen *browse = context;
-    browse->pool->rows.level = NO_LEVEL;
+    forget_rows(browse);
     browse->now_ms = now_ms;
     if (browse->favorites_only) {
         collect_favorites(browse);
@@ -241,7 +286,10 @@ static void draw(void *context, Canvas *canvas)
 void browse_pool_init(BrowsePool *pool, BrowsePoolConfig config)
 {
     pool->config = config;
-    pool->rows.level = NO_LEVEL;
+    pool->row_uses = 0;
+    for (int slot = 0; slot < BROWSE_ROW_CACHES; slot++) {
+        pool->rows[slot] = (BrowseRows){.level = NO_LEVEL};
+    }
 }
 
 Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)

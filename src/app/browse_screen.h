@@ -14,6 +14,7 @@
 enum {
     BROWSE_DEPTH = 6,
     BROWSE_ROWS = 8,
+    BROWSE_ROW_CACHES = 2,
     BROWSE_LABEL_CAPACITY = 128,
     BROWSE_DETAIL_CAPACITY = 16,
     BROWSE_TITLE_CAPACITY = 96
@@ -21,6 +22,7 @@ enum {
 
 typedef struct BrowseRows {
     int level;
+    uint32_t used;
     int first;
     int count;
     char labels[BROWSE_ROWS][BROWSE_LABEL_CAPACITY];
@@ -53,7 +55,8 @@ typedef struct BrowsePoolConfig {
 
 struct BrowsePool {
     BrowsePoolConfig config;
-    BrowseRows rows;
+    BrowseRows rows[BROWSE_ROW_CACHES];
+    uint32_t row_uses;
     BrowseScreen screens[BROWSE_DEPTH];
     uint16_t favorite_albums[FAVORITES_CAPACITY];
 };

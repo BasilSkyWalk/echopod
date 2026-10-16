@@ -2,6 +2,7 @@ add_library(echo_ui STATIC
     choice_screen.c
     cover_flow.c
     fade.c
+    slide.c
     header.c
     icons.c
     label.c

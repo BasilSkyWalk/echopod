@@ -13,6 +13,7 @@ typedef struct Canvas {
 
 Canvas canvas_make(Color *pixels, Rect bounds);
 Canvas canvas_clipped(const Canvas *canvas, Rect area);
+Canvas canvas_shifted(const Canvas *canvas, int dx, Rect area);
 void canvas_clear(Canvas *canvas, Color color);
 void canvas_fill_rect(Canvas *canvas, Rect area, Color color);
 void canvas_blend_pixel(Canvas *canvas, Point point, Color color, uint8_t alpha);

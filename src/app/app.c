@@ -22,9 +22,11 @@
 #include "player.h"
 #include "settings_store.h"
 #include "ui/fade.h"
+#include "ui/header.h"
 #include "ui/label.h"
 #include "ui/message_screen.h"
 #include "ui/screen_stack.h"
+#include "ui/slide.h"
 #include "ui/status_bar.h"
 #include "ui/toast.h"
 
@@ -77,6 +79,8 @@ typedef struct AppState {
     FrameDiff frame_diff;
     Fade splash;
     Fade goodbye;
+    Slide slide;
+    Screen *leaving;
     bool saying_goodbye;
     uint32_t now_ms;
     AppOptions options;
@@ -189,14 +193,31 @@ static bool opens_now_playing(KeyEvent event)
            player_status(&app.player).has_track && top_screen() != &app.screens.now_playing.screen;
 }
 
+static void start_slide(Screen *leaving, int depth_before, uint32_t now_ms)
+{
+    if (top_screen() == leaving) {
+        return;
+    }
+    bool deeper = screen_stack_depth(&app.stack) > depth_before;
+    app.leaving = leaving;
+    slide_start(&app.slide, now_ms, deeper ? SLIDE_FORWARD : SLIDE_BACK);
+}
+
+static bool slide_running(void)
+{
+    return app.slide.active && !slide_finished(&app.slide, app.now_ms);
+}
+
 static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
 {
     Screen *screen = top_screen();
+    int depth_before = screen_stack_depth(&app.stack);
     ScreenAction action = opens_now_playing(event)
                               ? screen_action_push(&app.screens.now_playing.screen)
                               : screen->handle_key(screen->context, event, now_ms);
     if (screen_stack_apply(&app.stack, action, now_ms)) {
         use_screen_key_behaviors();
+        start_slide(screen, depth_before, now_ms);
     }
 }
 
@@ -304,6 +325,30 @@ static bool draw_running_fade(Canvas *canvas)
     return false;
 }
 
+static void draw_shifted(Screen *screen, Canvas *canvas, int x, Rect area)
+{
+    Canvas shifted = canvas_shifted(canvas, x, area);
+    if (!rect_is_empty(shifted.clip)) {
+        screen->draw(screen->context, &shifted);
+    }
+}
+
+static void draw_slide(Canvas *canvas, Screen *arriving)
+{
+    const Theme *theme = &DEFAULT_THEME;
+    Screen *leaving = app.leaving;
+    bool whole = arriving->full_screen || leaving->full_screen;
+    Rect area =
+        whole ? (Rect){0, 0, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT} : theme_content_area(theme);
+    int width = HAL_DISPLAY_WIDTH;
+    draw_shifted(leaving, canvas, slide_leaving_x(&app.slide, app.now_ms, width), area);
+    draw_shifted(arriving, canvas, slide_arriving_x(&app.slide, app.now_ms, width), area);
+    if (!whole) {
+        bool arrived = slide_shows_arriving_title(&app.slide, app.now_ms);
+        header_draw(canvas, theme, arrived ? arriving->title : leaving->title);
+    }
+}
+
 static void draw_frame(void *context, Canvas *canvas)
 {
     const AppState *state = context;
@@ -311,7 +356,11 @@ static void draw_frame(void *context, Canvas *canvas)
         return;
     }
     Screen *screen = screen_stack_top(&state->stack);
-    screen->draw(screen->context, canvas);
+    if (slide_running()) {
+        draw_slide(canvas, screen);
+    } else {
+        screen->draw(screen->context, canvas);
+    }
     if (!screen->full_screen) {
         status_bar_draw(canvas, &DEFAULT_THEME, state->status_bar);
     }
@@ -390,7 +439,7 @@ static void render_frame(void)
     uint32_t started_us = hal_clock_microseconds();
     app.send_us = 0;
     app.status_bar = current_status_bar();
-    bool screen_paints = top_screen()->paints_every_pixel && !fade_running();
+    bool screen_paints = top_screen()->paints_every_pixel && !fade_running() && !slide_running();
     render((FrameDrawer){.draw = draw_frame, .context = &app}, screen_paints);
     uint32_t render_us = hal_clock_microseconds() - started_us;
     frame_stats_record(&app.send_stats, app.send_us);

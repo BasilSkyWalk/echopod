@@ -11,6 +11,7 @@
 #include "hal/system.h"
 #include "settings/settings.h"
 #include "settings_store.h"
+#include "ui/slide.h"
 #include "ui/status_bar.h"
 #include "ui/toast.h"
 
@@ -456,6 +457,37 @@ static void saved_settings_are_restored_at_start(void)
     CHECK_EQUAL(settings_defaults().brightness + 2, fake_hal_display_brightness());
 }
 
+static uint16_t scrollbar_probe(void)
+{
+    return fake_hal_pixel(HAL_DISPLAY_WIDTH - 2, 40);
+}
+
+static void a_new_screen_slides_in_from_the_right(void)
+{
+    start_app();
+    step();
+    tap(KEY_PLAY);
+    CHECK(title_is("Music"));
+    CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
+    wait_ms(SLIDE_DURATION_MS / 2);
+    CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
+    wait_ms(SLIDE_DURATION_MS / 2);
+    CHECK_EQUAL(DEFAULT_THEME.colors.scrollbar_thumb, scrollbar_probe());
+}
+
+static void going_back_slides_the_screen_out_to_the_right(void)
+{
+    start_app();
+    step();
+    tap(KEY_PLAY);
+    wait_ms(SLIDE_DURATION_MS);
+    tap(KEY_BACK);
+    CHECK(title_is("Echo Mini"));
+    CHECK_EQUAL(DEFAULT_THEME.colors.scrollbar_thumb, scrollbar_probe());
+    wait_ms(SLIDE_DURATION_MS);
+    CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
+}
+
 static void the_cpu_runs_fast_only_while_the_screen_is_on(void)
 {
     start_app();
@@ -880,7 +912,7 @@ static void now_playing_shows_the_album_cover(void)
 {
     start_app_with_library();
     play_first_album_track();
-    step();
+    wait_ms(SLIDE_DURATION_MS);
     step();
     CHECK_EQUAL(0xF800, cover_probe());
 }
@@ -892,7 +924,7 @@ static void now_playing_without_a_cover_keeps_the_text_layout(void)
     move_down(1);
     tap(KEY_PLAY);
     tap(KEY_PLAY);
-    step();
+    wait_ms(SLIDE_DURATION_MS);
     step();
     CHECK(title_is("Now Playing"));
     CHECK_EQUAL(DEFAULT_THEME.colors.background, cover_probe());
@@ -1171,6 +1203,8 @@ int main(void)
         TEST_CASE(brightness_is_applied_and_saved),
         TEST_CASE(gain_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),
+        TEST_CASE(a_new_screen_slides_in_from_the_right),
+        TEST_CASE(going_back_slides_the_screen_out_to_the_right),
         TEST_CASE(the_cpu_runs_fast_only_while_the_screen_is_on),
         TEST_CASE(the_screen_turns_off_after_the_timeout),
         TEST_CASE(after_a_timeout_volume_changes_without_waking),

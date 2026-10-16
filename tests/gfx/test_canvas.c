@@ -94,6 +94,35 @@ static void clipping_can_only_shrink_the_drawable_area(void)
     CHECK_EQUAL(3, count_pixels_of(PAINT));
 }
 
+static void a_shifted_canvas_moves_what_is_drawn_sideways(void)
+{
+    Canvas canvas = make_strip_canvas();
+    Canvas shifted = canvas_shifted(&canvas, 2, (Rect){0, 0, 100, 100});
+    canvas_fill_rect(&shifted, (Rect){0, 10, 1, 1}, PAINT);
+    CHECK_EQUAL(1, count_pixels_of(PAINT));
+    CHECK_EQUAL(PAINT, canvas_pixel_at(&canvas, 2, 10));
+}
+
+static void a_shifted_canvas_only_paints_its_own_area(void)
+{
+    Canvas canvas = make_strip_canvas();
+    Canvas shifted = canvas_shifted(&canvas, 1, (Rect){0, 11, 1, 5});
+    canvas_clear(&shifted, PAINT);
+    CHECK_EQUAL(2, count_pixels_of(PAINT));
+    CHECK_EQUAL(PAINT, canvas_pixel_at(&canvas, 1, 11));
+    CHECK_EQUAL(PAINT, canvas_pixel_at(&canvas, 1, 12));
+}
+
+static void a_canvas_shifted_back_keeps_the_original_clip(void)
+{
+    Canvas canvas = make_strip_canvas();
+    Canvas narrow = canvas_clipped(&canvas, (Rect){0, 10, 2, 3});
+    Canvas shifted = canvas_shifted(&narrow, -1, (Rect){0, 0, 100, 100});
+    canvas_clear(&shifted, PAINT);
+    CHECK_EQUAL(6, count_pixels_of(PAINT));
+    CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 2, 10));
+}
+
 static void blending_a_pixel_mixes_with_what_is_there(void)
 {
     Canvas canvas = make_strip_canvas();
@@ -123,6 +152,9 @@ int main(void)
         TEST_CASE(pixels_outside_the_canvas_read_as_black),
         TEST_CASE(a_clipped_canvas_only_paints_inside_its_clip),
         TEST_CASE(clipping_can_only_shrink_the_drawable_area),
+        TEST_CASE(a_shifted_canvas_moves_what_is_drawn_sideways),
+        TEST_CASE(a_shifted_canvas_only_paints_its_own_area),
+        TEST_CASE(a_canvas_shifted_back_keeps_the_original_clip),
         TEST_CASE(blending_a_pixel_mixes_with_what_is_there),
         TEST_CASE(blending_respects_the_clip),
     };

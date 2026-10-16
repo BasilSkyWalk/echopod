@@ -25,6 +25,15 @@ Canvas canvas_clipped(const Canvas *canvas, Rect area)
     return clipped;
 }
 
+Canvas canvas_shifted(const Canvas *canvas, int dx, Rect area)
+{
+    Canvas shifted = *canvas;
+    shifted.bounds.x -= dx;
+    shifted.clip.x -= dx;
+    shifted.clip = rect_intersection(shifted.clip, area);
+    return shifted;
+}
+
 void canvas_clear(Canvas *canvas, Color color)
 {
     canvas_fill_rect(canvas, canvas->clip, color);
