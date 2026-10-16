@@ -227,6 +227,68 @@ static void a_reflection_of_a_tall_quad_walks_up_the_image(void)
     CHECK_EQUAL(color_scale(0x1000, COLOR_LIGHT_FULL / 4), canvas_pixel_at(&canvas, 0, 7));
 }
 
+enum {
+    TALL_ROWS = 56,
+    TALL_CANVAS = 170
+};
+
+static Color tall_pixels[TALL_CANVAS];
+
+static Image tall_column(void)
+{
+    static Color rows[TALL_ROWS];
+    for (int row = 0; row < TALL_ROWS; row++) {
+        rows[row] = (Color)(row + 1);
+    }
+    return (Image){.pixels = rows, .width = 1, .height = TALL_ROWS};
+}
+
+static bool column_samples_exact_rows(int height)
+{
+    Canvas canvas = canvas_make(tall_pixels, (Rect){0, 0, 1, TALL_CANVAS});
+    canvas_clear(&canvas, BACKGROUND);
+    image_draw_quad(&canvas, tall_column(), flat(0, 0, 1, height));
+    for (int y = 0; y < height; y++) {
+        if (tall_pixels[y] != (Color)(y * TALL_ROWS / height + 1)) {
+            return false;
+        }
+    }
+    return tall_pixels[height] == BACKGROUND;
+}
+
+static bool reflection_samples_exact_rows(int height, int rows)
+{
+    Canvas canvas = canvas_make(tall_pixels, (Rect){0, 0, 1, TALL_CANVAS});
+    canvas_clear(&canvas, BACKGROUND);
+    image_draw_reflection(&canvas, tall_column(), flat(0, 0, 1, height),
+                          (QuadLight){COLOR_LIGHT_FULL, COLOR_LIGHT_FULL}, rows);
+    for (int step = 0; step < rows; step++) {
+        int row = TALL_ROWS - 1 - step * TALL_ROWS / height;
+        Color source = (Color)((row < 0 ? 0 : row) + 1);
+        unsigned light = (COLOR_LIGHT_FULL << COLOR_LIGHT_SHIFT) -
+                         (COLOR_LIGHT_FULL << COLOR_LIGHT_SHIFT) / (unsigned)rows * (unsigned)step;
+        if (tall_pixels[height + step] != color_scale(source, light >> COLOR_LIGHT_SHIFT)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void every_scaled_height_samples_the_exact_rows(void)
+{
+    for (int height = 1; height < TALL_CANVAS; height++) {
+        CHECK(column_samples_exact_rows(height));
+    }
+}
+
+static void reflections_sample_the_exact_mirrored_rows(void)
+{
+    CHECK(reflection_samples_exact_rows(104, 34));
+    CHECK(reflection_samples_exact_rows(78, 34));
+    CHECK(reflection_samples_exact_rows(112, 34));
+    CHECK(reflection_samples_exact_rows(20, 34));
+}
+
 static void a_reflection_mirrors_the_image_below_and_fades(void)
 {
     Canvas canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
@@ -262,6 +324,8 @@ int main(void)
         TEST_CASE(a_reflection_mirrors_the_image_below_and_fades),
         TEST_CASE(a_reflection_stays_inside_the_clip),
         TEST_CASE(a_lit_quad_samples_the_image_like_a_plain_one),
+        TEST_CASE(every_scaled_height_samples_the_exact_rows),
+        TEST_CASE(reflections_sample_the_exact_mirrored_rows),
         TEST_CASE(a_reflection_of_a_tall_quad_walks_up_the_image),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
