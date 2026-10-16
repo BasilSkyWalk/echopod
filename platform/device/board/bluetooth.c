@@ -48,9 +48,12 @@ enum {
 static const GpioPin MODULE_POWER = {2, 7};
 static const GpioPin UART_PIN_A = {2, 16};
 static const GpioPin UART_PIN_B = {2, 17};
+static const GpioPin AUDIO_MUTE = {2, 0};
+static const GpioPin WIRED_OUTPUT = {2, 14};
 
 static BtModule module;
 static bool powered;
+static bool routed;
 
 static void uart_write(uint32_t offset, uint32_t value)
 {
@@ -129,10 +132,29 @@ static void power_on(void)
     powered = true;
 }
 
+static void route_to_module(bool to_module)
+{
+    gpio_output(AUDIO_MUTE, to_module);
+    gpio_output(WIRED_OUTPUT, !to_module);
+    routed = to_module;
+}
+
+static void follow_stream(void)
+{
+    if (module.status.streaming) {
+        route_to_module(true);
+    } else if (routed) {
+        route_to_module(false);
+    }
+}
+
 static void power_off(void)
 {
     pins_off();
     powered = false;
+    if (routed) {
+        route_to_module(false);
+    }
 }
 
 void hal_bluetooth_set_power(bool on)
@@ -214,6 +236,7 @@ void hal_bluetooth_service(void)
     if (bt_module_poll(&module, now_ms, &frame)) {
         send(&frame);
     }
+    follow_stream();
     if (module.status.state == HAL_BLUETOOTH_NO_REPLY) {
         power_off();
     }
