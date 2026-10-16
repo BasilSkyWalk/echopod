@@ -48,37 +48,36 @@ static uint32_t read(FlacDecoder *decoder, uint32_t count)
     return flac_bits_read(&decoder->bits, count);
 }
 
-static uint32_t id3_size(FlacDecoder *decoder)
+static uint32_t id3_size(FlacBits *bits)
 {
-    if (read(decoder, 24) != ID3_MAGIC) {
+    if (flac_bits_read(bits, 24) != ID3_MAGIC) {
         return 0;
     }
-    read(decoder, 8);
-    read(decoder, 8);
-    uint32_t flags = read(decoder, 8);
+    flac_bits_read(bits, 8);
+    flac_bits_read(bits, 8);
+    uint32_t flags = flac_bits_read(bits, 8);
     uint32_t size = 0;
     for (int index = 0; index < 4; index++) {
-        size = size << 7 | (read(decoder, 8) & 0x7Fu);
+        size = size << 7 | (flac_bits_read(bits, 8) & 0x7Fu);
     }
     return ID3_HEADER_BYTES + size + ((flags & ID3_FOOTER_FLAG) != 0 ? ID3_HEADER_BYTES : 0);
 }
 
-static FlacResult read_streaminfo(FlacDecoder *decoder)
+static FlacResult read_streaminfo(FlacBits *bits, FlacInfo *info)
 {
-    FlacInfo *info = &decoder->info;
-    info->min_block = (uint16_t)read(decoder, 16);
-    info->max_block = (uint16_t)read(decoder, 16);
-    read(decoder, 24);
-    read(decoder, 24);
-    info->sample_rate = read(decoder, 20);
-    info->channels = (uint8_t)(read(decoder, 3) + 1);
-    info->bits_per_sample = (uint8_t)(read(decoder, 5) + 1);
-    uint32_t high = read(decoder, 4);
-    info->total_samples = read(decoder, 32);
+    info->min_block = (uint16_t)flac_bits_read(bits, 16);
+    info->max_block = (uint16_t)flac_bits_read(bits, 16);
+    flac_bits_read(bits, 24);
+    flac_bits_read(bits, 24);
+    info->sample_rate = flac_bits_read(bits, 20);
+    info->channels = (uint8_t)(flac_bits_read(bits, 3) + 1);
+    info->bits_per_sample = (uint8_t)(flac_bits_read(bits, 5) + 1);
+    uint32_t high = flac_bits_read(bits, 4);
+    info->total_samples = flac_bits_read(bits, 32);
     for (int index = 0; index < 16; index++) {
-        read(decoder, 8);
+        flac_bits_read(bits, 8);
     }
-    if (decoder->bits.failed) {
+    if (bits->failed) {
         return FLAC_ERROR;
     }
     bool supported = high == 0 && info->max_block <= FLAC_MAX_BLOCK &&
@@ -86,47 +85,66 @@ static FlacResult read_streaminfo(FlacDecoder *decoder)
     return supported ? FLAC_OK : FLAC_UNSUPPORTED;
 }
 
-static FlacResult read_metadata(FlacDecoder *decoder)
+static FlacResult read_metadata(FlacBits *bits, FlacInfo *info, uint32_t *audio_offset)
 {
     bool last = false;
     bool found = false;
     while (!last) {
-        last = read(decoder, 1) != 0;
-        uint32_t type = read(decoder, 7);
-        uint32_t length = read(decoder, 24);
-        if (decoder->bits.failed) {
+        last = flac_bits_read(bits, 1) != 0;
+        uint32_t type = flac_bits_read(bits, 7);
+        uint32_t length = flac_bits_read(bits, 24);
+        if (bits->failed) {
             return FLAC_ERROR;
         }
-        uint32_t next = flac_bits_offset(&decoder->bits) + length;
+        uint32_t next = flac_bits_offset(bits) + length;
         if (type == METADATA_STREAMINFO && length == STREAMINFO_BYTES) {
-            FlacResult result = read_streaminfo(decoder);
+            FlacResult result = read_streaminfo(bits, info);
             if (result != FLAC_OK) {
                 return result;
             }
             found = true;
         }
-        if (next > decoder->bits.input.size) {
+        if (next > bits->input.size) {
             return FLAC_ERROR;
         }
-        flac_bits_start(&decoder->bits, decoder->bits.input, next);
+        flac_bits_start(bits, bits->input, next);
     }
-    decoder->audio_offset = flac_bits_offset(&decoder->bits);
+    *audio_offset = flac_bits_offset(bits);
     return found ? FLAC_OK : FLAC_ERROR;
+}
+
+FlacResult flac_read_header(FlacBits *bits, FlacInput input, FlacInfo *info, uint32_t *audio_offset)
+{
+    *info = (FlacInfo){0};
+    flac_bits_start(bits, input, 0);
+    uint32_t start = id3_size(bits);
+    flac_bits_start(bits, input, start);
+    if (flac_bits_read(bits, 32) != MAGIC || bits->failed) {
+        return FLAC_ERROR;
+    }
+    return read_metadata(bits, info, audio_offset);
+}
+
+static void reset_counters(FlacDecoder *decoder)
+{
+    decoder->decoded_samples = 0;
+    decoder->block_samples = 0;
+    decoder->frame_first_sample = 0;
 }
 
 FlacResult flac_open(FlacDecoder *decoder, FlacInput input)
 {
-    decoder->info = (FlacInfo){0};
-    decoder->decoded_samples = 0;
-    decoder->block_samples = 0;
-    decoder->frame_first_sample = 0;
+    reset_counters(decoder);
+    decoder->audio_offset = 0;
+    return flac_read_header(&decoder->bits, input, &decoder->info, &decoder->audio_offset);
+}
+
+void flac_start(FlacDecoder *decoder, FlacInput input, FlacInfo info)
+{
+    reset_counters(decoder);
+    decoder->info = info;
+    decoder->audio_offset = 0;
     flac_bits_start(&decoder->bits, input, 0);
-    uint32_t start = id3_size(decoder);
-    flac_bits_start(&decoder->bits, input, start);
-    if (read(decoder, 32) != MAGIC || decoder->bits.failed) {
-        return FLAC_ERROR;
-    }
-    return read_metadata(decoder);
 }
 
 static bool read_coded_number(FlacDecoder *decoder, uint64_t *number)

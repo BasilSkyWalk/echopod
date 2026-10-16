@@ -235,6 +235,56 @@ static void a_seek_reads_little_of_the_file(void)
     free(flac.bytes);
 }
 
+static FlacBits header_bits;
+
+static void the_header_alone_gives_the_stream_info_and_audio_offset(void)
+{
+    Buffer flac = load("lpc_24_96k_stereo", "flac");
+    FlacInfo info = {0};
+    uint32_t audio_offset = 0;
+    CHECK_EQUAL(FLAC_OK, flac_read_header(&header_bits, input_of(&flac), &info, &audio_offset));
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(decoder.audio_offset, audio_offset);
+    CHECK_EQUAL(decoder.info.sample_rate, info.sample_rate);
+    CHECK_EQUAL(decoder.info.bits_per_sample, info.bits_per_sample);
+    CHECK_EQUAL(decoder.info.channels, info.channels);
+    CHECK_EQUAL(decoder.info.max_block, info.max_block);
+    CHECK_EQUAL(decoder.info.total_samples, info.total_samples);
+    free(flac.bytes);
+}
+
+static void a_header_that_is_not_flac_is_refused(void)
+{
+    uint8_t bytes[64] = {'R', 'I', 'F', 'F'};
+    Buffer buffer = {bytes, sizeof bytes};
+    FlacInfo info = {0};
+    uint32_t audio_offset = 0;
+    CHECK_EQUAL(FLAC_ERROR,
+                flac_read_header(&header_bits, input_of(&buffer), &info, &audio_offset));
+}
+
+static void decoding_can_start_from_audio_bytes_alone(void)
+{
+    Buffer flac = load("lpc_24_96k_stereo", "flac");
+    Buffer pcm = load("lpc_24_96k_stereo", "pcm");
+    FlacInfo info = {0};
+    uint32_t audio_offset = 0;
+    CHECK_EQUAL(FLAC_OK, flac_read_header(&header_bits, input_of(&flac), &info, &audio_offset));
+    Buffer audio = {flac.bytes + audio_offset, flac.size - audio_offset};
+    flac_start(&decoder, input_of(&audio), info);
+    CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+    CHECK_EQUAL(0u, decoder.frame_first_sample);
+    CHECK(decoder.block_samples > 0);
+    bool exact = true;
+    for (uint32_t sample = 0; sample < decoder.block_samples; sample++) {
+        exact = exact && flac_channel(&decoder, 0)[sample] == expected_at(&pcm, 2 * sample) &&
+                flac_channel(&decoder, 1)[sample] == expected_at(&pcm, 2 * sample + 1);
+    }
+    CHECK(exact);
+    free(flac.bytes);
+    free(pcm.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -254,6 +304,9 @@ int main(void)
         TEST_CASE(decoding_carries_on_after_a_seek),
         TEST_CASE(seeking_past_the_end_is_refused),
         TEST_CASE(a_seek_reads_little_of_the_file),
+        TEST_CASE(the_header_alone_gives_the_stream_info_and_audio_offset),
+        TEST_CASE(a_header_that_is_not_flac_is_refused),
+        TEST_CASE(decoding_can_start_from_audio_bytes_alone),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

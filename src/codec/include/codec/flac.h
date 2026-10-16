@@ -57,6 +57,9 @@ typedef struct FlacDecoder {
 } FlacDecoder;
 
 FlacResult flac_open(FlacDecoder *decoder, FlacInput input);
+FlacResult flac_read_header(FlacBits *bits, FlacInput input, FlacInfo *info,
+                            uint32_t *audio_offset);
+void flac_start(FlacDecoder *decoder, FlacInput input, FlacInfo info);
 FlacResult flac_decode_frame(FlacDecoder *decoder);
 FlacResult flac_seek(FlacDecoder *decoder, uint32_t sample);
 const int32_t *flac_channel(const FlacDecoder *decoder, int channel);
