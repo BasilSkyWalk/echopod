@@ -7,6 +7,7 @@
 #include "dac.h"
 #include "device/audio_engine.h"
 #include "device/audio_math.h"
+#include "device/dac_sequence.h"
 #include "device/dma_loop.h"
 #include "device/flac_source.h"
 #include "dmac.h"
@@ -305,13 +306,12 @@ void hal_audio_seek(uint32_t position_ms)
 
 void hal_audio_set_volume(uint8_t level)
 {
-    ensure_engine();
-    audio_engine_set_volume(&engine, level);
+    dac_path_set_volume(dac_volume_value(level));
 }
 
 void hal_audio_set_gain(HalAudioGain gain)
 {
-    (void)gain;
+    dac_path_set_gain(gain == HAL_AUDIO_GAIN_HIGH);
 }
 
 void hal_audio_set_output(HalAudioOutput output)

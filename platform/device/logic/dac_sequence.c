@@ -20,6 +20,18 @@ typedef struct Write {
     uint8_t value;
 } Write;
 
+#define PCM_VOLUME_B 0x090001u
+#define PCM_VOLUME_A 0x090002u
+#define HEADPHONE_GAIN 0x080000u
+
+enum {
+    TOP_VOLUME_VALUE = 0x7A,
+    VOLUME_STEP_NUMERATOR = 12,
+    VOLUME_STEP_DENOMINATOR = 5,
+    GAIN_HIGH_VALUE = 0x31,
+    GAIN_LOW_VALUE = 0x10
+};
+
 static const uint8_t CHIPS[CHIP_COUNT] = {DAC_LEFT_ADDRESS, DAC_RIGHT_ADDRESS};
 static const uint8_t CHANNEL_VALUES[CHIP_COUNT] = {0x07, 0x0F};
 
@@ -31,7 +43,8 @@ static const Write AFTER_STATUS[] = {
 
 static const Write BEFORE_MONO[] = {
     {0x090000, 0x02},
-    {0x010009, 0xFF},
+    {PCM_VOLUME_B, DAC_VOLUME_MUTED},
+    {PCM_VOLUME_A, DAC_VOLUME_MUTED},
     {0x090003, 0xEC},
     {0x090004, 0x00},
 };
@@ -198,13 +211,33 @@ DacResult dac_configure(const DacBus *bus, uint8_t rate_byte)
     return set_up_blocks(bus) && release_outputs(bus, rate_byte) ? DAC_READY : DAC_NO_REPLY;
 }
 
-void dac_output_on(const DacBus *bus)
+void dac_set_volume(const DacBus *bus, uint8_t volume)
+{
+    write_both(bus, PCM_VOLUME_B, volume);
+    write_both(bus, PCM_VOLUME_A, volume);
+}
+
+void dac_set_gain(const DacBus *bus, bool high)
+{
+    write_both(bus, HEADPHONE_GAIN, high ? GAIN_HIGH_VALUE : GAIN_LOW_VALUE);
+}
+
+uint8_t dac_volume_value(uint8_t level)
+{
+    if (level == 0) {
+        return DAC_VOLUME_MUTED;
+    }
+    uint32_t capped = level < DAC_VOLUME_LEVELS ? level : DAC_VOLUME_LEVELS;
+    return (uint8_t)(TOP_VOLUME_VALUE - VOLUME_STEP_NUMERATOR * capped / VOLUME_STEP_DENOMINATOR);
+}
+
+void dac_output_on(const DacBus *bus, uint8_t volume)
 {
     set_pin(bus, DAC_PIN_ENABLE_A, true);
     set_pin(bus, DAC_PIN_MUTE, false);
     set_pin(bus, DAC_PIN_AMP, true);
-    write_both(bus, 0x010009, 0x00);
     write_channel_values(bus);
+    dac_set_volume(bus, volume);
     wait_ms(bus, 10);
 }
 
@@ -212,7 +245,7 @@ void dac_output_off(const DacBus *bus)
 {
     set_pin(bus, DAC_PIN_MUTE, true);
     set_pin(bus, DAC_PIN_ENABLE_A, true);
-    write_both(bus, 0x010009, 0xFF);
+    dac_set_volume(bus, DAC_VOLUME_MUTED);
     write_both(bus, 0x020000, 0x10);
     wait_ms(bus, 5);
     write_both(bus, 0x0B0000, 0x00);
@@ -222,13 +255,13 @@ void dac_output_off(const DacBus *bus)
     set_pin(bus, DAC_PIN_ENABLE_B, false);
 }
 
-void dac_set_muted(const DacBus *bus, bool muted)
+void dac_set_muted(const DacBus *bus, bool muted, uint8_t volume)
 {
     if (muted) {
         set_pin(bus, DAC_PIN_MUTE, true);
-        write_both(bus, 0x010009, 0xFF);
+        dac_set_volume(bus, DAC_VOLUME_MUTED);
         return;
     }
-    write_both(bus, 0x010009, 0x00);
+    dac_set_volume(bus, volume);
     set_pin(bus, DAC_PIN_MUTE, false);
 }

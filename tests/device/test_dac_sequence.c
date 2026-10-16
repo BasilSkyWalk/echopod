@@ -204,7 +204,8 @@ static void the_register_sequence_follows_the_facts(void)
     CHECK(next_one(LEFT, 0x05000A, 0x07) && next_one(LEFT, 0x05000B, 0x07));
     CHECK(next_one(RIGHT, 0x05000A, 0x0F) && next_one(RIGHT, 0x05000B, 0x0F));
     CHECK(next_both(0x090000, 0x02));
-    CHECK(next_both(0x010009, 0xFF));
+    CHECK(next_both(0x090001, 0xFF));
+    CHECK(next_both(0x090002, 0xFF));
     CHECK(next_both(0x090003, 0xEC));
     CHECK(next_both(0x090004, 0x00));
     CHECK(next_mono_table());
@@ -263,13 +264,14 @@ static void output_on_unmutes_and_restores_the_channel_values(void)
 {
     DacBus bus = fresh_bus();
     cursor = 0;
-    dac_output_on(&bus);
+    dac_output_on(&bus, 0x5E);
     CHECK(next_pin(DAC_PIN_ENABLE_A, true));
     CHECK(next_pin(DAC_PIN_MUTE, false));
     CHECK(next_pin(DAC_PIN_AMP, true));
-    CHECK(next_both(0x010009, 0x00));
     CHECK(next_one(LEFT, 0x05000A, 0x07) && next_one(LEFT, 0x05000B, 0x07));
     CHECK(next_one(RIGHT, 0x05000A, 0x0F) && next_one(RIGHT, 0x05000B, 0x0F));
+    CHECK(next_both(0x090001, 0x5E));
+    CHECK(next_both(0x090002, 0x5E));
     CHECK(next_delay_ms(10));
     CHECK_EQUAL(cursor, fake.count);
 }
@@ -281,7 +283,8 @@ static void output_off_mutes_and_powers_down(void)
     dac_output_off(&bus);
     CHECK(next_pin(DAC_PIN_MUTE, true));
     CHECK(next_pin(DAC_PIN_ENABLE_A, true));
-    CHECK(next_both(0x010009, 0xFF));
+    CHECK(next_both(0x090001, 0xFF));
+    CHECK(next_both(0x090002, 0xFF));
     CHECK(next_both(0x020000, 0x10));
     CHECK(next_delay_ms(5));
     CHECK(next_both(0x0B0000, 0x00));
@@ -296,13 +299,46 @@ static void muting_holds_the_pin_and_mutes_both_chips(void)
 {
     DacBus bus = fresh_bus();
     cursor = 0;
-    dac_set_muted(&bus, true);
+    dac_set_muted(&bus, true, 0x5E);
     CHECK(next_pin(DAC_PIN_MUTE, true));
-    CHECK(next_both(0x010009, 0xFF));
-    dac_set_muted(&bus, false);
-    CHECK(next_both(0x010009, 0x00));
+    CHECK(next_both(0x090001, 0xFF));
+    CHECK(next_both(0x090002, 0xFF));
+    dac_set_muted(&bus, false, 0x5E);
+    CHECK(next_both(0x090001, 0x5E));
+    CHECK(next_both(0x090002, 0x5E));
     CHECK(next_pin(DAC_PIN_MUTE, false));
     CHECK_EQUAL(cursor, fake.count);
+}
+
+static void setting_the_volume_writes_both_pcm_volume_registers(void)
+{
+    DacBus bus = fresh_bus();
+    cursor = 0;
+    dac_set_volume(&bus, 0x30);
+    CHECK(next_both(0x090001, 0x30));
+    CHECK(next_both(0x090002, 0x30));
+    CHECK_EQUAL(cursor, fake.count);
+}
+
+static void the_gain_setting_writes_the_headphone_gain_register(void)
+{
+    DacBus bus = fresh_bus();
+    cursor = 0;
+    dac_set_gain(&bus, true);
+    CHECK(next_both(0x080000, 0x31));
+    dac_set_gain(&bus, false);
+    CHECK(next_both(0x080000, 0x10));
+    CHECK_EQUAL(cursor, fake.count);
+}
+
+static void volume_levels_map_onto_the_pcm_volume_scale(void)
+{
+    CHECK_EQUAL(0xFF, dac_volume_value(0));
+    CHECK_EQUAL(0x78, dac_volume_value(1));
+    CHECK_EQUAL(0x5E, dac_volume_value(12));
+    CHECK_EQUAL(0x3E, dac_volume_value(25));
+    CHECK_EQUAL(0x02, dac_volume_value(50));
+    CHECK_EQUAL(0x02, dac_volume_value(80));
 }
 
 int main(void)
@@ -318,6 +354,9 @@ int main(void)
         TEST_CASE(output_on_unmutes_and_restores_the_channel_values),
         TEST_CASE(output_off_mutes_and_powers_down),
         TEST_CASE(muting_holds_the_pin_and_mutes_both_chips),
+        TEST_CASE(setting_the_volume_writes_both_pcm_volume_registers),
+        TEST_CASE(the_gain_setting_writes_the_headphone_gain_register),
+        TEST_CASE(volume_levels_map_onto_the_pcm_volume_scale),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

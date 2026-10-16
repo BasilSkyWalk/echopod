@@ -123,6 +123,11 @@ static const GpioPin DAC_PINS[] = {
 };
 
 static HalToneDetail detail;
+static uint8_t volume_value;
+static bool volume_known;
+static bool gain_high;
+static bool dac_up;
+static bool muted;
 
 static void note_failure(I2cStage stage)
 {
@@ -376,11 +381,16 @@ static HalToneResult result_of(DacResult result)
     return result == DAC_NOT_READY ? HAL_TONE_NOT_READY : HAL_TONE_SETUP_FAILED;
 }
 
+static uint8_t current_volume(void)
+{
+    return volume_known ? volume_value : DAC_VOLUME_MUTED;
+}
+
 static bool play_tone_segments(void)
 {
     static int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
-    dac_output_on(&BUS);
+    dac_output_on(&BUS, current_volume());
     if (!play_for(samples, TONE_PERIOD_SAMPLES, TONE_SEGMENT_MS) ||
         !play_for(NULL, 1, TONE_GAP_MS)) {
         return false;
@@ -428,11 +438,17 @@ static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, u
         stop_i2s();
         return result_of(configured);
     }
+    if (gain_high) {
+        dac_set_gain(&BUS, true);
+    }
+    dac_up = true;
+    muted = true;
     return HAL_TONE_PLAYED;
 }
 
 static void stop_audio_path(void)
 {
+    dac_up = false;
     dac_output_off(&BUS);
     stop_i2s();
 }
@@ -468,12 +484,31 @@ void dac_path_stop(void)
 
 void dac_path_output_on(void)
 {
-    dac_output_on(&BUS);
+    dac_output_on(&BUS, current_volume());
+    muted = false;
 }
 
-void dac_path_set_muted(bool muted)
+void dac_path_set_muted(bool mute)
 {
-    dac_set_muted(&BUS, muted);
+    dac_set_muted(&BUS, mute, current_volume());
+    muted = mute;
+}
+
+void dac_path_set_volume(uint8_t value)
+{
+    volume_value = value;
+    volume_known = true;
+    if (dac_up && !muted) {
+        dac_set_volume(&BUS, value);
+    }
+}
+
+void dac_path_set_gain(bool high)
+{
+    gain_high = high;
+    if (dac_up) {
+        dac_set_gain(&BUS, high);
+    }
 }
 
 void dac_path_start_transfer(void)

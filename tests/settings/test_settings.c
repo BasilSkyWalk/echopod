@@ -40,7 +40,7 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(START_MAIN_MENU, settings.start_screen);
     CHECK_EQUAL(SHUFFLE_OFF, settings.shuffle);
     CHECK_EQUAL(REPEAT_OFF, settings.repeat);
-    CHECK_EQUAL(30, settings.volume);
+    CHECK_EQUAL(12, settings.volume);
 }
 
 static void timeout_options_end_with_never(void)
