@@ -132,6 +132,11 @@ echo_add_unit_test(NAME test_flac
     LIBRARIES echo_codec
 )
 target_compile_definitions(test_flac PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_flac_bits
+    SOURCES codec/test_flac_bits.c
+    LIBRARIES echo_codec
+)
+target_include_directories(test_flac_bits PRIVATE ${PROJECT_SOURCE_DIR}/src/codec)
 echo_add_unit_test(NAME test_audio_engine
     SOURCES device/test_audio_engine.c
     LIBRARIES echo_device_logic

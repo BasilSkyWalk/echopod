@@ -38,6 +38,7 @@ typedef struct FlacBits {
     uint32_t buffer_offset;
     uint32_t buffer_length;
     uint32_t index;
+    uint32_t crc_index;
     uint32_t word;
     uint32_t bits;
     uint16_t crc16;

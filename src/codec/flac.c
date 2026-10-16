@@ -207,7 +207,7 @@ static bool read_frame_header(FlacDecoder *decoder, FrameHeader *header)
     header->first_sample = (uint32_t)first;
     header->block_size = block_size_of(decoder, block_code);
     skip_sample_rate(decoder, rate_code);
-    uint8_t expected_crc = decoder->bits.crc8;
+    uint8_t expected_crc = flac_bits_crc8(&decoder->bits);
     if (read(decoder, 8) != expected_crc || decoder->bits.failed) {
         return false;
     }
@@ -266,14 +266,10 @@ static bool read_residual(FlacDecoder *decoder, int32_t *residual, uint32_t bloc
             }
             continue;
         }
-        for (uint32_t index = 0; index < count; index++) {
-            uint32_t value = flac_bits_read_unary(&decoder->bits) << parameter;
-            value |= read(decoder, parameter);
-            residual[sample++] = (int32_t)(value >> 1) ^ -(int32_t)(value & 1u);
-        }
-        if (decoder->bits.failed) {
+        if (!flac_bits_read_rice(&decoder->bits, residual + sample, count, parameter)) {
             return false;
         }
+        sample += count;
     }
     return true;
 }
@@ -434,7 +430,7 @@ static void decorrelate(FlacDecoder *decoder, const FrameHeader *header)
 static bool frame_crc_matches(FlacDecoder *decoder)
 {
     flac_bits_align(&decoder->bits);
-    uint16_t expected = decoder->bits.crc16;
+    uint16_t expected = flac_bits_crc16(&decoder->bits);
     return read(decoder, 16) == expected && !decoder->bits.failed;
 }
 

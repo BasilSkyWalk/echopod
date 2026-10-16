@@ -52,8 +52,23 @@ enum {
     FAILED_BYTE = 0xFF
 };
 
+static void fold_crc(FlacBits *bits, uint32_t end)
+{
+    uint32_t crc8 = bits->crc8;
+    uint32_t crc16 = bits->crc16;
+    for (uint32_t index = bits->crc_index; index < end; index++) {
+        uint32_t value = bits->buffer[index];
+        crc8 = CRC8_TABLE[crc8 ^ value];
+        crc16 = (crc16 << BITS_PER_BYTE ^ CRC16_TABLE[(crc16 >> BITS_PER_BYTE) ^ value]) & 0xFFFFu;
+    }
+    bits->crc8 = (uint8_t)crc8;
+    bits->crc16 = (uint16_t)crc16;
+    bits->crc_index = end;
+}
+
 static bool refill(FlacBits *bits)
 {
+    fold_crc(bits, bits->buffer_length);
     uint32_t next = bits->buffer_offset + bits->buffer_length;
     if (next >= bits->input.size) {
         return false;
@@ -66,6 +81,7 @@ static bool refill(FlacBits *bits)
     bits->buffer_offset = next;
     bits->buffer_length = length;
     bits->index = 0;
+    bits->crc_index = 0;
     return true;
 }
 
@@ -75,11 +91,7 @@ static uint32_t next_byte(FlacBits *bits)
         bits->failed = true;
         return FAILED_BYTE;
     }
-    uint8_t value = bits->buffer[bits->index++];
-    bits->crc8 = CRC8_TABLE[bits->crc8 ^ value];
-    bits->crc16 = (uint16_t)(bits->crc16 << BITS_PER_BYTE ^
-                             CRC16_TABLE[(bits->crc16 >> BITS_PER_BYTE) ^ value]);
-    return value;
+    return bits->buffer[bits->index++];
 }
 
 void flac_bits_start(FlacBits *bits, FlacInput input, uint32_t offset)
@@ -88,6 +100,7 @@ void flac_bits_start(FlacBits *bits, FlacInput input, uint32_t offset)
     bits->buffer_offset = offset;
     bits->buffer_length = 0;
     bits->index = 0;
+    bits->crc_index = 0;
     bits->word = 0;
     bits->bits = 0;
     bits->crc8 = 0;
@@ -149,10 +162,61 @@ uint32_t flac_bits_read_unary(FlacBits *bits)
         }
         uint32_t zeros = (uint32_t)__builtin_clz(bits->word);
         count += zeros;
-        bits->word <<= zeros + 1;
+        bits->word <<= zeros;
+        bits->word <<= 1;
         bits->bits -= zeros + 1;
         return count;
     }
+}
+
+static int32_t unfold(uint32_t value)
+{
+    return (int32_t)(value >> 1) ^ -(int32_t)(value & 1u);
+}
+
+static bool read_rice_wide(FlacBits *bits, int32_t *out, uint32_t count, uint32_t parameter)
+{
+    for (uint32_t index = 0; index < count; index++) {
+        uint32_t value = flac_bits_read_unary(bits) << parameter;
+        out[index] = unfold(value | flac_bits_read(bits, parameter));
+    }
+    return !bits->failed;
+}
+
+bool flac_bits_read_rice(FlacBits *bits, int32_t *out, uint32_t count, uint32_t parameter)
+{
+    if (parameter > FETCH_LIMIT) {
+        return read_rice_wide(bits, out, count, parameter);
+    }
+    uint32_t word = bits->word;
+    uint32_t available = bits->bits;
+    for (uint32_t index = 0; index < count; index++) {
+        uint32_t quotient = 0;
+        while (word == 0) {
+            quotient += available;
+            word = next_byte(bits) << FETCH_LIMIT;
+            available = BITS_PER_BYTE;
+        }
+        uint32_t zeros = (uint32_t)__builtin_clz(word);
+        quotient += zeros;
+        word <<= zeros;
+        word <<= 1;
+        available -= zeros + 1;
+        uint32_t low = 0;
+        if (parameter > 0) {
+            while (available < parameter) {
+                word |= next_byte(bits) << (FETCH_LIMIT - available);
+                available += BITS_PER_BYTE;
+            }
+            low = word >> (WORD_BITS - parameter);
+            word <<= parameter;
+            available -= parameter;
+        }
+        out[index] = unfold(quotient << parameter | low);
+    }
+    bits->word = word;
+    bits->bits = available;
+    return !bits->failed;
 }
 
 void flac_bits_align(FlacBits *bits)
@@ -162,8 +226,26 @@ void flac_bits_align(FlacBits *bits)
     bits->bits -= partial;
 }
 
+static uint32_t consumed_index(const FlacBits *bits)
+{
+    return bits->index - bits->bits / BITS_PER_BYTE;
+}
+
 void flac_bits_reset_crc(FlacBits *bits)
 {
+    bits->crc_index = consumed_index(bits);
     bits->crc8 = 0;
     bits->crc16 = 0;
+}
+
+uint8_t flac_bits_crc8(FlacBits *bits)
+{
+    fold_crc(bits, consumed_index(bits));
+    return bits->crc8;
+}
+
+uint16_t flac_bits_crc16(FlacBits *bits)
+{
+    fold_crc(bits, consumed_index(bits));
+    return bits->crc16;
 }

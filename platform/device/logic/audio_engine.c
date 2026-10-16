@@ -183,8 +183,7 @@ void audio_engine_stop(AudioEngine *engine)
 
 static int64_t floor_shift(int64_t value, int shift)
 {
-    int64_t divisor = INT64_C(1) << shift;
-    return value >= 0 ? value / divisor : -((-value + divisor - 1) / divisor);
+    return value >= 0 ? value >> shift : -((-value - 1) >> shift) - 1;
 }
 
 static int32_t to_output(int32_t sample, int bits, uint32_t gain)
