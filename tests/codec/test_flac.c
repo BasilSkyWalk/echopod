@@ -285,6 +285,22 @@ static void decoding_can_start_from_audio_bytes_alone(void)
     free(pcm.bytes);
 }
 
+static void the_position_moves_from_the_audio_start_to_the_next_frame(void)
+{
+    Buffer flac = load("fixed_16_mono", "flac");
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(decoder.audio_offset, flac_position(&decoder));
+    CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+    uint32_t second = flac_position(&decoder);
+    CHECK(second > decoder.audio_offset);
+    CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+    CHECK_EQUAL(1152u, decoder.frame_first_sample);
+    flac_rewind(&decoder, second);
+    CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+    CHECK_EQUAL(1152u, decoder.frame_first_sample);
+    free(flac.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -307,6 +323,7 @@ int main(void)
         TEST_CASE(the_header_alone_gives_the_stream_info_and_audio_offset),
         TEST_CASE(a_header_that_is_not_flac_is_refused),
         TEST_CASE(decoding_can_start_from_audio_bytes_alone),
+        TEST_CASE(the_position_moves_from_the_audio_start_to_the_next_frame),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

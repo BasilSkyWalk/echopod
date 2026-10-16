@@ -142,6 +142,11 @@ echo_add_unit_test(NAME test_audio_engine
     LIBRARIES echo_device_logic
 )
 target_compile_definitions(test_audio_engine PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_core1_stream
+    SOURCES device/test_core1_stream.c
+    LIBRARIES echo_device_logic
+)
+target_compile_definitions(test_core1_stream PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_fat
     SOURCES device/test_fat.c device/sparse_card.c
     LIBRARIES echo_device_logic

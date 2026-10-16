@@ -569,3 +569,13 @@ FlacResult flac_seek(FlacDecoder *decoder, uint32_t sample)
     decoder->decoded_samples = 0;
     return FLAC_OK;
 }
+
+uint32_t flac_position(const FlacDecoder *decoder)
+{
+    return flac_bits_offset(&decoder->bits);
+}
+
+void flac_rewind(FlacDecoder *decoder, uint32_t position)
+{
+    flac_bits_start(&decoder->bits, decoder->bits.input, position);
+}

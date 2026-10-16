@@ -2,6 +2,7 @@ add_library(echo_device_logic STATIC
     audio_engine.c
     audio_math.c
     core1_control.c
+    core1_stream.c
     dac_sequence.c
     flac_source.c
     dma_loop.c
