@@ -3,120 +3,110 @@
 
 enum {
     TICKS_PER_MICROSECOND = 24,
-    COUNTER_TOP = 0xFFFFFF,
-    FULL_PERIOD = COUNTER_TOP + 1,
-    MILLISECOND_PERIOD = TICKS_PER_MICROSECOND * 1000
+    PERIOD = TICKS_PER_MICROSECOND * 1000
 };
 
-static TickClock started_clock(uint32_t counter)
+static TickClock started_clock(void)
 {
     TickClock clock;
-    tick_clock_init(&clock, TICKS_PER_MICROSECOND, FULL_PERIOD, counter);
+    tick_clock_init(&clock, TICKS_PER_MICROSECOND, PERIOD);
     return clock;
+}
+
+static TickReading counter_at(uint32_t counter)
+{
+    return (TickReading){.counter = counter, .reload_pending = false};
+}
+
+static TickReading pending_at(uint32_t counter)
+{
+    return (TickReading){.counter = counter, .reload_pending = true};
 }
 
 static void a_new_clock_reads_zero(void)
 {
-    TickClock clock = started_clock(COUNTER_TOP);
-    CHECK_EQUAL(0, tick_clock_milliseconds(&clock));
-    CHECK_EQUAL(0, tick_clock_microseconds(&clock));
+    TickClock clock = started_clock();
+    CHECK_EQUAL(0, tick_clock_milliseconds(&clock, counter_at(0)));
+    CHECK_EQUAL(0, tick_clock_microseconds(&clock, counter_at(0)));
 }
 
-static void the_down_counter_advances_the_clock(void)
+static void the_down_counter_advances_within_a_period(void)
 {
-    TickClock clock = started_clock(COUNTER_TOP);
-    tick_clock_update(&clock, COUNTER_TOP - 24000);
-    CHECK_EQUAL(1, tick_clock_milliseconds(&clock));
-    CHECK_EQUAL(1000, tick_clock_microseconds(&clock));
+    TickClock clock = started_clock();
+    CHECK_EQUAL(500, tick_clock_microseconds(&clock, counter_at(PERIOD - 12000)));
+    CHECK_EQUAL(0, tick_clock_milliseconds(&clock, counter_at(PERIOD - 12000)));
+    CHECK_EQUAL(999, tick_clock_microseconds(&clock, counter_at(1)));
 }
 
-static void a_counter_wrap_is_counted(void)
+static void each_reload_adds_a_full_period(void)
 {
-    TickClock clock = started_clock(100);
-    tick_clock_update(&clock, COUNTER_TOP - 99);
-    CHECK_EQUAL(200 / TICKS_PER_MICROSECOND, tick_clock_microseconds(&clock));
+    TickClock clock = started_clock();
+    tick_clock_reload(&clock);
+    CHECK_EQUAL(1000, tick_clock_microseconds(&clock, counter_at(0)));
+    CHECK_EQUAL(1, tick_clock_milliseconds(&clock, counter_at(0)));
+    CHECK_EQUAL(1500, tick_clock_microseconds(&clock, counter_at(PERIOD - 12000)));
 }
 
-static void partial_ticks_carry_over_between_updates(void)
+static void reloads_with_no_reads_between_still_count_a_millisecond_each(void)
 {
-    TickClock clock = started_clock(COUNTER_TOP);
-    for (uint32_t step = 1; step <= 3; step++) {
-        tick_clock_update(&clock, COUNTER_TOP - step * 12);
+    TickClock clock = started_clock();
+    for (int reload = 0; reload < 1000; reload++) {
+        tick_clock_reload(&clock);
+        uint32_t entry_delay = reload % 2 == 0 ? 30 : 10;
+        CHECK(tick_clock_milliseconds(&clock, counter_at(PERIOD - 1 - entry_delay)) ==
+              (uint32_t)reload + 1);
     }
-    CHECK_EQUAL(1, tick_clock_microseconds(&clock));
-    tick_clock_update(&clock, COUNTER_TOP - 48);
-    CHECK_EQUAL(2, tick_clock_microseconds(&clock));
+    CHECK_EQUAL(1000, tick_clock_milliseconds(&clock, counter_at(0)));
+    CHECK_EQUAL(1000000, tick_clock_microseconds(&clock, counter_at(0)));
 }
 
-static void many_wraps_add_up_to_whole_seconds(void)
+static void a_pending_reload_counts_before_its_interrupt_runs(void)
 {
-    TickClock clock = started_clock(COUNTER_TOP);
-    uint32_t counter = COUNTER_TOP;
-    for (int step = 0; step < 3000; step++) {
-        counter = (counter - 8000) & COUNTER_TOP;
-        tick_clock_update(&clock, counter);
-    }
-    CHECK_EQUAL(1000, tick_clock_milliseconds(&clock));
-    CHECK_EQUAL(1000000, tick_clock_microseconds(&clock));
+    TickClock clock = started_clock();
+    CHECK_EQUAL(1001, tick_clock_microseconds(&clock, pending_at(PERIOD - 24)));
+    CHECK_EQUAL(1000, tick_clock_microseconds(&clock, pending_at(0)));
+    tick_clock_reload(&clock);
+    CHECK_EQUAL(1001, tick_clock_microseconds(&clock, counter_at(PERIOD - 24)));
+}
+
+static void partial_ticks_carry_across_a_new_rate(void)
+{
+    TickClock clock = started_clock();
+    tick_clock_set_rate(&clock, counter_at(PERIOD - 12), 96, 96000);
+    CHECK_EQUAL(0, tick_clock_microseconds(&clock, counter_at(0)));
+    CHECK_EQUAL(1, tick_clock_microseconds(&clock, counter_at(96000 - 48)));
 }
 
 static void a_new_rate_keeps_the_time_counted_so_far(void)
 {
-    TickClock clock = started_clock(COUNTER_TOP);
-    tick_clock_update(&clock, COUNTER_TOP - 24 * 1500);
-    tick_clock_set_rate(&clock, 96, FULL_PERIOD, COUNTER_TOP - 24 * 2000);
-    CHECK_EQUAL(2000, tick_clock_microseconds(&clock));
-    CHECK_EQUAL(2, tick_clock_milliseconds(&clock));
-    tick_clock_update(&clock, COUNTER_TOP - 96 * 1000);
-    CHECK_EQUAL(3000, tick_clock_microseconds(&clock));
-    CHECK_EQUAL(3, tick_clock_milliseconds(&clock));
+    TickClock clock = started_clock();
+    tick_clock_reload(&clock);
+    tick_clock_set_rate(&clock, counter_at(PERIOD - 12000), 96, 96000);
+    CHECK_EQUAL(1500, tick_clock_microseconds(&clock, counter_at(0)));
+    CHECK_EQUAL(2000, tick_clock_microseconds(&clock, counter_at(96000 - 48000)));
+    CHECK_EQUAL(2, tick_clock_milliseconds(&clock, counter_at(96000 - 48000)));
+    tick_clock_reload(&clock);
+    CHECK_EQUAL(2500, tick_clock_microseconds(&clock, counter_at(0)));
 }
 
-static void a_one_millisecond_period_counts_each_reload(void)
+static void a_new_rate_folds_in_a_pending_reload(void)
 {
-    TickClock clock;
-    tick_clock_init(&clock, TICKS_PER_MICROSECOND, MILLISECOND_PERIOD, MILLISECOND_PERIOD - 1);
-    tick_clock_update(&clock, MILLISECOND_PERIOD - 1 - 12000);
-    CHECK_EQUAL(500, tick_clock_microseconds(&clock));
-    tick_clock_update(&clock, MILLISECOND_PERIOD - 1 - 6000);
-    CHECK_EQUAL(1250, tick_clock_microseconds(&clock));
-    CHECK_EQUAL(1, tick_clock_milliseconds(&clock));
-}
-
-static void a_thousand_reloads_make_a_second(void)
-{
-    TickClock clock;
-    tick_clock_init(&clock, TICKS_PER_MICROSECOND, MILLISECOND_PERIOD, MILLISECOND_PERIOD - 1);
-    for (int reload = 0; reload < 1000; reload++) {
-        tick_clock_update(&clock, MILLISECOND_PERIOD / 2);
-        tick_clock_update(&clock, MILLISECOND_PERIOD - 1);
-    }
-    CHECK_EQUAL(1000, tick_clock_milliseconds(&clock));
-    CHECK_EQUAL(1000000, tick_clock_microseconds(&clock));
-}
-
-static void a_new_period_restarts_the_counter_from_its_top(void)
-{
-    TickClock clock;
-    tick_clock_init(&clock, TICKS_PER_MICROSECOND, MILLISECOND_PERIOD, MILLISECOND_PERIOD - 1);
-    tick_clock_set_rate(&clock, 96, 96000, MILLISECOND_PERIOD - 1 - 12000);
-    CHECK_EQUAL(500, tick_clock_microseconds(&clock));
-    tick_clock_update(&clock, 96000 - 1 - 48000);
-    CHECK_EQUAL(1000, tick_clock_microseconds(&clock));
+    TickClock clock = started_clock();
+    tick_clock_set_rate(&clock, pending_at(PERIOD - 24), 96, 96000);
+    CHECK_EQUAL(1001, tick_clock_microseconds(&clock, counter_at(0)));
 }
 
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(a_new_clock_reads_zero),
-        TEST_CASE(the_down_counter_advances_the_clock),
-        TEST_CASE(a_counter_wrap_is_counted),
-        TEST_CASE(partial_ticks_carry_over_between_updates),
-        TEST_CASE(many_wraps_add_up_to_whole_seconds),
+        TEST_CASE(the_down_counter_advances_within_a_period),
+        TEST_CASE(each_reload_adds_a_full_period),
+        TEST_CASE(reloads_with_no_reads_between_still_count_a_millisecond_each),
+        TEST_CASE(a_pending_reload_counts_before_its_interrupt_runs),
+        TEST_CASE(partial_ticks_carry_across_a_new_rate),
         TEST_CASE(a_new_rate_keeps_the_time_counted_so_far),
-        TEST_CASE(a_one_millisecond_period_counts_each_reload),
-        TEST_CASE(a_thousand_reloads_make_a_second),
-        TEST_CASE(a_new_period_restarts_the_counter_from_its_top),
+        TEST_CASE(a_new_rate_folds_in_a_pending_reload),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
