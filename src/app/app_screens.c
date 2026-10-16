@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "diagnostics_values.h"
+#include "hal/power.h"
 #include "hal/system.h"
 
 typedef enum MusicSource {
@@ -152,6 +153,15 @@ static const char *core1_decode_value(const void *context)
     diagnostics_core1_decode_text(decode->run, decode->result, core1_decode_text,
                                   sizeof core1_decode_text);
     return core1_decode_text;
+}
+
+static char battery_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *battery_value(const void *context)
+{
+    (void)context;
+    diagnostics_battery_text(hal_power_battery(), battery_text, sizeof battery_text);
+    return battery_text;
 }
 
 static ScreenAction play_test_tone(void *context)
@@ -359,6 +369,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = run_core1_decode_test,
                                                 .context = &screens->core1_decode,
                                                 .value = core1_decode_value};
+    screens->diagnostics_items[14] =
+        (MenuItem){.label = "Battery", .select = NULL, .context = NULL, .value = battery_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

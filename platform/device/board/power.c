@@ -1,14 +1,38 @@
 #include "hal/power.h"
 #include "board.h"
 #include "gpio.h"
+#include "usb.h"
 
 static const GpioPin POWER_KEY = {2, 5};
 static const GpioPin POWER_HOLD = {2, 6};
 static const GpioPin BACKLIGHT = {2, 4};
+static const GpioPin CHARGE_STATUS = {2, 3};
+
+static bool charge_status_ready;
+
+static bool charging_now(bool usb_power)
+{
+    if (!charge_status_ready) {
+        gpio_mux(CHARGE_STATUS, GPIO_FUNCTION_GPIO);
+        gpio_input(CHARGE_STATUS);
+        charge_status_ready = true;
+    }
+    return usb_power && !gpio_read(CHARGE_STATUS);
+}
 
 HalBattery hal_power_battery(void)
 {
-    return (HalBattery){.known = false, .percent = 0, .charging = false};
+    BatteryGauge gauge = board_battery_gauge();
+    bool usb_power = usb_vbus_present();
+    bool charging = charging_now(usb_power);
+    if (!battery_gauge_known(&gauge)) {
+        return (HalBattery){.known = false, .usb_power = usb_power, .charging = charging};
+    }
+    return (HalBattery){.known = true,
+                        .percent = battery_gauge_percent(&gauge, charging),
+                        .charging = charging,
+                        .usb_power = usb_power,
+                        .millivolts = (uint16_t)battery_gauge_millivolts(&gauge)};
 }
 
 void hal_power_off(void)

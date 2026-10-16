@@ -181,11 +181,29 @@ static void a_core_1_decode_without_blocks_or_track_says_so(void)
     CHECK(text_is("No reply", text));
 }
 
+static void the_battery_row_shows_millivolts_and_the_charger_state(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_battery_text((HalBattery){0}, text, sizeof text);
+    CHECK(text_is("No reading", text));
+    HalBattery battery = {.known = true, .percent = 50, .millivolts = 3803};
+    diagnostics_battery_text(battery, text, sizeof text);
+    CHECK(text_is("3803 mV", text));
+    battery.usb_power = true;
+    battery.charging = true;
+    diagnostics_battery_text(battery, text, sizeof text);
+    CHECK(text_is("3803 mV charging", text));
+    battery.charging = false;
+    diagnostics_battery_text(battery, text, sizeof text);
+    CHECK(text_is("3803 mV full", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
+        TEST_CASE(the_battery_row_shows_millivolts_and_the_charger_state),
         TEST_CASE(the_core_1_row_is_empty_until_run),
         TEST_CASE(a_core_1_run_shows_its_clock_and_loop_cycles),
         TEST_CASE(core_1_failures_name_the_step),

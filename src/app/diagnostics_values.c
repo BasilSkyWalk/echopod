@@ -193,3 +193,17 @@ void diagnostics_core1_decode_text(bool run, HalCore1Decode result, char *text, 
     string_builder_append(&builder, " ms max ");
     string_builder_append_unsigned(&builder, rounded_milliseconds(result.longest_us));
 }
+
+void diagnostics_battery_text(HalBattery battery, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!battery.known) {
+        string_builder_append(&builder, "No reading");
+        return;
+    }
+    string_builder_append_unsigned(&builder, battery.millivolts);
+    string_builder_append(&builder, " mV");
+    if (battery.usb_power) {
+        string_builder_append(&builder, battery.charging ? " charging" : " full");
+    }
+}

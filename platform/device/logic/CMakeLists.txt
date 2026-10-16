@@ -1,6 +1,7 @@
 add_library(echo_device_logic STATIC
     audio_engine.c
     audio_math.c
+    battery_gauge.c
     core1_control.c
     core1_stream.c
     dac_sequence.c
