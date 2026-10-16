@@ -9,8 +9,13 @@ enum {
     RGB_GREEN_SHIFT = 3,
     RGB_BLUE_SHIFT = 3,
     FIVE_BIT_MASK = 0x1F,
-    SIX_BIT_MASK = 0x3F
+    SIX_BIT_MASK = 0x3F,
+    SPREAD_SHIFT = 16,
+    SPREAD_LIGHT_BITS = 5,
+    SPREAD_LIGHT_DROP = COLOR_LIGHT_SHIFT - SPREAD_LIGHT_BITS
 };
+
+static const uint32_t SPREAD_MASK = 0x07E0F81Fu;
 
 typedef struct Channels {
     unsigned red;
@@ -63,10 +68,7 @@ Color color_scale(Color color, unsigned light)
     if (light >= COLOR_LIGHT_FULL) {
         return color;
     }
-    Channels channels = split(color);
-    return join((Channels){
-        .red = channels.red * light >> COLOR_LIGHT_SHIFT,
-        .green = channels.green * light >> COLOR_LIGHT_SHIFT,
-        .blue = channels.blue * light >> COLOR_LIGHT_SHIFT,
-    });
+    uint32_t spread = ((uint32_t)color | (uint32_t)color << SPREAD_SHIFT) & SPREAD_MASK;
+    uint32_t scaled = (spread * (light >> SPREAD_LIGHT_DROP)) >> SPREAD_LIGHT_BITS & SPREAD_MASK;
+    return (Color)(scaled | scaled >> SPREAD_SHIFT);
 }

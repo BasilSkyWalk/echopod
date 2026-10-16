@@ -24,6 +24,7 @@ struct Screen {
     const char *title;
     void *context;
     bool full_screen;
+    bool paints_every_pixel;
     bool hold_volume_keys;
     bool stays_on_wake;
     void (*enter)(void *context, uint32_t now_ms);

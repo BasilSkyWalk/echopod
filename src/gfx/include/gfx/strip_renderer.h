@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 #include "gfx/canvas.h"
 
 typedef struct FrameDrawer {
@@ -18,6 +20,7 @@ typedef struct StripRenderer {
     int screen_height;
     int strip_height;
     Color background;
+    bool drawer_paints_everything;
 } StripRenderer;
 
 void strip_renderer_render(const StripRenderer *renderer, FrameDrawer drawer, FrameSink sink);

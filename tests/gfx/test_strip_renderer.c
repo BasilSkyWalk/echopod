@@ -8,7 +8,8 @@ enum {
     EXPECTED_STRIPS = 3,
     MAX_RECORDED = 8,
     BACKGROUND = 0x0042,
-    PAINT = 0xBEEF
+    PAINT = 0xBEEF,
+    LEFTOVER = 0x1357
 };
 
 typedef struct Recording {
@@ -99,12 +100,35 @@ static void a_rect_spanning_strips_appears_whole(void)
     }
 }
 
+static void a_drawer_that_paints_everything_skips_the_clear(void)
+{
+    static Recording recording;
+    recording = (Recording){.rect_to_paint = {0, 0, 0, 0}};
+    for (int index = 0; index < SCREEN_WIDTH * STRIP_HEIGHT; index++) {
+        strip_pixels[index] = LEFTOVER;
+    }
+    StripRenderer renderer = {
+        .strip_pixels = strip_pixels,
+        .screen_width = SCREEN_WIDTH,
+        .screen_height = SCREEN_HEIGHT,
+        .strip_height = STRIP_HEIGHT,
+        .background = BACKGROUND,
+        .drawer_paints_everything = true,
+    };
+    FrameDrawer drawer = {.draw = record_draw, .context = &recording};
+    FrameSink sink = {.write = record_write, .context = &recording};
+    strip_renderer_render(&renderer, drawer, sink);
+    CHECK_EQUAL(LEFTOVER, recording.frame[0][0]);
+    CHECK_EQUAL(LEFTOVER, recording.frame[4][5]);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_screen_is_drawn_and_written_as_consecutive_strips),
         TEST_CASE(strips_start_from_the_background_color),
         TEST_CASE(a_rect_spanning_strips_appears_whole),
+        TEST_CASE(a_drawer_that_paints_everything_skips_the_clear),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

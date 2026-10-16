@@ -9,7 +9,9 @@ static void render_strip(const StripRenderer *renderer, Rect strip, FrameDrawer 
                          FrameSink sink)
 {
     Canvas canvas = canvas_make(renderer->strip_pixels, strip);
-    canvas_clear(&canvas, renderer->background);
+    if (!renderer->drawer_paints_everything) {
+        canvas_clear(&canvas, renderer->background);
+    }
     drawer.draw(drawer.context, &canvas);
     sink.write(sink.context, strip, renderer->strip_pixels);
 }

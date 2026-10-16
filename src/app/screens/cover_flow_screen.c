@@ -331,6 +331,7 @@ Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config)
         .title = "Cover Flow",
         .context = flow,
         .full_screen = true,
+        .paints_every_pixel = true,
         .enter = enter,
         .handle_key = handle_key,
         .update = update,
