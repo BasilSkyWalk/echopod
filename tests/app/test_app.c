@@ -41,7 +41,7 @@ enum {
     MUSIC_FAVORITES_INDEX = 8,
     DEFAULT_TIMEOUT_MS = 30000,
     SHORT_TIMEOUT_MS = 10000,
-    NOW_PLAYING_IDLE_MS = 10000,
+    IDLE_MS = 20000,
     DIAGNOSTICS_KEY_TEST_INDEX = 0,
     DIAGNOSTICS_CPU_CLOCK_INDEX = 5,
     DIAGNOSTICS_STOPWATCH_INDEX = 6,
@@ -931,31 +931,19 @@ static void play_on_another_track_starts_it(void)
     CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
 }
 
-static void idling_in_the_menus_returns_to_now_playing(void)
+static void idling_in_the_menus_stays_put_while_playing(void)
 {
     start_app_with_library();
     play_first_album_track();
     tap(KEY_BACK);
-    wait_ms(NOW_PLAYING_IDLE_MS - 100);
-    CHECK(!title_is("Now Playing"));
-    tap(KEY_VOLUME_DOWN);
-    wait_ms(NOW_PLAYING_IDLE_MS - 100);
-    CHECK(!title_is("Now Playing"));
-    wait_ms(200);
-    CHECK(title_is("Now Playing"));
-}
-
-static void a_paused_track_stays_in_the_menus(void)
-{
-    start_app_with_library();
-    play_first_album_track();
-    tap(KEY_PLAY);
-    tap(KEY_BACK);
-    wait_ms(NOW_PLAYING_IDLE_MS + 1000);
+    for (uint32_t waited = 0; waited < IDLE_MS; waited += 1000) {
+        wait_ms(1000);
+    }
+    CHECK(fake_hal_display_on());
     CHECK(!title_is("Now Playing"));
 }
 
-static void the_key_test_stays_open_while_playing(void)
+static void the_key_test_stays_open_after_waking(void)
 {
     start_app_with_library();
     play_first_album_track();
@@ -965,7 +953,8 @@ static void the_key_test_stays_open_while_playing(void)
     move_down(DIAGNOSTICS_KEY_TEST_INDEX);
     tap(KEY_PLAY);
     CHECK(title_is("Key test"));
-    wait_ms(NOW_PLAYING_IDLE_MS + 1000);
+    tap(KEY_POWER);
+    tap(KEY_POWER);
     CHECK(title_is("Key test"));
 }
 
@@ -1074,7 +1063,7 @@ static void a_clock_that_does_not_lock_stays_at_24_mhz(void)
     CHECK(title_is("Diagnostics"));
 }
 
-static void the_stopwatch_stays_open_while_playing(void)
+static void the_stopwatch_stays_open_after_waking(void)
 {
     start_app_with_library();
     play_first_album_track();
@@ -1082,7 +1071,8 @@ static void the_stopwatch_stays_open_while_playing(void)
     open_diagnostics_row(DIAGNOSTICS_STOPWATCH_INDEX);
     tap(KEY_PLAY);
     CHECK(title_is("Stopwatch"));
-    wait_ms(NOW_PLAYING_IDLE_MS + 1000);
+    tap(KEY_POWER);
+    tap(KEY_POWER);
     CHECK(title_is("Stopwatch"));
 }
 
@@ -1136,9 +1126,8 @@ int main(void)
         TEST_CASE(play_on_the_playing_track_opens_now_playing_without_restarting),
         TEST_CASE(play_on_another_track_starts_it),
         TEST_CASE(menu_opens_now_playing_from_anywhere_while_playing),
-        TEST_CASE(idling_in_the_menus_returns_to_now_playing),
-        TEST_CASE(a_paused_track_stays_in_the_menus),
-        TEST_CASE(the_key_test_stays_open_while_playing),
+        TEST_CASE(idling_in_the_menus_stays_put_while_playing),
+        TEST_CASE(the_key_test_stays_open_after_waking),
         TEST_CASE(waking_the_screen_shows_now_playing_while_playing),
         TEST_CASE(waking_while_paused_keeps_the_screen),
         TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
@@ -1148,7 +1137,7 @@ int main(void)
         TEST_CASE(the_core_1_test_runs_once_per_press),
         TEST_CASE(the_core_1_decode_test_runs_once_per_press),
         TEST_CASE(a_clock_that_does_not_lock_stays_at_24_mhz),
-        TEST_CASE(the_stopwatch_stays_open_while_playing),
+        TEST_CASE(the_stopwatch_stays_open_after_waking),
         TEST_CASE(menu_does_nothing_while_nothing_plays),
         TEST_CASE(now_playing_shows_the_album_cover),
         TEST_CASE(now_playing_without_a_cover_keeps_the_text_layout),

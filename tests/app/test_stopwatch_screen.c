@@ -42,9 +42,9 @@ static void reopening_restarts_the_count(void)
     CHECK(strcmp("0:00", stopwatch_screen_text(&stopwatch)) == 0);
 }
 
-static void the_stopwatch_stays_open_when_idle(void)
+static void the_stopwatch_stays_open_on_wake(void)
 {
-    CHECK(open_stopwatch()->stays_when_idle);
+    CHECK(open_stopwatch()->stays_on_wake);
 }
 
 int main(void)
@@ -53,7 +53,7 @@ int main(void)
         TEST_CASE(the_stopwatch_starts_at_zero),
         TEST_CASE(the_stopwatch_counts_whole_seconds),
         TEST_CASE(reopening_restarts_the_count),
-        TEST_CASE(the_stopwatch_stays_open_when_idle),
+        TEST_CASE(the_stopwatch_stays_open_on_wake),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

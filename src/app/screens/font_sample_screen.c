@@ -85,7 +85,7 @@ Screen *font_sample_screen_init(FontSampleScreen *sample, const Theme *theme)
     *sample = (FontSampleScreen){.theme = theme};
     sample->screen = (Screen){
         .title = "Fonts",
-        .stays_when_idle = true,
+        .stays_on_wake = true,
         .context = sample,
         .enter = NULL,
         .handle_key = handle_key,

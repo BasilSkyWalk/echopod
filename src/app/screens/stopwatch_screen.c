@@ -66,7 +66,7 @@ Screen *stopwatch_screen_init(StopwatchScreen *stopwatch, const Theme *theme)
     *stopwatch = (StopwatchScreen){.theme = theme};
     stopwatch->screen = (Screen){
         .title = "Stopwatch",
-        .stays_when_idle = true,
+        .stays_on_wake = true,
         .context = stopwatch,
         .enter = enter,
         .handle_key = handle_key,
