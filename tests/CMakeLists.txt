@@ -80,6 +80,11 @@ echo_add_unit_test(NAME test_app
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+echo_add_unit_test(NAME test_draw_profile
+    SOURCES app/test_draw_profile.c
+    LIBRARIES echo_app
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 echo_add_unit_test(NAME test_player
     SOURCES app/test_player.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures

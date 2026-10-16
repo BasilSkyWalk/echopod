@@ -234,6 +234,16 @@ static void the_frame_overlay_splits_the_frame_time(void)
     CHECK(strcmp("190 u12 d120 s58", text) == 0);
 }
 
+static void the_frame_overlay_splits_the_drawing(void)
+{
+    char text[FRAME_OVERLAY_TEXT_CAPACITY];
+    uint32_t parts[DRAW_PART_COUNT] = {[DRAW_PART_COVERS] = 9400, [DRAW_PART_REFLECTIONS] = 3100,
+                                       [DRAW_PART_TEXT] = 2000,   [DRAW_PART_BACKDROP] = 600,
+                                       [DRAW_PART_HASH] = 1500,   [DRAW_PART_AUDIO] = 0};
+    frame_overlay_format_parts(parts, text, sizeof text);
+    CHECK(strcmp("c9 r3 t2 b1 h2 a0", text) == 0);
+}
+
 static void the_frame_overlay_shows_the_audio_numbers(void)
 {
     char text[FRAME_OVERLAY_TEXT_CAPACITY];
@@ -1113,6 +1123,7 @@ int main(void)
         TEST_CASE(a_long_back_returns_home_from_deep_screens),
         TEST_CASE(the_frame_overlay_is_off_until_enabled_in_diagnostics),
         TEST_CASE(the_frame_overlay_splits_the_frame_time),
+        TEST_CASE(the_frame_overlay_splits_the_drawing),
         TEST_CASE(the_frame_overlay_shows_the_audio_numbers),
         TEST_CASE(the_frame_overlay_shows_average_and_longest_block_times),
         TEST_CASE(the_frame_overlay_shows_zero_before_any_block),

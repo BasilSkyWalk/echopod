@@ -3,6 +3,8 @@
 #include <stddef.h>
 
 #include "core/string_builder.h"
+#include "draw_profile.h"
+#include "hal/clock.h"
 #include "ui/cover_flow.h"
 #include "ui/label.h"
 #include "ui/marquee.h"
@@ -246,10 +248,14 @@ static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position
     }
     Image image;
     if (cover_image(flow, position, &image)) {
+        uint32_t started_us = hal_clock_microseconds();
         image_draw_quad_lit(canvas, image, quad, light);
+        uint32_t reflection_us = hal_clock_microseconds();
+        draw_profile_add(DRAW_PART_COVERS, reflection_us - started_us);
         QuadLight reflected = {(uint16_t)(light.left * REFLECTION_LIGHT / COLOR_LIGHT_FULL),
                                (uint16_t)(light.right * REFLECTION_LIGHT / COLOR_LIGHT_FULL)};
         image_draw_reflection(canvas, image, quad, reflected, REFLECTION_ROWS);
+        draw_profile_add(DRAW_PART_REFLECTIONS, hal_clock_microseconds() - reflection_us);
     } else {
         image_fill_quad(canvas, quad, flow->config.theme->colors.divider);
     }
@@ -304,7 +310,9 @@ static void draw_backdrop(const Theme *theme, Canvas *canvas)
 static void draw(void *context, Canvas *canvas)
 {
     const CoverFlowScreen *flow = context;
+    uint32_t backdrop_started_us = hal_clock_microseconds();
     draw_backdrop(flow->config.theme, canvas);
+    draw_profile_add(DRAW_PART_BACKDROP, hal_clock_microseconds() - backdrop_started_us);
     if (flow->count == 0) {
         draw_empty(flow->config.theme, canvas);
         return;
@@ -314,7 +322,9 @@ static void draw(void *context, Canvas *canvas)
     for (int index = 0; index < visible; index++) {
         draw_cover(flow, canvas, order[index]);
     }
+    uint32_t text_started_us = hal_clock_microseconds();
     draw_text(flow, canvas);
+    draw_profile_add(DRAW_PART_TEXT, hal_clock_microseconds() - text_started_us);
 }
 
 Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config)

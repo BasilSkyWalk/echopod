@@ -8,6 +8,7 @@
 #include "core/power_policy.h"
 #include "cover_cache.h"
 #include "default_theme.h"
+#include "draw_profile.h"
 #include "favorites_store.h"
 #include "frame_overlay.h"
 #include "gfx/frame_diff.h"
@@ -319,8 +320,13 @@ static void write_to_display(void *context, Rect area, const Color *pixels)
 {
     (void)context;
     Rect changed;
+    uint32_t audio_started_us = hal_clock_microseconds();
     hal_audio_service();
-    if (!frame_diff_changed(&app.frame_diff, area, pixels, &changed)) {
+    uint32_t hash_started_us = hal_clock_microseconds();
+    draw_profile_add(DRAW_PART_AUDIO, hash_started_us - audio_started_us);
+    bool any_changed = frame_diff_changed(&app.frame_diff, area, pixels, &changed);
+    draw_profile_add(DRAW_PART_HASH, hal_clock_microseconds() - hash_started_us);
+    if (!any_changed) {
         return;
     }
     const Color *first_row = pixels + (size_t)(changed.y - area.y) * (size_t)area.width;
@@ -378,6 +384,7 @@ static void render_frame(void)
     uint32_t render_us = hal_clock_microseconds() - started_us;
     frame_stats_record(&app.send_stats, app.send_us);
     frame_stats_record(&app.draw_stats, render_us - app.send_us);
+    draw_profile_finish_frame();
 }
 
 static void draw_notice(void *context, Canvas *canvas)

@@ -6,6 +6,7 @@ add_library(echo_app STATIC
     default_theme.c
     favorites_store.c
     diagnostics_values.c
+    draw_profile.c
     frame_overlay.c
     library_store.c
     player.c

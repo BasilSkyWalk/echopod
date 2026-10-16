@@ -7,7 +7,7 @@
 enum {
     OVERLAY_WIDTH = 120,
     OVERLAY_LINE_HEIGHT = 18,
-    OVERLAY_LINES = 3,
+    OVERLAY_LINES = 4,
     OVERLAY_HEIGHT = OVERLAY_LINE_HEIGHT * OVERLAY_LINES,
     OVERLAY_MARGIN = 4,
     MICROSECONDS_PER_MILLISECOND = 1000,
@@ -42,6 +42,15 @@ void frame_overlay_format(FrameBreakdown breakdown, char *text, size_t capacity)
     append_milliseconds(&builder, " u", breakdown.update_us);
     append_milliseconds(&builder, " d", breakdown.draw_us);
     append_milliseconds(&builder, " s", breakdown.send_us);
+}
+
+void frame_overlay_format_parts(const uint32_t *parts_us, char *text, size_t capacity)
+{
+    static const char *const PREFIXES[DRAW_PART_COUNT] = {"c", " r", " t", " b", " h", " a"};
+    StringBuilder builder = string_builder_make(text, capacity);
+    for (int part = 0; part < DRAW_PART_COUNT; part++) {
+        append_milliseconds(&builder, PREFIXES[part], parts_us[part]);
+    }
 }
 
 static uint32_t share_percent(uint32_t part, uint32_t whole)
@@ -101,5 +110,12 @@ void frame_overlay_draw(Canvas *canvas, const Theme *theme, FrameBreakdown break
     draw_line(canvas, theme, line, text);
     line.y += OVERLAY_LINE_HEIGHT;
     frame_overlay_format_block_times(stats, text, sizeof text);
+    draw_line(canvas, theme, line, text);
+    line.y += OVERLAY_LINE_HEIGHT;
+    uint32_t parts[DRAW_PART_COUNT];
+    for (int part = 0; part < DRAW_PART_COUNT; part++) {
+        parts[part] = draw_profile_average_us((DrawPart)part);
+    }
+    frame_overlay_format_parts(parts, text, sizeof text);
     draw_line(canvas, theme, line, text);
 }
