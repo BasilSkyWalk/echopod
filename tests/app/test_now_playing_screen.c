@@ -1,5 +1,33 @@
+#include <string.h>
+
 #include "check.h"
 #include "screens/now_playing_screen.h"
+
+enum {
+    TEXT_CAPACITY = 48
+};
+
+static const HalAudioFormat HI_RES_FLAC = {.codec = HAL_AUDIO_CODEC_FLAC,
+                                           .sample_rate = 96000,
+                                           .bits_per_sample = 24,
+                                           .channels = 2,
+                                           .bitrate_kbps = 2304};
+static const HalAudioFormat MP3 = {
+    .codec = HAL_AUDIO_CODEC_MP3, .sample_rate = 44100, .channels = 2, .bitrate_kbps = 320};
+
+static bool stream_text_is(HalAudioFormat format, const char *expected)
+{
+    char buffer[TEXT_CAPACITY];
+    now_playing_stream_text(format, buffer, sizeof buffer);
+    return strcmp(expected, buffer) == 0;
+}
+
+static bool detail_text_is(PlayerStatus status, const char *expected)
+{
+    char buffer[TEXT_CAPACITY];
+    now_playing_detail_text(&status, buffer, sizeof buffer);
+    return strcmp(expected, buffer) == 0;
+}
 
 static NowPlayingCommand command(Key key, KeyGesture gesture)
 {
@@ -130,9 +158,51 @@ static void progress_stays_inside_the_bar(void)
     CHECK_EQUAL(0, now_playing_progress_width(5000, 0, 300));
 }
 
+static void the_codec_has_a_short_name(void)
+{
+    CHECK(strcmp("FLAC", now_playing_codec_name(HAL_AUDIO_CODEC_FLAC)) == 0);
+    CHECK(strcmp("MP3", now_playing_codec_name(HAL_AUDIO_CODEC_MP3)) == 0);
+    CHECK(strcmp("WAV", now_playing_codec_name(HAL_AUDIO_CODEC_WAV)) == 0);
+    CHECK(strcmp("", now_playing_codec_name(HAL_AUDIO_CODEC_UNKNOWN)) == 0);
+}
+
+static void lossless_streams_show_bit_depth_and_rate(void)
+{
+    CHECK(stream_text_is(HI_RES_FLAC, "24-bit \xC2\xB7 96 kHz"));
+}
+
+static void lossy_streams_show_only_the_rate(void)
+{
+    CHECK(stream_text_is(MP3, "44.1 kHz"));
+}
+
+static void an_unknown_stream_shows_nothing(void)
+{
+    CHECK(stream_text_is((HalAudioFormat){.codec = HAL_AUDIO_CODEC_UNKNOWN}, ""));
+}
+
+static void the_detail_line_shows_bitrate_and_place(void)
+{
+    PlayerStatus status = {.format = HI_RES_FLAC, .place = {3, 10}};
+    CHECK(detail_text_is(status, "2,304 kbps \xC2\xB7 3 of 10"));
+}
+
+static void the_detail_line_leaves_out_what_is_unknown(void)
+{
+    CHECK(detail_text_is((PlayerStatus){.place = {3, 10}}, "3 of 10"));
+    CHECK(detail_text_is((PlayerStatus){.format = MP3}, "320 kbps"));
+    CHECK(detail_text_is((PlayerStatus){0}, ""));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_codec_has_a_short_name),
+        TEST_CASE(lossless_streams_show_bit_depth_and_rate),
+        TEST_CASE(lossy_streams_show_only_the_rate),
+        TEST_CASE(an_unknown_stream_shows_nothing),
+        TEST_CASE(the_detail_line_shows_bitrate_and_place),
+        TEST_CASE(the_detail_line_leaves_out_what_is_unknown),
         TEST_CASE(a_volume_tap_changes_the_volume),
         TEST_CASE(holding_volume_up_skips_forward_and_volume_down_skips_back),
         TEST_CASE(play_toggles_pause_and_a_long_play_starts_seeking),

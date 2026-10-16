@@ -8,6 +8,7 @@ const Theme TEST_THEME = {
             .background = 0x0000,
             .text = 0xFFFF,
             .text_secondary = 0x7BEF,
+            .text_tertiary = 0x4208,
             .selection_background = 0x001F,
             .selection_text = 0xFFE0,
             .header_background = 0x8000,

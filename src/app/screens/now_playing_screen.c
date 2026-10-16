@@ -14,26 +14,85 @@
 enum {
     COVER_TOP = 30,
     COVER_GAP = 12,
-    TITLE_TOP = 30,
-    ARTIST_TOP = 56,
-    ALBUM_TOP = 80,
-    TEXT_LINE_HEIGHT = 24,
-    PROGRESS_TOP = 112,
-    PROGRESS_HEIGHT = 4,
-    TIMES_TOP = 120,
-    STATUS_TOP = 146,
-    SMALL_LINE_HEIGHT = 18,
-    ICON_SIZE = 10,
-    ICON_GAP = 8,
+    TITLE_TOP = 28,
+    ARTIST_TOP = 50,
+    ALBUM_TOP = 70,
+    TEXT_LINE_HEIGHT = 22,
+    FORMAT_TOP = 97,
+    DETAIL_TOP = 116,
+    MODES_TOP = 131,
+    SMALL_LINE_HEIGHT = 16,
+    CODEC_PADDING = 4,
+    CODEC_GAP = 7,
+    OUTLINE = 1,
+    PROGRESS_TOP = 148,
+    PROGRESS_HEIGHT = 3,
+    TIMES_TOP = 153,
     TIME_CAPACITY = 16,
     BADGE_SIZE = 40,
     BADGE_ICON_SIZE = 18,
-    STATUS_CAPACITY = 64
+    STATUS_CAPACITY = 64,
+    BITRATE_CAPACITY = 24,
+    RATE_CAPACITY = 16
 };
+
+static const char SEPARATOR[] = " \xC2\xB7 ";
 
 static const char NOTHING_PLAYING[] = "Nothing playing";
 static const char *const SHUFFLE_TEXT[SHUFFLE_MODE_COUNT] = {"", "Shuffle Songs", "Shuffle Albums"};
 static const char *const REPEAT_TEXT[REPEAT_MODE_COUNT] = {"", "Repeat One", "Repeat All"};
+
+const char *now_playing_codec_name(HalAudioCodec codec)
+{
+    switch (codec) {
+    case HAL_AUDIO_CODEC_FLAC:
+        return "FLAC";
+    case HAL_AUDIO_CODEC_MP3:
+        return "MP3";
+    case HAL_AUDIO_CODEC_WAV:
+        return "WAV";
+    case HAL_AUDIO_CODEC_UNKNOWN:
+        return "";
+    }
+    return "";
+}
+
+void now_playing_stream_text(HalAudioFormat format, char *buffer, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(buffer, capacity);
+    if (format.codec == HAL_AUDIO_CODEC_UNKNOWN || format.sample_rate == 0) {
+        return;
+    }
+    if (format.bits_per_sample > 0) {
+        string_builder_append_unsigned(&builder, format.bits_per_sample);
+        string_builder_append(&builder, "-bit");
+        string_builder_append(&builder, SEPARATOR);
+    }
+    char rate[RATE_CAPACITY];
+    format_sample_rate(format.sample_rate, rate, sizeof rate);
+    string_builder_append(&builder, rate);
+}
+
+void now_playing_detail_text(const PlayerStatus *status, char *buffer, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(buffer, capacity);
+    bool has_bitrate =
+        status->format.codec != HAL_AUDIO_CODEC_UNKNOWN && status->format.bitrate_kbps > 0;
+    if (has_bitrate) {
+        char bitrate[BITRATE_CAPACITY];
+        format_bitrate(status->format.bitrate_kbps, bitrate, sizeof bitrate);
+        string_builder_append(&builder, bitrate);
+    }
+    if (status->place.total == 0) {
+        return;
+    }
+    if (has_bitrate) {
+        string_builder_append(&builder, SEPARATOR);
+    }
+    string_builder_append_unsigned(&builder, status->place.number);
+    string_builder_append(&builder, " of ");
+    string_builder_append_unsigned(&builder, status->place.total);
+}
 
 static NowPlayingCommand by_gesture(KeyGesture gesture, NowPlayingCommand press,
                                     NowPlayingCommand hold)
@@ -357,8 +416,8 @@ static void draw_track_text(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
     TextStyle title = {.font = theme->fonts.title, .color = theme->colors.text};
-    TextStyle artist = {.font = theme->fonts.body, .color = theme->colors.text};
-    TextStyle album = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
+    TextStyle artist = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
+    TextStyle album = {.font = theme->fonts.body, .color = theme->colors.text_tertiary};
     draw_text_line(
         now_playing, canvas,
         (Label){column_area(now_playing, TITLE_TOP, TEXT_LINE_HEIGHT), now_playing->title}, title);
@@ -380,13 +439,13 @@ static uint32_t shown_position(const NowPlayingScreen *now_playing)
 static void draw_progress(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
-    Rect bar = column_area(now_playing, PROGRESS_TOP, PROGRESS_HEIGHT);
+    Rect bar = line_area(theme, PROGRESS_TOP, PROGRESS_HEIGHT);
     bool volume = showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME);
     int filled = volume ? now_playing_volume_width(now_playing->status.volume, bar.width)
                         : now_playing_progress_width(shown_position(now_playing),
                                                      now_playing->status.duration_ms, bar.width);
     Color fill =
-        now_playing->scrubbing || volume ? theme->colors.text : theme->colors.selection_background;
+        now_playing->scrubbing || volume ? theme->colors.selection_background : theme->colors.text;
     canvas_fill_rect(canvas, bar, theme->colors.divider);
     canvas_fill_rect(canvas, (Rect){bar.x, bar.y, filled, bar.height}, fill);
 }
@@ -414,27 +473,10 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
         StringBuilder level = string_builder_make(remaining, sizeof remaining);
         string_builder_append_unsigned(&level, now_playing->status.volume);
     }
-    Rect area = column_area(now_playing, TIMES_TOP, SMALL_LINE_HEIGHT);
+    Rect area = line_area(theme, TIMES_TOP, SMALL_LINE_HEIGHT);
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
     label_draw(canvas, style, (Label){.area = area, .text = elapsed});
     draw_right_aligned(canvas, style, area, remaining);
-}
-
-static void draw_state_icon(const NowPlayingScreen *now_playing, Canvas *canvas, Point origin)
-{
-    Color color = now_playing->config.theme->colors.text;
-    Rect area = {origin.x, origin.y, ICON_SIZE, ICON_SIZE};
-    switch (now_playing->status.state) {
-    case PLAYER_PLAYING:
-        icon_draw_play(canvas, area, color);
-        return;
-    case PLAYER_PAUSED:
-        icon_draw_pause(canvas, area, color);
-        return;
-    case PLAYER_IDLE:
-        icon_draw_stop(canvas, area, color);
-        return;
-    }
 }
 
 static void modes_text(const PlayerStatus *status, char *buffer, size_t capacity)
@@ -442,30 +484,59 @@ static void modes_text(const PlayerStatus *status, char *buffer, size_t capacity
     StringBuilder builder = string_builder_make(buffer, capacity);
     string_builder_append(&builder, SHUFFLE_TEXT[status->shuffle]);
     if (status->shuffle != SHUFFLE_OFF && status->repeat != REPEAT_OFF) {
-        string_builder_append(&builder, " \xC2\xB7 ");
+        string_builder_append(&builder, SEPARATOR);
     }
     string_builder_append(&builder, REPEAT_TEXT[status->repeat]);
 }
 
-static void draw_status(const NowPlayingScreen *now_playing, Canvas *canvas)
+static void draw_outline(Canvas *canvas, Rect area, Color color)
+{
+    canvas_fill_rect(canvas, (Rect){area.x, area.y, area.width, OUTLINE}, color);
+    canvas_fill_rect(canvas, (Rect){area.x, area.y + area.height - OUTLINE, area.width, OUTLINE},
+                     color);
+    canvas_fill_rect(canvas, (Rect){area.x, area.y, OUTLINE, area.height}, color);
+    canvas_fill_rect(canvas, (Rect){area.x + area.width - OUTLINE, area.y, OUTLINE, area.height},
+                     color);
+}
+
+static void draw_format(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
-    Rect area = line_area(theme, STATUS_TOP, SMALL_LINE_HEIGHT);
+    HalAudioFormat format = now_playing->status.format;
+    const char *codec = now_playing_codec_name(format.codec);
+    if (codec[0] == '\0') {
+        return;
+    }
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
+    Rect row = column_area(now_playing, FORMAT_TOP, SMALL_LINE_HEIGHT);
+    int codec_width = text_width(style.font, codec) + 2 * CODEC_PADDING;
+    Rect badge = {row.x, row.y, codec_width, row.height};
+    draw_outline(canvas, badge, theme->colors.text_secondary);
+    Rect codec_text = label_centered_area(style.font, badge, codec);
+    label_draw(canvas, style, (Label){.area = codec_text, .text = codec});
+    char stream[STATUS_CAPACITY];
+    now_playing_stream_text(format, stream, sizeof stream);
+    int stream_left = badge.x + badge.width + CODEC_GAP;
+    Rect stream_area = {stream_left, row.y, row.x + row.width - stream_left, row.height};
+    label_draw(canvas, style, (Label){.area = stream_area, .text = stream});
+}
+
+static void draw_details(const NowPlayingScreen *now_playing, Canvas *canvas)
+{
+    const Theme *theme = now_playing->config.theme;
+    TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    char detail[STATUS_CAPACITY];
+    now_playing_detail_text(&now_playing->status, detail, sizeof detail);
+    label_draw(canvas, style,
+               (Label){column_area(now_playing, DETAIL_TOP, SMALL_LINE_HEIGHT), detail});
     char modes[STATUS_CAPACITY];
-    char volume[STATUS_CAPACITY];
-    StringBuilder builder = string_builder_make(volume, sizeof volume);
-    string_builder_append(&builder, "Vol ");
-    string_builder_append_unsigned(&builder, now_playing->status.volume);
     modes_text(&now_playing->status, modes, sizeof modes);
     if (now_playing->scrubbing) {
         StringBuilder seeking = string_builder_make(modes, sizeof modes);
         string_builder_append(&seeking, "Seeking \xC2\xB7 Play to jump");
     }
-    draw_state_icon(now_playing, canvas, (Point){area.x, area.y + (area.height - ICON_SIZE) / 2});
-    Rect modes_area = {area.x + ICON_SIZE + ICON_GAP, area.y, area.width / 2, area.height};
-    label_draw(canvas, style, (Label){.area = modes_area, .text = modes});
-    draw_right_aligned(canvas, style, area, volume);
+    label_draw(canvas, style,
+               (Label){column_area(now_playing, MODES_TOP, SMALL_LINE_HEIGHT), modes});
 }
 
 static void draw_badge_icon(Canvas *canvas, NowPlayingFeedback feedback, Rect area, Color color)
@@ -528,8 +599,9 @@ static void draw(void *context, Canvas *canvas)
     draw_badge(now_playing, canvas);
     draw_track_text(now_playing, canvas);
     draw_progress(now_playing, canvas);
+    draw_format(now_playing, canvas);
+    draw_details(now_playing, canvas);
     draw_times(now_playing, canvas);
-    draw_status(now_playing, canvas);
 }
 
 Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig config)

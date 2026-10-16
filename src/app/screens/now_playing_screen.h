@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "core/key_tracker.h"
@@ -75,6 +76,9 @@ typedef struct NowPlayingScreen {
 
 NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing);
 uint32_t now_playing_scrub_target(uint32_t position_ms, uint32_t duration_ms, int32_t delta_ms);
+const char *now_playing_codec_name(HalAudioCodec codec);
+void now_playing_stream_text(HalAudioFormat format, char *buffer, size_t capacity);
+void now_playing_detail_text(const PlayerStatus *status, char *buffer, size_t capacity);
 int now_playing_progress_width(uint32_t position_ms, uint32_t duration_ms, int width);
 NowPlayingFeedback now_playing_feedback_for(NowPlayingCommand command, PlayerState after);
 bool now_playing_feedback_visible(NowPlayingFeedback feedback, uint32_t started_ms,

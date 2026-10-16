@@ -9,6 +9,7 @@ const Theme DEFAULT_THEME = {
             .background = COLOR_RGB(16, 17, 20),
             .text = COLOR_RGB(242, 242, 245),
             .text_secondary = COLOR_RGB(142, 142, 150),
+            .text_tertiary = COLOR_RGB(98, 98, 106),
             .selection_background = COLOR_RGB(45, 108, 223),
             .selection_text = COLOR_RGB(255, 255, 255),
             .header_background = COLOR_RGB(28, 29, 34),
