@@ -6,7 +6,8 @@
 enum {
     READY_AFTER_MS = 300,
     DEVICE_EVERY_MS = 1000,
-    SCAN_LENGTH_MS = 3000
+    SCAN_LENGTH_MS = 3000,
+    CONNECT_LENGTH_MS = 1500
 };
 
 typedef struct SimDevice {
@@ -22,6 +23,7 @@ static const SimDevice DEVICES[] = {
 typedef struct SimBluetooth {
     HalBluetoothStatus status;
     uint32_t since_ms;
+    uint8_t target;
 } SimBluetooth;
 
 static SimBluetooth bluetooth;
@@ -47,6 +49,33 @@ void hal_bluetooth_scan(void)
     enter_state(HAL_BLUETOOTH_SCANNING);
 }
 
+void hal_bluetooth_connect(uint8_t index)
+{
+    HalBluetoothState state = bluetooth.status.state;
+    bool idle = state == HAL_BLUETOOTH_READY || state == HAL_BLUETOOTH_SCANNING;
+    if (!idle || index >= bluetooth.status.device_count) {
+        return;
+    }
+    bluetooth.target = index;
+    bluetooth.status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
+    enter_state(HAL_BLUETOOTH_CONNECTING);
+}
+
+void hal_bluetooth_disconnect(void)
+{
+    HalBluetoothState state = bluetooth.status.state;
+    if (state == HAL_BLUETOOTH_CONNECTED || state == HAL_BLUETOOTH_CONNECTING) {
+        enter_state(HAL_BLUETOOTH_READY);
+    }
+}
+
+static void finish_connect(void)
+{
+    bluetooth.status.pairing = HAL_BLUETOOTH_PAIRED;
+    bluetooth.status.connected = bluetooth.status.devices[bluetooth.target];
+    enter_state(HAL_BLUETOOTH_CONNECTED);
+}
+
 static void add_found_devices(uint32_t elapsed_ms)
 {
     uint32_t found = elapsed_ms / DEVICE_EVERY_MS;
@@ -65,6 +94,9 @@ void hal_bluetooth_service(void)
     if (bluetooth.status.state == HAL_BLUETOOTH_STARTING && elapsed_ms >= READY_AFTER_MS) {
         bluetooth.status.version = '5';
         enter_state(HAL_BLUETOOTH_READY);
+    } else if (bluetooth.status.state == HAL_BLUETOOTH_CONNECTING &&
+               elapsed_ms >= CONNECT_LENGTH_MS) {
+        finish_connect();
     } else if (bluetooth.status.state == HAL_BLUETOOTH_SCANNING) {
         add_found_devices(elapsed_ms);
         if (elapsed_ms >= SCAN_LENGTH_MS) {

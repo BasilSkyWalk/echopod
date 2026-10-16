@@ -12,7 +12,9 @@ enum {
     BT_MODULE_READY_TIMEOUT_MS = 5000,
     BT_MODULE_SCAN_RETRY_MS = 4000,
     BT_MODULE_SCAN_LIMIT_MS = 30000,
-    BT_MODULE_QUERY_PERIOD_MS = 3000
+    BT_MODULE_QUERY_PERIOD_MS = 3000,
+    BT_MODULE_CONNECT_RETRY_MS = 4000,
+    BT_MODULE_CONNECT_LIMIT_MS = 30000
 };
 
 typedef struct BtModuleFrame {
@@ -27,12 +29,15 @@ typedef struct BtModule {
     uint32_t last_byte_ms;
     uint32_t state_since_ms;
     uint32_t last_query_ms;
-    bool scan_answered;
-    bool scan_repeated;
+    HalBluetoothDevice target;
+    bool answered;
+    bool repeated;
 } BtModule;
 
 void bt_module_power_on(BtModule *module, uint32_t now_ms);
 void bt_module_power_off(BtModule *module);
 void bt_module_receive(BtModule *module, uint8_t byte, uint32_t now_ms);
 bool bt_module_scan(BtModule *module, uint32_t now_ms, BtModuleFrame *frame);
+bool bt_module_connect(BtModule *module, uint8_t index, uint32_t now_ms, BtModuleFrame *frame);
+bool bt_module_disconnect(BtModule *module, uint32_t now_ms, BtModuleFrame *frame);
 bool bt_module_poll(BtModule *module, uint32_t now_ms, BtModuleFrame *frame);

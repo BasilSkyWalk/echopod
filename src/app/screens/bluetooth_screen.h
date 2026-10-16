@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "hal/bluetooth.h"
 #include "ui/screen.h"
@@ -9,13 +10,14 @@
 enum {
     BLUETOOTH_SCREEN_STATUS_LINES = 3,
     BLUETOOTH_SCREEN_LINE_COUNT = BLUETOOTH_SCREEN_STATUS_LINES + HAL_BLUETOOTH_DEVICE_CAPACITY,
-    BLUETOOTH_SCREEN_LINE_CAPACITY = 48
+    BLUETOOTH_SCREEN_LINE_CAPACITY = 64
 };
 
 typedef struct BluetoothScreen {
     Screen screen;
     const Theme *theme;
     bool scanned;
+    uint8_t selected;
     char lines[BLUETOOTH_SCREEN_LINE_COUNT][BLUETOOTH_SCREEN_LINE_CAPACITY];
 } BluetoothScreen;
 

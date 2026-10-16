@@ -331,6 +331,206 @@ static void powering_off_forgets_the_session(void)
     CHECK(!poll(START_MS + 60000, &frame));
 }
 
+static void found_phones(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    bt_module_scan(&module, START_MS + 500, &frame);
+    receive_device(PHONES, "WH-1000XM4", START_MS + 1500);
+    receive_device(SPEAKER, "Kitchen", START_MS + 1500);
+    receive_text("CSEN", START_MS + 1500);
+    settle(START_MS + 1500);
+}
+
+static bool frame_is_connect(const BtModuleFrame *frame, const char *command,
+                             const uint8_t address[6])
+{
+    return frame->length == 10 && memcmp(frame->bytes, command, 4) == 0 &&
+           memcmp(frame->bytes + 4, address, 6) == 0;
+}
+
+enum {
+    CONNECT_MS = START_MS + 2000
+};
+
+static void connecting_sends_cl06_with_the_picked_address(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    CHECK(bt_module_connect(&module, 1, CONNECT_MS, &frame));
+    CHECK(frame_is_connect(&frame, "CL06", SPEAKER));
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTING, module.status.state);
+    CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
+}
+
+static void connecting_needs_a_found_device(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    CHECK(!bt_module_connect(&module, 2, CONNECT_MS, &frame));
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+}
+
+static void connecting_works_while_still_scanning(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    bt_module_scan(&module, START_MS + 500, &frame);
+    receive_device(PHONES, "WH-1000XM4", START_MS + 1500);
+    settle(START_MS + 1500);
+    CHECK(bt_module_connect(&module, 0, CONNECT_MS, &frame));
+    CHECK(frame_is_connect(&frame, "CL06", PHONES));
+}
+
+static void clok_reports_paired(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    receive_text("CLOK", CONNECT_MS + 1000);
+    settle(CONNECT_MS + 1000);
+    CHECK_EQUAL(HAL_BLUETOOTH_PAIRED, module.status.pairing);
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+}
+
+static void cler_and_cher_report_a_failed_pairing(void)
+{
+    static const char *const FAILURES[] = {"CLER", "CHER"};
+    for (int index = 0; index < 2; index++) {
+        BtModuleFrame frame;
+        found_phones();
+        bt_module_connect(&module, 0, CONNECT_MS, &frame);
+        receive_text(FAILURES[index], CONNECT_MS + 1000);
+        settle(CONNECT_MS + 1000);
+        CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_FAILED, module.status.pairing);
+        CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+    }
+}
+
+static void an_unanswered_connect_retries_once_with_ch06(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    CHECK(!poll(CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS - 1, &frame));
+    CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS, &frame));
+    CHECK(frame_is_connect(&frame, "CH06", PHONES));
+    CHECK(!poll(CONNECT_MS + 2 * BT_MODULE_CONNECT_RETRY_MS, &frame));
+}
+
+static void a_connect_without_a_result_is_cancelled_after_thirty_seconds(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    receive_text("CKKK", CONNECT_MS + 100);
+    settle(CONNECT_MS + 100);
+    CHECK(!poll(CONNECT_MS + BT_MODULE_CONNECT_LIMIT_MS - 1, &frame));
+    CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_LIMIT_MS, &frame));
+    CHECK(frame_is(&frame, "CT00"));
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+    CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_FAILED, module.status.pairing);
+}
+
+static void receive_connected(const uint8_t address[6], const char *name, uint32_t now_ms)
+{
+    size_t name_length = strlen(name);
+    size_t payload = 6 + name_length;
+    uint8_t bytes[128] = {'C', 'Q', 'O', (uint8_t)('0' + payload / 10),
+                          (uint8_t)('0' + payload % 10)};
+    memcpy(bytes + 5, address, 6);
+    memcpy(bytes + 11, name, name_length);
+    receive_bytes(bytes, 5 + payload, now_ms);
+}
+
+static void cqo_reports_the_connected_device(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    receive_text("CLOK", CONNECT_MS + 1000);
+    receive_connected(PHONES, "WH-1000XM4", CONNECT_MS + 1000);
+    settle(CONNECT_MS + 1000);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+    CHECK_EQUAL('O', module.status.link_status);
+    CHECK(memcmp(PHONES, module.status.connected.address, 6) == 0);
+    CHECK(strcmp("WH-1000XM4", module.status.connected.name) == 0);
+}
+
+static void a_long_connected_name_is_cut(void)
+{
+    power_on_ready();
+    receive_connected(PHONES, "A device name that is longer than thirty-one bytes", START_MS + 400);
+    settle(START_MS + 400);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+    CHECK(strcmp("A device name that is longer th", module.status.connected.name) == 0);
+}
+
+static void chok_connects_the_picked_device(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, 1, CONNECT_MS, &frame);
+    receive_text("CHOK", CONNECT_MS + 1000);
+    settle(CONNECT_MS + 1000);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+    CHECK_EQUAL(HAL_BLUETOOTH_PAIRED, module.status.pairing);
+    CHECK(strcmp("Kitchen", module.status.connected.name) == 0);
+}
+
+static void connected_for(uint32_t now_ms)
+{
+    power_on_ready();
+    receive_connected(PHONES, "WH-1000XM4", now_ms);
+    settle(now_ms);
+}
+
+static void a_connected_module_is_still_asked_for_its_status(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    uint32_t connected_ms = START_MS + 400 + BT_MODULE_SILENCE_MS;
+    CHECK(!poll(connected_ms + BT_MODULE_QUERY_PERIOD_MS - 1, &frame));
+    CHECK(poll(connected_ms + BT_MODULE_QUERY_PERIOD_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+}
+
+static void another_status_letter_means_the_link_dropped(void)
+{
+    connected_for(START_MS + 400);
+    receive_text("CQI", START_MS + 500);
+    settle(START_MS + 500);
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+}
+
+static void disconnecting_sends_ct00_and_ctok_confirms_it(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    CHECK(bt_module_disconnect(&module, START_MS + 500, &frame));
+    CHECK(frame_is(&frame, "CT00"));
+    receive_text("CTOK", START_MS + 600);
+    settle(START_MS + 600);
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+}
+
+static void disconnecting_needs_a_link(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    CHECK(!bt_module_disconnect(&module, START_MS + 500, &frame));
+}
+
+static void a_disconnect_cancels_a_pending_connect(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    CHECK(bt_module_disconnect(&module, START_MS + 500, &frame));
+    CHECK(frame_is(&frame, "CT00"));
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -358,6 +558,21 @@ int main(void)
         TEST_CASE(the_last_received_bytes_are_kept),
         TEST_CASE(frames_are_counted),
         TEST_CASE(powering_off_forgets_the_session),
+        TEST_CASE(connecting_sends_cl06_with_the_picked_address),
+        TEST_CASE(connecting_needs_a_found_device),
+        TEST_CASE(connecting_works_while_still_scanning),
+        TEST_CASE(clok_reports_paired),
+        TEST_CASE(cler_and_cher_report_a_failed_pairing),
+        TEST_CASE(an_unanswered_connect_retries_once_with_ch06),
+        TEST_CASE(a_connect_without_a_result_is_cancelled_after_thirty_seconds),
+        TEST_CASE(cqo_reports_the_connected_device),
+        TEST_CASE(a_long_connected_name_is_cut),
+        TEST_CASE(chok_connects_the_picked_device),
+        TEST_CASE(a_connected_module_is_still_asked_for_its_status),
+        TEST_CASE(another_status_letter_means_the_link_dropped),
+        TEST_CASE(disconnecting_sends_ct00_and_ctok_confirms_it),
+        TEST_CASE(disconnecting_needs_a_link),
+        TEST_CASE(a_disconnect_cancels_a_pending_connect),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

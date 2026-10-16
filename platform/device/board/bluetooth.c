@@ -164,6 +164,22 @@ void hal_bluetooth_scan(void)
     }
 }
 
+void hal_bluetooth_connect(uint8_t index)
+{
+    BtModuleFrame frame;
+    if (powered && bt_module_connect(&module, index, hal_clock_milliseconds(), &frame)) {
+        send(&frame);
+    }
+}
+
+void hal_bluetooth_disconnect(void)
+{
+    BtModuleFrame frame;
+    if (powered && bt_module_disconnect(&module, hal_clock_milliseconds(), &frame)) {
+        send(&frame);
+    }
+}
+
 static void note_fifo_level(void)
 {
     uint16_t level = (uint16_t)uart_read(UART_RX_LEVEL);

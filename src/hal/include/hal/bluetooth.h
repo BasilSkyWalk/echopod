@@ -15,8 +15,16 @@ typedef enum HalBluetoothState {
     HAL_BLUETOOTH_STARTING,
     HAL_BLUETOOTH_NO_REPLY,
     HAL_BLUETOOTH_READY,
-    HAL_BLUETOOTH_SCANNING
+    HAL_BLUETOOTH_SCANNING,
+    HAL_BLUETOOTH_CONNECTING,
+    HAL_BLUETOOTH_CONNECTED
 } HalBluetoothState;
+
+typedef enum HalBluetoothPairing {
+    HAL_BLUETOOTH_PAIRING_NONE,
+    HAL_BLUETOOTH_PAIRED,
+    HAL_BLUETOOTH_PAIRING_FAILED
+} HalBluetoothPairing;
 
 typedef struct HalBluetoothDevice {
     uint8_t address[HAL_BLUETOOTH_ADDRESS_SIZE];
@@ -37,6 +45,8 @@ typedef struct HalBluetoothStatus {
     HalBluetoothState state;
     char version;
     char link_status;
+    HalBluetoothPairing pairing;
+    HalBluetoothDevice connected;
     uint8_t device_count;
     HalBluetoothDevice devices[HAL_BLUETOOTH_DEVICE_CAPACITY];
     HalBluetoothLink link;
@@ -44,5 +54,7 @@ typedef struct HalBluetoothStatus {
 
 void hal_bluetooth_set_power(bool on);
 void hal_bluetooth_scan(void);
+void hal_bluetooth_connect(uint8_t index);
+void hal_bluetooth_disconnect(void);
 void hal_bluetooth_service(void);
 const HalBluetoothStatus *hal_bluetooth_status(void);
