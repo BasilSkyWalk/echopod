@@ -3,7 +3,7 @@
 #include "device/key_ladder.h"
 #include "device/key_scanner.h"
 #include "gpio.h"
-#include "hal/clock.h"
+#include "irq.h"
 #include "registers.h"
 
 #define ADC_RESULT (SARADC_BASE + 0x00u)
@@ -15,14 +15,9 @@
 #define ADC_START (1u << 4)
 #define ADC_INTERRUPT_STATUS (1u << 6)
 
-enum {
-    SCAN_PERIOD_MS = 5
-};
-
 static const GpioPin POWER_KEY = {2, 5};
 
 static KeyScanner scanner;
-static uint32_t last_scan_ms;
 static bool conversion_started;
 
 static void start_conversion(void)
@@ -46,25 +41,24 @@ void board_input_start(void)
     key_scanner_init(&scanner);
     start_conversion();
     conversion_started = true;
-    last_scan_ms = hal_clock_milliseconds();
 }
 
-void board_input_poll(void)
+void board_input_sample(uint32_t now_ms)
 {
-    uint32_t now_ms = hal_clock_milliseconds();
-    if (!conversion_started || now_ms - last_scan_ms < SCAN_PERIOD_MS) {
+    if (!conversion_started) {
         return;
     }
     uint16_t reading = (uint16_t)(register_read(ADC_RESULT) & ADC_RESULT_MASK);
     start_conversion();
-    last_scan_ms = now_ms;
     key_scanner_sample(&scanner, pressed_keys(reading), now_ms);
 }
 
 bool hal_input_next_transition(HalKeyTransition *transition)
 {
-    board_input_poll();
-    return key_scanner_next(&scanner, transition);
+    uint32_t primask = irq_save();
+    bool found = key_scanner_next(&scanner, transition);
+    irq_restore(primask);
+    return found;
 }
 
 void board_wait_for_key(void)

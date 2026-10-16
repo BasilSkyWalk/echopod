@@ -33,49 +33,27 @@ static KeyScanner armed_scanner(void)
     return scanner;
 }
 
-static void a_single_sample_soon_after_the_last_is_not_a_press(void)
+static void a_single_sample_is_not_a_press(void)
 {
     KeyScanner scanner = armed_scanner();
-    key_scanner_sample(&scanner, PLAY, 10);
+    key_scanner_sample(&scanner, PLAY, 100);
     check_empty(&scanner);
 }
 
 static void two_matching_samples_are_a_press_at_the_second_sample(void)
 {
     KeyScanner scanner = armed_scanner();
-    sample_twice(&scanner, PLAY, 10);
-    check_next(&scanner, KEY_PLAY, true, 15);
+    sample_twice(&scanner, PLAY, 100);
+    check_next(&scanner, KEY_PLAY, true, 105);
     check_empty(&scanner);
 }
 
 static void a_bounce_between_samples_is_ignored(void)
 {
     KeyScanner scanner = armed_scanner();
-    key_scanner_sample(&scanner, PLAY, 10);
-    key_scanner_sample(&scanner, 0, 15);
-    key_scanner_sample(&scanner, PLAY, 20);
-    check_empty(&scanner);
-}
-
-static void a_lone_sample_after_a_quiet_gap_counts(void)
-{
-    KeyScanner scanner = armed_scanner();
-    key_scanner_sample(&scanner, PLAY, 5 + KEY_SCANNER_SETTLED_GAP_MS);
-    check_next(&scanner, KEY_PLAY, true, 5 + KEY_SCANNER_SETTLED_GAP_MS);
-    check_empty(&scanner);
-}
-
-static void quick_taps_sampled_sparsely_stay_separate(void)
-{
-    KeyScanner scanner = armed_scanner();
     key_scanner_sample(&scanner, PLAY, 100);
-    key_scanner_sample(&scanner, 0, 130);
-    key_scanner_sample(&scanner, PLAY, 160);
-    key_scanner_sample(&scanner, 0, 190);
-    check_next(&scanner, KEY_PLAY, true, 100);
-    check_next(&scanner, KEY_PLAY, false, 130);
-    check_next(&scanner, KEY_PLAY, true, 160);
-    check_next(&scanner, KEY_PLAY, false, 190);
+    key_scanner_sample(&scanner, 0, 105);
+    key_scanner_sample(&scanner, PLAY, 110);
     check_empty(&scanner);
 }
 
@@ -84,8 +62,8 @@ static void a_release_follows_a_press(void)
     KeyScanner scanner = armed_scanner();
     sample_twice(&scanner, PLAY, 100);
     sample_twice(&scanner, 0, 200);
-    check_next(&scanner, KEY_PLAY, true, 100);
-    check_next(&scanner, KEY_PLAY, false, 200);
+    check_next(&scanner, KEY_PLAY, true, 105);
+    check_next(&scanner, KEY_PLAY, false, 205);
 }
 
 static void a_held_key_reports_one_press(void)
@@ -93,7 +71,7 @@ static void a_held_key_reports_one_press(void)
     KeyScanner scanner = armed_scanner();
     sample_twice(&scanner, PLAY, 100);
     sample_twice(&scanner, PLAY, 200);
-    check_next(&scanner, KEY_PLAY, true, 100);
+    check_next(&scanner, KEY_PLAY, true, 105);
     check_empty(&scanner);
 }
 
@@ -102,9 +80,9 @@ static void switching_ladder_keys_releases_the_old_key_first(void)
     KeyScanner scanner = armed_scanner();
     sample_twice(&scanner, PLAY, 100);
     sample_twice(&scanner, 1u << KEY_MENU, 200);
-    check_next(&scanner, KEY_PLAY, true, 100);
-    check_next(&scanner, KEY_PLAY, false, 200);
-    check_next(&scanner, KEY_MENU, true, 200);
+    check_next(&scanner, KEY_PLAY, true, 105);
+    check_next(&scanner, KEY_PLAY, false, 205);
+    check_next(&scanner, KEY_MENU, true, 205);
 }
 
 static void power_held_from_switch_on_is_ignored_until_released(void)
@@ -117,7 +95,7 @@ static void power_held_from_switch_on_is_ignored_until_released(void)
     sample_twice(&scanner, 0, 1000);
     check_empty(&scanner);
     sample_twice(&scanner, POWER, 2000);
-    check_next(&scanner, KEY_POWER, true, 2000);
+    check_next(&scanner, KEY_POWER, true, 2005);
 }
 
 static void ladder_keys_work_while_the_switch_on_power_press_is_held(void)
@@ -144,14 +122,26 @@ static void a_full_queue_drops_new_transitions(void)
     check_empty(&scanner);
 }
 
+static void a_reading_passing_through_another_key_on_release_is_not_a_press(void)
+{
+    KeyScanner scanner = armed_scanner();
+    const uint8_t volume = 1u << KEY_VOLUME_UP;
+    sample_twice(&scanner, volume, 100);
+    key_scanner_sample(&scanner, PLAY, 400);
+    key_scanner_sample(&scanner, 0, 405);
+    key_scanner_sample(&scanner, 0, 410);
+    check_next(&scanner, KEY_VOLUME_UP, true, 105);
+    check_next(&scanner, KEY_VOLUME_UP, false, 410);
+    check_empty(&scanner);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(a_single_sample_soon_after_the_last_is_not_a_press),
+        TEST_CASE(a_single_sample_is_not_a_press),
         TEST_CASE(two_matching_samples_are_a_press_at_the_second_sample),
         TEST_CASE(a_bounce_between_samples_is_ignored),
-        TEST_CASE(a_lone_sample_after_a_quiet_gap_counts),
-        TEST_CASE(quick_taps_sampled_sparsely_stay_separate),
+        TEST_CASE(a_reading_passing_through_another_key_on_release_is_not_a_press),
         TEST_CASE(a_release_follows_a_press),
         TEST_CASE(a_held_key_reports_one_press),
         TEST_CASE(switching_ladder_keys_releases_the_old_key_first),

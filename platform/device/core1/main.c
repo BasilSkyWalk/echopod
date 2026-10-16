@@ -6,6 +6,7 @@
 #include "device/core1_control.h"
 #include "device/tick_clock.h"
 #include "hal/system.h"
+#include "loop_bench.h"
 #include "registers.h"
 
 #define SYSTICK_ENABLE_CORE_CLOCK 0x5u
@@ -26,6 +27,16 @@ static void start_systick(void)
 static uint32_t ticks_since(uint32_t start)
 {
     return (start - register_read(SYSTICK_CURRENT)) & TICK_CLOCK_COUNTER_MASK;
+}
+
+uint32_t loop_bench_now(void)
+{
+    return register_read(SYSTICK_CURRENT);
+}
+
+uint32_t loop_bench_since(uint32_t start)
+{
+    return ticks_since(start);
 }
 
 static bool read_input(void *context, uint32_t offset, void *buffer, uint32_t length)

@@ -57,7 +57,6 @@ static uint32_t output_started_us;
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
     const HalFile *open = context;
-    board_input_poll();
     uint32_t started_us = hal_clock_microseconds();
     bool read = hal_file_read(*open, offset, buffer, length);
     uint32_t read_us = hal_clock_microseconds() - started_us;

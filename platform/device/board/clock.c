@@ -1,40 +1,84 @@
 #include "hal/clock.h"
 #include "board.h"
 #include "device/tick_clock.h"
+#include "hal/system.h"
+#include "irq.h"
+#include "loop_bench.h"
 #include "registers.h"
 
-#define SYSTICK_ENABLE_CORE_CLOCK 0x5u
+#define SYSTICK_ENABLE_INTERRUPT_CORE_CLOCK 0x7u
+
+enum {
+    MICROSECONDS_PER_PERIOD = 1000,
+    PERIODS_PER_KEY_SCAN = 5
+};
 
 static TickClock clock;
+static uint32_t periods_since_scan;
+
+static uint32_t period_of(uint32_t ticks_per_microsecond)
+{
+    return ticks_per_microsecond * MICROSECONDS_PER_PERIOD;
+}
 
 void board_clock_start(void)
 {
-    register_write(SYSTICK_RELOAD, TICK_CLOCK_COUNTER_MASK);
+    uint32_t ticks_per_microsecond = board_boot_ticks_per_microsecond();
+    uint32_t period = period_of(ticks_per_microsecond);
+    register_write(SYSTICK_CTRL, 0);
+    register_write(SYSTICK_RELOAD, period - 1);
     register_write(SYSTICK_CURRENT, 0);
-    register_write(SYSTICK_CTRL, SYSTICK_ENABLE_CORE_CLOCK);
-    tick_clock_init(&clock, board_boot_ticks_per_microsecond(), register_read(SYSTICK_CURRENT));
+    tick_clock_init(&clock, ticks_per_microsecond, period, period - 1);
+    register_write(SYSTICK_CTRL, SYSTICK_ENABLE_INTERRUPT_CORE_CLOCK);
+    irq_enable();
 }
 
 void board_clock_set_rate(uint32_t ticks_per_microsecond)
 {
-    tick_clock_set_rate(&clock, ticks_per_microsecond, register_read(SYSTICK_CURRENT));
+    uint32_t primask = irq_save();
+    uint32_t period = period_of(ticks_per_microsecond);
+    tick_clock_set_rate(&clock, ticks_per_microsecond, period, register_read(SYSTICK_CURRENT));
+    register_write(SYSTICK_RELOAD, period - 1);
+    register_write(SYSTICK_CURRENT, 0);
+    irq_restore(primask);
 }
 
-static void update(void)
+void board_systick_handler(void)
 {
     tick_clock_update(&clock, register_read(SYSTICK_CURRENT));
+    periods_since_scan++;
+    if (periods_since_scan >= PERIODS_PER_KEY_SCAN) {
+        periods_since_scan = 0;
+        board_input_sample(tick_clock_milliseconds(&clock));
+    }
 }
 
 uint32_t hal_clock_milliseconds(void)
 {
-    update();
-    return tick_clock_milliseconds(&clock);
+    uint32_t primask = irq_save();
+    tick_clock_update(&clock, register_read(SYSTICK_CURRENT));
+    uint32_t milliseconds = tick_clock_milliseconds(&clock);
+    irq_restore(primask);
+    return milliseconds;
 }
 
 uint32_t hal_clock_microseconds(void)
 {
-    update();
-    return tick_clock_microseconds(&clock);
+    uint32_t primask = irq_save();
+    tick_clock_update(&clock, register_read(SYSTICK_CURRENT));
+    uint32_t microseconds = tick_clock_microseconds(&clock);
+    irq_restore(primask);
+    return microseconds;
+}
+
+uint32_t loop_bench_now(void)
+{
+    return hal_clock_microseconds();
+}
+
+uint32_t loop_bench_since(uint32_t start)
+{
+    return (hal_clock_microseconds() - start) * hal_system_clock_mhz();
 }
 
 void board_delay_ms(uint32_t milliseconds)

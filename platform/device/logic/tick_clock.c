@@ -4,16 +4,18 @@ enum {
     MICROSECONDS_PER_MILLISECOND = 1000
 };
 
-void tick_clock_init(TickClock *clock, uint32_t ticks_per_microsecond, uint32_t counter)
+void tick_clock_init(TickClock *clock, uint32_t ticks_per_microsecond, uint32_t period,
+                     uint32_t counter)
 {
     *clock = (TickClock){.ticks_per_microsecond = ticks_per_microsecond,
-                         .last_counter = counter & TICK_CLOCK_COUNTER_MASK};
+                         .period = period,
+                         .last_counter = counter % period};
 }
 
 void tick_clock_update(TickClock *clock, uint32_t counter)
 {
-    uint32_t now = counter & TICK_CLOCK_COUNTER_MASK;
-    uint32_t elapsed = (clock->last_counter - now) & TICK_CLOCK_COUNTER_MASK;
+    uint32_t now = counter % clock->period;
+    uint32_t elapsed = (clock->last_counter + clock->period - now) % clock->period;
     uint32_t ticks_per_millisecond = clock->ticks_per_microsecond * MICROSECONDS_PER_MILLISECOND;
     clock->last_counter = now;
     clock->microsecond_ticks += elapsed;
@@ -24,10 +26,13 @@ void tick_clock_update(TickClock *clock, uint32_t counter)
     clock->millisecond_ticks %= ticks_per_millisecond;
 }
 
-void tick_clock_set_rate(TickClock *clock, uint32_t ticks_per_microsecond, uint32_t counter)
+void tick_clock_set_rate(TickClock *clock, uint32_t ticks_per_microsecond, uint32_t period,
+                         uint32_t counter)
 {
     tick_clock_update(clock, counter);
     clock->ticks_per_microsecond = ticks_per_microsecond;
+    clock->period = period;
+    clock->last_counter = period - 1;
     clock->microsecond_ticks = 0;
     clock->millisecond_ticks = 0;
 }

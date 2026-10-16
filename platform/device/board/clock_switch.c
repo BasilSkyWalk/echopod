@@ -6,6 +6,7 @@
 #include "dmac.h"
 #include "hal/clock.h"
 #include "hal/system.h"
+#include "irq.h"
 #include "registers.h"
 
 #define PLL_CON0 (CRU_BASE + 0x00u)
@@ -179,7 +180,9 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     }
     board_audio_before_clock_change();
     dmac_suspend();
+    uint32_t primask = irq_save();
     bool switched = switch_clock(mhz);
+    irq_restore(primask);
     dmac_resume();
     board_audio_after_clock_change();
     return switched;

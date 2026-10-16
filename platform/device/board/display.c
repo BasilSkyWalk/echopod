@@ -129,10 +129,8 @@ void board_display_start(void)
 
 void hal_display_write(int x, int y, int width, int height, const uint16_t *pixels)
 {
-    board_input_poll();
     panel_begin_write(&BUS, (PanelWindow){x, y, width, height});
     bus_pixels(NULL, pixels, (uint32_t)(width * height));
-    board_input_poll();
 }
 
 void hal_display_present(void)
