@@ -69,6 +69,40 @@ static void draw_column(Canvas *canvas, Column column, const Image *image, int q
     }
 }
 
+static unsigned light_at(QuadLight light, Column column, int quad_width)
+{
+    return (unsigned)interpolate(light.left, light.right, column.offset, quad_width);
+}
+
+static void draw_lit_column(Canvas *canvas, Column column, const Image *image, int quad_width,
+                            unsigned light)
+{
+    Rect clip = canvas->clip;
+    int first = max_of(column.top, clip.y);
+    int last = min_of(column.top + column.height, clip.y + clip.height);
+    const Color *source_column = &image->pixels[column.offset * image->width / quad_width];
+    for (int y = first; y < last; y++) {
+        int row = (y - column.top) * image->height / column.height;
+        *pixel_address(canvas, column.x, y) = color_scale(source_column[row * image->width], light);
+    }
+}
+
+static void draw_reflected_column(Canvas *canvas, Column column, const Image *image, int quad_width,
+                                  unsigned light, int rows)
+{
+    Rect clip = canvas->clip;
+    int top = column.top + column.height;
+    int first = max_of(top, clip.y);
+    int last = min_of(top + rows, clip.y + clip.height);
+    const Color *source_column = &image->pixels[column.offset * image->width / quad_width];
+    for (int y = first; y < last; y++) {
+        int step = y - top;
+        int row = max_of(image->height - 1 - step * image->height / column.height, 0);
+        unsigned faded = light * (unsigned)(rows - step) / (unsigned)rows;
+        *pixel_address(canvas, column.x, y) = color_scale(source_column[row * image->width], faded);
+    }
+}
+
 static void fill_column(Canvas *canvas, Column column, Color color)
 {
     Rect clip = canvas->clip;
@@ -98,6 +132,43 @@ void image_draw_quad(Canvas *canvas, Image image, Quad quad)
         Column column = column_at(quad, x);
         if (column.height > 0) {
             draw_column(canvas, column, &image, quad.width);
+        }
+    }
+}
+
+void image_draw_quad_lit(Canvas *canvas, Image image, Quad quad, QuadLight light)
+{
+    if (light.left >= COLOR_LIGHT_FULL && light.right >= COLOR_LIGHT_FULL) {
+        image_draw_quad(canvas, image, quad);
+        return;
+    }
+    int first = 0;
+    int last = 0;
+    if (image.width <= 0 || image.height <= 0 || !quad_visible(canvas, quad, &first, &last)) {
+        return;
+    }
+    for (int x = first; x < last; x++) {
+        Column column = column_at(quad, x);
+        if (column.height > 0) {
+            draw_lit_column(canvas, column, &image, quad.width,
+                            light_at(light, column, quad.width));
+        }
+    }
+}
+
+void image_draw_reflection(Canvas *canvas, Image image, Quad quad, QuadLight light, int rows)
+{
+    int first = 0;
+    int last = 0;
+    if (rows <= 0 || image.width <= 0 || image.height <= 0 ||
+        !quad_visible(canvas, quad, &first, &last)) {
+        return;
+    }
+    for (int x = first; x < last; x++) {
+        Column column = column_at(quad, x);
+        if (column.height > 0) {
+            draw_reflected_column(canvas, column, &image, quad.width,
+                                  light_at(light, column, quad.width), rows);
         }
     }
 }

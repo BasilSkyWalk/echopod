@@ -15,6 +15,8 @@ static const CoverFlowLayout LAYOUT = {
     .side_width = 40,
     .side_near_height = 80,
     .side_far_height = 60,
+    .side_near_light = 240,
+    .side_far_light = 140,
 };
 
 static int abs_of(int value)
@@ -67,6 +69,30 @@ static void a_cover_on_its_way_shrinks_smoothly(void)
     CHECK(half.left_height > half.right_height);
 }
 
+static void the_centre_cover_is_fully_lit(void)
+{
+    QuadLight light = cover_flow_light(&LAYOUT, 0);
+    CHECK_EQUAL(COLOR_LIGHT_FULL, light.left);
+    CHECK_EQUAL(COLOR_LIGHT_FULL, light.right);
+}
+
+static void side_covers_darken_away_from_the_centre(void)
+{
+    QuadLight right = cover_flow_light(&LAYOUT, ONE);
+    CHECK_EQUAL(240, right.left);
+    CHECK_EQUAL(140, right.right);
+    QuadLight left = cover_flow_light(&LAYOUT, -2 * ONE);
+    CHECK_EQUAL(140, left.left);
+    CHECK_EQUAL(240, left.right);
+}
+
+static void light_fades_smoothly_as_a_cover_leaves_the_centre(void)
+{
+    QuadLight half = cover_flow_light(&LAYOUT, ONE / 2);
+    CHECK(half.left < COLOR_LIGHT_FULL && half.left > 240);
+    CHECK(half.right < COLOR_LIGHT_FULL && half.right > 140);
+}
+
 static void the_position_never_overshoots_and_arrives(void)
 {
     int32_t position = 0;
@@ -116,6 +142,9 @@ static void only_existing_albums_are_drawn(void)
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_centre_cover_is_fully_lit),
+        TEST_CASE(side_covers_darken_away_from_the_centre),
+        TEST_CASE(light_fades_smoothly_as_a_cover_leaves_the_centre),
         TEST_CASE(the_centre_cover_is_flat_and_full_size),
         TEST_CASE(a_cover_to_the_right_faces_the_centre),
         TEST_CASE(a_cover_to_the_left_is_mirrored),

@@ -57,3 +57,16 @@ Color color_blend(Color background, Color foreground, uint8_t alpha)
         .blue = mix(back.blue, fore.blue, weight),
     });
 }
+
+Color color_scale(Color color, unsigned light)
+{
+    if (light >= COLOR_LIGHT_FULL) {
+        return color;
+    }
+    Channels channels = split(color);
+    return join((Channels){
+        .red = channels.red * light >> COLOR_LIGHT_SHIFT,
+        .green = channels.green * light >> COLOR_LIGHT_SHIFT,
+        .blue = channels.blue * light >> COLOR_LIGHT_SHIFT,
+    });
+}

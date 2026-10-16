@@ -7,9 +7,10 @@
 #include "hal/storage.h"
 #include "library/covers.h"
 #include "library/library.h"
+#include "ui/cover_flow.h"
 
 enum {
-    COVER_CACHE_SLOTS = 7
+    COVER_CACHE_SLOTS = COVER_FLOW_MAX_VISIBLE
 };
 
 typedef enum CoverState {

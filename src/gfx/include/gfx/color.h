@@ -3,7 +3,9 @@
 #include <stdint.h>
 
 enum {
-    COLOR_ALPHA_OPAQUE = 15
+    COLOR_ALPHA_OPAQUE = 15,
+    COLOR_LIGHT_SHIFT = 8,
+    COLOR_LIGHT_FULL = 1 << COLOR_LIGHT_SHIFT
 };
 
 typedef uint16_t Color;
@@ -13,3 +15,4 @@ typedef uint16_t Color;
 
 Color color_from_rgb(uint8_t red, uint8_t green, uint8_t blue);
 Color color_blend(Color background, Color foreground, uint8_t alpha);
+Color color_scale(Color color, unsigned light);

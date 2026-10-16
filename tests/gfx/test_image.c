@@ -167,6 +167,47 @@ static void an_empty_quad_draws_nothing(void)
     }
 }
 
+static const Color WHITE_PIXELS[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+static const Image WHITE = {.pixels = WHITE_PIXELS, .width = 2, .height = 2};
+
+static void full_light_draws_the_image_unchanged(void)
+{
+    Canvas canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
+    image_draw_quad_lit(&canvas, TWO_BY_TWO, flat(3, 4, 2, 2),
+                        (QuadLight){COLOR_LIGHT_FULL, COLOR_LIGHT_FULL});
+    CHECK_EQUAL(0x1000, canvas_pixel_at(&canvas, 3, 4));
+    CHECK_EQUAL(0x4000, canvas_pixel_at(&canvas, 4, 5));
+}
+
+static void light_runs_from_the_left_edge_to_the_right(void)
+{
+    Canvas canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
+    image_draw_quad_lit(&canvas, WHITE, flat(0, 0, 4, 2), (QuadLight){0, COLOR_LIGHT_FULL});
+    CHECK_EQUAL(0x0000, canvas_pixel_at(&canvas, 0, 0));
+    CHECK_EQUAL(color_scale(0xFFFF, COLOR_LIGHT_FULL / 2), canvas_pixel_at(&canvas, 2, 0));
+    CHECK_EQUAL(color_scale(0xFFFF, COLOR_LIGHT_FULL * 3 / 4), canvas_pixel_at(&canvas, 3, 1));
+}
+
+static void a_reflection_mirrors_the_image_below_and_fades(void)
+{
+    Canvas canvas = make_canvas((Rect){0, 0, WIDTH, HEIGHT});
+    QuadLight light = {COLOR_LIGHT_FULL, COLOR_LIGHT_FULL};
+    image_draw_reflection(&canvas, TWO_BY_TWO, flat(3, 2, 2, 2), light, 2);
+    CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 3, 3));
+    CHECK_EQUAL(0x3000, canvas_pixel_at(&canvas, 3, 4));
+    CHECK_EQUAL(0x4000, canvas_pixel_at(&canvas, 4, 4));
+    CHECK_EQUAL(color_scale(0x1000, COLOR_LIGHT_FULL / 2), canvas_pixel_at(&canvas, 3, 5));
+    CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 3, 6));
+}
+
+static void a_reflection_stays_inside_the_clip(void)
+{
+    Canvas canvas = make_canvas((Rect){0, 0, WIDTH, 5});
+    image_draw_reflection(&canvas, TWO_BY_TWO, flat(3, 2, 2, 2),
+                          (QuadLight){COLOR_LIGHT_FULL, COLOR_LIGHT_FULL}, 4);
+    CHECK_EQUAL(0x3000, canvas_pixel_at(&canvas, 3, 4));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -177,6 +218,10 @@ int main(void)
         TEST_CASE(drawing_stays_inside_the_clip),
         TEST_CASE(a_quad_can_be_filled_with_a_color),
         TEST_CASE(an_empty_quad_draws_nothing),
+        TEST_CASE(full_light_draws_the_image_unchanged),
+        TEST_CASE(light_runs_from_the_left_edge_to_the_right),
+        TEST_CASE(a_reflection_mirrors_the_image_below_and_fades),
+        TEST_CASE(a_reflection_stays_inside_the_clip),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

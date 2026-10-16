@@ -46,9 +46,28 @@ static void the_constant_macro_matches_the_function(void)
     CHECK_EQUAL(color_from_rgb(255, 128, 1), COLOR_RGB(255, 128, 1));
 }
 
+static void full_light_keeps_the_color(void)
+{
+    CHECK_EQUAL(0xFFFF, color_scale(0xFFFF, COLOR_LIGHT_FULL));
+    CHECK_EQUAL(0x1234, color_scale(0x1234, COLOR_LIGHT_FULL));
+}
+
+static void no_light_is_black(void)
+{
+    CHECK_EQUAL(0x0000, color_scale(0xFFFF, 0));
+}
+
+static void half_light_halves_each_channel(void)
+{
+    CHECK_EQUAL(COLOR_RGB(120, 64, 32), color_scale(COLOR_RGB(255, 128, 64), COLOR_LIGHT_FULL / 2));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(full_light_keeps_the_color),
+        TEST_CASE(no_light_is_black),
+        TEST_CASE(half_light_halves_each_channel),
         TEST_CASE(white_sets_every_bit),
         TEST_CASE(black_is_zero),
         TEST_CASE(primaries_fill_their_rgb565_fields),

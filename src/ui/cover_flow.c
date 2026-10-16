@@ -58,6 +58,15 @@ Quad cover_flow_quad(const CoverFlowLayout *layout, int32_t relative)
     };
 }
 
+QuadLight cover_flow_light(const CoverFlowLayout *layout, int32_t relative)
+{
+    int32_t distance = abs_of(relative);
+    distance = distance > COVER_FLOW_ONE ? COVER_FLOW_ONE : distance;
+    uint16_t near = (uint16_t)lerp(COLOR_LIGHT_FULL, layout->side_near_light, distance);
+    uint16_t far = (uint16_t)lerp(COLOR_LIGHT_FULL, layout->side_far_light, distance);
+    return relative > 0 ? (QuadLight){near, far} : (QuadLight){far, near};
+}
+
 int32_t cover_flow_approach(int32_t position, int32_t target, uint32_t elapsed_ms)
 {
     int32_t difference = target - position;

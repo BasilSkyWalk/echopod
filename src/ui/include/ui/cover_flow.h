@@ -19,8 +19,11 @@ typedef struct CoverFlowLayout {
     int side_width;
     int side_near_height;
     int side_far_height;
+    uint16_t side_near_light;
+    uint16_t side_far_light;
 } CoverFlowLayout;
 
 Quad cover_flow_quad(const CoverFlowLayout *layout, int32_t relative);
+QuadLight cover_flow_light(const CoverFlowLayout *layout, int32_t relative);
 int32_t cover_flow_approach(int32_t position, int32_t target, uint32_t elapsed_ms);
 int cover_flow_draw_order(int32_t position, int count, int *albums);

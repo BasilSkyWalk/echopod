@@ -13,19 +13,26 @@ enum {
     TITLE_TOP = 126,
     ARTIST_TOP = 148,
     LINE_HEIGHT = 20,
-    PLACEHOLDER_REACH = 3 * COVER_FLOW_ONE
+    PLACEHOLDER_REACH = 3 * COVER_FLOW_ONE,
+    REFLECTION_ROWS = 34,
+    REFLECTION_LIGHT = 80,
+    FLOOR_LEVEL = 16
 };
 
 static const CoverFlowLayout LAYOUT = {
     .center_x = 160,
     .center_top = 8,
     .center_size = COVER_FULL_SIZE,
-    .side_offset = 84,
-    .side_spacing = 32,
-    .side_width = 42,
-    .side_near_height = 84,
-    .side_far_height = 64,
+    .side_offset = 86,
+    .side_spacing = 24,
+    .side_width = 44,
+    .side_near_height = 104,
+    .side_far_height = 78,
+    .side_near_light = 230,
+    .side_far_light = 140,
 };
+
+static const Color BACKDROP = COLOR_RGB(0, 0, 0);
 
 static const char STAR_PREFIX[] = "\xE2\x98\x85 ";
 static const char EMPTY_MESSAGE[] = "Nothing here";
@@ -234,7 +241,11 @@ static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position
     Quad quad = cover_flow_quad(&LAYOUT, relative);
     Image image;
     if (cover_image(flow, position, &image)) {
-        image_draw_quad(canvas, image, quad);
+        QuadLight light = cover_flow_light(&LAYOUT, relative);
+        image_draw_quad_lit(canvas, image, quad, light);
+        QuadLight reflected = {(uint16_t)(light.left * REFLECTION_LIGHT / COLOR_LIGHT_FULL),
+                               (uint16_t)(light.right * REFLECTION_LIGHT / COLOR_LIGHT_FULL)};
+        image_draw_reflection(canvas, image, quad, reflected, REFLECTION_ROWS);
     } else if (relative <= PLACEHOLDER_REACH && relative >= -PLACEHOLDER_REACH) {
         image_fill_quad(canvas, quad, flow->config.theme->colors.divider);
     }
@@ -274,9 +285,22 @@ static void draw_empty(const Theme *theme, Canvas *canvas)
                (Label){label_centered_area(style.font, screen, EMPTY_MESSAGE), EMPTY_MESSAGE});
 }
 
+static void draw_backdrop(const Theme *theme, Canvas *canvas)
+{
+    int floor = LAYOUT.center_top + LAYOUT.center_size;
+    int height = theme->metrics.screen_height;
+    canvas_fill_rect(canvas, (Rect){0, 0, theme->metrics.screen_width, floor}, BACKDROP);
+    for (int y = floor; y < height; y++) {
+        uint8_t level = (uint8_t)(FLOOR_LEVEL * (height - y) / (height - floor));
+        canvas_fill_rect(canvas, (Rect){0, y, theme->metrics.screen_width, 1},
+                         color_from_rgb(level, level, level));
+    }
+}
+
 static void draw(void *context, Canvas *canvas)
 {
     const CoverFlowScreen *flow = context;
+    draw_backdrop(flow->config.theme, canvas);
     if (flow->count == 0) {
         draw_empty(flow->config.theme, canvas);
         return;
