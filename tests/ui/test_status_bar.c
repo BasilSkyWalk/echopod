@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "check.h"
 #include "ui/header.h"
 #include "ui/status_bar.h"
@@ -101,9 +103,52 @@ static void a_charging_battery_is_drawn_in_the_success_color(void)
     CHECK(!ui_test_area_has_color(&canvas, battery, theme.colors.danger));
 }
 
+static void the_percentage_reads_as_a_number_and_a_percent_sign(void)
+{
+    char text[STATUS_BAR_PERCENT_CAPACITY];
+    status_bar_percent_text(73, text, sizeof text);
+    CHECK(strcmp("73%", text) == 0);
+    status_bar_percent_text(100, text, sizeof text);
+    CHECK(strcmp("100%", text) == 0);
+    status_bar_percent_text(0, text, sizeof text);
+    CHECK(strcmp("0%", text) == 0);
+}
+
+static void the_percentage_sits_just_left_of_the_battery(void)
+{
+    Theme theme = status_theme();
+    Rect battery = status_bar_battery_area(&theme);
+    Rect percent = status_bar_percent_area(&theme, "73%");
+    CHECK(percent.width > 0);
+    CHECK(percent.x + percent.width < battery.x);
+    CHECK(percent.x + percent.width >= battery.x - theme.metrics.padding);
+}
+
+static void a_known_battery_shows_its_percentage(void)
+{
+    Theme theme = status_theme();
+    Canvas canvas = draw_status(&theme, battery_at(HALF_BATTERY, false));
+    Rect percent = status_bar_percent_area(&theme, "50%");
+    CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
+}
+
+static void an_unknown_battery_shows_no_percentage(void)
+{
+    Theme theme = status_theme();
+    StatusBarState state = battery_at(HALF_BATTERY, false);
+    state.battery_known = false;
+    Canvas canvas = draw_status(&theme, state);
+    Rect percent = status_bar_percent_area(&theme, "50%");
+    CHECK(ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_percentage_reads_as_a_number_and_a_percent_sign),
+        TEST_CASE(the_percentage_sits_just_left_of_the_battery),
+        TEST_CASE(a_known_battery_shows_its_percentage),
+        TEST_CASE(an_unknown_battery_shows_no_percentage),
         TEST_CASE(an_idle_player_without_a_battery_reading_draws_nothing),
         TEST_CASE(a_playing_player_shows_the_play_icon_at_the_left),
         TEST_CASE(a_paused_player_shows_two_bars),

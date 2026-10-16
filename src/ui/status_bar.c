@@ -1,6 +1,9 @@
 #include "ui/status_bar.h"
 
+#include "core/string_builder.h"
+#include "gfx/text.h"
 #include "ui/icons.h"
+#include "ui/label.h"
 
 enum {
     BORDER = 1,
@@ -38,6 +41,35 @@ int status_bar_battery_fill_width(uint8_t percent, int inner_width)
     int clamped = percent < FULL_PERCENT ? percent : FULL_PERCENT;
     int width = clamped * inner_width / FULL_PERCENT;
     return clamped > 0 && width == 0 ? 1 : width;
+}
+
+void status_bar_percent_text(uint8_t percent, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append_unsigned(&builder, percent < FULL_PERCENT ? percent : FULL_PERCENT);
+    string_builder_append_char(&builder, '%');
+}
+
+static int percent_gap(const Theme *theme)
+{
+    return theme->metrics.padding / 2 > 0 ? theme->metrics.padding / 2 : 1;
+}
+
+Rect status_bar_percent_area(const Theme *theme, const char *text)
+{
+    Rect battery = status_bar_battery_area(theme);
+    int width = text_width(theme->fonts.small, text);
+    return (Rect){battery.x - percent_gap(theme) - width, battery.y, width, battery.height};
+}
+
+static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent)
+{
+    char text[STATUS_BAR_PERCENT_CAPACITY];
+    status_bar_percent_text(percent, text, sizeof text);
+    Rect area = status_bar_percent_area(theme, text);
+    TextStyle style = {.font = theme->fonts.small, .color = theme->colors.header_text};
+    label_draw(canvas, style,
+               (Label){.area = label_centered_area(style.font, area, text), .text = text});
 }
 
 static Color fill_color(const Theme *theme, StatusBarState state)
@@ -86,5 +118,6 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
     }
     if (state.battery_known) {
         draw_battery(canvas, theme, state);
+        draw_percent(canvas, theme, state.battery_percent);
     }
 }
