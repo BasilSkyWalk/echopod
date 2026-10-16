@@ -220,6 +220,33 @@ static void start_checks_the_command_and_the_ready_word(void)
     CHECK_EQUAL(CORE1_BAD_REPLY, core1_start(&BUS, IMAGE, sizeof IMAGE));
 }
 
+static void load_leaves_core_1_held_until_run(void)
+{
+    reset_fake();
+    CHECK_EQUAL(CORE1_OK, core1_load(&BUS, IMAGE, sizeof IMAGE));
+    CHECK(!fake.core1_running);
+    CHECK(index_of_write(CORE1_RUN_RESET, 0x00040000u, 0) < 0);
+    CHECK_EQUAL(CORE1_OK, core1_run(&BUS, 200));
+    CHECK(fake.core1_running);
+}
+
+static void run_waits_as_long_as_asked(void)
+{
+    reset_fake();
+    fake.core1_replies = false;
+    CHECK_EQUAL(CORE1_OK, core1_load(&BUS, IMAGE, sizeof IMAGE));
+    uint32_t before = fake.now_ms;
+    CHECK_EQUAL(CORE1_NO_REPLY, core1_run(&BUS, 3000));
+    CHECK(fake.now_ms - before >= 3000u);
+}
+
+static void an_image_larger_than_core_1_code_ram_is_refused(void)
+{
+    reset_fake();
+    CHECK_EQUAL(CORE1_TOO_BIG, core1_load(&BUS, IMAGE, CORE1_CODE_BYTES + 4u));
+    CHECK_EQUAL(0, fake.count);
+}
+
 static void stop_holds_core_1_and_powers_the_domain_down(void)
 {
     reset_fake();
@@ -258,6 +285,9 @@ int main(void)
         TEST_CASE(start_copies_the_image_while_core_1_is_held),
         TEST_CASE(start_reports_no_reply_after_200_ms),
         TEST_CASE(start_checks_the_command_and_the_ready_word),
+        TEST_CASE(load_leaves_core_1_held_until_run),
+        TEST_CASE(run_waits_as_long_as_asked),
+        TEST_CASE(an_image_larger_than_core_1_code_ram_is_refused),
         TEST_CASE(stop_holds_core_1_and_powers_the_domain_down),
         TEST_CASE(stop_reports_a_domain_that_stays_on),
     };

@@ -393,3 +393,8 @@ HalDmaToneStatus hal_audio_dma_tone_status(void)
     uint32_t position = dma_loop_position(dmac_source(), ring_address(), ring_words);
     return (HalDmaToneStatus){.running = dmac_running(), .position = position};
 }
+
+const char *board_audio_current_path(void)
+{
+    return engine_ready ? audio_engine_current_path(&engine) : NULL;
+}

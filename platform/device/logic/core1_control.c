@@ -129,11 +129,11 @@ static void clear_shared(const Core1Bus *bus)
     }
 }
 
-static bool wait_for_reply(const Core1Bus *bus)
+static bool wait_for_reply(const Core1Bus *bus, uint32_t timeout_ms)
 {
     uint32_t start = bus->now_ms(bus->context);
     while ((bus->read(bus->context, MAILBOX_B2A_STATUS) & MAILBOX_CHANNEL_0) == 0) {
-        if (bus->now_ms(bus->context) - start >= REPLY_TIMEOUT_MS) {
+        if (bus->now_ms(bus->context) - start >= timeout_ms) {
             return false;
         }
     }
@@ -141,23 +141,34 @@ static bool wait_for_reply(const Core1Bus *bus)
     return true;
 }
 
-Core1Result core1_start(const Core1Bus *bus, const uint8_t *image, uint32_t length)
+Core1Result core1_load(const Core1Bus *bus, const uint8_t *image, uint32_t length)
 {
     if (length > CORE1_CODE_BYTES) {
-        return CORE1_BAD_REPLY;
+        return CORE1_TOO_BIG;
     }
     bus->write(bus->context, CRU_RESETS_30, CORE1_HOLD);
     copy_image(bus, image, length);
     clear_shared(bus);
     bus->write(bus->context, MAILBOX_B2A_STATUS, MAILBOX_ALL_CHANNELS);
     bus->write(bus->context, MAILBOX_A2B_STATUS, MAILBOX_ALL_CHANNELS);
+    return CORE1_OK;
+}
+
+Core1Result core1_run(const Core1Bus *bus, uint32_t timeout_ms)
+{
     bus->write(bus->context, CRU_RESETS_30, CORE1_RUN);
-    if (!wait_for_reply(bus)) {
+    if (!wait_for_reply(bus, timeout_ms)) {
         return CORE1_NO_REPLY;
     }
     bool ready = bus->read(bus->context, CORE1_MAILBOX_B2A_COMMAND) == CORE1_READY_COMMAND &&
                  bus->read(bus->context, CORE1_SHARED_READY) == CORE1_READY_MAGIC;
     return ready ? CORE1_OK : CORE1_BAD_REPLY;
+}
+
+Core1Result core1_start(const Core1Bus *bus, const uint8_t *image, uint32_t length)
+{
+    Core1Result loaded = core1_load(bus, image, length);
+    return loaded == CORE1_OK ? core1_run(bus, REPLY_TIMEOUT_MS) : loaded;
 }
 
 Core1Result core1_stop(const Core1Bus *bus)

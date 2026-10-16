@@ -2,7 +2,7 @@
 
 #include "registers.h"
 
-#define CORE1_STACK_TOP 0x01024000u
+#define CORE1_STACK_TOP 0x0102E000u
 #define ALL_INTERRUPTS 0xFFFFFFFFu
 
 typedef void (*Handler)(void);

@@ -136,6 +136,24 @@ static const char *core1_value(const void *context)
     return core1_text;
 }
 
+static char core1_decode_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static ScreenAction run_core1_decode_test(void *context)
+{
+    Core1DecodeOption *decode = context;
+    decode->result = hal_system_core1_decode_test();
+    decode->run = true;
+    return screen_action_none();
+}
+
+static const char *core1_decode_value(const void *context)
+{
+    const Core1DecodeOption *decode = context;
+    diagnostics_core1_decode_text(decode->run, decode->result, core1_decode_text,
+                                  sizeof core1_decode_text);
+    return core1_decode_text;
+}
+
 static ScreenAction play_test_tone(void *context)
 {
     ToneOption *tone = context;
@@ -336,6 +354,11 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = run_core1_test,
                                                 .context = &screens->core1,
                                                 .value = core1_value};
+    screens->core1_decode = (Core1DecodeOption){.run = false};
+    screens->diagnostics_items[13] = (MenuItem){.label = "Core 1 decode",
+                                                .select = run_core1_decode_test,
+                                                .context = &screens->core1_decode,
+                                                .value = core1_decode_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

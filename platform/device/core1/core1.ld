@@ -3,7 +3,7 @@ ENTRY(core1_reset)
 MEMORY
 {
     CORE1_CODE (rx) : ORIGIN = 0x00000000, LENGTH = 0x20000
-    CORE1_DATA (rw) : ORIGIN = 0x01021000, LENGTH = 0x2000
+    CORE1_DATA (rw) : ORIGIN = 0x01021000, LENGTH = 0xC000
 }
 
 SECTIONS
@@ -42,4 +42,4 @@ SECTIONS
 
 ASSERT(ADDR(.text) == 0, "core 1 code must start at its address 0")
 ASSERT(SIZEOF(.data) == 0, "core 1 has no initialised data: make globals const")
-ASSERT(core1_bss_end <= 0x01023000, "core 1 .bss must stay below its stack")
+ASSERT(core1_bss_end <= 0x0102D000, "core 1 .bss must stay below its stack at 0x0102D000-0x0102E000")

@@ -370,3 +370,8 @@ AudioEngineStatus audio_engine_status(const AudioEngine *engine)
                                .position_ms = position,
                                .failed = engine->failed};
 }
+
+const char *audio_engine_current_path(const AudioEngine *engine)
+{
+    return engine->segment_count == 0 ? NULL : engine->segments[0].path;
+}

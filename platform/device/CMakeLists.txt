@@ -28,6 +28,7 @@ set(ECHO_CORE1_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1.ld)
 add_executable(echo_core1
     core1/main.c
     core1/startup.c
+    board/libc.c
     board/loop_bench.c
 )
 set_target_properties(echo_core1 PROPERTIES
@@ -35,7 +36,7 @@ set_target_properties(echo_core1 PROPERTIES
     LINK_DEPENDS ${ECHO_CORE1_LINKER_SCRIPT}
 )
 target_include_directories(echo_core1 PRIVATE board)
-target_link_libraries(echo_core1 PRIVATE echo_device_logic echo_options)
+target_link_libraries(echo_core1 PRIVATE echo_codec echo_device_logic echo_options)
 target_link_options(echo_core1 PRIVATE
     -T${ECHO_CORE1_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1.map

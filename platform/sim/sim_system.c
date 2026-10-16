@@ -36,3 +36,8 @@ HalCore1Test hal_system_core1_test(void)
 {
     return (HalCore1Test){.status = HAL_CORE1_UNAVAILABLE};
 }
+
+HalCore1Decode hal_system_core1_decode_test(void)
+{
+    return (HalCore1Decode){.status = HAL_CORE1_UNAVAILABLE};
+}

@@ -16,6 +16,7 @@ void fake_hal_refuse_clock_switch(void);
 int fake_hal_test_tone_count(void);
 int fake_hal_loop_bench_count(void);
 int fake_hal_core1_test_count(void);
+int fake_hal_core1_decode_count(void);
 int fake_hal_audio_service_count(void);
 void fake_hal_queue_transition(Key key, bool pressed, uint32_t time_ms);
 uint16_t fake_hal_pixel(int x, int y);

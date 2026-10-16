@@ -317,9 +317,18 @@ static void every_decoded_frame_is_counted(void)
     CHECK_EQUAL(2u, audio_engine_stats(&engine).frames);
 }
 
+static void the_current_path_is_the_track_being_played(void)
+{
+    start_engine();
+    CHECK(audio_engine_current_path(&engine) == NULL);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 1));
+    CHECK(strcmp("lpc_16_44k_stereo", audio_engine_current_path(&engine)) == 0);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_current_path_is_the_track_being_played),
         TEST_CASE(observing_the_dma_position_never_decodes),
         TEST_CASE(the_dma_overtaking_the_decoder_counts_an_underrun),
         TEST_CASE(every_decoded_frame_is_counted),

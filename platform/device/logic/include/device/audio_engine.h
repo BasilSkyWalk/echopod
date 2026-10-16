@@ -73,6 +73,7 @@ typedef struct AudioEngine {
 void audio_engine_init(AudioEngine *engine, AudioEngineConfig config);
 void audio_engine_set_volume(AudioEngine *engine, uint8_t level);
 bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms, uint32_t token);
+const char *audio_engine_current_path(const AudioEngine *engine);
 void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token);
 bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms);
 void audio_engine_pause(AudioEngine *engine);

@@ -12,5 +12,6 @@ void board_delay_us(uint32_t microseconds);
 void board_display_start(void);
 void board_input_start(void);
 void board_input_poll(void);
+const char *board_audio_current_path(void);
 void board_wait_for_key(void);
 void board_main(void);

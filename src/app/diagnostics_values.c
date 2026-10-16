@@ -139,6 +139,12 @@ static const char *core1_failure_text(HalCore1Status status)
         return "Bad reply";
     case HAL_CORE1_NO_STOP:
         return "No stop";
+    case HAL_CORE1_NO_TRACK:
+        return "Play a track first";
+    case HAL_CORE1_NOT_FLAC:
+        return "Not FLAC";
+    case HAL_CORE1_READ_FAILED:
+        return "Read failed";
     }
     return "";
 }
@@ -156,4 +162,32 @@ void diagnostics_core1_text(bool run, HalCore1Test test, char *text, size_t capa
     string_builder_append_unsigned(&builder, test.mhz);
     append_centi(&builder, " r", test.cycles.register_centi);
     append_centi(&builder, " m", test.cycles.memory_centi);
+}
+
+static uint32_t rounded_milliseconds(uint32_t microseconds)
+{
+    return (microseconds + 500u) / 1000u;
+}
+
+void diagnostics_core1_decode_text(bool run, HalCore1Decode result, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!run) {
+        return;
+    }
+    if (result.status != HAL_CORE1_RAN) {
+        string_builder_append(&builder, core1_failure_text(result.status));
+        return;
+    }
+    if (result.blocks == 0) {
+        string_builder_append(&builder, "No blocks");
+        return;
+    }
+    string_builder_append_unsigned(&builder, result.mhz);
+    string_builder_append(&builder, ": ");
+    string_builder_append_unsigned(&builder, rounded_milliseconds(result.average_us));
+    string_builder_append(&builder, "/");
+    string_builder_append_unsigned(&builder, rounded_milliseconds(result.block_us));
+    string_builder_append(&builder, " ms max ");
+    string_builder_append_unsigned(&builder, rounded_milliseconds(result.longest_us));
 }

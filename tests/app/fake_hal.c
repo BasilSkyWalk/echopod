@@ -69,6 +69,7 @@ typedef struct FakeHal {
     int test_tone_count;
     int loop_bench_count;
     int core1_test_count;
+    int core1_decode_count;
     bool dma_tone_running;
     int audio_service_count;
 } FakeHal;
@@ -519,4 +520,15 @@ HalCore1Test hal_system_core1_test(void)
 {
     fake.core1_test_count++;
     return (HalCore1Test){.status = HAL_CORE1_RAN, .mhz = 100};
+}
+
+int fake_hal_core1_decode_count(void)
+{
+    return fake.core1_decode_count;
+}
+
+HalCore1Decode hal_system_core1_decode_test(void)
+{
+    fake.core1_decode_count++;
+    return (HalCore1Decode){.status = HAL_CORE1_NO_TRACK};
 }

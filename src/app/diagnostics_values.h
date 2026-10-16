@@ -27,3 +27,4 @@ uint32_t diagnostics_next_clock_mhz(uint32_t current_mhz);
 void diagnostics_clock_text(uint32_t mhz, bool failed, char *text, size_t capacity);
 void diagnostics_loop_text(bool run, HalLoopCycles cycles, char *text, size_t capacity);
 void diagnostics_core1_text(bool run, HalCore1Test test, char *text, size_t capacity);
+void diagnostics_core1_decode_text(bool run, HalCore1Decode result, char *text, size_t capacity);
