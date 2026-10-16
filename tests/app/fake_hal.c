@@ -310,6 +310,16 @@ void fake_hal_audio_set_position(uint32_t position_ms)
     fake.audio.status.position_ms = position_ms;
 }
 
+void fake_hal_audio_set_format(HalAudioFormat format)
+{
+    fake.audio.status.format = format;
+}
+
+void fake_hal_audio_set_token(uint32_t token)
+{
+    fake.audio.status.token = token;
+}
+
 int fake_hal_audio_seek_count(void)
 {
     return fake.audio.seek_count;

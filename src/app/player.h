@@ -30,6 +30,8 @@ typedef struct PlayerStatus {
     uint8_t volume;
     ShuffleMode shuffle;
     RepeatMode repeat;
+    PlayQueuePlace place;
+    HalAudioFormat format;
 } PlayerStatus;
 
 typedef struct Player {

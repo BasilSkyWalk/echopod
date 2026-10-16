@@ -209,3 +209,18 @@ void play_queue_move_to(PlayQueue *queue, PlayQueueCursor cursor)
 {
     queue->cursor = cursor;
 }
+
+PlayQueuePlace play_queue_place(const PlayQueue *queue)
+{
+    if (!shuffles_albums(queue)) {
+        if (queue->cursor.position >= queue->count) {
+            return (PlayQueuePlace){0, 0};
+        }
+        return (PlayQueuePlace){(uint16_t)(queue->cursor.position + 1), queue->count};
+    }
+    LibraryAlbum album;
+    if (!album_at(queue, queue->cursor.position, &album)) {
+        return (PlayQueuePlace){0, 0};
+    }
+    return (PlayQueuePlace){(uint16_t)(queue->cursor.album_track + 1), album.track_count};
+}

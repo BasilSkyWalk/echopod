@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "core/key.h"
+#include "hal/audio.h"
 #include "hal/power.h"
 
 void fake_hal_reset(void);
@@ -27,6 +28,8 @@ const char *fake_hal_audio_queued_path(void);
 void fake_hal_audio_finish_track(void);
 void fake_hal_audio_fail_track(void);
 void fake_hal_audio_set_position(uint32_t position_ms);
+void fake_hal_audio_set_format(HalAudioFormat format);
+void fake_hal_audio_set_token(uint32_t token);
 int fake_hal_audio_seek_count(void);
 uint32_t fake_hal_audio_last_seek(void);
 uint8_t fake_hal_audio_volume(void);

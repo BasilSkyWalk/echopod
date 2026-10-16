@@ -24,11 +24,27 @@ typedef enum HalAudioOutput {
     HAL_AUDIO_OUTPUT_BALANCED
 } HalAudioOutput;
 
+typedef enum HalAudioCodec {
+    HAL_AUDIO_CODEC_UNKNOWN,
+    HAL_AUDIO_CODEC_FLAC,
+    HAL_AUDIO_CODEC_MP3,
+    HAL_AUDIO_CODEC_WAV
+} HalAudioCodec;
+
+typedef struct HalAudioFormat {
+    HalAudioCodec codec;
+    uint32_t sample_rate;
+    uint8_t bits_per_sample;
+    uint8_t channels;
+    uint32_t bitrate_kbps;
+} HalAudioFormat;
+
 typedef struct HalAudioStatus {
     HalAudioState state;
     uint32_t token;
     uint32_t position_ms;
     bool failed;
+    HalAudioFormat format;
 } HalAudioStatus;
 
 typedef struct HalAudioStats {

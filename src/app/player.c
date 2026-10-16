@@ -319,6 +319,16 @@ bool player_restore(Player *player)
     return true;
 }
 
+static HalAudioFormat current_format(const Player *player)
+{
+    HalAudioFormat unknown = {.codec = HAL_AUDIO_CODEC_UNKNOWN};
+    if (!player->loaded) {
+        return unknown;
+    }
+    HalAudioStatus status = hal_audio_status();
+    return status.token == player->current_token ? status.format : unknown;
+}
+
 PlayerStatus player_status(const Player *player)
 {
     LibraryTrack record;
@@ -332,5 +342,7 @@ PlayerStatus player_status(const Player *player)
         .volume = player->volume,
         .shuffle = player->shuffle,
         .repeat = player->repeat,
+        .place = player->has_track ? play_queue_place(&player->queue) : (PlayQueuePlace){0, 0},
+        .format = current_format(player),
     };
 }

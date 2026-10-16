@@ -52,6 +52,54 @@ static void long_durations_show_hours(void)
     CHECK(duration_formats_as(4384000, "1:13:04"));
 }
 
+static bool text_is(const char *buffer, const char *expected)
+{
+    return strcmp(expected, buffer) == 0;
+}
+
+static bool rate_formats_as(uint32_t hertz, const char *expected)
+{
+    char buffer[CAPACITY];
+    format_sample_rate(hertz, buffer, sizeof buffer);
+    return text_is(buffer, expected);
+}
+
+static bool bitrate_formats_as(uint32_t kbps, const char *expected)
+{
+    char buffer[CAPACITY];
+    format_bitrate(kbps, buffer, sizeof buffer);
+    return text_is(buffer, expected);
+}
+
+static void sample_rates_show_kilohertz_with_a_decimal_only_when_needed(void)
+{
+    CHECK(rate_formats_as(44100, "44.1 kHz"));
+    CHECK(rate_formats_as(48000, "48 kHz"));
+    CHECK(rate_formats_as(88200, "88.2 kHz"));
+    CHECK(rate_formats_as(96000, "96 kHz"));
+    CHECK(rate_formats_as(192000, "192 kHz"));
+}
+
+static void bitrates_group_thousands(void)
+{
+    CHECK(bitrate_formats_as(320, "320 kbps"));
+    CHECK(bitrate_formats_as(2304, "2,304 kbps"));
+    CHECK(bitrate_formats_as(1000, "1,000 kbps"));
+    CHECK(bitrate_formats_as(12045, "12,045 kbps"));
+}
+
+static void the_average_bitrate_comes_from_audio_bytes_and_length(void)
+{
+    CHECK_EQUAL(320, average_kbps(2400000, 2646000, 44100));
+    CHECK_EQUAL(2304, average_kbps(345600000, 115200000, 96000));
+}
+
+static void an_unknown_length_has_no_bitrate(void)
+{
+    CHECK_EQUAL(0, average_kbps(2400000, 0, 44100));
+    CHECK_EQUAL(0, average_kbps(2400000, 2646000, 0));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -60,6 +108,10 @@ int main(void)
         TEST_CASE(durations_show_minutes_and_padded_seconds),
         TEST_CASE(durations_round_down_to_whole_seconds),
         TEST_CASE(long_durations_show_hours),
+        TEST_CASE(sample_rates_show_kilohertz_with_a_decimal_only_when_needed),
+        TEST_CASE(bitrates_group_thousands),
+        TEST_CASE(the_average_bitrate_comes_from_audio_bytes_and_length),
+        TEST_CASE(an_unknown_length_has_no_bitrate),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -169,6 +169,24 @@ static void different_seeds_shuffle_differently(void)
     CHECK(differences > 0);
 }
 
+static void a_list_queue_counts_its_place_from_one(void)
+{
+    PlayQueue *list = built(album_tracks(BACK_IN_BLACK), HELLS_BELLS, SHUFFLE_OFF, 1);
+    PlayQueuePlace place = play_queue_place(list);
+    CHECK_EQUAL(1, place.number);
+    CHECK_EQUAL(2, place.total);
+    advance(list);
+    CHECK_EQUAL(2, play_queue_place(list).number);
+}
+
+static void album_shuffle_counts_its_place_within_the_album(void)
+{
+    PlayQueue *albums = built(album_tracks(BACK_IN_BLACK), JOGA, SHUFFLE_ALBUMS, 3);
+    PlayQueuePlace place = play_queue_place(albums);
+    CHECK_EQUAL(2, place.number);
+    CHECK_EQUAL(2, place.total);
+}
+
 static void album_shuffle_starts_inside_the_anchor_album(void)
 {
     PlayQueue *albums = built(album_tracks(BACK_IN_BLACK), JOGA, SHUFFLE_ALBUMS, 3);
@@ -225,6 +243,8 @@ int main(void)
         TEST_CASE(shuffled_songs_start_with_the_anchor_and_keep_every_track),
         TEST_CASE(the_same_seed_rebuilds_the_same_order),
         TEST_CASE(different_seeds_shuffle_differently),
+        TEST_CASE(a_list_queue_counts_its_place_from_one),
+        TEST_CASE(album_shuffle_counts_its_place_within_the_album),
         TEST_CASE(album_shuffle_starts_inside_the_anchor_album),
         TEST_CASE(album_shuffle_finishes_an_album_before_the_next),
         TEST_CASE(album_shuffle_previous_returns_to_the_last_track_of_the_album_before),

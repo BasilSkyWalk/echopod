@@ -61,6 +61,39 @@ static void playing_a_list_starts_the_selected_track(void)
     CHECK_EQUAL(60000, status.duration_ms);
 }
 
+static const HalAudioFormat HI_RES_FLAC = {.codec = HAL_AUDIO_CODEC_FLAC,
+                                           .sample_rate = 96000,
+                                           .bits_per_sample = 24,
+                                           .channels = 2,
+                                           .bitrate_kbps = 2304};
+
+static void the_status_carries_the_playing_tracks_format(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_set_format(HI_RES_FLAC);
+    HalAudioFormat format = player_status(started).format;
+    CHECK_EQUAL(HAL_AUDIO_CODEC_FLAC, format.codec);
+    CHECK_EQUAL(96000, format.sample_rate);
+    CHECK_EQUAL(24, format.bits_per_sample);
+    CHECK_EQUAL(2304, format.bitrate_kbps);
+}
+
+static void the_format_waits_for_the_audio_to_reach_the_track(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_set_format(HI_RES_FLAC);
+    fake_hal_audio_set_token(999);
+    CHECK_EQUAL(HAL_AUDIO_CODEC_UNKNOWN, player_status(started).format.codec);
+}
+
+static void the_status_counts_the_place_in_the_queue(void)
+{
+    Player *started = playing(0);
+    PlayerStatus status = player_status(started);
+    CHECK_EQUAL(1, status.place.number);
+    CHECK_EQUAL(2, status.place.total);
+}
+
 static void the_following_track_is_queued_for_gapless_playback(void)
 {
     playing(0);
@@ -239,6 +272,9 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(playing_a_list_starts_the_selected_track),
+        TEST_CASE(the_status_carries_the_playing_tracks_format),
+        TEST_CASE(the_format_waits_for_the_audio_to_reach_the_track),
+        TEST_CASE(the_status_counts_the_place_in_the_queue),
         TEST_CASE(the_following_track_is_queued_for_gapless_playback),
         TEST_CASE(a_finished_track_moves_the_queue_on),
         TEST_CASE(the_end_of_the_queue_stops_playback),
