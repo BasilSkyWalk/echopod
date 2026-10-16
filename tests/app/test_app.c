@@ -225,9 +225,30 @@ static void the_frame_overlay_shows_the_audio_numbers(void)
 {
     char text[FRAME_OVERLAY_TEXT_CAPACITY];
     HalAudioStats stats = {
-        .buffered_ms = 340, .underruns = 2, .decode_max_us = 38400, .read_max_us = 11600};
+        .buffered_ms = 340, .underruns = 2, .decode_total_us = 640000, .elapsed_us = 1000000};
     frame_overlay_format_audio(stats, text, sizeof text);
-    CHECK(strcmp("b340 x2 d38 c12", text) == 0);
+    CHECK(strcmp("b340 x2 L64%", text) == 0);
+}
+
+static void the_frame_overlay_shows_average_and_longest_block_times(void)
+{
+    char text[FRAME_OVERLAY_TEXT_CAPACITY];
+    HalAudioStats stats = {.blocks = 4,
+                           .decode_total_us = 92000,
+                           .decode_max_us = 38400,
+                           .read_total_us = 20000,
+                           .read_max_us = 11600};
+    frame_overlay_format_block_times(stats, text, sizeof text);
+    CHECK(strcmp("d23/38 c5/12", text) == 0);
+}
+
+static void the_frame_overlay_shows_zero_before_any_block(void)
+{
+    char text[FRAME_OVERLAY_TEXT_CAPACITY];
+    frame_overlay_format_block_times((HalAudioStats){0}, text, sizeof text);
+    CHECK(strcmp("d0/0 c0/0", text) == 0);
+    frame_overlay_format_audio((HalAudioStats){0}, text, sizeof text);
+    CHECK(strcmp("b0 x0 L0%", text) == 0);
 }
 
 static void open_music_entry(int index)
@@ -1026,6 +1047,8 @@ int main(void)
         TEST_CASE(the_frame_overlay_is_off_until_enabled_in_diagnostics),
         TEST_CASE(the_frame_overlay_splits_the_frame_time),
         TEST_CASE(the_frame_overlay_shows_the_audio_numbers),
+        TEST_CASE(the_frame_overlay_shows_average_and_longest_block_times),
+        TEST_CASE(the_frame_overlay_shows_zero_before_any_block),
         TEST_CASE(diagnostics_shows_the_firmware_version_from_the_hal),
         TEST_CASE(albums_open_from_the_library),
         TEST_CASE(an_artist_leads_to_their_albums),

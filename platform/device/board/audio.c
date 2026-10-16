@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "board.h"
 #include "dac.h"
 #include "device/audio_engine.h"
 #include "device/audio_math.h"
@@ -40,10 +41,12 @@ static uint32_t stopped_since_ms;
 static bool tone_active;
 static HalAudioStats stats;
 static uint32_t read_us_pending;
+static uint32_t output_started_us;
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
     const HalFile *open = context;
+    board_input_poll();
     uint32_t started_us = hal_clock_microseconds();
     bool read = hal_file_read(*open, offset, buffer, length);
     read_us_pending += hal_clock_microseconds() - started_us;
@@ -59,15 +62,18 @@ static void pump(uint32_t consumed_words)
 {
     uint32_t frames = audio_engine_stats(&engine).frames;
     read_us_pending = 0;
-    uint32_t started_us = hal_clock_microseconds();
+    uint32_t decode_started_us = hal_clock_microseconds();
     audio_engine_pump(&engine, consumed_words);
     if (audio_engine_stats(&engine).frames == frames) {
         return;
     }
-    stats.decode_us = hal_clock_microseconds() - started_us;
+    stats.blocks++;
+    stats.decode_us = hal_clock_microseconds() - decode_started_us;
     stats.decode_max_us = larger(stats.decode_max_us, stats.decode_us);
+    stats.decode_total_us += stats.decode_us;
     stats.read_us = read_us_pending;
     stats.read_max_us = larger(stats.read_max_us, stats.read_us);
+    stats.read_total_us += stats.read_us;
 }
 
 static bool open_file(void *context, const char *path, FlacInput *input)
@@ -171,10 +177,11 @@ static bool start_output(void)
     if (!ensure_path(audio_engine_rate(&engine))) {
         return false;
     }
-    stats = (HalAudioStats){0};
     for (int round = 0; round < PREFILL_ROUNDS; round++) {
         pump(0);
     }
+    stats = (HalAudioStats){0};
+    output_started_us = hal_clock_microseconds();
     stopped_waiting = false;
     return start_transfer(RING_WORDS);
 }
@@ -333,6 +340,7 @@ HalAudioStats hal_audio_stats(void)
         return result;
     }
     result.underruns = audio_engine_stats(&engine).underruns;
+    result.elapsed_us = hal_clock_microseconds() - output_started_us;
     uint32_t rate = audio_engine_rate(&engine);
     if (rate > 0) {
         result.buffered_ms = (uint32_t)((uint64_t)audio_engine_buffered(&engine, consumed) *

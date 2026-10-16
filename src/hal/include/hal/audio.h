@@ -34,10 +34,14 @@ typedef struct HalAudioStatus {
 typedef struct HalAudioStats {
     uint32_t buffered_ms;
     uint32_t underruns;
+    uint32_t blocks;
     uint32_t decode_us;
     uint32_t decode_max_us;
+    uint32_t decode_total_us;
     uint32_t read_us;
     uint32_t read_max_us;
+    uint32_t read_total_us;
+    uint32_t elapsed_us;
 } HalAudioStats;
 
 typedef enum HalToneResult {
