@@ -4,7 +4,8 @@
 #include <stdint.h>
 
 enum {
-    BATTERY_GAUGE_READINGS = 8
+    BATTERY_GAUGE_READINGS = 64,
+    BATTERY_DISPLAY_STEP = 2
 };
 
 typedef struct BatteryGauge {
@@ -20,3 +21,11 @@ void battery_gauge_add(BatteryGauge *gauge, uint16_t raw);
 bool battery_gauge_known(const BatteryGauge *gauge);
 uint32_t battery_gauge_millivolts(const BatteryGauge *gauge);
 uint8_t battery_gauge_percent(const BatteryGauge *gauge, bool charging);
+
+typedef struct BatteryDisplay {
+    bool shown_known;
+    uint8_t shown;
+} BatteryDisplay;
+
+void battery_display_init(BatteryDisplay *display);
+uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent);

@@ -74,3 +74,19 @@ uint8_t battery_gauge_percent(const BatteryGauge *gauge, bool charging)
     }
     return battery_percent_for(millivolts);
 }
+
+void battery_display_init(BatteryDisplay *display)
+{
+    *display = (BatteryDisplay){.shown_known = false, .shown = 0};
+}
+
+uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent)
+{
+    uint8_t difference =
+        percent > display->shown ? percent - display->shown : display->shown - percent;
+    if (!display->shown_known || difference >= BATTERY_DISPLAY_STEP) {
+        display->shown = percent;
+        display->shown_known = true;
+    }
+    return display->shown;
+}

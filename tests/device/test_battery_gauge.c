@@ -65,6 +65,38 @@ static void charging_reads_100_mv_lower(void)
     CHECK_EQUAL(50, battery_gauge_percent(&gauge, true));
 }
 
+static void the_average_spans_several_seconds_of_readings(void)
+{
+    CHECK(BATTERY_GAUGE_READINGS >= 64);
+}
+
+static void the_shown_percent_starts_at_the_first_level(void)
+{
+    BatteryDisplay display;
+    battery_display_init(&display);
+    CHECK_EQUAL(34, battery_display_update(&display, 34));
+}
+
+static void a_one_point_wobble_keeps_the_shown_percent(void)
+{
+    BatteryDisplay display;
+    battery_display_init(&display);
+    battery_display_update(&display, 34);
+    CHECK_EQUAL(34, battery_display_update(&display, 33));
+    CHECK_EQUAL(34, battery_display_update(&display, 35));
+    CHECK_EQUAL(34, battery_display_update(&display, 34));
+}
+
+static void a_real_change_moves_the_shown_percent(void)
+{
+    BatteryDisplay display;
+    battery_display_init(&display);
+    battery_display_update(&display, 34);
+    CHECK_EQUAL(32, battery_display_update(&display, 32));
+    CHECK_EQUAL(32, battery_display_update(&display, 33));
+    CHECK_EQUAL(36, battery_display_update(&display, 36));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -75,6 +107,10 @@ int main(void)
         TEST_CASE(one_reading_gives_a_level),
         TEST_CASE(a_single_odd_reading_moves_the_level_only_a_little),
         TEST_CASE(charging_reads_100_mv_lower),
+        TEST_CASE(the_average_spans_several_seconds_of_readings),
+        TEST_CASE(the_shown_percent_starts_at_the_first_level),
+        TEST_CASE(a_one_point_wobble_keeps_the_shown_percent),
+        TEST_CASE(a_real_change_moves_the_shown_percent),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

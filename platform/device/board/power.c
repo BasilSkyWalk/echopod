@@ -9,6 +9,7 @@ static const GpioPin BACKLIGHT = {2, 4};
 static const GpioPin CHARGE_STATUS = {2, 3};
 
 static bool charge_status_ready;
+static BatteryDisplay display;
 
 static bool charging_now(bool usb_power)
 {
@@ -28,11 +29,12 @@ HalBattery hal_power_battery(void)
     if (!battery_gauge_known(&gauge)) {
         return (HalBattery){.known = false, .usb_power = usb_power, .charging = charging};
     }
-    return (HalBattery){.known = true,
-                        .percent = battery_gauge_percent(&gauge, charging),
-                        .charging = charging,
-                        .usb_power = usb_power,
-                        .millivolts = (uint16_t)battery_gauge_millivolts(&gauge)};
+    return (HalBattery){
+        .known = true,
+        .percent = battery_display_update(&display, battery_gauge_percent(&gauge, charging)),
+        .charging = charging,
+        .usb_power = usb_power,
+        .millivolts = (uint16_t)battery_gauge_millivolts(&gauge)};
 }
 
 void hal_power_off(void)
