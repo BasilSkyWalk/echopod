@@ -6,11 +6,13 @@
 #include "hal/input.h"
 
 enum {
-    KEY_SCANNER_QUEUE_CAPACITY = 16
+    KEY_SCANNER_QUEUE_CAPACITY = 16,
+    KEY_SCANNER_SETTLED_GAP_MS = 20
 };
 
 typedef struct KeyScanner {
     uint8_t last_sample;
+    uint32_t last_sample_ms;
     uint8_t stable;
     bool power_armed;
     uint8_t head;

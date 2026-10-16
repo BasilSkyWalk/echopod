@@ -43,10 +43,13 @@ static void emit_changes(KeyScanner *scanner, uint8_t mask, uint32_t time_ms)
 void key_scanner_sample(KeyScanner *scanner, uint8_t pressed_mask, uint32_t time_ms)
 {
     uint8_t mask = gate_power(scanner, pressed_mask);
-    if (mask == scanner->last_sample && mask != scanner->stable) {
+    bool settled = mask == scanner->last_sample ||
+                   time_ms - scanner->last_sample_ms >= KEY_SCANNER_SETTLED_GAP_MS;
+    if (settled && mask != scanner->stable) {
         emit_changes(scanner, mask, time_ms);
     }
     scanner->last_sample = mask;
+    scanner->last_sample_ms = time_ms;
 }
 
 bool key_scanner_next(KeyScanner *scanner, HalKeyTransition *transition)
