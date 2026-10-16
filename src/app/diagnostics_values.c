@@ -207,3 +207,12 @@ void diagnostics_battery_text(HalBattery battery, char *text, size_t capacity)
         string_builder_append(&builder, battery.charging ? " charging" : " full");
     }
 }
+
+void diagnostics_boot_hold_text(HalPowerHold hold, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append(&builder, "fn");
+    string_builder_append_unsigned(&builder, hold.function);
+    string_builder_append(&builder, hold.output ? " output" : " input");
+    string_builder_append(&builder, hold.high ? " high" : " low");
+}

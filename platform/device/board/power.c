@@ -9,6 +9,21 @@ static const GpioPin BACKLIGHT = {2, 4};
 static const GpioPin CHARGE_STATUS = {2, 3};
 
 static bool charge_status_ready;
+static HalPowerHold boot_hold;
+
+void board_power_hold(void)
+{
+    boot_hold = (HalPowerHold){.function = (uint8_t)gpio_function(POWER_HOLD),
+                               .output = gpio_is_output(POWER_HOLD),
+                               .high = gpio_output_level(POWER_HOLD)};
+    gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
+    gpio_output(POWER_HOLD, true);
+}
+
+HalPowerHold hal_power_boot_hold(void)
+{
+    return boot_hold;
+}
 static BatteryDisplay display;
 
 static bool charging_now(bool usb_power)

@@ -532,3 +532,8 @@ HalCore1Decode hal_system_core1_decode_test(void)
     fake.core1_decode_count++;
     return (HalCore1Decode){.status = HAL_CORE1_NO_TRACK};
 }
+
+HalPowerHold hal_power_boot_hold(void)
+{
+    return (HalPowerHold){.function = 0, .output = true, .high = true};
+}

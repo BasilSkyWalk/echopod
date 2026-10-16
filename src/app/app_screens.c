@@ -164,6 +164,15 @@ static const char *battery_value(const void *context)
     return battery_text;
 }
 
+static char boot_hold_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *boot_hold_value(const void *context)
+{
+    (void)context;
+    diagnostics_boot_hold_text(hal_power_boot_hold(), boot_hold_text, sizeof boot_hold_text);
+    return boot_hold_text;
+}
+
 static ScreenAction play_test_tone(void *context)
 {
     ToneOption *tone = context;
@@ -371,6 +380,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .value = core1_decode_value};
     screens->diagnostics_items[14] =
         (MenuItem){.label = "Battery", .select = NULL, .context = NULL, .value = battery_value};
+    screens->diagnostics_items[15] =
+        (MenuItem){.label = "Boot hold", .select = NULL, .context = NULL, .value = boot_hold_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

@@ -198,11 +198,23 @@ static void the_battery_row_shows_millivolts_and_the_charger_state(void)
     CHECK(text_is("3803 mV full", text));
 }
 
+static void the_boot_hold_row_shows_how_the_rom_left_the_pin(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_boot_hold_text((HalPowerHold){.function = 0, .output = false, .high = true}, text,
+                               sizeof text);
+    CHECK(text_is("fn0 input high", text));
+    diagnostics_boot_hold_text((HalPowerHold){.function = 2, .output = true, .high = false}, text,
+                               sizeof text);
+    CHECK(text_is("fn2 output low", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
+        TEST_CASE(the_boot_hold_row_shows_how_the_rom_left_the_pin),
         TEST_CASE(the_battery_row_shows_millivolts_and_the_charger_state),
         TEST_CASE(the_core_1_row_is_empty_until_run),
         TEST_CASE(a_core_1_run_shows_its_clock_and_loop_cycles),

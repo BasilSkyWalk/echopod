@@ -12,4 +12,12 @@ typedef struct HalBattery {
 } HalBattery;
 
 HalBattery hal_power_battery(void);
+
+typedef struct HalPowerHold {
+    uint8_t function;
+    bool output;
+    bool high;
+} HalPowerHold;
+
+HalPowerHold hal_power_boot_hold(void);
 void hal_power_off(void);

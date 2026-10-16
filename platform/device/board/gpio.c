@@ -45,3 +45,21 @@ bool gpio_read(GpioPin pin)
 {
     return (register_read(gpio_port_base(pin.port) + GPIO_INPUT_LEVEL) >> pin.pin & 1u) != 0;
 }
+
+uint32_t gpio_function(GpioPin pin)
+{
+    uint32_t address = GRF_BASE + GRF_MUX_PORT_STRIDE * pin.port +
+                       4u * (uint32_t)(pin.pin / GRF_MUX_PINS_PER_REGISTER);
+    uint32_t shift = 2u * (uint32_t)(pin.pin % GRF_MUX_PINS_PER_REGISTER);
+    return register_read(address) >> shift & 3u;
+}
+
+bool gpio_is_output(GpioPin pin)
+{
+    return (register_read(gpio_port_base(pin.port) + GPIO_DIRECTION) >> pin.pin & 1u) != 0;
+}
+
+bool gpio_output_level(GpioPin pin)
+{
+    return (register_read(gpio_port_base(pin.port) + GPIO_DATA) >> pin.pin & 1u) != 0;
+}

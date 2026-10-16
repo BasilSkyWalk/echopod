@@ -31,3 +31,8 @@ void hal_power_off(void)
 {
     power.off_requested = true;
 }
+
+HalPowerHold hal_power_boot_hold(void)
+{
+    return (HalPowerHold){.function = 0, .output = true, .high = true};
+}
