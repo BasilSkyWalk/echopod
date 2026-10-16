@@ -16,13 +16,19 @@ static void draw_glyph(Canvas *canvas, TextStyle style, const Glyph *glyph, Poin
     if (rect_is_empty(visible)) {
         return;
     }
+    int stride = canvas->bounds.width;
+    Color *row =
+        &canvas->pixels[(visible.y - canvas->bounds.y) * stride + (visible.x - canvas->bounds.x)];
     for (int y = visible.y; y < visible.y + visible.height; y++) {
+        Color *pixel = row;
         for (int x = visible.x; x < visible.x + visible.width; x++) {
             uint8_t level = font_glyph_level(style.font, glyph, x - area.x, y - area.y);
             if (level > 0) {
-                canvas_blend_pixel(canvas, (Point){x, y}, style.color, level);
+                *pixel = color_blend(*pixel, style.color, level);
             }
+            pixel++;
         }
+        row += stride;
     }
 }
 

@@ -50,6 +50,9 @@ Rect label_centered_area(const Font *font, Rect bounds, const char *text)
 void label_draw(Canvas *canvas, TextStyle style, Label label)
 {
     Canvas clipped = canvas_clipped(canvas, label.area);
+    if (rect_is_empty(clipped.clip)) {
+        return;
+    }
     LabelFit fit = label_fit(style.font, label.text, label.area.width);
     Point pen = {label.area.x, label_baseline(style.font, label.area)};
     pen.x = text_draw_span(&clipped, style, pen, (TextSpan){label.text, fit.byte_count});
@@ -61,6 +64,9 @@ void label_draw(Canvas *canvas, TextStyle style, Label label)
 void label_draw_scrolling(Canvas *canvas, TextStyle style, Label label, Marquee marquee)
 {
     Canvas clipped = canvas_clipped(canvas, label.area);
+    if (rect_is_empty(clipped.clip)) {
+        return;
+    }
     int baseline = label_baseline(style.font, label.area);
     int start = label.area.x - marquee.offset;
     int repeat_start = start + text_width(style.font, label.text) + marquee.gap;
