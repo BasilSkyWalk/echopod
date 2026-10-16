@@ -14,6 +14,7 @@
 #include "gfx/frame_diff.h"
 #include "gfx/strip_renderer.h"
 #include "hal/audio.h"
+#include "hal/bluetooth.h"
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
@@ -382,6 +383,7 @@ static void write_to_display(void *context, Rect area, const Color *pixels)
     Rect changed;
     uint32_t audio_started_us = hal_clock_microseconds();
     hal_audio_service();
+    hal_bluetooth_service();
     uint32_t hash_started_us = hal_clock_microseconds();
     draw_profile_add(DRAW_PART_AUDIO, hash_started_us - audio_started_us);
     bool any_changed = frame_diff_changed(&app.frame_diff, area, pixels, &changed);
@@ -528,6 +530,7 @@ void app_step(void)
     uint32_t now_ms = hal_clock_milliseconds();
     app.now_ms = now_ms;
     hal_audio_service();
+    hal_bluetooth_service();
     read_input();
     key_tracker_update(&app.keys, now_ms);
     if (fade_running()) {

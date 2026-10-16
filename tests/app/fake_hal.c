@@ -3,6 +3,7 @@
 #include "hal/system.h"
 
 #include "hal/audio.h"
+#include "hal/bluetooth.h"
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
@@ -72,6 +73,10 @@ typedef struct FakeHal {
     int core1_decode_count;
     bool dma_tone_running;
     int audio_service_count;
+    HalBluetoothStatus bluetooth;
+    bool bluetooth_powered;
+    int bluetooth_scan_count;
+    int bluetooth_service_count;
 } FakeHal;
 
 static FakeHal fake;
@@ -551,4 +556,48 @@ HalPowerHold hal_power_boot_hold(void)
 HalStartInfo hal_system_start_info(void)
 {
     return (HalStartInfo){.warm = false, .starts = 1};
+}
+
+HalBluetoothStatus *fake_hal_bluetooth(void)
+{
+    return &fake.bluetooth;
+}
+
+bool fake_hal_bluetooth_powered(void)
+{
+    return fake.bluetooth_powered;
+}
+
+int fake_hal_bluetooth_scan_count(void)
+{
+    return fake.bluetooth_scan_count;
+}
+
+int fake_hal_bluetooth_service_count(void)
+{
+    return fake.bluetooth_service_count;
+}
+
+void hal_bluetooth_set_power(bool on)
+{
+    fake.bluetooth_powered = on;
+    fake.bluetooth = (HalBluetoothStatus){.state = on ? HAL_BLUETOOTH_STARTING : HAL_BLUETOOTH_OFF};
+}
+
+void hal_bluetooth_scan(void)
+{
+    fake.bluetooth_scan_count++;
+    if (fake.bluetooth.state == HAL_BLUETOOTH_READY) {
+        fake.bluetooth.state = HAL_BLUETOOTH_SCANNING;
+    }
+}
+
+void hal_bluetooth_service(void)
+{
+    fake.bluetooth_service_count++;
+}
+
+const HalBluetoothStatus *hal_bluetooth_status(void)
+{
+    return &fake.bluetooth;
 }

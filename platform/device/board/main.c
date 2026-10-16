@@ -40,6 +40,7 @@ void board_main(void)
 {
     board_start_record_boot();
     board_power_hold();
+    board_bluetooth_off();
     board_clock_record_boot();
     board_clock_start();
     hal_system_set_clock_mhz(START_CLOCK_MHZ);

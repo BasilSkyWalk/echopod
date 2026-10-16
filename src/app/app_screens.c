@@ -409,6 +409,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         (MenuItem){.label = "Boot hold", .select = NULL, .context = NULL, .value = boot_hold_value};
     screens->diagnostics_items[16] =
         (MenuItem){.label = "Last start", .select = NULL, .context = NULL, .value = start_value};
+    screens->diagnostics_items[17] =
+        open_item("Bluetooth", bluetooth_screen_init(&screens->bluetooth, theme));
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

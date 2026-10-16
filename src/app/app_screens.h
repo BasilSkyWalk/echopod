@@ -11,6 +11,7 @@
 #include "home_art.h"
 #include "library_store.h"
 #include "player.h"
+#include "screens/bluetooth_screen.h"
 #include "screens/cover_flow_screen.h"
 #include "screens/font_sample_screen.h"
 #include "screens/now_playing_screen.h"
@@ -26,7 +27,7 @@
 enum {
     HOME_ITEM_COUNT = 4,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 17,
+    DIAGNOSTICS_ITEM_COUNT = 18,
     START_PATH_CAPACITY = 2
 };
 
@@ -87,6 +88,7 @@ typedef struct AppScreens {
     TestPatternScreen test_pattern;
     FontSampleScreen font_sample;
     StopwatchScreen stopwatch;
+    BluetoothScreen bluetooth;
     ClockOption clock;
     ToneOption tone;
     DmaToneOption dma_tone;

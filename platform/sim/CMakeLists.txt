@@ -15,6 +15,7 @@ target_link_libraries(echo_sim_decoder PUBLIC echo_hal echo_sim_codecs PRIVATE e
 add_executable(echo_sim
     main.c
     sim_audio.c
+    sim_bluetooth.c
     sim_clock.c
     sim_display.c
     sim_input.c

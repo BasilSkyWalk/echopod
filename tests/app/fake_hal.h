@@ -5,6 +5,7 @@
 
 #include "core/key.h"
 #include "hal/audio.h"
+#include "hal/bluetooth.h"
 #include "hal/power.h"
 
 void fake_hal_reset(void);
@@ -19,6 +20,10 @@ int fake_hal_loop_bench_count(void);
 int fake_hal_core1_test_count(void);
 int fake_hal_core1_decode_count(void);
 int fake_hal_audio_service_count(void);
+HalBluetoothStatus *fake_hal_bluetooth(void);
+bool fake_hal_bluetooth_powered(void);
+int fake_hal_bluetooth_scan_count(void);
+int fake_hal_bluetooth_service_count(void);
 void fake_hal_queue_transition(Key key, bool pressed, uint32_t time_ms);
 uint16_t fake_hal_pixel(int x, int y);
 const char *fake_hal_audio_playing_path(void);

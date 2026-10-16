@@ -26,6 +26,7 @@ void board_audio_after_clock_change(void);
 void board_wait_for_key(void);
 void board_main(void);
 void board_power_hold(void);
+void board_bluetooth_off(void);
 void board_start_record_boot(void);
 void board_start_record_tick(uint32_t uptime_ms);
 void board_start_record_power_off(void);
