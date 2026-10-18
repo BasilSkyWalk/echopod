@@ -46,7 +46,7 @@ endforeach()
 
 echo_add_unit_test(NAME test_settings SOURCES settings/test_settings.c LIBRARIES echo_settings)
 
-foreach(library_test block_cache library library_browse favorites covers)
+foreach(library_test block_cache library library_browse favorites covers sort_key)
     echo_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES echo_library_fixtures
@@ -257,6 +257,12 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
     add_test(NAME cover_fixture_up_to_date
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/cover_fixture.py
             --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_covers.bin
+            --check
+    )
+    add_test(NAME sort_fold_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/fold_table.py
+            --output ${PROJECT_SOURCE_DIR}/src/library
+            --style ${PROJECT_SOURCE_DIR}/.clang-format
             --check
     )
     add_test(NAME library_fixture_up_to_date
