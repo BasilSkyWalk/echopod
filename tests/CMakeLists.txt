@@ -46,7 +46,7 @@ endforeach()
 
 echo_add_unit_test(NAME test_settings SOURCES settings/test_settings.c LIBRARIES echo_settings)
 
-foreach(library_test block_cache library library_browse favorites covers sort_key track_fields)
+foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader)
     echo_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES echo_library_fixtures
@@ -278,6 +278,15 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             -DMUSIC=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tags
             -DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tags_library.db
             -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/tags_library.db
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_library_index.cmake
+    )
+    add_test(NAME scan_music_up_to_date
+        COMMAND ${CMAKE_COMMAND}
+            -DPYTHON=${ECHO_TOOLS_PYTHON}
+            -DINDEXER=${PROJECT_SOURCE_DIR}/tools/library_index.py
+            -DMUSIC=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music
+            -DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music.db
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/scan_music.db
             -P ${CMAKE_CURRENT_SOURCE_DIR}/check_library_index.cmake
     )
     add_test(NAME builder_fixture_up_to_date

@@ -65,20 +65,24 @@ static void append_code_point(KeyBuilder *builder, uint32_t code_point)
     append_bytes(builder, bytes, length);
 }
 
-static const SortFold *fold_for(uint32_t code_point)
+static const SortFold *find_fold(const SortFold *folds, size_t count, uint32_t code_point)
 {
     size_t low = 0;
-    size_t high = SORT_FOLD_COUNT;
+    size_t high = count;
     while (low < high) {
         size_t middle = low + (high - low) / 2;
-        if (SORT_FOLDS[middle].code_point < code_point) {
+        if (folds[middle].code_point < code_point) {
             low = middle + 1;
         } else {
             high = middle;
         }
     }
-    return low < SORT_FOLD_COUNT && SORT_FOLDS[low].code_point == code_point ? &SORT_FOLDS[low]
-                                                                             : NULL;
+    return low < count && folds[low].code_point == code_point ? &folds[low] : NULL;
+}
+
+static const SortFold *fold_for(uint32_t code_point)
+{
+    return find_fold(SORT_FOLDS, SORT_FOLD_COUNT, code_point);
 }
 
 static void append_hangul(KeyBuilder *builder, uint32_t code_point)
@@ -179,4 +183,30 @@ int sort_key_compare(const char *left, const char *right)
         b++;
     }
     return (int)*a - (int)*b;
+}
+
+static void append_case_folded(KeyBuilder *builder, uint32_t code_point)
+{
+    if (code_point >= 'A' && code_point <= 'Z') {
+        append_code_point(builder, code_point - 'A' + 'a');
+        return;
+    }
+    const SortFold *fold =
+        code_point >= 0x80 ? find_fold(CASE_FOLDS, CASE_FOLD_COUNT, code_point) : NULL;
+    if (fold != NULL) {
+        append_bytes(builder, (const char *)CASE_FOLD_TEXT + fold->offset, fold->length);
+    } else {
+        append_code_point(builder, code_point);
+    }
+}
+
+size_t case_fold_make(const char *text, size_t length, char *folded, size_t capacity)
+{
+    KeyBuilder builder = {.key = folded, .capacity = capacity, .length = 0, .full = false};
+    const char *cursor = text;
+    while (cursor < text + length && !builder.full) {
+        append_case_folded(&builder, utf8_next(&cursor));
+    }
+    folded[builder.length] = '\0';
+    return builder.length;
 }

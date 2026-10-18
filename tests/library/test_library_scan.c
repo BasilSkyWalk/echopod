@@ -142,6 +142,20 @@ static void scanning_the_tag_fixtures_matches_the_pc_indexer(void)
     free(expected);
 }
 
+static void scanning_folders_and_playlists_matches_the_pc_indexer(void)
+{
+    static Output output;
+    Progress progress = {.calls = 0};
+    ScanStats stats;
+    CHECK_EQUAL(SCAN_OK, scan_folder(ECHO_FIXTURE_DIR "/scan_music", &output, &progress, &stats));
+    CHECK_EQUAL(4u, stats.tracks);
+    uint32_t expected_size = 0;
+    uint8_t *expected = read_fixture("scan_music.db", &expected_size);
+    CHECK_EQUAL(expected_size, stats.length);
+    CHECK_EQUAL(0, memcmp(expected, output.bytes, expected_size));
+    free(expected);
+}
+
 static void a_missing_music_root_says_so(void)
 {
     static Output output;
@@ -155,6 +169,7 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(scanning_the_tag_fixtures_matches_the_pc_indexer),
+        TEST_CASE(scanning_folders_and_playlists_matches_the_pc_indexer),
         TEST_CASE(a_missing_music_root_says_so),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

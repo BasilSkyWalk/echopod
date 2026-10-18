@@ -39,8 +39,18 @@ typedef struct LibraryBuilder {
     uint32_t tracks_offset;
     uint32_t strings_floor;
     uint32_t empty_string;
+    bool prepared;
+    BuilderResult prepare_result;
+    uint32_t work_start;
+    uint32_t work_used;
+    uint32_t work_top;
+    void *model;
 } LibraryBuilder;
 
 void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size);
 BuilderResult library_builder_add_track(LibraryBuilder *builder, const BuilderTrack *track);
+BuilderResult library_builder_prepare(LibraryBuilder *builder);
+BuilderResult library_builder_begin_playlist(LibraryBuilder *builder, const char *name,
+                                             const char *folder);
+BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char *entry);
 BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t *length);

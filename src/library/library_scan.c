@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "library/playlist_reader.h"
 #include "library/track_fields.h"
 #include "library/track_tags.h"
 
@@ -32,6 +33,11 @@ typedef struct ScanState {
     uint8_t *listing;
     uint32_t listing_size;
     uint32_t listing_used;
+    uint32_t playlist_floor;
+    uint32_t playlist_count;
+    PlaylistReader playlist;
+    char entry_text[PLAYLIST_ENTRY_CAPACITY];
+    char playlist_name[SCAN_NAME_CAPACITY];
 } ScanState;
 
 typedef struct Listing {
@@ -103,7 +109,7 @@ static void sort_names(const ScanState *state, uint32_t *items, uint32_t *scratc
 static bool store_entry(ScanState *state, const ScanEntry *entry)
 {
     uint32_t length = text_length(entry->name);
-    if (length + 2 > state->listing_size - state->listing_used) {
+    if (length + 2 > state->playlist_floor - state->listing_used) {
         return false;
     }
     uint8_t *record = state->listing + state->listing_used;
@@ -123,7 +129,7 @@ static uint32_t align4(uint32_t value)
 static ScanResult index_listing(ScanState *state, uint32_t start, uint32_t count, Level *level)
 {
     uint32_t table = align4(state->listing_used);
-    if (table > state->listing_size || (uint64_t)count * 8 > state->listing_size - table) {
+    if (table > state->playlist_floor || (uint64_t)count * 8 > state->playlist_floor - table) {
         return SCAN_FOLDER_TOO_BIG;
     }
     uint32_t *offsets = (uint32_t *)(void *)(state->listing + table);
@@ -220,11 +226,60 @@ static ScanResult add_file(ScanState *state, const ScanJob *job, ScanStats *stat
     return result;
 }
 
+static bool is_playlist_name(const char *name)
+{
+    uint32_t length = text_length(name);
+    const char *dot = NULL;
+    for (uint32_t index = 1; index < length; index++) {
+        dot = name[index] == '.' ? name + index : dot;
+    }
+    if (dot == NULL) {
+        return false;
+    }
+    char lower[6] = {0};
+    uint32_t count = 0;
+    for (const char *cursor = dot + 1; *cursor != '\0' && count < 5; cursor++) {
+        lower[count++] = (char)(*cursor >= 'A' && *cursor <= 'Z' ? *cursor - 'A' + 'a' : *cursor);
+    }
+    bool m3u = count == 3 && lower[0] == 'm' && lower[1] == '3' && lower[2] == 'u';
+    bool m3u8 =
+        count == 4 && lower[0] == 'm' && lower[1] == '3' && lower[2] == 'u' && lower[3] == '8';
+    return (m3u || m3u8) && dot[count + 1] == '\0';
+}
+
+static ScanResult note_playlist(ScanState *state, const char *name)
+{
+    uint32_t parent = state->path_length;
+    uint32_t length = parent + text_length(name);
+    uint32_t need = align4(length + 1 + 4);
+    if (need > state->playlist_floor - align4(state->listing_used)) {
+        return SCAN_FOLDER_TOO_BIG;
+    }
+    state->playlist_floor -= need;
+    uint8_t *record = state->listing + state->playlist_floor;
+    record[0] = (uint8_t)(length & 0xFF);
+    record[1] = (uint8_t)(length >> 8);
+    record[2] = (uint8_t)(parent & 0xFF);
+    record[3] = (uint8_t)(parent >> 8);
+    for (uint32_t index = 0; index < parent; index++) {
+        record[4 + index] = (uint8_t)state->path[index];
+    }
+    for (uint32_t index = parent; index < length; index++) {
+        record[4 + index] = (uint8_t)name[index - parent];
+    }
+    record[4 + length] = 0;
+    state->playlist_count++;
+    return SCAN_OK;
+}
+
 static ScanResult visit_entry(ScanState *state, const ScanJob *job, ScanStats *stats,
                               uint32_t offset)
 {
     const char *name = entry_name(state, offset);
     bool directory = entry_is_directory(state, offset);
+    if (!directory && is_playlist_name(name)) {
+        return note_playlist(state, name);
+    }
     if (!directory && track_tags_format_for_name(name) == TAG_FORMAT_UNKNOWN) {
         return SCAN_OK;
     }
@@ -280,8 +335,75 @@ static bool split_memory(ScanState **state, const ScanJob *job)
     (*state)->listing = memory + header;
     (*state)->listing_size = listing;
     (*state)->listing_used = 0;
+    (*state)->playlist_floor = listing;
+    (*state)->playlist_count = 0;
     library_builder_init(&(*state)->builder, memory + header + listing, size - header - listing);
     return true;
+}
+
+static void name_and_folder(ScanState *state, const uint8_t *record, char *folder)
+{
+    uint32_t length = (uint32_t)record[0] | (uint32_t)record[1] << 8;
+    uint32_t parent = (uint32_t)record[2] | (uint32_t)record[3] << 8;
+    const char *path = (const char *)record + 4;
+    uint32_t folder_length = parent > 1 ? parent - 2 : 0;
+    for (uint32_t index = 0; index < folder_length; index++) {
+        folder[index] = path[index + 1];
+    }
+    folder[folder_length] = '\0';
+    uint32_t stem_end = length;
+    for (uint32_t index = parent + 1; index < length; index++) {
+        stem_end = path[index] == '.' ? index : stem_end;
+    }
+    uint32_t count = 0;
+    for (uint32_t index = parent; index < stem_end; index++) {
+        state->playlist_name[count++] = path[index];
+    }
+    state->playlist_name[count] = '\0';
+}
+
+static ScanResult read_playlist(ScanState *state, const ScanJob *job, const uint8_t *record)
+{
+    ByteSource source;
+    uint32_t size = 0;
+    const char *path = (const char *)record + 4;
+    if (!job->files.open_file(job->files.context, path, &source, &size)) {
+        return SCAN_OK;
+    }
+    name_and_folder(state, record, state->path);
+    ScanResult result = builder_result(
+        library_builder_begin_playlist(&state->builder, state->playlist_name, state->path));
+    playlist_reader_open(&state->playlist, source, size);
+    while (result == SCAN_OK &&
+           playlist_reader_next(&state->playlist, state->entry_text, sizeof state->entry_text)) {
+        result = builder_result(library_builder_playlist_entry(&state->builder, state->entry_text));
+    }
+    job->files.close_file(job->files.context);
+    return result;
+}
+
+static uint32_t record_length(const ScanState *state, uint32_t offset)
+{
+    uint32_t length = (uint32_t)state->listing[offset] | (uint32_t)state->listing[offset + 1] << 8;
+    return align4(length + 1 + 4);
+}
+
+static uint32_t noted_playlist(const ScanState *state, uint32_t index)
+{
+    uint32_t offset = state->playlist_floor;
+    for (uint32_t skip = 0; skip + 1 + index < state->playlist_count; skip++) {
+        offset += record_length(state, offset);
+    }
+    return offset;
+}
+
+static ScanResult read_playlists(ScanState *state, const ScanJob *job)
+{
+    ScanResult result = builder_result(library_builder_prepare(&state->builder));
+    for (uint32_t index = 0; result == SCAN_OK && index < state->playlist_count; index++) {
+        result = read_playlist(state, job, state->listing + noted_playlist(state, index));
+    }
+    return result;
 }
 
 ScanResult library_scan(const ScanJob *job, ScanStats *stats)
@@ -294,6 +416,9 @@ ScanResult library_scan(const ScanJob *job, ScanStats *stats)
     state->path[0] = '/';
     truncate_path(state, 1);
     ScanResult result = walk(state, job, stats);
+    if (result == SCAN_OK) {
+        result = read_playlists(state, job);
+    }
     if (result != SCAN_OK) {
         return result;
     }

@@ -1,6 +1,7 @@
 #include <stddef.h>
 
 #include "builder_internal.h"
+#include "library/sort_key.h"
 
 enum {
     HEADER_SIZE = 128,
@@ -49,7 +50,15 @@ typedef struct StringPass {
     uint32_t *path_offsets;
     uint32_t length;
     Writer *writer;
+    const uint8_t *work_memory;
+    const uint16_t *playlist_order;
+    uint32_t *playlist_names;
 } StringPass;
+
+typedef struct PlaylistSort {
+    const LibraryModel *model;
+    const uint8_t *work_memory;
+} PlaylistSort;
 
 static void flush(Writer *writer)
 {
@@ -163,6 +172,54 @@ static void add_names(StringPass *pass, const NameIndex *index)
     }
 }
 
+static const char *playlist_name(const uint8_t *work_memory, const PlaylistModel *playlist)
+{
+    return (const char *)work_memory + playlist->name;
+}
+
+static bool same_bytes(const char *left, const char *right)
+{
+    while (*left != '\0' && *left == *right) {
+        left++;
+        right++;
+    }
+    return *left == *right;
+}
+
+static uint32_t earlier_playlist_name(const StringPass *pass, uint32_t sorted, const char *name)
+{
+    for (uint32_t earlier = 0; earlier < sorted; earlier++) {
+        const PlaylistModel *other = &pass->model->playlists[pass->playlist_order[earlier]];
+        if (same_bytes(playlist_name(pass->work_memory, other), name)) {
+            return pass->playlist_names[earlier];
+        }
+    }
+    return BUILDER_UNSET;
+}
+
+static void add_playlist_name(StringPass *pass, uint32_t sorted)
+{
+    const PlaylistModel *playlist = &pass->model->playlists[pass->playlist_order[sorted]];
+    const char *name = playlist_name(pass->work_memory, playlist);
+    uint32_t existing = builder_find(pass->builder, name, text_length(name));
+    if (existing != BUILDER_UNSET) {
+        add_string(pass, existing);
+        pass->playlist_names[sorted] = *builder_output_offset(pass->builder, existing);
+        return;
+    }
+    uint32_t earlier = earlier_playlist_name(pass, sorted, name);
+    if (earlier != BUILDER_UNSET) {
+        pass->playlist_names[sorted] = earlier;
+        return;
+    }
+    pass->playlist_names[sorted] = pass->length;
+    pass->length += text_length(name) + 1;
+    if (pass->writer != NULL) {
+        put_text(pass->writer, name);
+        put_byte(pass->writer, 0);
+    }
+}
+
 static void run_string_pass(StringPass *pass)
 {
     const LibraryModel *model = pass->model;
@@ -180,12 +237,16 @@ static void run_string_pass(StringPass *pass)
     for (uint32_t folder = 0; folder < model->folder_count; folder++) {
         add_string(pass, model->folders[folder].name);
     }
+    for (uint32_t sorted = 0; sorted < model->playlist_count; sorted++) {
+        add_playlist_name(pass, sorted);
+    }
 }
 
 static void plan(Layout *layout, const LibraryModel *model, uint32_t strings)
 {
     uint32_t links = model->artist_links.total + model->album_artist_links.total +
-                     model->genre_links.total + model->folder_link_count;
+                     model->genre_links.total + model->folder_link_count +
+                     model->playlist_link_count;
     const uint32_t counts[SECTION_COUNT] = {model->track_count,
                                             model->album_count,
                                             model->artists.count,
@@ -193,7 +254,7 @@ static void plan(Layout *layout, const LibraryModel *model, uint32_t strings)
                                             model->genres.count,
                                             model->folder_count,
                                             model->track_count,
-                                            0,
+                                            model->playlist_count,
                                             links,
                                             strings};
     const uint16_t sizes[SECTION_COUNT] = {
@@ -289,17 +350,36 @@ static void write_indices(Writer *writer, const uint16_t *values, uint32_t count
     }
 }
 
-static void write_links(Writer *writer, const LibraryModel *model)
+static void write_playlists(Writer *writer, const StringPass *pass, uint32_t first_link)
 {
+    for (uint32_t sorted = 0; sorted < pass->model->playlist_count; sorted++) {
+        const PlaylistModel *playlist = &pass->model->playlists[pass->playlist_order[sorted]];
+        put_u32(writer, pass->playlist_names[sorted]);
+        put_u32(writer, first_link);
+        put_u16(writer, playlist->count);
+        put_u16(writer, 0);
+        first_link += playlist->count;
+    }
+}
+
+static void write_links(Writer *writer, const StringPass *pass)
+{
+    const LibraryModel *model = pass->model;
     write_indices(writer, model->artist_links.albums, model->artist_links.total);
     write_indices(writer, model->album_artist_links.albums, model->album_artist_links.total);
     write_indices(writer, model->genre_links.albums, model->genre_links.total);
     write_indices(writer, model->folder_links, model->folder_link_count);
+    for (uint32_t sorted = 0; sorted < model->playlist_count; sorted++) {
+        const PlaylistModel *playlist = &model->playlists[pass->playlist_order[sorted]];
+        write_indices(writer, model->playlist_links + playlist->first_link, playlist->count);
+    }
 }
 
-static void write_records(Writer *writer, LibraryBuilder *builder, const LibraryModel *model,
-                          const Layout *layout, const uint32_t *path_offsets)
+static void write_records(Writer *writer, const StringPass *pass, const Layout *layout)
 {
+    LibraryBuilder *builder = pass->builder;
+    const LibraryModel *model = pass->model;
+    const uint32_t *path_offsets = pass->path_offsets;
     write_header(writer, layout);
     write_tracks(writer, builder, model, path_offsets);
     pad_to(writer, layout->offset[SECTION_ALBUMS]);
@@ -314,28 +394,71 @@ static void write_records(Writer *writer, LibraryBuilder *builder, const Library
     write_folders(writer, builder, model, links);
     pad_to(writer, layout->offset[SECTION_TITLE_ORDER]);
     write_indices(writer, model->title_order, model->track_count);
+    pad_to(writer, layout->offset[SECTION_PLAYLISTS]);
+    write_playlists(writer, pass, links + model->folder_link_count);
     pad_to(writer, layout->offset[SECTION_LINKS]);
-    write_links(writer, model);
+    write_links(writer, pass);
     pad_to(writer, layout->offset[SECTION_STRINGS]);
+}
+
+static int by_playlist_name(const void *context, uint16_t left, uint16_t right)
+{
+    const PlaylistSort *sort = context;
+    const char *a = playlist_name(sort->work_memory, &sort->model->playlists[left]);
+    const char *b = playlist_name(sort->work_memory, &sort->model->playlists[right]);
+    int key = sort_key_compare(a, b);
+    if (key != 0) {
+        return key;
+    }
+    const unsigned char *x = (const unsigned char *)a;
+    const unsigned char *y = (const unsigned char *)b;
+    while (*x != '\0' && *x == *y) {
+        x++;
+        y++;
+    }
+    return (int)*x - (int)*y;
+}
+
+static uint16_t *order_playlists(const LibraryModel *model, Work *work)
+{
+    uint32_t count = model->playlist_count;
+    uint16_t *order = work_alloc(work, count * 2 + 2);
+    uint16_t *scratch = work_alloc(work, count * 2 + 2);
+    if (work->failed) {
+        return NULL;
+    }
+    for (uint32_t index = 0; index < count; index++) {
+        order[index] = (uint16_t)index;
+    }
+    PlaylistSort sort = {.model = model, .work_memory = work->memory};
+    stable_sort(order, scratch, count, by_playlist_name, &sort);
+    return order;
 }
 
 BuilderResult builder_encode(LibraryBuilder *builder, const LibraryModel *model, Work *work,
                              ByteSink sink, uint32_t *length)
 {
     uint32_t *path_offsets = work_alloc(work, model->track_count * 4 + 4);
-    if (path_offsets == NULL) {
+    uint16_t *playlist_order = order_playlists(model, work);
+    uint32_t *playlist_names = work_alloc(work, model->playlist_count * 4 + 4);
+    if (work->failed) {
         return BUILDER_OUT_OF_MEMORY;
     }
     *builder_output_offset(builder, builder->empty_string) = 0;
-    StringPass pass = {.builder = builder, .model = model, .path_offsets = path_offsets};
+    StringPass pass = {.builder = builder,
+                       .model = model,
+                       .path_offsets = path_offsets,
+                       .work_memory = work->memory,
+                       .playlist_order = playlist_order,
+                       .playlist_names = playlist_names};
     run_string_pass(&pass);
     Layout layout;
     plan(&layout, model, pass.length);
     Writer writer = {.sink = sink, .offset = 0, .used = 0, .failed = false};
-    write_records(&writer, builder, model, &layout, path_offsets);
+    write_records(&writer, &pass, &layout);
     put_byte(&writer, 0);
-    StringPass emit = {
-        .builder = builder, .model = model, .path_offsets = path_offsets, .writer = &writer};
+    StringPass emit = pass;
+    emit.writer = &writer;
     run_string_pass(&emit);
     flush(&writer);
     static const uint8_t MAGIC[4] = {'E', 'M', 'D', 'B'};

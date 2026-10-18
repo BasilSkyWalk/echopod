@@ -3,7 +3,7 @@ import random
 import sys
 from pathlib import Path
 
-from library_index import TrackInfo, build_library, encode_library
+from library_index import RawPlaylist, TrackInfo, build_library, encode_library
 
 SEED = 20261018
 TRACK_COUNT = 400
@@ -39,24 +39,75 @@ def random_track(rng, index):
                      duration_ms=rng.randint(1000, 600000))
 
 
+PLAYLIST_COUNT = 30
+PLAYLIST_NAMES = ["Road Trip", "road trip", "The Gym", "Gym", "Ünïcödé", "Chill", "Chill",
+                  "Best Of", "Ágætis"]
+
+
 def tracks():
     rng = random.Random(SEED)
     return [random_track(rng, index) for index in range(TRACK_COUNT)]
 
 
-def tsv(track_list):
+def entry_for(rng, path, folder):
+    parts = path.split("/")
+    style = rng.randrange(9)
+    if style == 0:
+        return path
+    if style == 1:
+        return path.upper() if rng.random() < 0.5 else path.lower()
+    if style == 2:
+        return "\\".join(parts)
+    if style == 3:
+        return "D:\\Music\\" + "\\".join(parts)
+    if style == 4:
+        return parts[-1]
+    if style == 5:
+        depth = len(folder.split("/")) if folder else 0
+        return "../" * depth + path
+    if style == 6:
+        return "./" + path
+    if style == 7:
+        return "Missing/" + parts[-1] + ".gone"
+    return "http://example.com/" + parts[-1]
+
+
+def playlists(track_list):
+    rng = random.Random(SEED + 1)
+    result = []
+    for _ in range(PLAYLIST_COUNT):
+        folder = rng.choice(["", "Playlists", "Music/Lists", "a"])
+        entries = [entry_for(rng, rng.choice(track_list).path, folder)
+                   for _ in range(rng.randint(0, 25))]
+        result.append(RawPlaylist(rng.choice(PLAYLIST_NAMES), folder, entries))
+    return result
+
+
+def playlist_rows(raw_playlists):
+    rows = []
+    for playlist in raw_playlists:
+        rows.append("\t".join(["#PLAYLIST", playlist.name, playlist.folder]))
+        rows.extend("\t" + entry for entry in playlist.entries)
+    return rows
+
+
+def tsv(track_list, raw_playlists=()):
     rows = []
     for track in track_list:
         rows.append("\t".join([track.path, track.title, track.artist, track.album_artist,
                                track.album, track.genre, str(track.year), str(track.disc),
                                str(track.number), str(track.duration_ms)]))
+    rows += playlist_rows(raw_playlists)
     return ("\n".join(rows) + "\n").encode("utf-8")
 
 
 def outputs(directory):
     track_list = tracks()
+    raw_playlists = playlists(track_list)
     return {directory / "tracks.tsv": tsv(track_list),
-            directory / "library.db": encode_library(build_library(track_list))}
+            directory / "library.db": encode_library(build_library(track_list)),
+            directory / "with_playlists.tsv": tsv(track_list, raw_playlists),
+            directory / "with_playlists.db": encode_library(build_library(track_list, raw_playlists))}
 
 
 def main():

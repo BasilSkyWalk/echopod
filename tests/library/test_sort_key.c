@@ -80,12 +80,31 @@ static void a_long_text_is_cut_at_the_capacity(void)
     CHECK_EQUAL(0, strcmp("aaaaaaaaaaaaaaa", key));
 }
 
+static void case_folding_keeps_accents_and_lowers_everything(void)
+{
+    char folded[64];
+    const char *text = "Bj\xc3\xb6rk/J\xc3\x93GA.flac";
+    case_fold_make(text, strlen(text), folded, sizeof folded);
+    CHECK_EQUAL(0, strcmp("bj\xc3\xb6rk/j\xc3\xb3ga.flac", folded));
+    text = "STRASSE stra\xc3\x9f"
+           "e";
+    case_fold_make(text, strlen(text), folded, sizeof folded);
+    CHECK_EQUAL(0, strcmp("strasse strasse", folded));
+    text = "\xc4\xb0x";
+    case_fold_make(text, strlen(text), folded, sizeof folded);
+    CHECK_EQUAL(0, strcmp("i\xcc\x87x", folded));
+    text = "ABCdef";
+    CHECK_EQUAL(3u, case_fold_make(text, 3, folded, sizeof folded));
+    CHECK_EQUAL(0, strcmp("abc", folded));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(keys_match_the_pc_indexer),
         TEST_CASE(comparison_follows_the_keys),
         TEST_CASE(a_long_text_is_cut_at_the_capacity),
+        TEST_CASE(case_folding_keeps_accents_and_lowers_everything),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

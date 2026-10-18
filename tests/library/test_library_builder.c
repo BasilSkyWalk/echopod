@@ -173,6 +173,84 @@ static void random_tracks_build_the_same_bytes_as_the_pc_indexer(void)
     free(text);
 }
 
+static void check_matches(const char *fixture, const Output *output, uint32_t length)
+{
+    uint32_t expected_size = 0;
+    uint8_t *expected = read_fixture(fixture, &expected_size);
+    CHECK_EQUAL(expected_size, length);
+    uint32_t first_difference = expected_size;
+    for (uint32_t index = 0; index < expected_size && index < output->length; index++) {
+        if (expected[index] != output->bytes[index]) {
+            first_difference = index;
+            break;
+        }
+    }
+    CHECK_EQUAL(expected_size, first_difference);
+    free(expected);
+}
+
+static void the_fixture_playlist_resolves_like_the_pc_indexer(void)
+{
+    static uint8_t memory[MEMORY_SIZE];
+    static Output output;
+    output.length = 0;
+    LibraryBuilder builder;
+    library_builder_init(&builder, memory, sizeof memory);
+    add_fixture_tracks(&builder);
+    CHECK_EQUAL(BUILDER_OK, library_builder_begin_playlist(&builder, "Road Trip", "Playlists"));
+    const char *entries[] = {
+        "../acloudyskye/This Won't Be The Last Time/01 - Shoots.flac",
+        "../AC DC/Back In Black/1-01 - Hells Bells.flac",
+        "../Missing/Gone.flac",
+        "../Bj\xc3\xb6rk/Homogenic/02 - J\xc3\xb3ga.flac",
+    };
+    for (size_t index = 0; index < sizeof entries / sizeof entries[0]; index++) {
+        CHECK_EQUAL(BUILDER_OK, library_builder_playlist_entry(&builder, entries[index]));
+    }
+    uint32_t length = 0;
+    CHECK_EQUAL(BUILDER_OK,
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, &length));
+    check_matches("small_library.db", &output, length);
+}
+
+static void add_tsv_line(LibraryBuilder *builder, char **cursor)
+{
+    if (strncmp(*cursor, "#PLAYLIST\t", 10) == 0) {
+        *cursor += 10;
+        char *name = next_field(cursor);
+        char *folder = next_field(cursor);
+        CHECK_EQUAL(BUILDER_OK, library_builder_begin_playlist(builder, name, folder));
+    } else if (**cursor == '\t') {
+        (*cursor)++;
+        CHECK_EQUAL(BUILDER_OK, library_builder_playlist_entry(builder, next_field(cursor)));
+    } else {
+        BuilderTrack parsed = parse_track(cursor);
+        CHECK_EQUAL(BUILDER_OK, library_builder_add_track(builder, &parsed));
+    }
+}
+
+static void random_playlists_resolve_like_the_pc_indexer(void)
+{
+    static uint8_t memory[MEMORY_SIZE];
+    static Output output;
+    output.length = 0;
+    uint32_t tsv_size = 0;
+    uint8_t *tsv = read_fixture("builder_random/with_playlists.tsv", &tsv_size);
+    char *text = realloc(tsv, tsv_size + 1);
+    text[tsv_size] = '\0';
+    LibraryBuilder builder;
+    library_builder_init(&builder, memory, sizeof memory);
+    char *cursor = text;
+    while (*cursor != '\0') {
+        add_tsv_line(&builder, &cursor);
+    }
+    uint32_t length = 0;
+    CHECK_EQUAL(BUILDER_OK,
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, &length));
+    check_matches("builder_random/with_playlists.db", &output, length);
+    free(text);
+}
+
 static void a_library_too_big_for_the_memory_says_so(void)
 {
     static uint8_t memory[2048];
@@ -207,6 +285,8 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(the_fixture_tracks_build_the_same_bytes_as_the_pc_indexer),
         TEST_CASE(random_tracks_build_the_same_bytes_as_the_pc_indexer),
+        TEST_CASE(the_fixture_playlist_resolves_like_the_pc_indexer),
+        TEST_CASE(random_playlists_resolve_like_the_pc_indexer),
         TEST_CASE(a_library_too_big_for_the_memory_says_so),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
     };

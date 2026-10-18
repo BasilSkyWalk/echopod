@@ -255,13 +255,42 @@ int builder_compare_raw(const LibraryBuilder *builder, uint32_t left, uint32_t r
 void *work_alloc(Work *work, uint32_t bytes)
 {
     uint32_t need = (bytes + 3) & ~3u;
-    if (work->failed || need > work->size - work->used) {
+    if (work->failed || need > work->top - work->used) {
         work->failed = true;
         return NULL;
     }
     void *block = work->memory + work->used;
     work->used += need;
     return block;
+}
+
+void *work_alloc_top(Work *work, uint32_t bytes)
+{
+    uint32_t need = (bytes + 3) & ~3u;
+    if (work->failed || need > work->top - work->used) {
+        work->failed = true;
+        return NULL;
+    }
+    work->top -= need;
+    return work->memory + work->top;
+}
+
+uint32_t builder_find(const LibraryBuilder *builder, const char *text, uint32_t length)
+{
+    uint32_t hash = hash_update(HASH_START, text, length);
+    uint32_t mask = builder->slot_count - 1;
+    for (uint32_t probe = 0; probe < builder->slot_count; probe++) {
+        uint32_t slot = slots(builder)[(hash + probe) & mask];
+        if (slot == 0) {
+            return BUILDER_UNSET;
+        }
+        uint32_t string = slot - 1;
+        if (*(uint32_t *)(void *)(builder->memory + string + 4) == hash &&
+            same_text(builder_text(builder, string), text, length)) {
+            return string;
+        }
+    }
+    return BUILDER_UNSET;
 }
 
 static void merge(uint16_t *from, uint16_t *to, uint32_t start, uint32_t middle, uint32_t end,
@@ -298,19 +327,146 @@ void stable_sort(uint16_t *items, uint16_t *scratch, uint32_t count, IndexCompar
     }
 }
 
+enum {
+    PLAYLIST_SHARE = 64,
+    MAX_PLAYLISTS = 1024
+};
+
+static Work open_work(const LibraryBuilder *builder)
+{
+    return (Work){.memory = builder->memory + builder->work_start,
+                  .used = builder->work_used,
+                  .top = builder->work_top,
+                  .failed = false};
+}
+
+static void close_work(LibraryBuilder *builder, const Work *work)
+{
+    builder->work_used = work->used;
+    builder->work_top = work->top;
+}
+
+static bool reserve_playlists(const LibraryBuilder *builder, Work *work, LibraryModel *model)
+{
+    uint32_t capacity = (work->top - work->used) / PLAYLIST_SHARE / (uint32_t)sizeof(PlaylistModel);
+    capacity = capacity < MAX_PLAYLISTS ? capacity : MAX_PLAYLISTS;
+    model->playlist_capacity = capacity;
+    model->playlists =
+        work_alloc(work, (capacity > 0 ? capacity : 1u) * (uint32_t)sizeof(PlaylistModel));
+    model->playlist_links = (uint16_t *)(void *)(work->memory + work->used);
+    (void)builder;
+    return !work->failed;
+}
+
+BuilderResult library_builder_prepare(LibraryBuilder *builder)
+{
+    if (builder->prepared) {
+        return builder->prepare_result;
+    }
+    builder->prepared = true;
+    builder->prepare_result = BUILDER_OUT_OF_MEMORY;
+    if (builder->empty_string == BUILDER_UNSET) {
+        return builder->prepare_result;
+    }
+    builder->work_start = (tracks_end(builder) + 7) & ~7u;
+    builder->work_used = 0;
+    builder->work_top = builder->strings_floor > builder->work_start
+                            ? (builder->strings_floor - builder->work_start) & ~3u
+                            : 0;
+    Work work = open_work(builder);
+    LibraryModel *model = work_alloc(&work, (uint32_t)sizeof(LibraryModel));
+    if (model == NULL || !builder_build_model(builder, &work, model) ||
+        !builder_index_paths(builder, &work, model) || !reserve_playlists(builder, &work, model)) {
+        return builder->prepare_result;
+    }
+    close_work(builder, &work);
+    builder->model = model;
+    builder->prepare_result = BUILDER_OK;
+    return BUILDER_OK;
+}
+
+static uint32_t text_bytes(const char *text)
+{
+    uint32_t length = 0;
+    while (text[length] != '\0') {
+        length++;
+    }
+    return length;
+}
+
+static uint32_t keep_text(Work *work, const char *text)
+{
+    uint32_t length = text_bytes(text);
+    char *copy = work_alloc_top(work, length + 1);
+    if (copy == NULL) {
+        return BUILDER_UNSET;
+    }
+    for (uint32_t index = 0; index <= length; index++) {
+        copy[index] = text[index];
+    }
+    return (uint32_t)((uint8_t *)copy - work->memory);
+}
+
+BuilderResult library_builder_begin_playlist(LibraryBuilder *builder, const char *name,
+                                             const char *folder)
+{
+    BuilderResult result = library_builder_prepare(builder);
+    LibraryModel *model = builder->model;
+    if (result != BUILDER_OK) {
+        return result;
+    }
+    if (model->playlist_count >= model->playlist_capacity) {
+        return BUILDER_TOO_MANY;
+    }
+    Work work = open_work(builder);
+    uint32_t kept_name = keep_text(&work, name);
+    uint32_t kept_folder = keep_text(&work, folder);
+    if (kept_name == BUILDER_UNSET || kept_folder == BUILDER_UNSET) {
+        return BUILDER_OUT_OF_MEMORY;
+    }
+    close_work(builder, &work);
+    model->playlist_folder = kept_folder;
+    model->playlists[model->playlist_count++] =
+        (PlaylistModel){.name = kept_name,
+                        .name_output = BUILDER_UNSET,
+                        .first_link = model->playlist_link_count,
+                        .count = 0};
+    return BUILDER_OK;
+}
+
+BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char *entry)
+{
+    LibraryModel *model = builder->model;
+    if (!builder->prepared || builder->prepare_result != BUILDER_OK || model->playlist_count == 0) {
+        return BUILDER_OUT_OF_MEMORY;
+    }
+    Work work = open_work(builder);
+    const char *folder = (const char *)work.memory + model->playlist_folder;
+    uint32_t position = builder_resolve_entry(builder, model, folder, entry);
+    if (position == BUILDER_UNSET) {
+        return BUILDER_OK;
+    }
+    if (work.top - work.used < 2) {
+        return BUILDER_OUT_OF_MEMORY;
+    }
+    model->playlist_links[model->playlist_link_count] = (uint16_t)position;
+    work.used += 2;
+    close_work(builder, &work);
+    model->playlist_link_count++;
+    model->playlists[model->playlist_count - 1].count++;
+    return BUILDER_OK;
+}
+
 BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t *length)
 {
-    if (builder->empty_string == BUILDER_UNSET) {
+    BuilderResult result = library_builder_prepare(builder);
+    if (result != BUILDER_OK) {
+        return result;
+    }
+    Work work = open_work(builder);
+    work.used = (work.used + 3) & ~3u;
+    if (work.used > work.top) {
         return BUILDER_OUT_OF_MEMORY;
     }
-    uint32_t start = (tracks_end(builder) + 3) & ~3u;
-    Work work = {.memory = builder->memory + start,
-                 .used = 0,
-                 .size = builder->strings_floor > start ? builder->strings_floor - start : 0,
-                 .failed = false};
-    LibraryModel model;
-    if (!builder_build_model(builder, &work, &model)) {
-        return BUILDER_OUT_OF_MEMORY;
-    }
-    return builder_encode(builder, &model, &work, sink, length);
+    return builder_encode(builder, builder->model, &work, sink, length);
 }

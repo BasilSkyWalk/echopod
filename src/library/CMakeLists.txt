@@ -5,9 +5,11 @@ add_library(echo_library STATIC
     library.c
     library_browse.c
     library_scan.c
+    playlist_reader.c
     library_builder.c
     library_builder_encode.c
     library_builder_model.c
+    library_builder_paths.c
     sort_fold_table.c
     sort_key.c
     tags_ape.c
