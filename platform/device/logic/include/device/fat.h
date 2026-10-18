@@ -8,7 +8,8 @@
 enum {
     FAT_SECTOR_SIZE = 512,
     FAT_CACHE_SECTORS = 8,
-    FAT_LONG_NAME_CAPACITY = 260
+    FAT_LONG_NAME_CAPACITY = 260,
+    FAT_NAME_CAPACITY = 768
 };
 
 typedef enum FatType {
@@ -47,7 +48,20 @@ typedef struct FatVolume {
     uint16_t long_name[FAT_LONG_NAME_CAPACITY];
 } FatVolume;
 
+typedef struct FatDirCursor {
+    FatFile directory;
+    uint32_t index;
+} FatDirCursor;
+
+typedef struct FatDirEntry {
+    FatFile file;
+    bool hidden;
+    char name[FAT_NAME_CAPACITY];
+} FatDirEntry;
+
 bool fat_mount(FatVolume *volume, BlockDevice device);
+bool fat_open_directory(FatVolume *volume, const char *path, FatDirCursor *cursor);
+bool fat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *entry);
 bool fat_open(FatVolume *volume, const char *path, FatFile *file);
 bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, uint32_t length);
 bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *bytes,

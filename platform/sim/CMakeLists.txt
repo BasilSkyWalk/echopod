@@ -12,6 +12,10 @@ add_library(echo_sim_decoder STATIC sim_decoder.c)
 target_include_directories(echo_sim_decoder PUBLIC .)
 target_link_libraries(echo_sim_decoder PUBLIC echo_hal echo_sim_codecs PRIVATE echo_core echo_options)
 
+add_library(echo_sim_storage STATIC sim_storage.c)
+target_include_directories(echo_sim_storage PUBLIC .)
+target_link_libraries(echo_sim_storage PUBLIC echo_hal PRIVATE echo_options)
+
 add_executable(echo_sim
     main.c
     sim_audio.c
@@ -20,8 +24,7 @@ add_executable(echo_sim
     sim_display.c
     sim_input.c
     sim_power.c
-    sim_storage.c
     sim_system.c
 )
 target_compile_definitions(echo_sim PRIVATE SDL_MAIN_HANDLED)
-target_link_libraries(echo_sim PRIVATE echo_app echo_sim_options echo_sim_decoder echo_options SDL2::SDL2)
+target_link_libraries(echo_sim PRIVATE echo_app echo_sim_options echo_sim_decoder echo_sim_storage echo_options SDL2::SDL2)

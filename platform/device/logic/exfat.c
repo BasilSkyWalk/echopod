@@ -8,6 +8,7 @@ enum {
     ENTRY_FILE = 0x85,
     ENTRY_STREAM = 0xC0,
     ENTRY_NAME = 0xC1,
+    ATTRIBUTE_HIDDEN = 0x02,
     ATTRIBUTE_DIRECTORY = 0x10,
     FLAG_NO_FAT_CHAIN = 0x02,
     NAME_UNITS_PER_ENTRY = 15,
@@ -25,6 +26,7 @@ typedef struct EntrySet {
     uint8_t secondaries;
     uint8_t name_length;
     bool directory;
+    bool hidden;
     bool contiguous;
 } EntrySet;
 
@@ -79,6 +81,7 @@ static bool read_set(FatVolume *volume, FatFile *directory, uint32_t index, Entr
     const uint8_t *entry = fat_read_entry(volume, directory, index);
     set->secondaries = entry[1];
     set->directory = (fat_le16(entry + 4) & ATTRIBUTE_DIRECTORY) != 0;
+    set->hidden = (fat_le16(entry + 4) & ATTRIBUTE_HIDDEN) != 0;
     return set->secondaries >= MINIMUM_SECONDARIES && set->secondaries <= MAXIMUM_SECONDARIES &&
            read_stream(volume, directory, index + 1, set);
 }
@@ -102,6 +105,31 @@ bool exfat_find_entry(FatVolume *volume, FatFile *directory, const char *name, s
             return file_from_set(&set, found);
         }
         index += 1u + set.secondaries;
+    }
+    return false;
+}
+
+bool exfat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *found)
+{
+    while (cursor->index < MAXIMUM_DIRECTORY_ENTRIES) {
+        uint32_t index = cursor->index;
+        const uint8_t *entry = fat_read_entry(volume, &cursor->directory, index);
+        if (entry == NULL || entry[0] == ENTRY_END) {
+            return false;
+        }
+        EntrySet set = {.secondaries = 0};
+        if (entry[0] != ENTRY_FILE || !read_set(volume, &cursor->directory, index, &set)) {
+            cursor->index++;
+            continue;
+        }
+        cursor->index += 1u + set.secondaries;
+        read_names(volume, &cursor->directory, index + 1, &set);
+        if (file_from_set(&set, &found->file)) {
+            found->hidden = set.hidden;
+            fat_utf8_from_units(volume->long_name, set.name_length, found->name,
+                                sizeof found->name);
+            return true;
+        }
     }
     return false;
 }

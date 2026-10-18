@@ -11,6 +11,7 @@ enum {
     ENTRY_END = 0x00,
     ENTRY_DELETED = 0xE5,
     ATTRIBUTES = 11,
+    ATTRIBUTE_HIDDEN = 0x02,
     ATTRIBUTE_VOLUME_ID = 0x08,
     ATTRIBUTE_DIRECTORY = 0x10,
     ATTRIBUTE_LONG_NAME = 0x0F,
@@ -22,6 +23,9 @@ enum {
     SHORT_NAME_LENGTH = 11,
     SHORT_BASE_LENGTH = 8,
     KANJI_E5_MARKER = 0x05,
+    CASE_FLAGS = 12,
+    LOWER_BASE = 0x08,
+    LOWER_EXTENSION = 0x10,
     MAXIMUM_DIRECTORY_ENTRIES = 65536
 };
 
@@ -177,10 +181,10 @@ static size_t component_length(const char *path)
     return length;
 }
 
-bool fat_open(FatVolume *volume, const char *path, FatFile *file)
+static bool walk_path(FatVolume *volume, const char *path, FatFile *found, bool *found_any)
 {
     FatFile current = fat_root_directory(volume);
-    bool found_any = false;
+    *found_any = false;
     while (*path != '\0') {
         if (*path == '/') {
             path++;
@@ -190,16 +194,108 @@ bool fat_open(FatVolume *volume, const char *path, FatFile *file)
         if (!current.directory || !find_entry(volume, &current, path, length, &current)) {
             return false;
         }
-        found_any = true;
+        *found_any = true;
         path += length;
     }
-    if (!found_any || current.directory) {
+    *found = current;
+    return true;
+}
+
+bool fat_open(FatVolume *volume, const char *path, FatFile *file)
+{
+    FatFile current;
+    bool found_any = false;
+    if (!walk_path(volume, path, &current, &found_any) || !found_any || current.directory) {
         return false;
     }
     current.cursor_index = 0;
     current.cursor_cluster = 0;
     *file = current;
     return true;
+}
+
+bool fat_open_directory(FatVolume *volume, const char *path, FatDirCursor *cursor)
+{
+    FatFile directory;
+    bool found_any = false;
+    if (!walk_path(volume, path, &directory, &found_any) || !directory.directory) {
+        return false;
+    }
+    directory.cursor_index = 0;
+    directory.cursor_cluster = 0;
+    *cursor = (FatDirCursor){.directory = directory, .index = 0};
+    return true;
+}
+
+static void lower_ascii(char *text, size_t length)
+{
+    for (size_t index = 0; index < length; index++) {
+        if (text[index] >= 'A' && text[index] <= 'Z') {
+            text[index] = (char)(text[index] - 'A' + 'a');
+        }
+    }
+}
+
+static void short_name_utf8(const uint8_t *entry, char *out)
+{
+    size_t base = trimmed_length(entry, SHORT_BASE_LENGTH);
+    size_t length = short_name_text(entry, out);
+    out[length] = '\0';
+    if ((entry[CASE_FLAGS] & LOWER_BASE) != 0) {
+        lower_ascii(out, base);
+    }
+    if ((entry[CASE_FLAGS] & LOWER_EXTENSION) != 0 && length > base) {
+        lower_ascii(out + base, length - base);
+    }
+}
+
+static bool is_dot_entry(const uint8_t *entry)
+{
+    return entry[0] == '.' && (entry[1] == ' ' || (entry[1] == '.' && entry[2] == ' '));
+}
+
+static void fill_entry(FatVolume *volume, const LongName *long_name, const uint8_t *entry,
+                       FatDirEntry *found)
+{
+    found->file = entry_file(volume, entry);
+    found->hidden = (entry[ATTRIBUTES] & ATTRIBUTE_HIDDEN) != 0;
+    if (long_name_applies(long_name, entry)) {
+        size_t limit = (size_t)long_name->entries * CHARACTERS_PER_ENTRY;
+        fat_utf8_from_units(volume->long_name, limit, found->name, sizeof found->name);
+    } else {
+        short_name_utf8(entry, found->name);
+    }
+}
+
+static bool next_fat_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *found)
+{
+    LongName long_name = {.valid = false};
+    while (cursor->index < MAXIMUM_DIRECTORY_ENTRIES) {
+        const uint8_t *entry = fat_read_entry(volume, &cursor->directory, cursor->index);
+        if (entry == NULL || entry[0] == ENTRY_END) {
+            return false;
+        }
+        cursor->index++;
+        if (entry[0] == ENTRY_DELETED) {
+            long_name.valid = false;
+        } else if (entry[ATTRIBUTES] == ATTRIBUTE_LONG_NAME) {
+            collect_long_name(volume, &long_name, entry);
+        } else if ((entry[ATTRIBUTES] & ATTRIBUTE_VOLUME_ID) != 0 || is_dot_entry(entry)) {
+            long_name.valid = false;
+        } else {
+            fill_entry(volume, &long_name, entry, found);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool fat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *entry)
+{
+    if (volume->type == FAT_TYPE_EXFAT) {
+        return exfat_next_entry(volume, cursor, entry);
+    }
+    return next_fat_entry(volume, cursor, entry);
 }
 
 bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, uint32_t length)

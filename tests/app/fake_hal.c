@@ -664,3 +664,22 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
 {
     return &fake.bluetooth;
 }
+
+bool hal_dir_open(HalDir *dir, const char *path)
+{
+    (void)path;
+    dir->handle = -1;
+    return false;
+}
+
+bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
+{
+    (void)dir;
+    (void)entry;
+    return false;
+}
+
+void hal_dir_close(HalDir *dir)
+{
+    dir->handle = -1;
+}

@@ -7,7 +7,8 @@
 #include "storage_reset.h"
 
 enum {
-    OPEN_FILE_CAPACITY = 8
+    OPEN_FILE_CAPACITY = 8,
+    OPEN_DIR_CAPACITY = 16
 };
 
 typedef enum MountState {
@@ -16,10 +17,15 @@ typedef enum MountState {
     MOUNT_FAILED
 } MountState;
 
+_Static_assert((int)HAL_NAME_CAPACITY == (int)FAT_NAME_CAPACITY, "listed names fit the HAL entry");
+
 static MountState mount_state;
 static FatVolume volume;
 static FatFile files[OPEN_FILE_CAPACITY];
 static bool in_use[OPEN_FILE_CAPACITY];
+static FatDirCursor dirs[OPEN_DIR_CAPACITY];
+static bool dir_in_use[OPEN_DIR_CAPACITY];
+static FatDirEntry listed;
 
 static bool mounted(void)
 {
@@ -93,4 +99,52 @@ void storage_reset(void)
     for (int slot = 0; slot < OPEN_FILE_CAPACITY; slot++) {
         in_use[slot] = false;
     }
+    for (int slot = 0; slot < OPEN_DIR_CAPACITY; slot++) {
+        dir_in_use[slot] = false;
+    }
+}
+
+static int free_dir_slot(void)
+{
+    for (int slot = 0; slot < OPEN_DIR_CAPACITY; slot++) {
+        if (!dir_in_use[slot]) {
+            return slot;
+        }
+    }
+    return -1;
+}
+
+bool hal_dir_open(HalDir *dir, const char *path)
+{
+    dir->handle = -1;
+    int slot = free_dir_slot();
+    if (slot < 0 || !mounted() || !fat_open_directory(&volume, path, &dirs[slot])) {
+        return false;
+    }
+    dir_in_use[slot] = true;
+    dir->handle = slot;
+    return true;
+}
+
+bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
+{
+    if (dir->handle < 0 || dir->handle >= OPEN_DIR_CAPACITY || !dir_in_use[dir->handle] ||
+        !fat_next_entry(&volume, &dirs[dir->handle], &listed)) {
+        return false;
+    }
+    entry->directory = listed.file.directory;
+    entry->hidden = listed.hidden;
+    entry->size = listed.file.directory ? 0 : listed.file.size;
+    for (size_t index = 0; index < sizeof entry->name; index++) {
+        entry->name[index] = listed.name[index];
+    }
+    return true;
+}
+
+void hal_dir_close(HalDir *dir)
+{
+    if (dir->handle >= 0 && dir->handle < OPEN_DIR_CAPACITY) {
+        dir_in_use[dir->handle] = false;
+    }
+    dir->handle = -1;
 }

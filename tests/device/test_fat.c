@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -398,6 +399,112 @@ static void a_device_without_writes_refuses_to_write(void)
     sparse_card_free(&card->sparse);
 }
 
+typedef struct Listing {
+    int count;
+    int directories;
+    bool found;
+    FatDirEntry match;
+} Listing;
+
+static Listing list(Card *card, const char *path, const char *wanted)
+{
+    Listing listing = {.count = 0, .directories = 0, .found = false};
+    FatDirCursor cursor;
+    CHECK(fat_open_directory(&card->volume, path, &cursor));
+    static FatDirEntry entry;
+    while (fat_next_entry(&card->volume, &cursor, &entry)) {
+        if (strncmp(entry.name, "._", 2) == 0) {
+            continue;
+        }
+        listing.count++;
+        listing.directories += entry.file.directory;
+        if (wanted != NULL && strcmp(entry.name, wanted) == 0) {
+            listing.found = true;
+            listing.match = entry;
+        }
+    }
+    return listing;
+}
+
+static void check_root_listing(const char *name)
+{
+    Card *card = mounted(name);
+    Listing music = list(card, "/", "Music");
+    CHECK(music.found);
+    CHECK(music.match.file.directory);
+    Listing notes = list(card, "/", "notes.txt");
+    CHECK(notes.found);
+    CHECK(!notes.match.file.directory);
+    CHECK_EQUAL(700, notes.match.file.size);
+    CHECK(list(card, "/", "README.TXT").found);
+    CHECK(list(card, "/", ".echo").found);
+    CHECK(!list(card, "/", ".").found);
+    CHECK(!list(card, "/", "..").found);
+    sparse_card_free(&card->sparse);
+}
+
+static void the_fat32_root_lists_its_files_and_folders(void)
+{
+    check_root_listing("fat32_mbr");
+}
+
+static void the_fat16_root_lists_its_files_and_folders(void)
+{
+    check_root_listing("fat16_superfloppy");
+}
+
+static void the_exfat_root_lists_its_files_and_folders(void)
+{
+    check_root_listing("exfat_mbr");
+}
+
+static void check_folder_listing(const char *name)
+{
+    Card *card = mounted(name);
+    Listing album = list(card, "/Music/Sigur R\xc3\xb3s/\xc3\x81g\xc3\xa6tis byrjun",
+                         "02 Svefn-g-englar with a long name.flac");
+    CHECK_EQUAL(2, album.count);
+    CHECK(album.found);
+    CHECK_EQUAL(20000, album.match.file.size);
+    Listing music = list(card, "/Music", "\xf0\x9f\x8e\xb5 Emoji");
+    CHECK(music.found);
+    CHECK(music.match.file.directory);
+    Listing many = list(card, "/Many", "file number 119.txt");
+    CHECK_EQUAL(120, many.count);
+    CHECK_EQUAL(0, many.directories);
+    CHECK(many.found);
+    sparse_card_free(&card->sparse);
+}
+
+static void fat32_folders_list_long_unicode_names(void)
+{
+    check_folder_listing("fat32_mbr");
+}
+
+static void exfat_folders_list_long_unicode_names(void)
+{
+    check_folder_listing("exfat_mbr");
+}
+
+static void a_listed_file_opens_and_reads(void)
+{
+    Card *card = mounted("exfat_mbr");
+    Listing readme = list(card, "/", "README.TXT");
+    uint8_t bytes[100];
+    CHECK(fat_read(&card->volume, &readme.match.file, 0, bytes, sizeof bytes));
+    check_pattern(bytes, 2, 0, sizeof bytes);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_file_is_not_a_directory_to_list(void)
+{
+    Card *card = mounted("fat32_mbr");
+    FatDirCursor cursor;
+    CHECK(!fat_open_directory(&card->volume, "/notes.txt", &cursor));
+    CHECK(!fat_open_directory(&card->volume, "/Missing", &cursor));
+    sparse_card_free(&card->sparse);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -426,6 +533,13 @@ int main(void)
         TEST_CASE(exfat_writes_land_in_place_across_sectors_and_clusters),
         TEST_CASE(a_write_past_the_end_fails_and_changes_nothing),
         TEST_CASE(a_device_without_writes_refuses_to_write),
+        TEST_CASE(the_fat32_root_lists_its_files_and_folders),
+        TEST_CASE(the_fat16_root_lists_its_files_and_folders),
+        TEST_CASE(the_exfat_root_lists_its_files_and_folders),
+        TEST_CASE(fat32_folders_list_long_unicode_names),
+        TEST_CASE(exfat_folders_list_long_unicode_names),
+        TEST_CASE(a_listed_file_opens_and_reads),
+        TEST_CASE(a_file_is_not_a_directory_to_list),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

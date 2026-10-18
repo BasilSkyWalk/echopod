@@ -62,6 +62,7 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 ## Settings and favorites
 
 - `app/settings_store` loads `/.echo/settings.bin` (defaults if it's missing or invalid), applies brightness, gain and output through the HAL, and only writes when the encoded bytes changed.
+- `hal_dir_open`, `hal_dir_next` and `hal_dir_close` list a folder: name (UTF-8, up to 767 bytes), folder or file, size, and a hidden flag (the FAT/exFAT hidden attribute on the device, a leading dot in the simulator). `.` and `..` are never listed. On the device, `fat_open_directory` and `fat_next_entry` walk FAT16/FAT32 entries (long names, or 8.3 names with the lowercase flags) and exFAT entry sets; up to 16 folders can be open at once. macOS's `._` files are listed like any other file.
 - On the device, `hal_file_write` overwrites an existing file in place from offset 0 (`fat_write`, FAT16, FAT32 and exFAT) and fails if the file is missing or too short; it never allocates clusters or changes a directory entry. `tools/save_files.py` makes 4 KB zero-filled `settings.bin`, `resume.bin` and `favorites.bin` once. Every reader checks its magic and accepts a longer file, so a zero-filled file reads as missing.
 - At start-up the saved volume, shuffle and repeat go to the player first, and then a valid resume file overrides them. The current volume, shuffle and repeat are copied back into the settings before every save.
 - The start screen setting pushes the matching path at start-up (for example Home → Music → Albums), so Back still leads home.

@@ -1,14 +1,17 @@
 #include "sim_storage.h"
 
+#include <dirent.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "hal/storage.h"
 
 enum {
     OPEN_FILE_CAPACITY = 8,
+    OPEN_DIR_CAPACITY = 16,
     PATH_CAPACITY = 1024
 };
 
@@ -18,6 +21,8 @@ typedef struct SimStorage {
     const char *card_directory;
     const char *system_directory;
     FILE *files[OPEN_FILE_CAPACITY];
+    DIR *dirs[OPEN_DIR_CAPACITY];
+    char dir_paths[OPEN_DIR_CAPACITY][PATH_CAPACITY];
 } SimStorage;
 
 static SimStorage storage;
@@ -143,4 +148,74 @@ void sim_storage_close_all(void)
             storage.files[slot] = NULL;
         }
     }
+}
+
+static int free_dir_slot(void)
+{
+    for (int slot = 0; slot < OPEN_DIR_CAPACITY; slot++) {
+        if (storage.dirs[slot] == NULL) {
+            return slot;
+        }
+    }
+    return -1;
+}
+
+bool hal_dir_open(HalDir *dir, const char *path)
+{
+    dir->handle = -1;
+    int slot = free_dir_slot();
+    char *resolved = slot >= 0 ? storage.dir_paths[slot] : NULL;
+    if (slot < 0 || !sim_storage_host_path(path, resolved, PATH_CAPACITY)) {
+        return false;
+    }
+    storage.dirs[slot] = opendir(resolved);
+    if (storage.dirs[slot] == NULL) {
+        return false;
+    }
+    dir->handle = slot;
+    return true;
+}
+
+static bool is_dot_name(const char *name)
+{
+    return strcmp(name, ".") == 0 || strcmp(name, "..") == 0;
+}
+
+static bool describe(int slot, const char *name, HalDirEntry *entry)
+{
+    char full[PATH_CAPACITY];
+    struct stat status;
+    int written = snprintf(full, sizeof full, "%s/%s", storage.dir_paths[slot], name);
+    if (written <= 0 || (size_t)written >= sizeof full || stat(full, &status) != 0 ||
+        strlen(name) >= sizeof entry->name) {
+        return false;
+    }
+    entry->directory = S_ISDIR(status.st_mode);
+    entry->hidden = name[0] == '.';
+    entry->size = entry->directory || status.st_size > UINT32_MAX ? 0 : (uint32_t)status.st_size;
+    strcpy(entry->name, name);
+    return true;
+}
+
+bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
+{
+    if (dir->handle < 0 || dir->handle >= OPEN_DIR_CAPACITY || storage.dirs[dir->handle] == NULL) {
+        return false;
+    }
+    struct dirent *found = NULL;
+    while ((found = readdir(storage.dirs[dir->handle])) != NULL) {
+        if (!is_dot_name(found->d_name) && describe(dir->handle, found->d_name, entry)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void hal_dir_close(HalDir *dir)
+{
+    if (dir->handle >= 0 && dir->handle < OPEN_DIR_CAPACITY && storage.dirs[dir->handle] != NULL) {
+        closedir(storage.dirs[dir->handle]);
+        storage.dirs[dir->handle] = NULL;
+    }
+    dir->handle = -1;
 }
