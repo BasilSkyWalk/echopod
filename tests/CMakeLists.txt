@@ -52,6 +52,11 @@ foreach(library_test block_cache library library_browse favorites covers sort_ke
         LIBRARIES echo_library_fixtures
     )
 endforeach()
+echo_add_unit_test(NAME test_library_builder
+    SOURCES library/test_library_builder.c
+    LIBRARIES echo_library_fixtures
+)
+target_compile_definitions(test_library_builder PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_track_tags
     SOURCES library/test_track_tags.c
     LIBRARIES echo_library_fixtures
@@ -259,6 +264,11 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_covers.bin
             --check
     )
+    add_test(NAME builder_fixture_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/builder_fixture.py
+            --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/builder_random
+            --check
+    )
     add_test(NAME sort_fold_up_to_date
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/fold_table.py
             --output ${PROJECT_SOURCE_DIR}/src/library
@@ -268,6 +278,7 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
     add_test(NAME library_fixture_up_to_date
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/library_fixture.py
             --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_library.db
+            --tracks-only-output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_library_tracks.db
             --check
     )
 else()

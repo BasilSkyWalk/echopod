@@ -48,9 +48,14 @@ def fixture_bytes():
     return encode_library(build_library(FIXTURE_TRACKS, FIXTURE_PLAYLISTS))
 
 
+def tracks_only_bytes():
+    return encode_library(build_library(FIXTURE_TRACKS))
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Write the small library used by the C tests")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--tracks-only-output", type=Path, required=True)
     parser.add_argument("--check", action="store_true",
                         help="fail if the committed fixture differs from a fresh build")
     return parser.parse_args()
@@ -58,16 +63,18 @@ def parse_arguments():
 
 def main():
     arguments = parse_arguments()
-    data = fixture_bytes()
+    outputs = {arguments.output: fixture_bytes(),
+               arguments.tracks_only_output: tracks_only_bytes()}
     if arguments.check:
-        current = arguments.output.read_bytes() if arguments.output.exists() else b""
-        if current != data:
-            print(f"out of date: {arguments.output}")
-            return 1
-        return 0
-    arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_bytes(data)
-    print(f"wrote {len(data):,} bytes to {arguments.output}")
+        stale = [path for path, data in outputs.items()
+                 if not path.exists() or path.read_bytes() != data]
+        for path in stale:
+            print(f"out of date: {path}")
+        return 1 if stale else 0
+    for path, data in outputs.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        print(f"wrote {len(data):,} bytes to {path}")
     return 0
 
 
