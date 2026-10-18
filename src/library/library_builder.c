@@ -1,5 +1,7 @@
 #include "library/library_builder.h"
 
+#include <stdint.h>
+
 #include "builder_internal.h"
 #include "core/hash.h"
 #include "library/sort_key.h"
@@ -9,7 +11,8 @@ enum {
     BYTES_PER_FOLDER_SHARE = 192,
     MINIMUM_SLOTS = 16,
     MINIMUM_FOLDERS = 8,
-    MAX_INDEX = 0xFFFF
+    MAX_INDEX = 0xFFFF,
+    ALIGNMENT = 8
 };
 
 const char *builder_text(const LibraryBuilder *builder, uint32_t string)
@@ -57,9 +60,11 @@ static uint32_t intern(LibraryBuilder *builder, const char *text, uint32_t lengt
 
 void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size)
 {
+    uint32_t skip = (uint32_t)((ALIGNMENT - (uintptr_t)memory % ALIGNMENT) % ALIGNMENT);
+    size = size > skip ? size - skip : 0;
     uint32_t slot_share = size / BYTES_PER_SLOT_SHARE;
     uint32_t folders = size / BYTES_PER_FOLDER_SHARE;
-    *builder = (LibraryBuilder){.memory = memory, .size = size & ~3u};
+    *builder = (LibraryBuilder){.memory = (uint8_t *)memory + skip, .size = size & ~3u};
     builder->slot_count =
         power_of_two_at_most(slot_share > MINIMUM_SLOTS ? slot_share : MINIMUM_SLOTS);
     builder->folder_capacity = folders > MINIMUM_FOLDERS ? folders : MINIMUM_FOLDERS;

@@ -4,6 +4,7 @@ add_library(echo_library STATIC
     favorites.c
     library.c
     library_browse.c
+    library_scan.c
     library_builder.c
     library_builder_encode.c
     library_builder_model.c

@@ -199,6 +199,13 @@ if(ECHO_BUILD_SIM)
     target_compile_definitions(test_sim_storage PRIVATE
         ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
+    echo_add_unit_test(NAME test_library_scan
+        SOURCES library/test_library_scan.c
+        LIBRARIES echo_library echo_sim_storage
+    )
+    target_compile_definitions(test_library_scan PRIVATE
+        ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    )
     add_test(NAME sim_headless_smoke
         COMMAND echo_sim --headless --frames 30 --screenshot ${CMAKE_BINARY_DIR}/sim_smoke.bmp
     )
@@ -263,6 +270,15 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/cover_fixture.py
             --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_covers.bin
             --check
+    )
+    add_test(NAME tags_library_up_to_date
+        COMMAND ${CMAKE_COMMAND}
+            -DPYTHON=${ECHO_TOOLS_PYTHON}
+            -DINDEXER=${PROJECT_SOURCE_DIR}/tools/library_index.py
+            -DMUSIC=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tags
+            -DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tags_library.db
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/tags_library.db
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_library_index.cmake
     )
     add_test(NAME builder_fixture_up_to_date
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/builder_fixture.py
