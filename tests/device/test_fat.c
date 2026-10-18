@@ -317,6 +317,87 @@ static void exfat_names_match_like_fat_names(void)
     sparse_card_free(&card->sparse);
 }
 
+static void fill_written(uint8_t *bytes, uint32_t length)
+{
+    for (uint32_t index = 0; index < length; index++) {
+        bytes[index] = (uint8_t)(0xA5u ^ index);
+    }
+}
+
+static void check_written(const uint8_t *bytes, uint32_t length)
+{
+    uint32_t mismatches = 0;
+    for (uint32_t index = 0; index < length; index++) {
+        mismatches += bytes[index] != (uint8_t)(0xA5u ^ index);
+    }
+    CHECK_EQUAL(0, mismatches);
+}
+
+static void check_write_in_place(const char *name)
+{
+    Card *card = mounted(name);
+    FatFile file;
+    static uint8_t written[1200];
+    static uint8_t bytes[20000];
+    fill_written(written, sizeof written);
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    CHECK(fat_read(&card->volume, &file, 0, bytes, 600));
+    CHECK(fat_write(&card->volume, &file, 3500, written, sizeof written));
+    CHECK(fat_read(&card->volume, &file, 3500, bytes, sizeof written));
+    check_written(bytes, sizeof written);
+    CHECK(fat_mount(&card->volume, sparse_card_device(&card->sparse)));
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    CHECK_EQUAL(20000, file.size);
+    CHECK(fat_read(&card->volume, &file, 0, bytes, 20000));
+    check_pattern(bytes, 5, 0, 3500);
+    check_written(bytes + 3500, sizeof written);
+    check_pattern(bytes + 4700, 5, 4700, 20000 - 4700);
+    check_file(card, INTRO_PATH, 4, 9000);
+    sparse_card_free(&card->sparse);
+}
+
+static void fat32_writes_land_in_place_across_sectors_and_clusters(void)
+{
+    check_write_in_place("fat32_mbr");
+}
+
+static void fat16_writes_land_in_place_across_sectors_and_clusters(void)
+{
+    check_write_in_place("fat16_superfloppy");
+}
+
+static void exfat_writes_land_in_place_across_sectors_and_clusters(void)
+{
+    check_write_in_place("exfat_mbr");
+}
+
+static void a_write_past_the_end_fails_and_changes_nothing(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    uint8_t written[20];
+    fill_written(written, sizeof written);
+    CHECK(fat_open(&card->volume, "/README.TXT", &file));
+    CHECK(!fat_write(&card->volume, &file, 90, written, sizeof written));
+    CHECK_EQUAL(0, card->sparse.writes);
+    check_file(card, "/README.TXT", 2, 100);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_device_without_writes_refuses_to_write(void)
+{
+    Card *card = mounted("fat32_mbr");
+    BlockDevice read_only = sparse_card_device(&card->sparse);
+    read_only.write = NULL;
+    CHECK(fat_mount(&card->volume, read_only));
+    FatFile file;
+    uint8_t written[4] = {1, 2, 3, 4};
+    CHECK(fat_open(&card->volume, "/README.TXT", &file));
+    CHECK(!fat_write(&card->volume, &file, 0, written, sizeof written));
+    check_file(card, "/README.TXT", 2, 100);
+    sparse_card_free(&card->sparse);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -340,6 +421,11 @@ int main(void)
         TEST_CASE(a_long_read_of_consecutive_sectors_takes_one_block_read),
         TEST_CASE(a_read_that_starts_inside_the_cached_run_reads_only_the_rest),
         TEST_CASE(exfat_names_match_like_fat_names),
+        TEST_CASE(fat32_writes_land_in_place_across_sectors_and_clusters),
+        TEST_CASE(fat16_writes_land_in_place_across_sectors_and_clusters),
+        TEST_CASE(exfat_writes_land_in_place_across_sectors_and_clusters),
+        TEST_CASE(a_write_past_the_end_fails_and_changes_nothing),
+        TEST_CASE(a_device_without_writes_refuses_to_write),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

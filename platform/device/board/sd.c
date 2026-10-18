@@ -135,7 +135,7 @@ bool sd_start(BlockDevice *device)
         tried = true;
         ready = start_card();
     }
-    *device = (BlockDevice){sd_read, NULL};
+    *device = (BlockDevice){sd_read, NULL, sd_write};
     return ready;
 }
 

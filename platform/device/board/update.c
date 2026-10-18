@@ -50,7 +50,7 @@ static void report(void *context, uint32_t done, uint32_t total)
 static bool open_update(UpdateStorage *storage)
 {
     EmmcInfo info;
-    BlockDevice device = {emmc_volume_read, NULL};
+    BlockDevice device = {emmc_volume_read, NULL, NULL};
     if (!emmc_start(&info) || !fat_mount(&volume, device) ||
         !fat_open(&volume, UPDATE_PATH, &file)) {
         return false;

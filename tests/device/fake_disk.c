@@ -49,5 +49,5 @@ static bool read_sectors(void *context, uint32_t lba, uint32_t count, void *buff
 
 BlockDevice fake_disk_device(FakeDisk *disk)
 {
-    return (BlockDevice){read_sectors, disk};
+    return (BlockDevice){read_sectors, disk, NULL};
 }

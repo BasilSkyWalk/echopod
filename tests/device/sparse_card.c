@@ -82,7 +82,18 @@ static bool read_sectors(void *context, uint32_t lba, uint32_t count, void *buff
     return true;
 }
 
+static bool write_sectors(void *context, uint32_t lba, uint32_t count, const void *buffer)
+{
+    SparseCard *card = context;
+    if (lba >= card->sector_count || count > card->sector_count - lba) {
+        return false;
+    }
+    card->writes += count;
+    memcpy(card->bytes + (size_t)lba * SECTOR_SIZE, buffer, (size_t)count * SECTOR_SIZE);
+    return true;
+}
+
 BlockDevice sparse_card_device(SparseCard *card)
 {
-    return (BlockDevice){read_sectors, card};
+    return (BlockDevice){read_sectors, card, write_sectors};
 }

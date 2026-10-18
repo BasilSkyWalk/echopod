@@ -235,3 +235,42 @@ bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, u
     }
     return true;
 }
+
+static bool write_sector_part(FatVolume *volume, uint32_t lba, uint32_t within,
+                              const uint8_t *bytes, uint32_t chunk)
+{
+    if (!fat_read_run(volume, lba, 1)) {
+        return false;
+    }
+    uint8_t *sector = (uint8_t *)volume->cache + volume->cache_index * FAT_SECTOR_SIZE;
+    for (uint32_t index = 0; index < chunk; index++) {
+        sector[within + index] = bytes[index];
+    }
+    if (!volume->device.write(volume->device.context, lba, 1, sector)) {
+        volume->cache_count = 0;
+        return false;
+    }
+    return true;
+}
+
+bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *bytes,
+               uint32_t length)
+{
+    if (volume->device.write == NULL || offset > file->size || length > file->size - offset) {
+        return false;
+    }
+    const uint8_t *in = bytes;
+    while (length > 0) {
+        uint32_t within = offset % FAT_SECTOR_SIZE;
+        uint32_t chunk = FAT_SECTOR_SIZE - within < length ? FAT_SECTOR_SIZE - within : length;
+        uint32_t lba = 0;
+        if (!fat_file_sector(volume, file, offset / FAT_SECTOR_SIZE, &lba) ||
+            !write_sector_part(volume, lba, within, in, chunk)) {
+            return false;
+        }
+        in += chunk;
+        offset += chunk;
+        length -= chunk;
+    }
+    return true;
+}

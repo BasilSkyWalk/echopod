@@ -187,7 +187,7 @@ uint32_t emmc_fifo_depth_words(void)
 
 BlockDevice emmc_device(void)
 {
-    return (BlockDevice){emmc_read, NULL};
+    return (BlockDevice){emmc_read, NULL, NULL};
 }
 
 static bool inside_volume(uint32_t lba, uint32_t count)

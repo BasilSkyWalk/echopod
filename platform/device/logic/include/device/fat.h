@@ -50,3 +50,5 @@ typedef struct FatVolume {
 bool fat_mount(FatVolume *volume, BlockDevice device);
 bool fat_open(FatVolume *volume, const char *path, FatFile *file);
 bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, uint32_t length);
+bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *bytes,
+               uint32_t length);

@@ -10,6 +10,7 @@ typedef struct SparseCard {
     uint32_t sector_count;
     uint32_t reads;
     uint32_t calls;
+    uint32_t writes;
 } SparseCard;
 
 bool sparse_card_load(SparseCard *card, const char *name);

@@ -1,5 +1,6 @@
 #include <stddef.h>
 
+#include "board.h"
 #include "device/fat.h"
 #include "hal/storage.h"
 #include "sd.h"
@@ -76,10 +77,14 @@ void hal_file_close(HalFile *file)
 
 bool hal_file_write(const char *path, const void *bytes, uint32_t length)
 {
-    (void)path;
-    (void)bytes;
-    (void)length;
-    return false;
+    FatFile file;
+    if (!mounted() || !fat_open(&volume, path, &file)) {
+        return false;
+    }
+    board_start_record_step(HAL_START_STEP_CARD_WRITE);
+    bool written = fat_write(&volume, &file, 0, bytes, length);
+    board_start_record_step_done();
+    return written;
 }
 
 void storage_reset(void)
