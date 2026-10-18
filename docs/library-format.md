@@ -52,6 +52,23 @@ Field notes:
 
 Sort keys are case-insensitive and accent-insensitive (Unicode NFKD with combining marks removed), and a leading "The " is ignored. So "The Beatles" sorts as "beatles" and "Björk" as "bjork".
 
+## Files and tags
+
+The indexer lists every format stock plays: `.flac`, `.ogg`, `.mp3`, `.m4a` (AAC or ALAC), `.wav`, `.wma`, `.ape`, `.dsf` and `.dff`, skipping hidden files and folders (a name starting with `.`). Each field takes the first non-empty value, trimmed:
+
+| Field | Vorbis comment (FLAC, Ogg) | ID3 (MP3, WAV, DSF, DFF) | MP4 atom | APEv2 (any case) | ASF (WMA) |
+|---|---|---|---|---|---|
+| title | `title` | `TIT2` | `©nam` | `Title` | `Title` |
+| artist | `artist` | `TPE1` | `©ART` | `Artist` | `Author` |
+| album artist | `albumartist` | `TPE2` | `aART` | `Album Artist` | `WM/AlbumArtist` |
+| album | `album` | `TALB` | `©alb` | `Album` | `WM/AlbumTitle` |
+| genre | `genre` | `TCON` (ID3v1 numbers become names) | `©gen` | `Genre` | `WM/Genre` |
+| date | `date` | `TDRC` (`TYER` in ID3v2.3) | `©day` | `Year` | `WM/Year` |
+| disc | `discnumber` | `TPOS` | `disk` (first number) | `Disc` | `WM/PartOfSet` |
+| track | `tracknumber` | `TRCK` | `trkn` (first number) | `Track` | `WM/TrackNumber` |
+
+An MP3 without ID3v2 uses its ID3v1 tag. The duration is the container's length rounded to the nearest millisecond (FLAC and DSF sample counts, Ogg's last granule, an MP3's Xing/Info frame count or its bitrate, MP4's track duration, WAV data length, APE frame counts, ASF play duration minus preroll, DFF DSD data length). `tools/tag_fixture.py` writes one small file per format to `tests/fixtures/tags`, and both the Python indexer and the device reader are tested against them.
+
 ## Fallbacks for missing tags
 
 | Missing | Used instead |

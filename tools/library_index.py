@@ -19,7 +19,7 @@ MAX_U32 = 0xFFFFFFFF
 UNKNOWN_ARTIST = "Unknown Artist"
 UNKNOWN_ALBUM = "Unknown Album"
 UNKNOWN_GENRE = "Unknown Genre"
-AUDIO_SUFFIXES = {".flac", ".mp3", ".wav"}
+AUDIO_SUFFIXES = {".flac", ".ogg", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf", ".dff"}
 PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
 URL_MARKER = "://"
 
@@ -168,19 +168,85 @@ def nfc(text):
     return unicodedata.normalize("NFC", text)
 
 
+FIELDS = ("title", "artist", "albumartist", "album", "genre", "date", "discnumber", "tracknumber")
+ID3_FRAMES = ("TIT2", "TPE1", "TPE2", "TALB", "TCON", "TDRC", "TPOS", "TRCK")
+MP4_ATOMS = ("\xa9nam", "\xa9ART", "aART", "\xa9alb", "\xa9gen", "\xa9day", "disk", "trkn")
+APE_KEYS = ("title", "artist", "album artist", "album", "genre", "year", "disc", "track")
+ASF_KEYS = ("Title", "Author", "WM/AlbumArtist", "WM/AlbumTitle", "WM/Genre", "WM/Year",
+            "WM/PartOfSet", "WM/TrackNumber")
+
+
+def id3_values(tags):
+    values = {}
+    for field_name, frame_id in zip(FIELDS, ID3_FRAMES):
+        frame = tags.get(frame_id)
+        if frame is not None:
+            values[field_name] = frame.genres if frame_id == "TCON" else [str(text) for text in frame.text]
+    return values
+
+
+def mp4_text(value):
+    return str(value[0]) if isinstance(value, tuple) else str(value)
+
+
+def mp4_values(tags):
+    values = {}
+    for field_name, atom in zip(FIELDS, MP4_ATOMS):
+        if atom in tags:
+            values[field_name] = [mp4_text(value) for value in tags[atom]]
+    return values
+
+
+def ape_values(tags):
+    by_key = {key.lower(): value for key, value in tags.items()}
+    values = {}
+    for field_name, key in zip(FIELDS, APE_KEYS):
+        value = by_key.get(key)
+        if value is not None and value.kind == 0:
+            values[field_name] = list(value)
+    return values
+
+
+def asf_values(tags):
+    values = {}
+    for field_name, key in zip(FIELDS, ASF_KEYS):
+        if key in tags:
+            values[field_name] = [str(value) for value in tags[key]]
+    return values
+
+
+def vorbis_values(tags):
+    values = {}
+    for key, value in tags:
+        values.setdefault(key.lower(), []).append(value)
+    return {field_name: values[field_name] for field_name in FIELDS if field_name in values}
+
+
+def raw_tag_values(tags):
+    from mutagen.apev2 import APEv2
+    from mutagen.asf import ASFTags
+    from mutagen.id3 import ID3
+    from mutagen.mp4 import MP4Tags
+    if isinstance(tags, ID3):
+        return id3_values(tags)
+    if isinstance(tags, MP4Tags):
+        return mp4_values(tags)
+    if isinstance(tags, APEv2):
+        return ape_values(tags)
+    if isinstance(tags, ASFTags):
+        return asf_values(tags)
+    return vorbis_values(tags)
+
+
 def normalized_tags(audio):
     if audio is None or audio.tags is None:
         return {}
-    tags = {}
-    for key, values in audio.tags.items():
-        if isinstance(values, list):
-            tags[str(key).lower()] = [nfc(str(value)) for value in values]
-    return tags
+    return {key: [nfc(value) for value in values] for key, values in raw_tag_values(audio.tags).items()}
 
 
 def read_track(root, path):
     from mutagen import File
-    audio = File(path, easy=True)
+    audio = File(path)
     duration = audio.info.length if audio is not None else 0.0
     return track_from_tags(nfc(path.relative_to(root).as_posix()), normalized_tags(audio), duration)
 
