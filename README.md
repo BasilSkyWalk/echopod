@@ -25,6 +25,12 @@ ctest --preset dev
 
 The indexer and the cover exporter only read the music folder. The exporter uses embedded front covers, or a `cover`/`folder` image next to the tracks. On the device, the database goes in `/.echo/library.db` on the card, and the covers in `/.echo/covers.bin`. The format is described in `docs/library-format.md`.
 
+The player saves its settings, favorites and resume spot by overwriting files that already exist on the card; it never creates files. Make them once (it keeps any saved bytes and only pads short files):
+
+```sh
+.venv/bin/python tools/save_files.py --echo /Volumes/<card>/.echo
+```
+
 ### Simulator keys
 
 | Device button | Keyboard |

@@ -49,6 +49,7 @@ The updater checks the image's shape, rows, entry vector, header copy and CRC be
 - **Keys:** Diagnostics → Key test. The rocker's up end should register as up.
 - **Power:** a short press turns the screen off and on. A long press switches the player off, but only with the cable unplugged; with USB connected the player stays powered.
 - **USB:** the "USB" notice appears and the drive mounts within about 10 s.
+- **Saving:** the card needs `/.echo/settings.bin`, `resume.bin` and `favorites.bin`, made once with `tools/save_files.py --echo /Volumes/<card>/.echo`. Without them nothing is saved, and adding a favorite says "Could not save favorites".
 
 ## If something goes wrong
 
