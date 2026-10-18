@@ -17,6 +17,7 @@ add_library(echo_library STATIC
     tags_mpeg.c
     tags_riff.c
     tags_vorbis.c
+    track_fields.c
     track_tags.c
 )
 target_include_directories(echo_library PUBLIC include)
