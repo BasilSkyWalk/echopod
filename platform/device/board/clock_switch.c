@@ -186,6 +186,7 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     irq_restore(primask);
     board_start_record_step_done();
     dmac_resume();
+    board_display_after_clock_change();
     board_audio_after_clock_change();
     return switched;
 }

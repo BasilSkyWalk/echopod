@@ -1,6 +1,8 @@
 #include <stddef.h>
 
 #include "board.h"
+#include "cru.h"
+#include "device/backlight.h"
 #include "device/panel.h"
 #include "gpio.h"
 #include "hal/display.h"
@@ -8,6 +10,11 @@
 
 #define PANEL_DIRECTION_BITS 0x03FF9000u
 #define PANEL_READ_STROBE (1u << 12)
+#define PWM_COUNTER (PWM_BASE + 0x0u)
+#define PWM_PERIOD (PWM_BASE + 0x4u)
+#define PWM_DUTY (PWM_BASE + 0x8u)
+#define PWM_CONTROL (PWM_BASE + 0xCu)
+#define PWM_CONTROL_RUN 0x00010003u
 
 enum {
     PANEL_READ_STROBE_PIN = 12,
@@ -18,13 +25,19 @@ enum {
     RESET_LOW_MS = 150,
     RESET_SETTLE_MS = 30,
     RESET_READY_MS = 120,
-    CLEAR_ROWS = 10
+    CLEAR_ROWS = 10,
+    PWM_GATE = 0x90,
+    PWM_RESET = 0x17,
+    PWM_RESET_MS = 1
 };
 
 static const GpioPin BACKLIGHT = {2, 4};
 static const GpioPin PANEL_RESET = {2, 15};
 
 static uint32_t port_shadow;
+static uint8_t brightness;
+static bool backlight_on;
+static bool pwm_running;
 
 static void write_port(uint32_t word)
 {
@@ -114,10 +127,78 @@ static void clear_screen(void)
     }
 }
 
+static void stop_pwm(void)
+{
+    if (!pwm_running) {
+        return;
+    }
+    register_write(PWM_CONTROL, 0);
+    cru_gate(PWM_GATE, false);
+    pwm_running = false;
+}
+
+static void drive_backlight(bool level)
+{
+    stop_pwm();
+    gpio_mux(BACKLIGHT, GPIO_FUNCTION_GPIO);
+    gpio_output(BACKLIGHT, level);
+}
+
+static void start_pwm(void)
+{
+    cru_gate(PWM_GATE, true);
+    cru_reset(PWM_RESET, true);
+    board_delay_ms(PWM_RESET_MS);
+    cru_reset(PWM_RESET, false);
+    pwm_running = true;
+}
+
+static void run_pwm(BacklightPwm pwm)
+{
+    if (!pwm_running) {
+        start_pwm();
+    }
+    register_write(PWM_CONTROL, 0);
+    register_write(PWM_DUTY, pwm.duty);
+    register_write(PWM_COUNTER, 0);
+    register_write(PWM_PERIOD, pwm.period);
+    register_write(PWM_CONTROL, PWM_CONTROL_RUN);
+    gpio_output(BACKLIGHT, true);
+    gpio_mux(BACKLIGHT, GPIO_FUNCTION_ALTERNATE);
+}
+
+static void apply_backlight(void)
+{
+    if (!backlight_on) {
+        drive_backlight(false);
+        return;
+    }
+    BacklightPwm pwm = backlight_pwm(board_pclk_hz(), backlight_percent(brightness));
+    if (pwm.full) {
+        drive_backlight(true);
+    } else {
+        run_pwm(pwm);
+    }
+}
+
+void board_backlight_off(void)
+{
+    backlight_on = false;
+    drive_backlight(false);
+}
+
+void board_display_after_clock_change(void)
+{
+    if (pwm_running) {
+        apply_backlight();
+    }
+}
+
 void board_display_start(void)
 {
-    gpio_mux(BACKLIGHT, GPIO_FUNCTION_GPIO);
-    gpio_output(BACKLIGHT, true);
+    brightness = HAL_DISPLAY_BRIGHTNESS_MAX;
+    backlight_on = true;
+    drive_backlight(true);
     mux_panel_pins();
     gpio_output(PANEL_RESET, true);
     set_bus_idle();
@@ -140,11 +221,15 @@ void hal_display_present(void)
 void hal_display_set_power(bool on)
 {
     board_start_record_step(on ? HAL_START_STEP_BACKLIGHT_ON : HAL_START_STEP_BACKLIGHT_OFF);
-    gpio_output(BACKLIGHT, on);
+    backlight_on = on;
+    apply_backlight();
     board_start_record_step_done();
 }
 
 void hal_display_set_brightness(uint8_t level)
 {
-    (void)level;
+    brightness = level;
+    if (backlight_on) {
+        apply_backlight();
+    }
 }
