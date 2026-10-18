@@ -30,7 +30,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
 | Gapless | sim | Token-based hand-over through the audio HAL |
 | Resume after power-off | device | `/.echo/resume.bin`; on the device it overwrites a file made by `tools/save_files.py` (settings and resume written on hardware 2026-10-18) |
-| Library DB from SD scan | in progress | Built on the PC (`tools/library_index.py`). On-device rescan and covers, every stock format, started 2026-10-18 (NOTES, 2026-10-18 plan) |
+| Library DB from SD scan | in progress | Built on the PC (`tools/library_index.py`) or on the player: Settings → Rescan library (and after USB changes the card) indexes every stock format with playlists, byte for byte like the PC (sim; device untried). Runs from a HIGHRAM0 overlay. Covers on the device still to do |
 | Browse: Artist / Album Artist / Album / Genre / Folder / All Songs / Playlists / Favorites | sim | Selecting a track plays the list from it |
 | Now Playing: art, info, progress, seek | in progress | Info, progress, times, state, modes, volume and seek done; the cover isn't shown on Now Playing yet |
 | Queue, shuffle, repeat | sim | Shuffle Songs/Albums, Repeat One/All, seeded |
