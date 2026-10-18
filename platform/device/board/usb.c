@@ -175,7 +175,7 @@ bool usb_vbus_present(void)
     return (register_read(GRF_BASE + GRF_VBUS) & GRF_VBUS_PRESENT) != 0;
 }
 
-static void silence_audio(void)
+void usb_silence_audio(void)
 {
     cru_gate(GATE_GPIO1, true);
     gpio_mux(AMP_ENABLE, GPIO_FUNCTION_GPIO);
@@ -197,7 +197,6 @@ void usb_power_up(void)
     write_grf(PHY_ON_FIRST, sizeof PHY_ON_FIRST / sizeof PHY_ON_FIRST[0]);
     board_delay_ms(PHY_READY_MS);
     write_grf(PHY_ON_SECOND, sizeof PHY_ON_SECOND / sizeof PHY_ON_SECOND[0]);
-    silence_audio();
 }
 
 void usb_power_down(void)
@@ -538,6 +537,11 @@ static void pump_bulk_in(UsbPort *port)
     if (msc_next_in(port->msc, (uint8_t *)chunk, BULK_CHUNK_BYTES, &length)) {
         port->in_busy = send_bulk(port, chunk, length);
     }
+}
+
+bool usb_host_reset_pending(void)
+{
+    return (read_register(GINTSTS) & GINT_USB_RESET) != 0;
 }
 
 bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms)

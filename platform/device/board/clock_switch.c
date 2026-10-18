@@ -37,7 +37,8 @@ enum {
     CRYSTAL_MHZ = 24,
     HZ_PER_MHZ = 1000000,
     LOCK_TIMEOUT_MS = 200,
-    DIVIDER_SETTLE_US = 10
+    DIVIDER_SETTLE_US = 10,
+    USB_LOWEST_MHZ = 96
 };
 
 static uint32_t current_mhz;
@@ -175,6 +176,9 @@ static bool switch_clock(uint32_t mhz)
 
 bool hal_system_set_clock_mhz(uint32_t mhz)
 {
+    if (board_usb_listening() && mhz < USB_LOWEST_MHZ) {
+        mhz = USB_LOWEST_MHZ;
+    }
     if (mhz == hal_system_clock_mhz()) {
         return true;
     }

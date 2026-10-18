@@ -28,6 +28,7 @@ void board_audio_before_clock_change(void);
 void board_audio_after_clock_change(void);
 void board_wait_for_key(void);
 void board_main(void);
+bool board_usb_listening(void);
 void board_power_hold(void);
 void board_bluetooth_off(void);
 void board_start_record_boot(void);

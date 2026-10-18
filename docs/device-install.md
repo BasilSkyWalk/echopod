@@ -59,4 +59,4 @@ The updater checks the image's shape, rows, entry vector, header copy and CRC be
 | Black screen and nothing over USB | Maskrom recovery, then a direct maskrom write of a fixed image |
 | "Update not installed" | The file isn't a valid image for this player; rebuild it and copy it again |
 | "Update failed" | Copy the file again and retry before turning the player off; one slot is always complete |
-| USB shows the "USB 1/4"–"4/4" screens | The controller didn't connect; note the values for diagnosis |
+| USB shows the "USB 1/4"–"4/4" screens | The USB controller failed to start; note the values for diagnosis |

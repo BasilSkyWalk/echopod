@@ -38,6 +38,8 @@ typedef struct UsbPort {
 bool usb_vbus_present(void);
 void usb_power_up(void);
 void usb_power_down(void);
+void usb_silence_audio(void);
+bool usb_host_reset_pending(void);
 bool usb_connect(UsbPort *port);
 bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms);
 void usb_poll(UsbPort *port);

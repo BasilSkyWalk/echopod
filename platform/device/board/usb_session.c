@@ -37,23 +37,26 @@ static void serial_text(uint32_t serial, char *text)
     text[SERIAL_DIGITS] = '\0';
 }
 
-static void prepare_luns(void)
+static void prepare_port(void)
 {
-    BlockDevice card;
-    bool internal_ready = emmc_start(&internal);
-    bool card_ready = sd_start(&card);
-    MscLun luns[LUN_COUNT] = {
-        {emmc_volume_read, emmc_volume_write, NULL, internal.layout.volume_sectors, true,
-         internal_ready, "Internal storage"},
-        {sd_read, sd_write, NULL, sd_sector_count(), true, card_ready, "SD card"},
-    };
-    report.internal_ready = internal_ready;
-    card_present = card_ready;
-    msc_init(&msc, luns, LUN_COUNT);
+    report.internal_ready = emmc_start(&internal);
     char serial[SERIAL_DIGITS + 1];
     serial_text(internal.serial, serial);
     port = (UsbPort){.msc = &msc};
     usb_device_init(&port.device, serial, LUN_COUNT);
+}
+
+static void prepare_luns(void)
+{
+    BlockDevice card;
+    bool card_ready = sd_start(&card);
+    MscLun luns[LUN_COUNT] = {
+        {emmc_volume_read, emmc_volume_write, NULL, internal.layout.volume_sectors, true,
+         report.internal_ready, "Internal storage"},
+        {sd_read, sd_write, NULL, sd_sector_count(), true, card_ready, "SD card"},
+    };
+    card_present = card_ready;
+    msc_init(&msc, luns, LUN_COUNT);
 }
 
 static void finish_last_reply(void)
@@ -121,25 +124,43 @@ static UsbSessionEnd serve(void)
     return USB_SESSION_UNPLUGGED;
 }
 
-UsbSessionEnd usb_session_run(void)
+bool usb_session_listen(void)
 {
-    app_show_notice("USB", "Cable detected. Starting...");
     report = (UsbReport){.internal_ready = false};
-    prepare_luns();
+    prepare_port();
     usb_power_up();
     report.after_power_up = usb_probe();
-    UsbSessionEnd end = USB_SESSION_FAILED;
-    if (usb_connect(&port)) {
-        end = USB_SESSION_NO_HOST;
-        if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
-            app_show_notice("USB", card_present ? "Connected. Eject both drives to finish."
-                                                : "Connected. Eject the drive to finish.");
-            end = serve();
-        }
-    }
+    bool connected = usb_connect(&port);
     report.connect_step = port.connect_step;
+    if (!connected) {
+        usb_power_down();
+    }
+    return connected;
+}
+
+bool usb_session_host_seen(void)
+{
+    return usb_host_reset_pending();
+}
+
+void usb_session_stop_listening(void)
+{
     report.after_wait = usb_probe();
     usb_power_down();
+}
+
+UsbSessionEnd usb_session_run(void)
+{
+    app_show_notice("USB", "Computer found. Starting...");
+    prepare_luns();
+    usb_silence_audio();
+    UsbSessionEnd end = USB_SESSION_NO_HOST;
+    if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
+        app_show_notice("USB", card_present ? "Connected. Eject both drives to finish."
+                                            : "Connected. Eject the drive to finish.");
+        end = serve();
+    }
+    usb_session_stop_listening();
     return end;
 }
 
