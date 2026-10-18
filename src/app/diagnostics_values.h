@@ -8,7 +8,7 @@
 #include "hal/system.h"
 
 enum {
-    DIAGNOSTICS_VALUE_CAPACITY = 24
+    DIAGNOSTICS_VALUE_CAPACITY = 32
 };
 
 typedef struct DmaToneView {
@@ -30,5 +30,7 @@ void diagnostics_loop_text(bool run, HalLoopCycles cycles, char *text, size_t ca
 void diagnostics_battery_text(HalBattery battery, char *text, size_t capacity);
 void diagnostics_boot_hold_text(HalPowerHold hold, char *text, size_t capacity);
 void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity);
+void diagnostics_last_step_text(HalStartInfo info, char *text, size_t capacity);
+void diagnostics_last_battery_text(HalStartInfo info, char *text, size_t capacity);
 void diagnostics_core1_text(bool run, HalCore1Test test, char *text, size_t capacity);
 void diagnostics_core1_decode_text(bool run, HalCore1Decode result, char *text, size_t capacity);

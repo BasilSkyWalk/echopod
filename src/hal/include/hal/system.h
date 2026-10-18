@@ -25,6 +25,17 @@ typedef struct HalLoopCycles {
 
 HalLoopCycles hal_system_loop_cycles(void);
 
+typedef enum HalStartStep {
+    HAL_START_STEP_NONE,
+    HAL_START_STEP_BACKLIGHT_ON,
+    HAL_START_STEP_BACKLIGHT_OFF,
+    HAL_START_STEP_CLOCK_SWITCH,
+    HAL_START_STEP_CORE1_START,
+    HAL_START_STEP_CORE1_STOP,
+    HAL_START_STEP_CARD_WRITE,
+    HAL_START_STEP_COUNT
+} HalStartStep;
+
 typedef struct HalStartInfo {
     bool warm;
     uint32_t starts;
@@ -33,6 +44,10 @@ typedef struct HalStartInfo {
     uint32_t fault_status;
     uint32_t hard_fault_status;
     uint32_t fault_pc;
+    HalStartStep last_step;
+    bool last_step_finished;
+    uint32_t last_step_ms;
+    uint32_t last_millivolts;
 } HalStartInfo;
 
 HalStartInfo hal_system_start_info(void);

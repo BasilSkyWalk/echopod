@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "device/battery_gauge.h"
+#include "hal/system.h"
 
 void board_clock_start(void);
 void board_clock_record_boot(void);
@@ -30,5 +31,8 @@ void board_bluetooth_off(void);
 void board_start_record_boot(void);
 void board_start_record_tick(uint32_t uptime_ms);
 void board_start_record_power_off(void);
+void board_start_record_step(HalStartStep step);
+void board_start_record_step_done(void);
+void board_start_record_battery(uint32_t millivolts);
 void device_fault_handler(const uint32_t *frame);
 void device_fault_entry(void);

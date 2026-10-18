@@ -43,6 +43,13 @@ static uint8_t pressed_keys(uint16_t reading)
     return gpio_read(POWER_KEY) ? (uint8_t)(mask | (1u << KEY_POWER)) : mask;
 }
 
+static void record_battery(void)
+{
+    if (battery_gauge_known(&gauge)) {
+        board_start_record_battery(battery_gauge_millivolts(&gauge));
+    }
+}
+
 void board_input_start(void)
 {
     gpio_mux(POWER_KEY, GPIO_FUNCTION_GPIO);
@@ -62,6 +69,7 @@ void board_input_sample(uint32_t now_ms)
     if (battery_pending) {
         battery_gauge_add(&gauge, reading);
         battery_pending = false;
+        record_battery();
     } else {
         key_scanner_sample(&scanner, pressed_keys(reading), now_ms);
     }

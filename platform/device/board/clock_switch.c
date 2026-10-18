@@ -180,9 +180,11 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     }
     board_audio_before_clock_change();
     dmac_suspend();
+    board_start_record_step(HAL_START_STEP_CLOCK_SWITCH);
     uint32_t primask = irq_save();
     bool switched = switch_clock(mhz);
     irq_restore(primask);
+    board_start_record_step_done();
     dmac_resume();
     board_audio_after_clock_change();
     return switched;

@@ -79,6 +79,7 @@ bool board_core1_start_stream(void)
     if (pll_mhz < LOWEST_PLL_MHZ) {
         return false;
     }
+    board_start_record_step(HAL_START_STEP_CORE1_START);
     uint32_t divider = core1_divider_for(pll_mhz);
     uint32_t length = (uint32_t)(_binary_core1_bin_end - _binary_core1_bin_start);
     Core1Result result = core1_power_up(&BUS, pll_mhz, divider);
@@ -89,6 +90,7 @@ bool board_core1_start_stream(void)
         register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_STREAM);
         result = core1_run(&BUS, REPLY_TIMEOUT_MS);
     }
+    board_start_record_step_done();
     if (result != CORE1_OK) {
         core1_stop(&BUS);
         return false;
@@ -100,8 +102,10 @@ bool board_core1_start_stream(void)
 void board_core1_stop(void)
 {
     if (streaming) {
+        board_start_record_step(HAL_START_STEP_CORE1_STOP);
         core1_stop(&BUS);
         streaming = false;
+        board_start_record_step_done();
     }
 }
 

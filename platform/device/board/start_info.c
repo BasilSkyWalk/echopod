@@ -30,6 +30,21 @@ void board_start_record_power_off(void)
     start_record_power_off(&record);
 }
 
+void board_start_record_step(HalStartStep step)
+{
+    start_record_step_begin(&record, step);
+}
+
+void board_start_record_step_done(void)
+{
+    start_record_step_end(&record);
+}
+
+void board_start_record_battery(uint32_t millivolts)
+{
+    start_record_battery(&record, millivolts);
+}
+
 void device_fault_handler(const uint32_t *frame)
 {
     start_record_fault(&record, register_read(SCB_CFSR), register_read(SCB_HFSR),
@@ -51,5 +66,9 @@ HalStartInfo hal_system_start_info(void)
                           .previous_power_off = info.previous_power_off,
                           .fault_status = info.fault_status,
                           .hard_fault_status = info.hard_fault_status,
-                          .fault_pc = info.fault_address};
+                          .fault_pc = info.fault_address,
+                          .last_step = info.last_step,
+                          .last_step_finished = info.last_step_finished,
+                          .last_step_ms = info.last_step_ms,
+                          .last_millivolts = info.last_millivolts};
 }

@@ -61,6 +61,50 @@ static void a_clean_power_off_is_remembered(void)
     CHECK(info.previous_power_off);
 }
 
+static void the_last_step_survives_with_its_start_time_and_whether_it_finished(void)
+{
+    StartRecord record = garbage();
+    start_record_boot(&record);
+    start_record_tick(&record, 41000);
+    start_record_step_begin(&record, HAL_START_STEP_CLOCK_SWITCH);
+    start_record_tick(&record, 41005);
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(HAL_START_STEP_CLOCK_SWITCH, info.last_step);
+    CHECK(!info.last_step_finished);
+    CHECK_EQUAL(41000u, info.last_step_ms);
+    CHECK_EQUAL(HAL_START_STEP_NONE, (HalStartStep)record.step);
+}
+
+static void a_finished_step_is_marked_finished(void)
+{
+    StartRecord record = garbage();
+    start_record_boot(&record);
+    start_record_step_begin(&record, HAL_START_STEP_BACKLIGHT_ON);
+    start_record_step_end(&record);
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(HAL_START_STEP_BACKLIGHT_ON, info.last_step);
+    CHECK(info.last_step_finished);
+}
+
+static void the_last_battery_reading_survives(void)
+{
+    StartRecord record = garbage();
+    start_record_boot(&record);
+    start_record_battery(&record, 3712);
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(3712u, info.last_millivolts);
+    CHECK_EQUAL(0u, record.millivolts);
+}
+
+static void a_cold_start_has_no_last_step(void)
+{
+    StartRecord record = garbage();
+    record.step = HAL_START_STEP_CORE1_STOP;
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(HAL_START_STEP_NONE, info.last_step);
+    CHECK_EQUAL(0u, info.last_millivolts);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -69,6 +113,10 @@ int main(void)
         TEST_CASE(a_corrupted_count_reads_as_cold),
         TEST_CASE(a_fault_survives_into_the_next_start),
         TEST_CASE(a_clean_power_off_is_remembered),
+        TEST_CASE(the_last_step_survives_with_its_start_time_and_whether_it_finished),
+        TEST_CASE(a_finished_step_is_marked_finished),
+        TEST_CASE(the_last_battery_reading_survives),
+        TEST_CASE(a_cold_start_has_no_last_step),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

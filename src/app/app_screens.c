@@ -187,6 +187,25 @@ static const char *start_value(const void *context)
     return start_text;
 }
 
+static char last_step_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *last_step_value(const void *context)
+{
+    (void)context;
+    diagnostics_last_step_text(hal_system_start_info(), last_step_text, sizeof last_step_text);
+    return last_step_text;
+}
+
+static char last_battery_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *last_battery_value(const void *context)
+{
+    (void)context;
+    diagnostics_last_battery_text(hal_system_start_info(), last_battery_text,
+                                  sizeof last_battery_text);
+    return last_battery_text;
+}
+
 static ScreenAction play_test_tone(void *context)
 {
     ToneOption *tone = context;
@@ -410,6 +429,10 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
     screens->diagnostics_items[16] =
         (MenuItem){.label = "Last start", .select = NULL, .context = NULL, .value = start_value};
     screens->diagnostics_items[17] =
+        (MenuItem){.label = "Last step", .select = NULL, .context = NULL, .value = last_step_value};
+    screens->diagnostics_items[18] = (MenuItem){
+        .label = "Last battery", .select = NULL, .context = NULL, .value = last_battery_value};
+    screens->diagnostics_items[19] =
         open_item("Bluetooth", bluetooth_screen_init(&screens->bluetooth, theme));
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);

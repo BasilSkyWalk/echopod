@@ -227,12 +227,45 @@ static void the_last_start_row_tells_cold_starts_resets_and_faults_apart(void)
     CHECK(text_is("Fault at 0305ABCD", text));
 }
 
+static void the_last_step_row_tells_an_unfinished_step_from_a_finished_one(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_last_step_text((HalStartInfo){.warm = false}, text, sizeof text);
+    CHECK(text_is("None", text));
+    diagnostics_last_step_text((HalStartInfo){.warm = true, .last_step = HAL_START_STEP_NONE}, text,
+                               sizeof text);
+    CHECK(text_is("None", text));
+    diagnostics_last_step_text((HalStartInfo){.warm = true,
+                                              .last_step = HAL_START_STEP_CLOCK_SWITCH,
+                                              .last_step_ms = 41900},
+                               text, sizeof text);
+    CHECK(text_is("In clock switch at 41 s", text));
+    diagnostics_last_step_text((HalStartInfo){.warm = true,
+                                              .last_step = HAL_START_STEP_BACKLIGHT_OFF,
+                                              .last_step_finished = true,
+                                              .last_step_ms = 12345000},
+                               text, sizeof text);
+    CHECK(text_is("Backlight off at 12345 s", text));
+}
+
+static void the_last_battery_row_shows_the_reading_before_the_start(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_last_battery_text((HalStartInfo){.warm = false}, text, sizeof text);
+    CHECK(text_is("No reading", text));
+    diagnostics_last_battery_text((HalStartInfo){.warm = true, .last_millivolts = 3712}, text,
+                                  sizeof text);
+    CHECK(text_is("3712 mV", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
         TEST_CASE(the_last_start_row_tells_cold_starts_resets_and_faults_apart),
+        TEST_CASE(the_last_step_row_tells_an_unfinished_step_from_a_finished_one),
+        TEST_CASE(the_last_battery_row_shows_the_reading_before_the_start),
         TEST_CASE(the_boot_hold_row_shows_how_the_rom_left_the_pin),
         TEST_CASE(the_battery_row_shows_millivolts_and_the_charger_state),
         TEST_CASE(the_core_1_row_is_empty_until_run),

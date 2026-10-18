@@ -139,7 +139,9 @@ void hal_display_present(void)
 
 void hal_display_set_power(bool on)
 {
+    board_start_record_step(on ? HAL_START_STEP_BACKLIGHT_ON : HAL_START_STEP_BACKLIGHT_OFF);
     gpio_output(BACKLIGHT, on);
+    board_start_record_step_done();
 }
 
 void hal_display_set_brightness(uint8_t level)

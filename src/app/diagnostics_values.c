@@ -151,6 +151,45 @@ static const char *core1_failure_text(HalCore1Status status)
     return "";
 }
 
+static const char *step_name(HalStartStep step, bool finished)
+{
+    static const char *const OPEN_NAMES[HAL_START_STEP_COUNT] = {
+        "",          "backlight on", "backlight off", "clock switch", "core 1 start", "core 1 stop",
+        "card write"};
+    static const char *const DONE_NAMES[HAL_START_STEP_COUNT] = {
+        "",          "Backlight on", "Backlight off", "Clock switch", "Core 1 start", "Core 1 stop",
+        "Card write"};
+    return finished ? DONE_NAMES[step] : OPEN_NAMES[step];
+}
+
+void diagnostics_last_step_text(HalStartInfo info, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!info.warm || info.last_step == HAL_START_STEP_NONE ||
+        info.last_step >= HAL_START_STEP_COUNT) {
+        string_builder_append(&builder, "None");
+        return;
+    }
+    if (!info.last_step_finished) {
+        string_builder_append(&builder, "In ");
+    }
+    string_builder_append(&builder, step_name(info.last_step, info.last_step_finished));
+    string_builder_append(&builder, " at ");
+    string_builder_append_unsigned(&builder, info.last_step_ms / 1000u);
+    string_builder_append(&builder, " s");
+}
+
+void diagnostics_last_battery_text(HalStartInfo info, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!info.warm || info.last_millivolts == 0) {
+        string_builder_append(&builder, "No reading");
+        return;
+    }
+    string_builder_append_unsigned(&builder, info.last_millivolts);
+    string_builder_append(&builder, " mV");
+}
+
 void diagnostics_core1_text(bool run, HalCore1Test test, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
