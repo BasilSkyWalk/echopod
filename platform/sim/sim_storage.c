@@ -140,6 +140,21 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length)
     return written && rename(temporary, resolved) == 0;
 }
 
+bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)
+{
+    char resolved[PATH_CAPACITY];
+    if (!is_system_path(path) || !sim_storage_host_path(path, resolved, sizeof resolved)) {
+        return false;
+    }
+    FILE *handle = fopen(resolved, "r+b");
+    if (handle == NULL) {
+        return false;
+    }
+    bool written =
+        fseek(handle, (long)offset, SEEK_SET) == 0 && fwrite(bytes, 1, length, handle) == length;
+    return fclose(handle) == 0 && written;
+}
+
 void sim_storage_close_all(void)
 {
     for (int slot = 0; slot < OPEN_FILE_CAPACITY; slot++) {

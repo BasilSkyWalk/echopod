@@ -93,6 +93,18 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length)
     return written;
 }
 
+bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)
+{
+    FatFile file;
+    if (!mounted() || !fat_open(&volume, path, &file)) {
+        return false;
+    }
+    board_start_record_step(HAL_START_STEP_CARD_WRITE);
+    bool written = fat_write(&volume, &file, offset, bytes, length);
+    board_start_record_step_done();
+    return written;
+}
+
 void storage_reset(void)
 {
     mount_state = MOUNT_NOT_TRIED;

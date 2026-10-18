@@ -457,7 +457,8 @@ BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char
     return BUILDER_OK;
 }
 
-BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t *length)
+BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
+                                     uint32_t *length)
 {
     BuilderResult result = library_builder_prepare(builder);
     if (result != BUILDER_OK) {
@@ -468,5 +469,5 @@ BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uin
     if (work.used > work.top) {
         return BUILDER_OUT_OF_MEMORY;
     }
-    return builder_encode(builder, builder->model, &work, sink, length);
+    return builder_encode(builder, builder->model, &work, (EncodeTarget){sink, capacity}, length);
 }

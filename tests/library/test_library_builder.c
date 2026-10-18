@@ -95,7 +95,7 @@ static void the_fixture_tracks_build_the_same_bytes_as_the_pc_indexer(void)
     add_fixture_tracks(&builder);
     uint32_t length = 0;
     CHECK_EQUAL(BUILDER_OK,
-                library_builder_finish(&builder, (ByteSink){write_output, &output}, &length));
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, 0, &length));
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("small_library_tracks.db", &expected_size);
     CHECK_EQUAL(expected_size, length);
@@ -157,7 +157,7 @@ static void random_tracks_build_the_same_bytes_as_the_pc_indexer(void)
     }
     uint32_t length = 0;
     CHECK_EQUAL(BUILDER_OK,
-                library_builder_finish(&builder, (ByteSink){write_output, &output}, &length));
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, 0, &length));
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("builder_random/library.db", &expected_size);
     CHECK_EQUAL(expected_size, length);
@@ -209,7 +209,7 @@ static void the_fixture_playlist_resolves_like_the_pc_indexer(void)
     }
     uint32_t length = 0;
     CHECK_EQUAL(BUILDER_OK,
-                library_builder_finish(&builder, (ByteSink){write_output, &output}, &length));
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, 0, &length));
     check_matches("small_library.db", &output, length);
 }
 
@@ -246,7 +246,7 @@ static void random_playlists_resolve_like_the_pc_indexer(void)
     }
     uint32_t length = 0;
     CHECK_EQUAL(BUILDER_OK,
-                library_builder_finish(&builder, (ByteSink){write_output, &output}, &length));
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, 0, &length));
     check_matches("builder_random/with_playlists.db", &output, length);
     free(text);
 }
@@ -266,6 +266,21 @@ static void a_library_too_big_for_the_memory_says_so(void)
     CHECK_EQUAL(BUILDER_OUT_OF_MEMORY, result);
 }
 
+static void a_library_bigger_than_its_room_writes_nothing(void)
+{
+    static uint8_t memory[MEMORY_SIZE];
+    static Output output;
+    output.length = 0;
+    output.writes = 0;
+    LibraryBuilder builder;
+    library_builder_init(&builder, memory, sizeof memory);
+    add_fixture_tracks(&builder);
+    uint32_t length = 0;
+    CHECK_EQUAL(BUILDER_NO_ROOM,
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, 1000, &length));
+    CHECK_EQUAL(0, output.writes);
+}
+
 static void an_empty_library_still_writes_a_valid_header(void)
 {
     static uint8_t memory[MEMORY_SIZE];
@@ -275,7 +290,7 @@ static void an_empty_library_still_writes_a_valid_header(void)
     library_builder_init(&builder, memory, sizeof memory);
     uint32_t length = 0;
     CHECK_EQUAL(BUILDER_OK,
-                library_builder_finish(&builder, (ByteSink){write_output, &output}, &length));
+                library_builder_finish(&builder, (ByteSink){write_output, &output}, 0, &length));
     CHECK(length >= 128);
     CHECK_EQUAL(0, memcmp("EMDB", output.bytes, 4));
 }
@@ -288,6 +303,7 @@ int main(void)
         TEST_CASE(the_fixture_playlist_resolves_like_the_pc_indexer),
         TEST_CASE(random_playlists_resolve_like_the_pc_indexer),
         TEST_CASE(a_library_too_big_for_the_memory_says_so),
+        TEST_CASE(a_library_bigger_than_its_room_writes_nothing),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

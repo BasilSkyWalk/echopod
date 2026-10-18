@@ -98,6 +98,23 @@ static void case_folding_keeps_accents_and_lowers_everything(void)
     CHECK_EQUAL(0, strcmp("abc", folded));
 }
 
+static void every_kind_of_fold_run_applies(void)
+{
+    char folded[32];
+    const char *pair = "\xc4\x80\xc4\x82";
+    case_fold_make(pair, strlen(pair), folded, sizeof folded);
+    CHECK_EQUAL(0, strcmp("\xc4\x81\xc4\x83", folded));
+    char key[32];
+    sort_key_make("a\xcc\x81"
+                  "b",
+                  key, sizeof key);
+    CHECK_EQUAL(0, strcmp("ab", key));
+    sort_key_make("\xc3\x80\xc3\x81\xc3\x82", key, sizeof key);
+    CHECK_EQUAL(0, strcmp("aaa", key));
+    sort_key_make("\xd0\x96", key, sizeof key);
+    CHECK_EQUAL(0, strcmp("\xd0\xb6", key));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -105,6 +122,7 @@ int main(void)
         TEST_CASE(comparison_follows_the_keys),
         TEST_CASE(a_long_text_is_cut_at_the_capacity),
         TEST_CASE(case_folding_keeps_accents_and_lowers_everything),
+        TEST_CASE(every_kind_of_fold_run_applies),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -197,6 +197,8 @@ static ScanResult builder_result(BuilderResult result)
         return SCAN_TOO_MANY;
     case BUILDER_WRITE_FAILED:
         return SCAN_WRITE_FAILED;
+    case BUILDER_NO_ROOM:
+        return SCAN_NO_ROOM;
     }
     return SCAN_WRITE_FAILED;
 }
@@ -422,5 +424,6 @@ ScanResult library_scan(const ScanJob *job, ScanStats *stats)
     if (result != SCAN_OK) {
         return result;
     }
-    return builder_result(library_builder_finish(&state->builder, job->sink, &stats->length));
+    return builder_result(
+        library_builder_finish(&state->builder, job->sink, job->capacity, &stats->length));
 }

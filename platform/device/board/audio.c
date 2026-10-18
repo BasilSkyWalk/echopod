@@ -515,3 +515,14 @@ void board_audio_after_clock_change(void)
         hal_audio_pause();
     }
 }
+
+void board_audio_shut_down(void)
+{
+    if (engine_ready) {
+        audio_engine_stop(&engine);
+    }
+    stop_tone();
+    stop_path();
+    board_core1_stop();
+    using_core1 = false;
+}

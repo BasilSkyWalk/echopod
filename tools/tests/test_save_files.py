@@ -44,5 +44,24 @@ class SaveFilesTest(unittest.TestCase):
             self.assertTrue((echo / "resume.bin").is_file())
 
 
+class LibraryRoomTest(unittest.TestCase):
+    def test_the_library_gets_its_reserved_room_and_keeps_its_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            echo = Path(directory)
+            (echo / "library.db").write_bytes(b"EMDB" + bytes(100))
+            save_files.prepare(echo)
+            data = (echo / "library.db").read_bytes()
+            self.assertEqual(save_files.LIBRARY_FILE_SIZE, len(data))
+            self.assertEqual(b"EMDB", data[:4])
+
+    def test_a_missing_library_is_reserved_as_zeros(self):
+        with tempfile.TemporaryDirectory() as directory:
+            echo = Path(directory)
+            save_files.prepare(echo)
+            data = (echo / "library.db").read_bytes()
+            self.assertEqual(save_files.LIBRARY_FILE_SIZE, len(data))
+            self.assertEqual(0, max(data))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -278,3 +278,29 @@ void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity)
     string_builder_append_unsigned(&builder, info.previous_uptime_ms / 1000u);
     string_builder_append(&builder, " s");
 }
+
+void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!run) {
+        return;
+    }
+    switch (test.status) {
+    case HAL_HIGH_RAM_OK:
+        string_builder_append(&builder, "OK ");
+        string_builder_append_unsigned(&builder, test.size / 1024u);
+        string_builder_append(&builder, " KB, call works");
+        return;
+    case HAL_HIGH_RAM_UNAVAILABLE:
+        string_builder_append(&builder, "Not on this player");
+        return;
+    case HAL_HIGH_RAM_BAD_MEMORY:
+        string_builder_append(&builder, "Bad at ");
+        append_hex(&builder, test.bad_address, 8);
+        return;
+    case HAL_HIGH_RAM_BAD_CALL:
+        string_builder_append(&builder, "Call gave ");
+        append_hex(&builder, test.call_result, 8);
+        return;
+    }
+}

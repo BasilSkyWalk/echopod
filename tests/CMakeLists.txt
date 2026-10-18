@@ -35,7 +35,7 @@ target_include_directories(echo_library_fixtures PUBLIC library)
 target_compile_definitions(echo_library_fixtures PRIVATE
     ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
-target_link_libraries(echo_library_fixtures PUBLIC echo_library PRIVATE echo_options)
+target_link_libraries(echo_library_fixtures PUBLIC echo_library echo_library_scan PRIVATE echo_options)
 
 foreach(playback_test play_queue resume_state)
     echo_add_unit_test(NAME test_${playback_test}
@@ -114,27 +114,27 @@ echo_add_unit_test(NAME test_stores
 )
 echo_add_unit_test(NAME test_now_playing_screen
     SOURCES app/test_now_playing_screen.c app/fake_hal.c
-    LIBRARIES echo_app
+    LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_diagnostics_values
     SOURCES app/test_diagnostics_values.c app/fake_hal.c
-    LIBRARIES echo_app
+    LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_bluetooth_screen
     SOURCES app/test_bluetooth_screen.c app/fake_hal.c
-    LIBRARIES echo_app
+    LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_stopwatch_screen
     SOURCES app/test_stopwatch_screen.c app/fake_hal.c
-    LIBRARIES echo_app
+    LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_test_pattern_screen
     SOURCES app/test_test_pattern_screen.c app/fake_hal.c
-    LIBRARIES echo_app
+    LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
@@ -201,7 +201,7 @@ if(ECHO_BUILD_SIM)
     )
     echo_add_unit_test(NAME test_library_scan
         SOURCES library/test_library_scan.c
-        LIBRARIES echo_library echo_sim_storage
+        LIBRARIES echo_library echo_library_scan echo_sim_storage
     )
     target_compile_definitions(test_library_scan PRIVATE
         ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"

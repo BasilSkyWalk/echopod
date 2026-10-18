@@ -10,11 +10,13 @@ add_executable(echo_device
     board/display.c
     board/emmc.c
     board/gpio.c
+    board/high_ram.c
     board/input.c
     board/libc.c
     board/loop_bench.c
     board/main.c
     board/mmc.c
+    board/overlay.c
     board/panic.c
     board/power.c
     board/sd.c
@@ -79,6 +81,21 @@ target_link_options(echo_device PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_device.map
 )
 
+set(ECHO_OVERLAY_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/overlay/rescan_overlay.ld)
+add_executable(echo_rescan_overlay overlay/rescan_overlay.c)
+set_target_properties(echo_rescan_overlay PROPERTIES
+    SUFFIX .elf
+    LINK_DEPENDS "${ECHO_OVERLAY_LINKER_SCRIPT};$<TARGET_FILE:echo_device>"
+)
+add_dependencies(echo_rescan_overlay echo_device)
+target_link_libraries(echo_rescan_overlay PRIVATE echo_library_scan echo_options gcc)
+target_link_options(echo_rescan_overlay PRIVATE
+    -T${ECHO_OVERLAY_LINKER_SCRIPT}
+    -Wl,--just-symbols=$<TARGET_FILE:echo_device>
+    -Wl,--allow-multiple-definition
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_rescan_overlay.map
+)
+
 set(ECHO_REFERENCE_IMG
     "$ENV{HOME}/echo-mini-blobs/recho-0.9.2/HIFIEC90.IMG"
     CACHE FILEPATH "RECHO 0.9.2 HIFIEC90.IMG; only its header bytes are copied"
@@ -91,9 +108,10 @@ if(EXISTS ${ECHO_REFERENCE_IMG})
         COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
             --reference ${ECHO_REFERENCE_IMG}
             --elf $<TARGET_FILE:echo_device>
+            --overlay $<TARGET_FILE:echo_rescan_overlay>
             --output ${ECHO_DEVICE_IMAGE}
         BYPRODUCTS ${ECHO_DEVICE_IMAGE}
-        DEPENDS echo_device ${PROJECT_SOURCE_DIR}/tools/make_image.py
+        DEPENDS echo_device echo_rescan_overlay ${PROJECT_SOURCE_DIR}/tools/make_image.py
         VERBATIM
     )
 else()

@@ -136,5 +136,10 @@ uint32_t builder_resolve_entry(const LibraryBuilder *builder, const LibraryModel
 void stable_sort(uint16_t *items, uint16_t *scratch, uint32_t count, IndexCompare compare,
                  const void *context);
 bool builder_build_model(LibraryBuilder *builder, Work *work, LibraryModel *model);
+typedef struct EncodeTarget {
+    ByteSink sink;
+    uint32_t capacity;
+} EncodeTarget;
+
 BuilderResult builder_encode(LibraryBuilder *builder, const LibraryModel *model, Work *work,
-                             ByteSink sink, uint32_t *length);
+                             EncodeTarget target, uint32_t *length);

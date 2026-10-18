@@ -8,6 +8,7 @@
 #include "core/key_tracker.h"
 #include "core/low_battery.h"
 #include "core/power_policy.h"
+#include "core/string_builder.h"
 #include "cover_cache.h"
 #include "default_theme.h"
 #include "draw_profile.h"
@@ -21,6 +22,7 @@
 #include "hal/display.h"
 #include "hal/input.h"
 #include "hal/power.h"
+#include "library_rescan.h"
 #include "library_store.h"
 #include "player.h"
 #include "settings_store.h"
@@ -35,6 +37,7 @@
 
 enum {
     STRIP_HEIGHT = 34,
+    RESCAN_PROGRESS_MS = 250,
     BATTERY_CHECK_MS = 250
 };
 
@@ -79,6 +82,7 @@ typedef struct AppState {
     LowBattery low_battery;
     uint32_t battery_check_ms;
     bool usb_power;
+    bool rescan_requested;
     bool light_after_frame;
     const char *goodbye_text;
     Toast toast;
@@ -557,6 +561,7 @@ static void start_screens(uint32_t now_ms)
         .power = &app.power,
         .toast = &app.toast,
         .covers = &app.covers,
+        .rescan_requested = &app.rescan_requested,
     };
     Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);
@@ -588,9 +593,47 @@ void app_start(void)
     start_screens(now_ms);
 }
 
+static void show_rescan_progress(uint32_t files, uint32_t tracks)
+{
+    static uint32_t shown_ms;
+    uint32_t now_ms = hal_clock_milliseconds();
+    if (files > 1 && now_ms - shown_ms < RESCAN_PROGRESS_MS) {
+        return;
+    }
+    shown_ms = now_ms;
+    static char text[48];
+    StringBuilder builder = string_builder_make(text, sizeof text);
+    string_builder_append_unsigned(&builder, tracks);
+    string_builder_append(&builder, " tracks so far");
+    app_show_notice("Scanning library", text);
+}
+
+static void run_rescan(void)
+{
+    app_show_notice("Scanning library", "Starting...");
+    RescanOutcome outcome = library_rescan_run(show_rescan_progress);
+    static char message[48];
+    const char *text = library_rescan_message(outcome, message, sizeof message);
+    if (outcome.result == SCAN_OK) {
+        app_start();
+    }
+    app_wake();
+    toast_show(&app.toast, text, hal_clock_milliseconds());
+}
+
+void app_request_rescan(void)
+{
+    app.rescan_requested = true;
+}
+
 void app_step(void)
 {
     if (app.powered_off) {
+        return;
+    }
+    if (app.rescan_requested) {
+        app.rescan_requested = false;
+        run_rescan();
         return;
     }
     uint32_t started_us = hal_clock_microseconds();

@@ -121,6 +121,23 @@ static const char *clock_value(const void *context)
     return clock_text;
 }
 
+static char high_ram_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static ScreenAction run_high_ram_test(void *context)
+{
+    HighRamOption *option = context;
+    option->test = hal_system_high_ram_test();
+    option->run = true;
+    return screen_action_none();
+}
+
+static const char *high_ram_value(const void *context)
+{
+    const HighRamOption *option = context;
+    diagnostics_high_ram_text(option->run, option->test, high_ram_text, sizeof high_ram_text);
+    return high_ram_text;
+}
+
 static char loop_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static ScreenAction run_loop_benchmark(void *context)
@@ -383,6 +400,7 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
         .player = context.player,
         .power = context.power,
         .toast = context.toast,
+        .rescan_requested = context.rescan_requested,
         .sleep_option = 0,
     };
     settings_screens_init(&screens->settings, settings, context.theme);
@@ -456,6 +474,11 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         open_item("Bluetooth", bluetooth_screen_init(&screens->bluetooth, theme));
     screens->diagnostics_items[20] =
         (MenuItem){.label = "Stall test", .select = run_stall_test, .context = NULL, .value = NULL};
+    screens->high_ram = (HighRamOption){.run = false};
+    screens->diagnostics_items[22] = (MenuItem){.label = "High RAM",
+                                                .select = run_high_ram_test,
+                                                .context = &screens->high_ram,
+                                                .value = high_ram_value};
     screens->diagnostics_items[21] = (MenuItem){.label = "Power taps",
                                                 .select = toggle_power_taps,
                                                 .context = options,

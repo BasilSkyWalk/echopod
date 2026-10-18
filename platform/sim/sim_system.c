@@ -1,4 +1,5 @@
 #include "hal/system.h"
+#include "library/library_scan.h"
 
 enum {
     BOOT_CLOCK_MHZ = 24
@@ -25,6 +26,27 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
 {
     clock_mhz = mhz;
     return true;
+}
+
+const void *hal_system_load_rescan_code(void)
+{
+    return &LIBRARY_SCAN_ENTRY;
+}
+
+HalHighRamTest hal_system_high_ram_test(void)
+{
+    return (HalHighRamTest){.status = HAL_HIGH_RAM_UNAVAILABLE};
+}
+
+void *hal_system_borrow_scratch(uint32_t *size)
+{
+    static uint8_t scratch[384 * 1024];
+    *size = sizeof scratch;
+    return scratch;
+}
+
+void hal_system_return_scratch(void)
+{
 }
 
 void hal_system_stall_test(void)

@@ -38,7 +38,9 @@ typedef enum ScanResult {
     SCAN_TOO_MANY,
     SCAN_FOLDER_TOO_BIG,
     SCAN_PATH_TOO_LONG,
-    SCAN_WRITE_FAILED
+    SCAN_WRITE_FAILED,
+    SCAN_NO_ROOM,
+    SCAN_NO_CODE
 } ScanResult;
 
 typedef struct ScanStats {
@@ -53,7 +55,17 @@ typedef struct ScanJob {
     void *memory;
     uint32_t size;
     ByteSink sink;
+    uint32_t capacity;
     ScanProgress progress;
 } ScanJob;
+
+#define LIBRARY_SCAN_MAGIC 0x4E414353u
+
+typedef struct LibraryScanEntry {
+    uint32_t magic;
+    ScanResult (*scan)(const ScanJob *job, ScanStats *stats);
+} LibraryScanEntry;
+
+extern const LibraryScanEntry LIBRARY_SCAN_ENTRY;
 
 ScanResult library_scan(const ScanJob *job, ScanStats *stats);

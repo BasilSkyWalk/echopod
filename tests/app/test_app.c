@@ -35,6 +35,7 @@ enum {
     SETTINGS_BRIGHTNESS_INDEX = 5,
     SETTINGS_GAIN_INDEX = 6,
     SETTINGS_START_INDEX = 8,
+    SETTINGS_RESCAN_INDEX = 9,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -795,6 +796,33 @@ static void the_splash_draws_over_the_home_screen(void)
     CHECK_EQUAL(DEFAULT_THEME.colors.background, fake_hal_pixel(content.x + 2, content.y + 4));
 }
 
+static bool toast_is(const char *expected)
+{
+    return app_toast_text() != NULL && strcmp(expected, app_toast_text()) == 0;
+}
+
+static void rescanning_without_a_card_says_so(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_RESCAN_INDEX);
+    step();
+    CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
+    CHECK(toast_is("No music found on the card"));
+}
+
+static void a_rescan_of_an_empty_card_writes_an_empty_library(void)
+{
+    start_app_with_library();
+    fake_hal_set_empty_card(true);
+    app_request_rescan();
+    CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
+    step();
+    CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
+    CHECK_EQUAL(0, fake_hal_scratch_outstanding());
+    CHECK(fake_hal_library_writes() > 0);
+    CHECK(toast_is("Library: 0 tracks"));
+}
+
 static void the_sleep_timer_turns_the_player_off(void)
 {
     start_app_with_library();
@@ -836,11 +864,6 @@ static void an_empty_battery_on_usb_power_keeps_playing(void)
     wait_ms(5000);
     wait_ms(GOODBYE_MS);
     CHECK_EQUAL(0, fake_hal_power_off_count());
-}
-
-static bool toast_is(const char *expected)
-{
-    return app_toast_text() != NULL && strcmp(expected, app_toast_text()) == 0;
 }
 
 static void open_albums_and_hold_the_first(void)
@@ -1434,6 +1457,8 @@ int main(void)
         TEST_CASE(the_splash_ignores_keys_until_it_ends),
         TEST_CASE(the_splash_draws_over_the_home_screen),
         TEST_CASE(the_sleep_timer_turns_the_player_off),
+        TEST_CASE(rescanning_without_a_card_says_so),
+        TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
         TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),

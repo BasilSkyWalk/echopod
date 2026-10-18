@@ -12,6 +12,7 @@ bool hal_file_open(HalFile *file, const char *path);
 bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length);
 void hal_file_close(HalFile *file);
 bool hal_file_write(const char *path, const void *bytes, uint32_t length);
+bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length);
 
 enum {
     HAL_NAME_CAPACITY = 768

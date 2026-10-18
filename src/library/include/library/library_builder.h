@@ -25,7 +25,8 @@ typedef enum BuilderResult {
     BUILDER_OK,
     BUILDER_OUT_OF_MEMORY,
     BUILDER_TOO_MANY,
-    BUILDER_WRITE_FAILED
+    BUILDER_WRITE_FAILED,
+    BUILDER_NO_ROOM
 } BuilderResult;
 
 typedef struct LibraryBuilder {
@@ -53,4 +54,5 @@ BuilderResult library_builder_prepare(LibraryBuilder *builder);
 BuilderResult library_builder_begin_playlist(LibraryBuilder *builder, const char *name,
                                              const char *folder);
 BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char *entry);
-BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t *length);
+BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
+                                     uint32_t *length);

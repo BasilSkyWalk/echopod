@@ -9,6 +9,7 @@
 #include "hal/input.h"
 #include "hal/power.h"
 #include "hal/storage.h"
+#include "library/library_scan.h"
 
 #include <string.h>
 
@@ -67,6 +68,10 @@ typedef struct FakeHal {
     int write_count;
     uint32_t clock_mhz;
     int stall_test_count;
+    int scratch_borrows;
+    bool empty_card;
+    int library_writes;
+    int scratch_outstanding;
     int presents_at_power_on;
     bool refuse_clock_switch;
     int test_tone_count;
@@ -668,8 +673,18 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
 bool hal_dir_open(HalDir *dir, const char *path)
 {
     (void)path;
-    dir->handle = -1;
-    return false;
+    dir->handle = fake.empty_card ? 0 : -1;
+    return fake.empty_card;
+}
+
+void fake_hal_set_empty_card(bool empty)
+{
+    fake.empty_card = empty;
+}
+
+int fake_hal_library_writes(void)
+{
+    return fake.library_writes;
 }
 
 bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
@@ -682,4 +697,47 @@ bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
 void hal_dir_close(HalDir *dir)
 {
     dir->handle = -1;
+}
+
+void *hal_system_borrow_scratch(uint32_t *size)
+{
+    static uint8_t scratch[128 * 1024];
+    fake.scratch_borrows++;
+    fake.scratch_outstanding++;
+    *size = sizeof scratch;
+    return scratch;
+}
+
+void hal_system_return_scratch(void)
+{
+    fake.scratch_outstanding--;
+}
+
+int fake_hal_scratch_borrow_count(void)
+{
+    return fake.scratch_borrows;
+}
+
+int fake_hal_scratch_outstanding(void)
+{
+    return fake.scratch_outstanding;
+}
+
+bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)
+{
+    (void)offset;
+    (void)bytes;
+    (void)length;
+    fake.library_writes += strcmp(path, "/.echo/library.db") == 0;
+    return true;
+}
+
+HalHighRamTest hal_system_high_ram_test(void)
+{
+    return (HalHighRamTest){.status = HAL_HIGH_RAM_UNAVAILABLE};
+}
+
+const void *hal_system_load_rescan_code(void)
+{
+    return &LIBRARY_SCAN_ENTRY;
 }

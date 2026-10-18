@@ -258,6 +258,28 @@ static void the_last_battery_row_shows_the_reading_before_the_start(void)
     CHECK(text_is("3712 mV", text));
 }
 
+static void the_high_ram_row_reports_each_outcome(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_high_ram_text(false, (HalHighRamTest){.status = HAL_HIGH_RAM_OK}, text,
+                              sizeof text);
+    CHECK(text_is("", text));
+    diagnostics_high_ram_text(true, (HalHighRamTest){.status = HAL_HIGH_RAM_OK, .size = 151552},
+                              text, sizeof text);
+    CHECK(text_is("OK 148 KB, call works", text));
+    diagnostics_high_ram_text(true, (HalHighRamTest){.status = HAL_HIGH_RAM_UNAVAILABLE}, text,
+                              sizeof text);
+    CHECK(text_is("Not on this player", text));
+    diagnostics_high_ram_text(
+        true, (HalHighRamTest){.status = HAL_HIGH_RAM_BAD_MEMORY, .bad_address = 0x0307A010u}, text,
+        sizeof text);
+    CHECK(text_is("Bad at 0307A010", text));
+    diagnostics_high_ram_text(
+        true, (HalHighRamTest){.status = HAL_HIGH_RAM_BAD_CALL, .call_result = 0x12u}, text,
+        sizeof text);
+    CHECK(text_is("Call gave 00000012", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -266,6 +288,7 @@ int main(void)
         TEST_CASE(the_last_start_row_tells_cold_starts_resets_and_faults_apart),
         TEST_CASE(the_last_step_row_tells_an_unfinished_step_from_a_finished_one),
         TEST_CASE(the_last_battery_row_shows_the_reading_before_the_start),
+        TEST_CASE(the_high_ram_row_reports_each_outcome),
         TEST_CASE(the_boot_hold_row_shows_how_the_rom_left_the_pin),
         TEST_CASE(the_battery_row_shows_millivolts_and_the_charger_state),
         TEST_CASE(the_core_1_row_is_empty_until_run),

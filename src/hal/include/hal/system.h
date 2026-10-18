@@ -25,6 +25,24 @@ typedef struct HalLoopCycles {
 
 HalLoopCycles hal_system_loop_cycles(void);
 void hal_system_stall_test(void);
+typedef enum HalHighRamStatus {
+    HAL_HIGH_RAM_OK,
+    HAL_HIGH_RAM_UNAVAILABLE,
+    HAL_HIGH_RAM_BAD_MEMORY,
+    HAL_HIGH_RAM_BAD_CALL
+} HalHighRamStatus;
+
+typedef struct HalHighRamTest {
+    HalHighRamStatus status;
+    uint32_t size;
+    uint32_t bad_address;
+    uint32_t call_result;
+} HalHighRamTest;
+
+HalHighRamTest hal_system_high_ram_test(void);
+const void *hal_system_load_rescan_code(void);
+void *hal_system_borrow_scratch(uint32_t *size);
+void hal_system_return_scratch(void);
 
 typedef enum HalStartStep {
     HAL_START_STEP_NONE,

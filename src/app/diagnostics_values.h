@@ -32,5 +32,6 @@ void diagnostics_boot_hold_text(HalPowerHold hold, char *text, size_t capacity);
 void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity);
 void diagnostics_last_step_text(HalStartInfo info, char *text, size_t capacity);
 void diagnostics_last_battery_text(HalStartInfo info, char *text, size_t capacity);
+void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t capacity);
 void diagnostics_core1_text(bool run, HalCore1Test test, char *text, size_t capacity);
 void diagnostics_core1_decode_text(bool run, HalCore1Decode result, char *text, size_t capacity);

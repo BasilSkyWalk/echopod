@@ -65,24 +65,75 @@ static void append_code_point(KeyBuilder *builder, uint32_t code_point)
     append_bytes(builder, bytes, length);
 }
 
-static const SortFold *find_fold(const SortFold *folds, size_t count, uint32_t code_point)
+typedef struct FoldTable {
+    const FoldRun *runs;
+    uint32_t run_count;
+    const FoldText *texts;
+    uint32_t text_count;
+    const uint8_t *bytes;
+} FoldTable;
+
+static const FoldTable SORT_TABLE = {SORT_FOLD_RUNS, SORT_FOLD_RUN_COUNT, SORT_FOLD_TEXTS,
+                                     SORT_FOLD_TEXT_COUNT, SORT_FOLD_BYTES};
+static const FoldTable CASE_TABLE = {CASE_FOLD_RUNS, CASE_FOLD_RUN_COUNT, CASE_FOLD_TEXTS,
+                                     CASE_FOLD_TEXT_COUNT, CASE_FOLD_BYTES};
+
+static const FoldText *find_text(const FoldTable *table, uint32_t code_point)
 {
     size_t low = 0;
-    size_t high = count;
+    size_t high = table->text_count;
     while (low < high) {
         size_t middle = low + (high - low) / 2;
-        if (folds[middle].code_point < code_point) {
+        if (table->texts[middle].code_point < code_point) {
             low = middle + 1;
         } else {
             high = middle;
         }
     }
-    return low < count && folds[low].code_point == code_point ? &folds[low] : NULL;
+    return low < table->text_count && table->texts[low].code_point == code_point
+               ? &table->texts[low]
+               : NULL;
 }
 
-static const SortFold *fold_for(uint32_t code_point)
+static const FoldRun *find_run(const FoldTable *table, uint32_t code_point)
 {
-    return find_fold(SORT_FOLDS, SORT_FOLD_COUNT, code_point);
+    size_t low = 0;
+    size_t high = table->run_count;
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        if (table->runs[middle].first <= code_point) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    if (low == 0) {
+        return NULL;
+    }
+    const FoldRun *run = &table->runs[low - 1];
+    uint32_t stride = run->shape >> 2;
+    uint32_t offset = code_point - run->first;
+    return offset % stride == 0 && offset / stride < run->count ? run : NULL;
+}
+
+static bool append_from_table(KeyBuilder *builder, const FoldTable *table, uint32_t code_point)
+{
+    const FoldText *text = find_text(table, code_point);
+    if (text != NULL) {
+        append_bytes(builder, (const char *)table->bytes + text->offset, text->length);
+        return true;
+    }
+    const FoldRun *run = find_run(table, code_point);
+    if (run == NULL) {
+        return false;
+    }
+    uint32_t kind = run->shape & 3u;
+    if (kind == FOLD_RUN_DELTA) {
+        append_code_point(builder, (code_point + run->value) & 0xFFFFu);
+    } else if (kind == FOLD_RUN_SAME) {
+        append_code_point(builder, run->value);
+    }
+    return true;
 }
 
 static void append_hangul(KeyBuilder *builder, uint32_t code_point)
@@ -105,10 +156,7 @@ static void append_folded(KeyBuilder *builder, uint32_t code_point)
         append_hangul(builder, code_point);
         return;
     }
-    const SortFold *fold = code_point >= 0x80 ? fold_for(code_point) : NULL;
-    if (fold != NULL) {
-        append_bytes(builder, (const char *)SORT_FOLD_TEXT + fold->offset, fold->length);
-    } else {
+    if (code_point < 0x80 || !append_from_table(builder, &SORT_TABLE, code_point)) {
         append_code_point(builder, code_point);
     }
 }
@@ -191,11 +239,7 @@ static void append_case_folded(KeyBuilder *builder, uint32_t code_point)
         append_code_point(builder, code_point - 'A' + 'a');
         return;
     }
-    const SortFold *fold =
-        code_point >= 0x80 ? find_fold(CASE_FOLDS, CASE_FOLD_COUNT, code_point) : NULL;
-    if (fold != NULL) {
-        append_bytes(builder, (const char *)CASE_FOLD_TEXT + fold->offset, fold->length);
-    } else {
+    if (code_point < 0x80 || !append_from_table(builder, &CASE_TABLE, code_point)) {
         append_code_point(builder, code_point);
     }
 }

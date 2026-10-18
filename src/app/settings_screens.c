@@ -169,7 +169,7 @@ static void choose_start(void *context, int index)
     save(context);
 }
 
-static const SettingChoice CHOICES[SETTINGS_ITEM_COUNT] = {
+static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {"Shuffle", SHUFFLE_OPTIONS, SHUFFLE_MODE_COUNT, current_shuffle, choose_shuffle},
     {"Repeat", REPEAT_OPTIONS, REPEAT_MODE_COUNT, current_repeat, choose_repeat},
     {"Sleep timer", SLEEP_OPTIONS, SLEEP_TIMER_OPTION_COUNT, current_sleep, choose_sleep},
@@ -208,11 +208,22 @@ static const char *choice_value(const void *context)
                                                                  : "";
 }
 
+static ScreenAction request_rescan(void *context)
+{
+    SettingsContext *settings = context;
+    if (settings->rescan_requested != NULL) {
+        *settings->rescan_requested = true;
+    }
+    return screen_action_none();
+}
+
 Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context, const Theme *theme)
 {
     screens->context = context;
     screens->theme = theme;
-    for (int index = 0; index < SETTINGS_ITEM_COUNT; index++) {
+    screens->items[SETTINGS_CHOICE_COUNT] = (MenuItem){
+        .label = "Rescan library", .select = request_rescan, .context = &screens->context};
+    for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
         screens->items[index] = (MenuItem){.label = CHOICES[index].title,
                                            .select = open_choice,

@@ -436,7 +436,7 @@ static uint16_t *order_playlists(const LibraryModel *model, Work *work)
 }
 
 BuilderResult builder_encode(LibraryBuilder *builder, const LibraryModel *model, Work *work,
-                             ByteSink sink, uint32_t *length)
+                             EncodeTarget target, uint32_t *length)
 {
     uint32_t *path_offsets = work_alloc(work, model->track_count * 4 + 4);
     uint16_t *playlist_order = order_playlists(model, work);
@@ -454,6 +454,10 @@ BuilderResult builder_encode(LibraryBuilder *builder, const LibraryModel *model,
     run_string_pass(&pass);
     Layout layout;
     plan(&layout, model, pass.length);
+    if (target.capacity != 0 && layout.end > target.capacity) {
+        return BUILDER_NO_ROOM;
+    }
+    ByteSink sink = target.sink;
     Writer writer = {.sink = sink, .offset = 0, .used = 0, .failed = false};
     write_records(&writer, &pass, &layout);
     put_byte(&writer, 0);

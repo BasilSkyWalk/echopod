@@ -11,7 +11,8 @@
 #include "ui/toast.h"
 
 enum {
-    SETTINGS_ITEM_COUNT = 9
+    SETTINGS_CHOICE_COUNT = 9,
+    SETTINGS_ITEM_COUNT = SETTINGS_CHOICE_COUNT + 1
 };
 
 typedef struct SettingsContext {
@@ -19,6 +20,7 @@ typedef struct SettingsContext {
     Player *player;
     PowerPolicy *power;
     Toast *toast;
+    bool *rescan_requested;
     int sleep_option;
 } SettingsContext;
 
@@ -42,7 +44,7 @@ struct SettingsScreens {
     const Theme *theme;
     MenuScreen menu;
     ChoiceScreen choice;
-    SettingsEntry entries[SETTINGS_ITEM_COUNT];
+    SettingsEntry entries[SETTINGS_CHOICE_COUNT];
     MenuItem items[SETTINGS_ITEM_COUNT];
 };
 

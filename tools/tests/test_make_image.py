@@ -412,3 +412,38 @@ class SectionCheckTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OverlayTest(unittest.TestCase):
+    def overlay(self, body=b"\x5A" * 100):
+        return bytes(16) + body
+
+    def test_the_overlay_lands_at_its_offset_with_size_and_crc(self):
+        overlay = self.overlay()
+        image = build(overlay=overlay)
+        offset = make_image.OVERLAY_OFFSET
+        self.assertEqual(b"EOVL", image[offset:offset + 4])
+        self.assertEqual(len(overlay), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(overlay[16:]), word(image, offset + 8))
+        self.assertEqual(overlay[16:], image[offset + 16:offset + len(overlay)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_the_fw1_end_ignores_the_overlay(self):
+        self.assertEqual(word(build(), make_image.FW1_END_OFFSET),
+                         word(build(overlay=self.overlay()), make_image.FW1_END_OFFSET))
+
+    def test_an_overlay_bigger_than_high_ram_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(overlay=self.overlay(bytes(make_image.OVERLAY_CAPACITY)))
+
+    def test_the_overlay_comes_from_its_elf_section(self):
+        content = self.overlay(b"\x01\x02\x03\x04")
+        elf = elf_file([(".overlay", SHT_PROGBITS, SHF_ALLOC, 0x0307A000, content, len(content))])
+        self.assertEqual(content, make_image.overlay_from_elf(elf))
+
+    def test_an_overlay_elf_with_writable_data_is_refused(self):
+        content = self.overlay()
+        elf = elf_file([(".overlay", SHT_PROGBITS, SHF_ALLOC, 0x0307A000, content, len(content)),
+                        (".data", SHT_PROGBITS, SHF_ALLOC | 1, 0x0307B000, b"\x01", 1)])
+        with self.assertRaises(make_image.ImageError):
+            make_image.overlay_from_elf(elf)

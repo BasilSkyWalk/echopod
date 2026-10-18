@@ -17,6 +17,11 @@ MAGIC = b"RKnanoFW"
 MAGIC_OFFSET = 0x1F8
 FW_SIZE_OFFSET = 0x1F4
 CODE_BASE = 0x03050000
+OVERLAY_OFFSET = 0x200000
+OVERLAY_BASE = 0x0307A000
+OVERLAY_CAPACITY = 0x25000
+OVERLAY_HEADER_SIZE = 16
+OVERLAY_MAGIC = b"EOVL"
 TABLE_CAPACITY = 91
 TABLE_OFFSET = 0x208
 ROW = struct.Struct("<4I")
@@ -62,6 +67,7 @@ class ImageParts:
     rows: tuple
     payload: bytes
     marker: bytes
+    overlay: bytes = b""
 
 
 def crc_table():
@@ -150,9 +156,22 @@ def assemble(parts):
     image[PAYLOAD_OFFSET:PAYLOAD_OFFSET + len(parts.payload)] = parts.payload
     image[FW_SIZE:FW_SIZE + HEADER_SIZE] = image[:HEADER_SIZE]
     image[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE] = parts.marker
+    place_overlay(image, parts)
     end = fw_end(FW_SIZE)
     struct.pack_into("<I", image, end, crc32(image[:end]))
     return bytes(image)
+
+
+def place_overlay(image, parts):
+    overlay = parts.overlay
+    if not overlay:
+        return
+    if len(overlay) > OVERLAY_CAPACITY or len(overlay) < OVERLAY_HEADER_SIZE:
+        raise ImageError(f"the overlay must be {OVERLAY_HEADER_SIZE} to {OVERLAY_CAPACITY:#x} bytes")
+    if PAYLOAD_OFFSET + len(parts.payload) > OVERLAY_OFFSET:
+        raise ImageError("the payload reaches the overlay")
+    header = OVERLAY_MAGIC + struct.pack("<III", len(overlay), crc32(overlay[OVERLAY_HEADER_SIZE:]), 0)
+    image[OVERLAY_OFFSET:OVERLAY_OFFSET + len(overlay)] = header + overlay[OVERLAY_HEADER_SIZE:]
 
 
 def split_image(image):
@@ -206,7 +225,7 @@ def fw1_end(payload):
     return PAYLOAD_OFFSET + (used + 3) // 4 * 4
 
 
-def build_image(reference, firmware, brand, build_tag, date):
+def build_image(reference, firmware, brand, build_tag, date, overlay=b""):
     check_firmware(firmware)
     if len(reference) != IMAGE_SIZE or word(reference, FW_SIZE_OFFSET) != FW_SIZE:
         raise ImageError("the reference does not have the 5 MiB shape")
@@ -224,7 +243,7 @@ def build_image(reference, firmware, brand, build_tag, date):
     ]
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     marker = reference[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE]
-    return assemble(ImageParts(bytes(header), tuple(rows), payload, marker))
+    return assemble(ImageParts(bytes(header), tuple(rows), payload, marker, overlay))
 
 
 def validate_image(image):
@@ -295,6 +314,18 @@ def firmware_from_elf(elf):
     return Firmware(code=code, data=data, bss_size=bss.size if bss is not None else 0)
 
 
+def overlay_from_elf(elf):
+    sections = elf_sections(elf)
+    overlay = sections.get(".overlay")
+    if overlay is None or overlay.address != OVERLAY_BASE:
+        raise ImageError(f"the overlay ELF needs an .overlay section at {OVERLAY_BASE:#010x}")
+    stray = [name for name, section in sections.items()
+             if section.flags & SHF_ALLOC and section.size and name != ".overlay"]
+    if stray:
+        raise ImageError("the overlay may only hold code and constants: " + ", ".join(sorted(stray)))
+    return overlay.content
+
+
 def load_reference(path):
     reference = Path(path).read_bytes()
     if len(reference) != IMAGE_SIZE or hashlib.md5(reference).hexdigest() != REFERENCE_MD5:
@@ -338,6 +369,7 @@ def parse_arguments(argv):
     parser.add_argument("--brand", default="ECHOFW")
     parser.add_argument("--build-tag", help="defaults to the short git commit, + when dirty")
     parser.add_argument("--date", type=parse_date, help="YYYY-MM-DD; defaults to today")
+    parser.add_argument("--overlay", type=Path, help="rescan overlay ELF linked at 0x0307A000")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -349,7 +381,8 @@ def main(argv=None):
     try:
         reference = load_reference(arguments.reference)
         firmware = firmware_from_elf(arguments.elf.read_bytes())
-        image = build_image(reference, firmware, arguments.brand, build_tag, date)
+        overlay = overlay_from_elf(arguments.overlay.read_bytes()) if arguments.overlay else b""
+        image = build_image(reference, firmware, arguments.brand, build_tag, date, overlay)
     except ImageError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -360,6 +393,7 @@ def main(argv=None):
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_bytes(image)
     print(f"wrote {arguments.output} ({build_tag}): code {len(firmware.code):,} bytes, "
+          f"overlay {len(overlay):,} bytes, "
           f".data {len(firmware.data)} bytes, .bss {firmware.bss_size:,} bytes, "
           f"crc {word(image, fw_end(FW_SIZE)):#010x}")
     return 0

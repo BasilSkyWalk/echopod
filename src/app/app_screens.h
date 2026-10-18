@@ -27,9 +27,14 @@
 enum {
     HOME_ITEM_COUNT = 4,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 22,
+    DIAGNOSTICS_ITEM_COUNT = 23,
     START_PATH_CAPACITY = 2
 };
+
+typedef struct HighRamOption {
+    bool run;
+    HalHighRamTest test;
+} HighRamOption;
 
 typedef struct AppOptions {
     bool show_frame_time;
@@ -100,6 +105,7 @@ typedef struct AppScreens {
     HomeArt home_art;
     MenuItem music_items[MUSIC_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];
+    HighRamOption high_ram;
 } AppScreens;
 
 typedef struct AppScreensContext {
@@ -112,6 +118,7 @@ typedef struct AppScreensContext {
     PowerPolicy *power;
     Toast *toast;
     CoverCache *covers;
+    bool *rescan_requested;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);

@@ -11,6 +11,7 @@
 
 enum {
     LOWEST_PLL_MHZ = 96,
+    CORE1_RAM_BYTES = 0x60000,
     STAGING_WORDS = 1024,
     WORD_BYTES = 4,
     DECODE_TIMEOUT_MS = 10000,
@@ -247,4 +248,32 @@ HalCore1Decode hal_system_core1_decode_test(void)
         result.status = status_of(ran != CORE1_OK ? ran : stopped);
     }
     return result;
+}
+
+static bool lent;
+
+void *hal_system_borrow_scratch(uint32_t *size)
+{
+    board_audio_shut_down();
+    board_core1_stop();
+    if (hal_system_clock_mhz() < LOWEST_PLL_MHZ) {
+        hal_system_set_clock_mhz(LOWEST_PLL_MHZ);
+    }
+    uint32_t pll_mhz = hal_system_clock_mhz();
+    *size = 0;
+    if (core1_power_up(&BUS, pll_mhz, core1_divider_for(pll_mhz)) != CORE1_OK) {
+        core1_stop(&BUS);
+        return NULL;
+    }
+    lent = true;
+    *size = CORE1_RAM_BYTES;
+    return (void *)(uintptr_t)CORE1_CODE_BASE;
+}
+
+void hal_system_return_scratch(void)
+{
+    if (lent) {
+        core1_stop(&BUS);
+        lent = false;
+    }
 }

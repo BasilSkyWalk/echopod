@@ -7,12 +7,22 @@ typedef struct SimPower {
     bool off_requested;
 } SimPower;
 
+enum {
+    EMPTY_MILLIVOLTS = 3450,
+    MILLIVOLTS_PER_PERCENT_TENFOLD = 75
+};
+
 static SimPower power;
 
 void sim_power_configure(uint8_t battery_percent, bool charging)
 {
+    uint32_t millivolts = EMPTY_MILLIVOLTS + battery_percent * MILLIVOLTS_PER_PERCENT_TENFOLD / 10;
     power = (SimPower){
-        .battery = {.known = true, .percent = battery_percent, .charging = charging},
+        .battery = {.known = true,
+                    .percent = battery_percent,
+                    .charging = charging,
+                    .usb_power = charging,
+                    .millivolts = (uint16_t)millivolts},
         .off_requested = false,
     };
 }
