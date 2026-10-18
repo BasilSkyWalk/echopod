@@ -52,6 +52,11 @@ foreach(library_test block_cache library library_browse favorites covers)
         LIBRARIES echo_library_fixtures
     )
 endforeach()
+echo_add_unit_test(NAME test_track_tags
+    SOURCES library/test_track_tags.c
+    LIBRARIES echo_library_fixtures
+)
+target_compile_definitions(test_track_tags PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 
 echo_add_unit_test(NAME test_screen_stack SOURCES ui/test_screen_stack.c LIBRARIES echo_ui)
 echo_add_unit_test(NAME test_navigation SOURCES ui/test_navigation.c LIBRARIES echo_ui)
