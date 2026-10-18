@@ -349,6 +349,7 @@ HalAudioStatus hal_audio_status(void)
         .token = track->token,
         .position_ms = (uint32_t)position,
         .failed = audio.failed,
+        .idle = audio.state == HAL_AUDIO_STOPPED,
         .format = track->open ? sim_decoder_format(&track->decoder)
                               : (HalAudioFormat){.codec = HAL_AUDIO_CODEC_UNKNOWN},
     };

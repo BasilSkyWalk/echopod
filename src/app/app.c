@@ -100,6 +100,7 @@ static AppState app;
 static const FadeTiming SPLASH_TIMING = {.fade_ms = 600, .hold_ms = 500, .rising = true};
 static const uint32_t SCREEN_ON_CLOCK_MHZ = 200;
 static const uint32_t SCREEN_OFF_CLOCK_MHZ = 96;
+static const uint32_t IDLE_CLOCK_MHZ = 24;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
 static const char SPLASH_TEXT[] = "Echo Mini";
 static const char GOODBYE_TEXT[] = "Goodbye";
@@ -126,9 +127,17 @@ static void read_input(void)
 
 static void use_screen_key_behaviors(void);
 
-static void use_clock_for_display(bool on)
+static uint32_t wanted_clock_mhz(void)
 {
-    uint32_t wanted = on ? SCREEN_ON_CLOCK_MHZ : SCREEN_OFF_CLOCK_MHZ;
+    if (app.display_on) {
+        return SCREEN_ON_CLOCK_MHZ;
+    }
+    return hal_audio_status().idle ? IDLE_CLOCK_MHZ : SCREEN_OFF_CLOCK_MHZ;
+}
+
+static void use_wanted_clock(void)
+{
+    uint32_t wanted = wanted_clock_mhz();
     if (hal_system_clock_mhz() != wanted) {
         hal_system_set_clock_mhz(wanted);
     }
@@ -138,7 +147,7 @@ static void set_display(bool on)
 {
     app.display_on = on;
     hal_display_set_power(on);
-    use_clock_for_display(on);
+    use_wanted_clock();
     if (screen_stack_depth(&app.stack) > 0) {
         use_screen_key_behaviors();
     }
@@ -574,6 +583,9 @@ void app_step(void)
     }
     if (app.powered_off) {
         return;
+    }
+    if (!app.display_on) {
+        use_wanted_clock();
     }
     toast_update(&app.toast, now_ms);
     update_screen(now_ms);

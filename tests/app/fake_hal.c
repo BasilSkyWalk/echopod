@@ -87,6 +87,7 @@ static FakeHal fake;
 void fake_hal_reset(void)
 {
     fake = (FakeHal){0};
+    fake.audio.status.idle = true;
 }
 
 void fake_hal_set_version(const char *version)
@@ -323,6 +324,11 @@ void fake_hal_audio_set_format(HalAudioFormat format)
     fake.audio.status.format = format;
 }
 
+void fake_hal_audio_set_idle(bool idle)
+{
+    fake.audio.status.idle = idle;
+}
+
 void fake_hal_audio_set_token(uint32_t token)
 {
     fake.audio.status.token = token;
@@ -358,8 +364,11 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
     copy_path(fake.audio.playing_path, path);
     fake.audio.play_start_ms = start_ms;
     fake.audio.play_count++;
-    fake.audio.status = (HalAudioStatus){
-        .state = HAL_AUDIO_PLAYING, .token = token, .position_ms = start_ms, .failed = false};
+    fake.audio.status = (HalAudioStatus){.state = HAL_AUDIO_PLAYING,
+                                         .token = token,
+                                         .position_ms = start_ms,
+                                         .failed = false,
+                                         .idle = false};
     return true;
 }
 

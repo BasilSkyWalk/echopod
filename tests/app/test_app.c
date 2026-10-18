@@ -584,11 +584,32 @@ static void going_back_slides_the_screen_out_to_the_right(void)
 
 static void the_cpu_runs_fast_only_while_the_screen_is_on(void)
 {
-    start_app();
+    start_app_with_library();
+    play_first_album_track();
     step();
     CHECK_EQUAL(200, hal_system_clock_mhz());
     tap(KEY_POWER);
     CHECK(!fake_hal_display_on());
+    CHECK_EQUAL(96, hal_system_clock_mhz());
+    tap(KEY_POWER);
+    CHECK_EQUAL(200, hal_system_clock_mhz());
+}
+
+static void with_the_screen_off_the_cpu_idles_at_24_mhz_while_audio_is_down(void)
+{
+    start_app_with_library();
+    tap(KEY_POWER);
+    CHECK_EQUAL(24, hal_system_clock_mhz());
+    tap(KEY_POWER);
+    CHECK_EQUAL(200, hal_system_clock_mhz());
+    play_first_album_track();
+    tap(KEY_POWER);
+    CHECK_EQUAL(96, hal_system_clock_mhz());
+    fake_hal_audio_set_idle(true);
+    step();
+    CHECK_EQUAL(24, hal_system_clock_mhz());
+    fake_hal_audio_set_idle(false);
+    step();
     CHECK_EQUAL(96, hal_system_clock_mhz());
     tap(KEY_POWER);
     CHECK_EQUAL(200, hal_system_clock_mhz());
@@ -1332,6 +1353,7 @@ int main(void)
         TEST_CASE(a_new_screen_slides_in_from_the_right),
         TEST_CASE(going_back_slides_the_screen_out_to_the_right),
         TEST_CASE(the_cpu_runs_fast_only_while_the_screen_is_on),
+        TEST_CASE(with_the_screen_off_the_cpu_idles_at_24_mhz_while_audio_is_down),
         TEST_CASE(the_screen_turns_off_after_the_timeout),
         TEST_CASE(after_a_timeout_volume_changes_without_waking),
         TEST_CASE(the_timeout_setting_is_used),

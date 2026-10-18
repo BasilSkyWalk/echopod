@@ -15,6 +15,7 @@
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
+#include "hal/system.h"
 
 enum {
     RING_BLOCKS = 4,
@@ -24,6 +25,8 @@ enum {
     PREFILL_TIMEOUT_MS = 1000,
     FILL_BUDGET_BYTES = 8192,
     IDLE_SHUTDOWN_MS = 3000,
+    PAUSE_PARK_MS = 30000,
+    AUDIO_CLOCK_MHZ = 96,
     TONE_RATE_HZ = 44100,
     TONE_PERIOD_SAMPLES = 100,
     TONE_AMPLITUDE = 9000,
@@ -50,6 +53,10 @@ static uint32_t last_position;
 static uint32_t ring_words;
 static bool stopped_waiting;
 static uint32_t stopped_since_ms;
+static bool paused_waiting;
+static uint32_t paused_since_ms;
+static bool parked;
+static HalAudioStatus parked_status;
 static bool tone_active;
 static HalAudioStats stats;
 static uint32_t read_us_pending;
@@ -248,9 +255,18 @@ static void stop_tone(void)
     }
 }
 
+static void ensure_audio_clock(void)
+{
+    if (hal_system_clock_mhz() < AUDIO_CLOCK_MHZ) {
+        hal_system_set_clock_mhz(AUDIO_CLOCK_MHZ);
+    }
+}
+
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 {
     ensure_engine();
+    parked = false;
+    ensure_audio_clock();
     stop_tone();
     stop_transfer();
     if (!audio_engine_play(&engine, path, start_ms, token)) {
@@ -269,9 +285,18 @@ void hal_audio_queue_next(const char *path, uint32_t token)
     audio_engine_queue_next(&engine, path, token);
 }
 
+static void unpark(void)
+{
+    parked = false;
+    hal_audio_seek(parked_status.position_ms);
+}
+
 void hal_audio_pause(void)
 {
     ensure_engine();
+    if (parked) {
+        return;
+    }
     if (transferring) {
         dac_path_set_muted(true);
         dmac_suspend();
@@ -282,6 +307,9 @@ void hal_audio_pause(void)
 void hal_audio_resume(void)
 {
     ensure_engine();
+    if (parked) {
+        unpark();
+    }
     if (transferring) {
         dmac_resume();
         dac_path_set_muted(false);
@@ -292,6 +320,13 @@ void hal_audio_resume(void)
 void hal_audio_seek(uint32_t position_ms)
 {
     ensure_engine();
+    if (parked) {
+        parked = false;
+        hal_audio_seek(position_ms);
+        hal_audio_pause();
+        return;
+    }
+    ensure_audio_clock();
     bool paused = audio_engine_status(&engine).state == AUDIO_ENGINE_PAUSED;
     stop_transfer();
     if (!audio_engine_seek(&engine, position_ms) || !start_output()) {
@@ -347,9 +382,17 @@ static HalAudioFormat format_of(AudioTrackInfo track)
     };
 }
 
+static bool output_idle(void)
+{
+    return !path_up && !board_core1_streaming();
+}
+
 HalAudioStatus hal_audio_status(void)
 {
     ensure_engine();
+    if (parked) {
+        return parked_status;
+    }
     update_consumed();
     audio_engine_observe(&engine, consumed);
     AudioEngineStatus status = audio_engine_status(&engine);
@@ -357,6 +400,7 @@ HalAudioStatus hal_audio_status(void)
                             .token = status.token,
                             .position_ms = status.position_ms,
                             .failed = status.failed,
+                            .idle = output_idle(),
                             .format = format_of(status.track)};
 }
 
@@ -393,6 +437,35 @@ static void shut_down_when_idle(void)
     }
 }
 
+static void park(void)
+{
+    parked_status = hal_audio_status();
+    parked_status.idle = true;
+    audio_engine_stop(&engine);
+    stop_path();
+    board_core1_stop();
+    using_core1 = false;
+    paused_waiting = false;
+    parked = true;
+}
+
+static void park_when_paused_long(void)
+{
+    if (audio_engine_status(&engine).state != AUDIO_ENGINE_PAUSED) {
+        paused_waiting = false;
+        return;
+    }
+    uint32_t now_ms = hal_clock_milliseconds();
+    if (!paused_waiting) {
+        paused_waiting = true;
+        paused_since_ms = now_ms;
+        return;
+    }
+    if (now_ms - paused_since_ms >= PAUSE_PARK_MS) {
+        park();
+    }
+}
+
 void hal_audio_service(void)
 {
     if (!engine_ready || !transferring || tone_active) {
@@ -402,6 +475,7 @@ void hal_audio_service(void)
     pump(consumed);
     change_rate();
     shut_down_when_idle();
+    park_when_paused_long();
 }
 
 HalAudioStats hal_audio_stats(void)

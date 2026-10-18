@@ -20,6 +20,9 @@ static void check_usb(void)
     bool vbus = usb_vbus_present();
     if (vbus && !usb_handled) {
         usb_handled = true;
+        if (hal_system_clock_mhz() < START_CLOCK_MHZ) {
+            hal_system_set_clock_mhz(START_CLOCK_MHZ);
+        }
         UsbSessionEnd end = usb_session_run();
         if (end == USB_SESSION_EJECTED || end == USB_SESSION_UNPLUGGED) {
             update_after_usb();

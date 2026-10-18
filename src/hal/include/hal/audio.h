@@ -44,6 +44,7 @@ typedef struct HalAudioStatus {
     uint32_t token;
     uint32_t position_ms;
     bool failed;
+    bool idle;
     HalAudioFormat format;
 } HalAudioStatus;
 
