@@ -47,6 +47,7 @@ static void run_usb_session(void)
     if (usb_session_card_changed()) {
         storage_reset();
         app_start();
+        app_request_rescan();
     }
     app_wake();
     board_stall_pause(false);
