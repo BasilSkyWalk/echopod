@@ -29,14 +29,14 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | FLAC / MP3 / WAV playback | in progress | dr_libs in the simulator. On the device: our own FLAC decoder (`src/codec`, bit-exact on the test files) and a DMA ring engine; plays at the right rate on the device but too slowly for 96 kHz on core 0, so decoding moves to core 1 (NOTES, Next session). MP3/WAV not on the device |
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
 | Gapless | sim | Token-based hand-over through the audio HAL |
-| Resume after power-off | in progress | `/.echo/resume.bin`; on the device it overwrites a file made by `tools/save_files.py` (not yet tried on hardware) |
+| Resume after power-off | device | `/.echo/resume.bin`; on the device it overwrites a file made by `tools/save_files.py` (settings and resume written on hardware 2026-10-18) |
 | Library DB from SD scan | sim | Built on the PC (`tools/library_index.py`); an on-device rescan comes later |
 | Browse: Artist / Album Artist / Album / Genre / Folder / All Songs / Playlists / Favorites | sim | Selecting a track plays the list from it |
 | Now Playing: art, info, progress, seek | in progress | Info, progress, times, state, modes, volume and seek done; the cover isn't shown on Now Playing yet |
 | Queue, shuffle, repeat | sim | Shuffle Songs/Albums, Repeat One/All, seeded |
 | Volume and button mapping, lock/hold | sim | Rocker = volume (hold on Now Playing = previous/next track). Power short press = lock/unlock, long press = off; wake on any key |
 | Settings: brightness, screen timeout, sleep timer, gain, output | in progress | Saved in `/.echo/settings.bin` (in place on the device, untried on hardware). Brightness drives stock's 10 kHz backlight PWM on the device (untried); gain works; output needs jack routing |
-| Battery, charging, power management | in progress | Battery percent, charging state, screen timeout and power-off work on the device. Low-battery shutdown (3450 mV for 2 s), parking a 30 s pause and 24 MHz while idle with the screen off are built, untried on hardware |
+| Battery, charging, power management | in progress | Battery percent, charging state, screen timeout, power-off, charger detection (no USB mode without a computer) and stock's clock policy, WFI while dark and auto off (5 min) on the device; the Power-tap restarts are fixed (stock's power key pull). Low-battery shutdown is untried on hardware; no watchdog, boot cutoff or jack detect yet |
 | USB mass storage | todo | Works in ReChord (full speed, SD read-only) |
 
 ### Ours
