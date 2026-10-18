@@ -17,6 +17,7 @@ void board_display_start(void);
 void board_display_after_clock_change(void);
 void board_backlight_off(void);
 void board_backlight_full(void);
+bool board_display_lit(void);
 void board_display_clear(void);
 void board_input_start(void);
 void board_input_sample(uint32_t now_ms);

@@ -31,9 +31,10 @@ enum {
     HOME_NOW_PLAYING_INDEX = 3,
     SETTINGS_REPEAT_INDEX = 1,
     SETTINGS_SLEEP_INDEX = 2,
-    SETTINGS_TIMEOUT_INDEX = 3,
-    SETTINGS_BRIGHTNESS_INDEX = 4,
-    SETTINGS_GAIN_INDEX = 5,
+    SETTINGS_TIMEOUT_INDEX = 4,
+    SETTINGS_BRIGHTNESS_INDEX = 5,
+    SETTINGS_GAIN_INDEX = 6,
+    SETTINGS_START_INDEX = 8,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -583,7 +584,7 @@ static void going_back_slides_the_screen_out_to_the_right(void)
     CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
 }
 
-static void the_cpu_runs_fast_only_while_the_screen_is_on(void)
+static void the_clock_never_changes_with_the_screen_while_audio_is_up(void)
 {
     start_app_with_library();
     play_first_album_track();
@@ -591,29 +592,54 @@ static void the_cpu_runs_fast_only_while_the_screen_is_on(void)
     CHECK_EQUAL(200, hal_system_clock_mhz());
     tap(KEY_POWER);
     CHECK(!fake_hal_display_on());
-    CHECK_EQUAL(96, hal_system_clock_mhz());
+    CHECK_EQUAL(200, hal_system_clock_mhz());
     tap(KEY_POWER);
     CHECK_EQUAL(200, hal_system_clock_mhz());
 }
 
-static void with_the_screen_off_the_cpu_idles_at_24_mhz_while_audio_is_down(void)
+static void with_the_screen_off_the_cpu_drops_to_96_mhz_once_audio_is_down(void)
 {
     start_app_with_library();
     tap(KEY_POWER);
-    CHECK_EQUAL(24, hal_system_clock_mhz());
+    CHECK_EQUAL(96, hal_system_clock_mhz());
     tap(KEY_POWER);
     CHECK_EQUAL(200, hal_system_clock_mhz());
     play_first_album_track();
     tap(KEY_POWER);
-    CHECK_EQUAL(96, hal_system_clock_mhz());
+    CHECK_EQUAL(200, hal_system_clock_mhz());
     fake_hal_audio_set_idle(true);
     step();
-    CHECK_EQUAL(24, hal_system_clock_mhz());
+    CHECK_EQUAL(96, hal_system_clock_mhz());
     fake_hal_audio_set_idle(false);
     step();
-    CHECK_EQUAL(96, hal_system_clock_mhz());
-    tap(KEY_POWER);
     CHECK_EQUAL(200, hal_system_clock_mhz());
+}
+
+static void the_player_turns_itself_off_after_five_idle_minutes_on_battery(void)
+{
+    start_app_with_library();
+    wait_ms(5 * 60000 - 1000);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    wait_ms(1000);
+    wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(1, fake_hal_power_off_count());
+}
+
+static void playing_or_usb_power_keeps_the_player_on(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    for (int minute = 0; minute < 12; minute++) {
+        wait_ms(60000);
+    }
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    tap(KEY_PLAY);
+    fake_hal_set_battery(
+        (HalBattery){.known = true, .percent = 80, .millivolts = 3900, .usb_power = true});
+    for (int minute = 0; minute < 12; minute++) {
+        wait_ms(60000);
+    }
+    CHECK_EQUAL(0, fake_hal_power_off_count());
 }
 
 static void the_screen_turns_off_after_the_timeout(void)
@@ -759,6 +785,8 @@ static void the_splash_draws_over_the_home_screen(void)
 static void the_sleep_timer_turns_the_player_off(void)
 {
     start_app_with_library();
+    fake_hal_set_battery(
+        (HalBattery){.known = true, .percent = 80, .millivolts = 3900, .usb_power = true});
     open_setting(SETTINGS_SLEEP_INDEX);
     CHECK(title_is("Sleep timer"));
     move_down(1);
@@ -867,7 +895,7 @@ static void playlists_open_from_the_music_menu(void)
 static void start_with(StartScreen start)
 {
     start_app_with_library();
-    open_setting(7);
+    open_setting(SETTINGS_START_INDEX);
     CHECK(title_is("Start screen"));
     move_down((int)start);
     tap(KEY_PLAY);
@@ -1363,8 +1391,10 @@ int main(void)
         TEST_CASE(saved_settings_are_restored_at_start),
         TEST_CASE(a_new_screen_slides_in_from_the_right),
         TEST_CASE(going_back_slides_the_screen_out_to_the_right),
-        TEST_CASE(the_cpu_runs_fast_only_while_the_screen_is_on),
-        TEST_CASE(with_the_screen_off_the_cpu_idles_at_24_mhz_while_audio_is_down),
+        TEST_CASE(the_clock_never_changes_with_the_screen_while_audio_is_up),
+        TEST_CASE(with_the_screen_off_the_cpu_drops_to_96_mhz_once_audio_is_down),
+        TEST_CASE(the_player_turns_itself_off_after_five_idle_minutes_on_battery),
+        TEST_CASE(playing_or_usb_power_keeps_the_player_on),
         TEST_CASE(the_screen_turns_off_after_the_timeout),
         TEST_CASE(after_a_timeout_volume_changes_without_waking),
         TEST_CASE(the_timeout_setting_is_used),

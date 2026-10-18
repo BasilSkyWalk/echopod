@@ -15,6 +15,8 @@ static const char *const SLEEP_MESSAGES[SLEEP_TIMER_OPTION_COUNT] = {
     "Sleep timer off",       "Turning off in 15 min", "Turning off in 30 min",
     "Turning off in 45 min", "Turning off in 60 min", "Turning off in 90 min",
     "Turning off in 120 min"};
+static const char *const AUTO_OFF_OPTIONS[AUTO_OFF_OPTION_COUNT] = {"Off", "1 min", "5 min",
+                                                                    "10 min"};
 static const char *const TIMEOUT_OPTIONS[SCREEN_TIMEOUT_OPTION_COUNT] = {
     "10 s", "20 s", "30 s", "1 min", "2 min", "5 min", "Never"};
 static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2", "3", "4", "5",
@@ -109,6 +111,20 @@ static void choose_timeout(void *context, int index)
     save(settings);
 }
 
+static int current_auto_off(const void *context)
+{
+    return settings_of(context)->auto_off;
+}
+
+static void choose_auto_off(void *context, int index)
+{
+    SettingsContext *settings = context;
+    editable_settings(context)->auto_off = (uint8_t)index;
+    power_policy_set_auto_off(settings->power, settings_auto_off_ms(settings_of(context)),
+                              hal_clock_milliseconds());
+    save(settings);
+}
+
 static int current_brightness(const void *context)
 {
     return settings_of(context)->brightness - SETTINGS_BRIGHTNESS_MIN;
@@ -157,6 +173,7 @@ static const SettingChoice CHOICES[SETTINGS_ITEM_COUNT] = {
     {"Shuffle", SHUFFLE_OPTIONS, SHUFFLE_MODE_COUNT, current_shuffle, choose_shuffle},
     {"Repeat", REPEAT_OPTIONS, REPEAT_MODE_COUNT, current_repeat, choose_repeat},
     {"Sleep timer", SLEEP_OPTIONS, SLEEP_TIMER_OPTION_COUNT, current_sleep, choose_sleep},
+    {"Auto off", AUTO_OFF_OPTIONS, AUTO_OFF_OPTION_COUNT, current_auto_off, choose_auto_off},
     {"Screen timeout", TIMEOUT_OPTIONS, SCREEN_TIMEOUT_OPTION_COUNT, current_timeout,
      choose_timeout},
     {"Brightness", BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,

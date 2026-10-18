@@ -93,6 +93,13 @@ static void check_usb(void)
     }
 }
 
+static void sleep_while_dark(void)
+{
+    if (!board_display_lit()) {
+        __asm__ volatile("wfi" ::: "memory");
+    }
+}
+
 void board_main(void)
 {
     board_start_record_boot();
@@ -111,5 +118,6 @@ void board_main(void)
         board_stall_beat();
         app_step();
         check_usb();
+        sleep_while_dark();
     }
 }

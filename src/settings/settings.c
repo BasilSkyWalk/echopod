@@ -3,7 +3,8 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 1,
+    VERSION = 2,
+    FIRST_VERSION = 1,
     MAGIC_SIZE = 4,
     VERSION_FIELD = 4,
     BRIGHTNESS_FIELD = 6,
@@ -14,10 +15,13 @@ enum {
     SHUFFLE_FIELD = 11,
     REPEAT_FIELD = 12,
     VOLUME_FIELD = 13,
+    AUTO_OFF_FIELD = 14,
     CHECKSUM_FIELD = 20,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
     DEFAULT_VOLUME = 12,
+    DEFAULT_AUTO_OFF_OPTION = 2,
+    MILLISECONDS_PER_MINUTE = 60000,
     MILLISECONDS_PER_SECOND = 1000,
     BITS_PER_BYTE = 8
 };
@@ -25,6 +29,7 @@ enum {
 static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'S', 'T'};
 static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30, 60, 120, 300, 0};
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
+static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
 
 Settings settings_defaults(void)
 {
@@ -37,6 +42,7 @@ Settings settings_defaults(void)
         .shuffle = SHUFFLE_OFF,
         .repeat = REPEAT_OFF,
         .volume = DEFAULT_VOLUME,
+        .auto_off = DEFAULT_AUTO_OFF_OPTION,
     };
 }
 
@@ -53,6 +59,16 @@ uint32_t settings_sleep_option_minutes(int option)
 uint32_t settings_screen_timeout_ms(const Settings *settings)
 {
     return settings_timeout_option_seconds(settings->screen_timeout) * MILLISECONDS_PER_SECOND;
+}
+
+uint32_t settings_auto_off_option_minutes(int option)
+{
+    return option >= 0 && option < AUTO_OFF_OPTION_COUNT ? AUTO_OFF_MINUTES[option] : 0;
+}
+
+uint32_t settings_auto_off_ms(const Settings *settings)
+{
+    return settings_auto_off_option_minutes(settings->auto_off) * MILLISECONDS_PER_MINUTE;
 }
 
 static uint32_t checksum_of(const uint8_t *bytes)
@@ -90,6 +106,7 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     bytes[SHUFFLE_FIELD] = (uint8_t)settings->shuffle;
     bytes[REPEAT_FIELD] = (uint8_t)settings->repeat;
     bytes[VOLUME_FIELD] = settings->volume;
+    bytes[AUTO_OFF_FIELD] = settings->auto_off;
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
@@ -100,7 +117,8 @@ static bool header_valid(const uint8_t *bytes)
             return false;
         }
     }
-    return bytes[VERSION_FIELD] == VERSION && bytes[VERSION_FIELD + 1] == 0 &&
+    uint8_t version = bytes[VERSION_FIELD];
+    return (version == VERSION || version == FIRST_VERSION) && bytes[VERSION_FIELD + 1] == 0 &&
            get_u32(bytes, CHECKSUM_FIELD) == checksum_of(bytes);
 }
 
@@ -111,7 +129,8 @@ static bool values_valid(const uint8_t *bytes)
            bytes[TIMEOUT_FIELD] < SCREEN_TIMEOUT_OPTION_COUNT &&
            bytes[GAIN_FIELD] < GAIN_LEVEL_COUNT && bytes[OUTPUT_FIELD] < OUTPUT_JACK_COUNT &&
            bytes[START_FIELD] < START_SCREEN_COUNT && bytes[SHUFFLE_FIELD] < SHUFFLE_MODE_COUNT &&
-           bytes[REPEAT_FIELD] < REPEAT_MODE_COUNT && bytes[VOLUME_FIELD] <= SETTINGS_VOLUME_MAX;
+           bytes[REPEAT_FIELD] < REPEAT_MODE_COUNT && bytes[VOLUME_FIELD] <= SETTINGS_VOLUME_MAX &&
+           bytes[AUTO_OFF_FIELD] < AUTO_OFF_OPTION_COUNT;
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
@@ -128,6 +147,8 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .shuffle = (ShuffleMode)bytes[SHUFFLE_FIELD],
         .repeat = (RepeatMode)bytes[REPEAT_FIELD],
         .volume = bytes[VOLUME_FIELD],
+        .auto_off = bytes[VERSION_FIELD] == FIRST_VERSION ? (uint8_t)DEFAULT_AUTO_OFF_OPTION
+                                                          : bytes[AUTO_OFF_FIELD],
     };
     return true;
 }

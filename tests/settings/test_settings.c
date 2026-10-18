@@ -3,7 +3,9 @@
 #include "settings/settings.h"
 
 enum {
+    VERSION_FIELD = 4,
     BRIGHTNESS_FIELD = 6,
+    AUTO_OFF_FIELD = 14,
     CHECKSUM_FIELD = 20,
     NEVER_OPTION = 6
 };
@@ -19,6 +21,7 @@ static Settings custom_settings(void)
     settings.shuffle = SHUFFLE_ALBUMS;
     settings.repeat = REPEAT_ONE;
     settings.volume = 42;
+    settings.auto_off = 3;
     return settings;
 }
 
@@ -41,6 +44,29 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(SHUFFLE_OFF, settings.shuffle);
     CHECK_EQUAL(REPEAT_OFF, settings.repeat);
     CHECK_EQUAL(12, settings.volume);
+    CHECK_EQUAL(5u * 60000u, settings_auto_off_ms(&settings));
+}
+
+static void auto_off_options_are_stocks(void)
+{
+    CHECK_EQUAL(0, settings_auto_off_option_minutes(0));
+    CHECK_EQUAL(1, settings_auto_off_option_minutes(1));
+    CHECK_EQUAL(5, settings_auto_off_option_minutes(2));
+    CHECK_EQUAL(10, settings_auto_off_option_minutes(AUTO_OFF_OPTION_COUNT - 1));
+}
+
+static void a_version_one_file_keeps_its_values_and_gets_the_default_auto_off(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 1;
+    bytes[AUTO_OFF_FIELD] = 0;
+    rewrite_checksum(bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(42, decoded.volume);
+    CHECK_EQUAL(settings_defaults().auto_off, decoded.auto_off);
 }
 
 static void timeout_options_end_with_never(void)
@@ -75,6 +101,7 @@ static void settings_survive_a_round_trip(void)
     CHECK_EQUAL(original.shuffle, decoded.shuffle);
     CHECK_EQUAL(original.repeat, decoded.repeat);
     CHECK_EQUAL(original.volume, decoded.volume);
+    CHECK_EQUAL(original.auto_off, decoded.auto_off);
 }
 
 static void a_corrupted_file_is_rejected(void)
@@ -100,9 +127,14 @@ static void out_of_range_values_are_rejected(void)
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(defaults_are_comfortable),     TEST_CASE(timeout_options_end_with_never),
-        TEST_CASE(sleep_options_start_with_off), TEST_CASE(settings_survive_a_round_trip),
-        TEST_CASE(a_corrupted_file_is_rejected), TEST_CASE(out_of_range_values_are_rejected),
+        TEST_CASE(defaults_are_comfortable),
+        TEST_CASE(timeout_options_end_with_never),
+        TEST_CASE(sleep_options_start_with_off),
+        TEST_CASE(settings_survive_a_round_trip),
+        TEST_CASE(a_corrupted_file_is_rejected),
+        TEST_CASE(out_of_range_values_are_rejected),
+        TEST_CASE(auto_off_options_are_stocks),
+        TEST_CASE(a_version_one_file_keeps_its_values_and_gets_the_default_auto_off),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

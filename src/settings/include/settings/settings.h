@@ -35,6 +35,7 @@ enum {
     SETTINGS_VOLUME_MAX = 50,
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
+    AUTO_OFF_OPTION_COUNT = 4,
     SETTINGS_FILE_SIZE = 24
 };
 
@@ -47,11 +48,14 @@ typedef struct Settings {
     ShuffleMode shuffle;
     RepeatMode repeat;
     uint8_t volume;
+    uint8_t auto_off;
 } Settings;
 
 Settings settings_defaults(void);
 uint32_t settings_timeout_option_seconds(int option);
 uint32_t settings_sleep_option_minutes(int option);
 uint32_t settings_screen_timeout_ms(const Settings *settings);
+uint32_t settings_auto_off_option_minutes(int option);
+uint32_t settings_auto_off_ms(const Settings *settings);
 void settings_encode(const Settings *settings, uint8_t *bytes);
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings);

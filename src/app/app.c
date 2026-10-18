@@ -78,6 +78,7 @@ typedef struct AppState {
     PowerPolicy power;
     LowBattery low_battery;
     uint32_t battery_check_ms;
+    bool usb_power;
     const char *goodbye_text;
     Toast toast;
     StatusBarState status_bar;
@@ -99,8 +100,7 @@ static AppState app;
 
 static const FadeTiming SPLASH_TIMING = {.fade_ms = 600, .hold_ms = 500, .rising = true};
 static const uint32_t SCREEN_ON_CLOCK_MHZ = 200;
-static const uint32_t SCREEN_OFF_CLOCK_MHZ = 96;
-static const uint32_t IDLE_CLOCK_MHZ = 24;
+static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
 static const char SPLASH_TEXT[] = "Echo Mini";
 static const char GOODBYE_TEXT[] = "Goodbye";
@@ -129,10 +129,10 @@ static void use_screen_key_behaviors(void);
 
 static uint32_t wanted_clock_mhz(void)
 {
-    if (app.display_on) {
+    if (app.display_on || !hal_audio_status().idle) {
         return SCREEN_ON_CLOCK_MHZ;
     }
-    return hal_audio_status().idle ? IDLE_CLOCK_MHZ : SCREEN_OFF_CLOCK_MHZ;
+    return IDLE_CLOCK_MHZ;
 }
 
 static void use_wanted_clock(void)
@@ -301,9 +301,17 @@ static bool battery_empty(uint32_t now_ms)
     }
     app.battery_check_ms = now_ms + BATTERY_CHECK_MS;
     HalBattery battery = hal_power_battery();
+    app.usb_power = battery.usb_power;
     LowBatteryReading reading = {
         .known = battery.known, .millivolts = battery.millivolts, .usb_power = battery.usb_power};
     return low_battery_update(&app.low_battery, reading, now_ms);
+}
+
+static void keep_awake_while_busy(uint32_t now_ms)
+{
+    if (app.usb_power || player_status(&app.player).state == PLAYER_PLAYING) {
+        power_policy_stay_awake(&app.power, now_ms);
+    }
 }
 
 static void update_power(uint32_t now_ms)
@@ -312,6 +320,7 @@ static void update_power(uint32_t now_ms)
         shut_down(BATTERY_LOW_TEXT);
         return;
     }
+    keep_awake_while_busy(now_ms);
     if (power_policy_update(&app.power, now_ms)) {
         shut_down(GOODBYE_TEXT);
         return;
@@ -501,6 +510,7 @@ static void start_playback(void)
 static void start_hardware(uint32_t now_ms)
 {
     power_policy_init(&app.power, settings_screen_timeout_ms(&app.settings.settings), now_ms);
+    power_policy_set_auto_off(&app.power, settings_auto_off_ms(&app.settings.settings), now_ms);
     settings_store_apply_hardware(&app.settings.settings);
     set_display(true);
 }

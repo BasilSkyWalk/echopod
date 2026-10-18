@@ -4,7 +4,8 @@
 enum {
     START_MS = 1000,
     TIMEOUT_MS = 30000,
-    SLEEP_MS = 60000
+    SLEEP_MS = 60000,
+    AUTO_OFF_MS = 300000
 };
 
 static PowerPolicy fresh_policy(void)
@@ -158,6 +159,32 @@ static void a_wake_after_a_power_tap_turns_the_screen_on(void)
     CHECK(policy.display_on);
 }
 
+static void auto_off_shuts_down_after_its_time_without_activity(void)
+{
+    PowerPolicy policy = fresh_policy();
+    power_policy_set_auto_off(&policy, AUTO_OFF_MS, START_MS);
+    CHECK(!power_policy_update(&policy, START_MS + AUTO_OFF_MS - 1));
+    CHECK(power_policy_update(&policy, START_MS + AUTO_OFF_MS));
+}
+
+static void staying_awake_and_keys_restart_the_auto_off_count(void)
+{
+    PowerPolicy policy = fresh_policy();
+    power_policy_set_auto_off(&policy, AUTO_OFF_MS, START_MS);
+    power_policy_stay_awake(&policy, START_MS + 200000);
+    CHECK(!power_policy_update(&policy, START_MS + 200000 + AUTO_OFF_MS - 1));
+    send(&policy, KEY_MENU, KEY_GESTURE_PRESS, START_MS + 400000);
+    CHECK(!power_policy_update(&policy, START_MS + 400000 + AUTO_OFF_MS - 1));
+    CHECK(power_policy_update(&policy, START_MS + 400000 + AUTO_OFF_MS));
+}
+
+static void auto_off_set_to_zero_never_shuts_down(void)
+{
+    PowerPolicy policy = fresh_policy();
+    power_policy_set_auto_off(&policy, 0, START_MS);
+    CHECK(!power_policy_update(&policy, START_MS + 10 * AUTO_OFF_MS));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -176,6 +203,9 @@ int main(void)
         TEST_CASE(a_cancelled_sleep_timer_never_fires),
         TEST_CASE(a_wake_turns_the_display_on_and_restarts_the_timeout),
         TEST_CASE(a_wake_after_a_power_tap_turns_the_screen_on),
+        TEST_CASE(auto_off_shuts_down_after_its_time_without_activity),
+        TEST_CASE(staying_awake_and_keys_restart_the_auto_off_count),
+        TEST_CASE(auto_off_set_to_zero_never_shuts_down),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

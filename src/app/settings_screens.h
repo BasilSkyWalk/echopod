@@ -11,7 +11,7 @@
 #include "ui/toast.h"
 
 enum {
-    SETTINGS_ITEM_COUNT = 8
+    SETTINGS_ITEM_COUNT = 9
 };
 
 typedef struct SettingsContext {

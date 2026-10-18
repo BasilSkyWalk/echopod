@@ -11,6 +11,8 @@ typedef struct PowerPolicy {
     uint32_t last_activity_ms;
     uint32_t timeout_ms;
     uint32_t sleep_deadline_ms;
+    uint32_t auto_off_ms;
+    uint32_t awake_ms;
 } PowerPolicy;
 
 typedef struct PowerKeyOutcome {
@@ -26,3 +28,5 @@ void power_policy_start_sleep_timer(PowerPolicy *policy, uint32_t duration_ms, u
 void power_policy_cancel_sleep_timer(PowerPolicy *policy);
 bool power_policy_update(PowerPolicy *policy, uint32_t now_ms);
 void power_policy_wake(PowerPolicy *policy, uint32_t now_ms);
+void power_policy_set_auto_off(PowerPolicy *policy, uint32_t auto_off_ms, uint32_t now_ms);
+void power_policy_stay_awake(PowerPolicy *policy, uint32_t now_ms);
