@@ -15,6 +15,7 @@ add_executable(echo_device
     board/loop_bench.c
     board/main.c
     board/mmc.c
+    board/panic.c
     board/power.c
     board/sd.c
     board/start_info.c

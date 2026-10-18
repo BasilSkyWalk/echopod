@@ -27,6 +27,10 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     return true;
 }
 
+void hal_system_stall_test(void)
+{
+}
+
 HalLoopCycles hal_system_loop_cycles(void)
 {
     return (HalLoopCycles){0};

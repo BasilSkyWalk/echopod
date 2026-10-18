@@ -206,6 +206,13 @@ static const char *last_battery_value(const void *context)
     return last_battery_text;
 }
 
+static ScreenAction run_stall_test(void *context)
+{
+    (void)context;
+    hal_system_stall_test();
+    return screen_action_none();
+}
+
 static ScreenAction play_test_tone(void *context)
 {
     ToneOption *tone = context;
@@ -434,6 +441,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         .label = "Last battery", .select = NULL, .context = NULL, .value = last_battery_value};
     screens->diagnostics_items[19] =
         open_item("Bluetooth", bluetooth_screen_init(&screens->bluetooth, theme));
+    screens->diagnostics_items[20] =
+        (MenuItem){.label = "Stall test", .select = run_stall_test, .context = NULL, .value = NULL};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

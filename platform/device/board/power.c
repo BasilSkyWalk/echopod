@@ -51,8 +51,25 @@ HalBattery hal_power_battery(void)
         .millivolts = (uint16_t)battery_gauge_millivolts(&gauge)};
 }
 
+void board_power_cut(void)
+{
+    board_backlight_off();
+    __asm__ volatile("cpsid i" ::: "memory");
+    board_start_record_power_off();
+    gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
+    gpio_output(POWER_HOLD, false);
+    for (;;) {
+    }
+}
+
+bool board_power_key_down(void)
+{
+    return gpio_read(POWER_KEY);
+}
+
 void hal_power_off(void)
 {
+    board_stall_pause(true);
     while (gpio_read(POWER_KEY)) {
     }
     board_backlight_off();

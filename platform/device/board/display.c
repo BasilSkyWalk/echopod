@@ -119,7 +119,7 @@ static void pulse_reset(uint32_t settle_ms)
     board_delay_ms(settle_ms);
 }
 
-static void clear_screen(void)
+void board_display_clear(void)
 {
     static uint16_t black[HAL_DISPLAY_WIDTH * CLEAR_ROWS];
     for (int y = 0; y < HAL_DISPLAY_HEIGHT; y += CLEAR_ROWS) {
@@ -181,6 +181,12 @@ static void apply_backlight(void)
     }
 }
 
+void board_backlight_full(void)
+{
+    backlight_on = true;
+    drive_backlight(true);
+}
+
 void board_backlight_off(void)
 {
     backlight_on = false;
@@ -205,7 +211,7 @@ void board_display_start(void)
     pulse_reset(RESET_SETTLE_MS);
     pulse_reset(RESET_READY_MS);
     panel_send_init(&BUS, PANEL_VARIANT_B);
-    clear_screen();
+    board_display_clear();
 }
 
 void hal_display_write(int x, int y, int width, int height, const uint16_t *pixels)

@@ -17,6 +17,7 @@ uint32_t fake_hal_microseconds(void);
 void fake_hal_refuse_clock_switch(void);
 void fake_hal_audio_set_idle(bool idle);
 int fake_hal_test_tone_count(void);
+int fake_hal_stall_test_count(void);
 int fake_hal_loop_bench_count(void);
 int fake_hal_core1_test_count(void);
 int fake_hal_core1_decode_count(void);

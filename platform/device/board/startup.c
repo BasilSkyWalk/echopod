@@ -38,7 +38,7 @@ __attribute__((section(".code_vectors"), used,
     device_default_handler,
     0,
     device_default_handler,
-    board_systick_handler,
+    device_systick_entry,
 };
 
 void device_default_handler(void)

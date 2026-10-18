@@ -38,6 +38,7 @@ static void raise_clock_for_usb(void)
 
 static void run_usb_session(void)
 {
+    board_stall_pause(true);
     raise_clock_for_usb();
     UsbSessionEnd end = usb_session_run();
     if (end == USB_SESSION_EJECTED || end == USB_SESSION_UNPLUGGED) {
@@ -48,13 +49,16 @@ static void run_usb_session(void)
         app_start();
     }
     app_wake();
+    board_stall_pause(false);
 }
 
 static void start_listening(void)
 {
     raise_clock_for_usb();
     if (!usb_session_listen()) {
+        board_stall_pause(true);
         usb_report_show(usb_session_report());
+        board_stall_pause(false);
         app_wake();
         usb_state = USB_STATE_HANDLED;
         return;
@@ -96,12 +100,15 @@ void board_main(void)
     board_bluetooth_off();
     board_clock_record_boot();
     board_clock_start();
+    board_stall_pause(true);
     hal_system_set_clock_mhz(START_CLOCK_MHZ);
     board_input_start();
     board_display_start();
     app_start();
     app_show_splash();
+    board_stall_pause(false);
     for (;;) {
+        board_stall_beat();
         app_step();
         check_usb();
     }

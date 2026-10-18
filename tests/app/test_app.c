@@ -53,6 +53,7 @@ enum {
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
     DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
+    DIAGNOSTICS_STALL_TEST_INDEX = 20,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 600,
@@ -1206,6 +1207,15 @@ static void the_test_tone_plays_once_per_press(void)
     CHECK(title_is("Diagnostics"));
 }
 
+static void the_stall_test_row_freezes_the_main_loop_on_purpose(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_STALL_TEST_INDEX);
+    CHECK_EQUAL(0, fake_hal_stall_test_count());
+    tap(KEY_PLAY);
+    CHECK_EQUAL(1, fake_hal_stall_test_count());
+}
+
 static void the_dma_tone_starts_and_stops_from_one_row(void)
 {
     start_app();
@@ -1331,6 +1341,7 @@ int main(void)
         TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
         TEST_CASE(the_test_tone_plays_once_per_press),
         TEST_CASE(the_dma_tone_starts_and_stops_from_one_row),
+        TEST_CASE(the_stall_test_row_freezes_the_main_loop_on_purpose),
         TEST_CASE(the_loop_benchmark_runs_once_per_press),
         TEST_CASE(the_core_1_test_runs_once_per_press),
         TEST_CASE(the_core_1_decode_test_runs_once_per_press),

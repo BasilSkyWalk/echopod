@@ -66,6 +66,7 @@ typedef struct FakeHal {
     WrittenFile written[FILE_CAPACITY];
     int write_count;
     uint32_t clock_mhz;
+    int stall_test_count;
     bool refuse_clock_switch;
     int test_tone_count;
     int loop_bench_count;
@@ -530,6 +531,16 @@ const uint8_t *fake_hal_file_bytes(const char *path, uint32_t *size)
 int fake_hal_loop_bench_count(void)
 {
     return fake.loop_bench_count;
+}
+
+void hal_system_stall_test(void)
+{
+    fake.stall_test_count++;
+}
+
+int fake_hal_stall_test_count(void)
+{
+    return fake.stall_test_count;
 }
 
 HalLoopCycles hal_system_loop_cycles(void)

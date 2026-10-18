@@ -19,9 +19,11 @@ add_library(echo_device_logic STATIC
     key_scanner.c
     msc.c
     panel.c
+    panic_text.c
     pll.c
     start_record.c
     sd_card.c
+    stall_watch.c
     tick_clock.c
     updater.c
     usb_device.c

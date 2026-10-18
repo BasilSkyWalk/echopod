@@ -24,6 +24,7 @@ typedef struct HalLoopCycles {
 } HalLoopCycles;
 
 HalLoopCycles hal_system_loop_cycles(void);
+void hal_system_stall_test(void);
 
 typedef enum HalStartStep {
     HAL_START_STEP_NONE,

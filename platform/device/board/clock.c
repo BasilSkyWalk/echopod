@@ -1,5 +1,6 @@
 #include "hal/clock.h"
 #include "board.h"
+#include "device/stall_watch.h"
 #include "device/tick_clock.h"
 #include "hal/system.h"
 #include "irq.h"
@@ -10,11 +11,14 @@
 
 enum {
     MICROSECONDS_PER_PERIOD = 1000,
-    PERIODS_PER_KEY_SCAN = 5
+    PERIODS_PER_KEY_SCAN = 5,
+    STACKED_LR_WORD = 5,
+    STACKED_PC_WORD = 6
 };
 
 static TickClock clock;
 static uint32_t periods_since_scan;
+static StallWatch stall_watch;
 
 static uint32_t period_of(uint32_t ticks_per_microsecond)
 {
@@ -61,16 +65,40 @@ void board_clock_set_rate(uint32_t ticks_per_microsecond)
     irq_restore(primask);
 }
 
-void board_systick_handler(void)
+__attribute__((naked)) void device_systick_entry(void)
+{
+    __asm__ volatile("mrs r0, msp\n\tb board_systick_handler");
+}
+
+void board_systick_handler(const uint32_t *frame)
 {
     tick_clock_reload(&clock);
     periods_since_scan++;
-    if (periods_since_scan >= PERIODS_PER_KEY_SCAN) {
-        periods_since_scan = 0;
-        uint32_t now_ms = tick_clock_milliseconds(&clock, read_counter());
-        board_input_sample(now_ms);
-        board_start_record_tick(now_ms);
+    if (periods_since_scan < PERIODS_PER_KEY_SCAN) {
+        return;
     }
+    periods_since_scan = 0;
+    uint32_t now_ms = tick_clock_milliseconds(&clock, read_counter());
+    board_input_sample(now_ms);
+    board_start_record_tick(now_ms);
+    if (stall_watch_check(&stall_watch, now_ms)) {
+        board_panic_stall(frame[STACKED_PC_WORD], frame[STACKED_LR_WORD]);
+    }
+    if (stall_watch.tripped) {
+        board_panic_poll_power(now_ms);
+    }
+}
+
+void board_stall_beat(void)
+{
+    stall_watch_beat(&stall_watch, hal_clock_milliseconds());
+}
+
+void board_stall_pause(bool paused)
+{
+    uint32_t primask = irq_save();
+    stall_watch_pause(&stall_watch, paused, tick_clock_milliseconds(&clock, read_counter()));
+    irq_restore(primask);
 }
 
 uint32_t hal_clock_milliseconds(void)
