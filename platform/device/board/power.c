@@ -1,7 +1,11 @@
 #include "hal/power.h"
 #include "board.h"
 #include "gpio.h"
+#include "registers.h"
 #include "usb.h"
+
+#define GRF_PORT2_LOW_PULL (GRF_BASE + 0x50u)
+#define POWER_KEY_PULL_OFF 0x00200000u
 
 static const GpioPin POWER_KEY = {2, 5};
 static const GpioPin POWER_HOLD = {2, 6};
@@ -17,6 +21,9 @@ void board_power_hold(void)
                                .high = gpio_output_level(POWER_HOLD)};
     gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
     gpio_output(POWER_HOLD, true);
+    gpio_mux(POWER_KEY, GPIO_FUNCTION_GPIO);
+    gpio_input(POWER_KEY);
+    register_write(GRF_PORT2_LOW_PULL, POWER_KEY_PULL_OFF);
 }
 
 HalPowerHold hal_power_boot_hold(void)

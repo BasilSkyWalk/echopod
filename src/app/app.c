@@ -291,10 +291,19 @@ static void run_background(KeyEvent event)
     }
 }
 
+static bool ignored_power_tap(KeyEvent event)
+{
+    return app.options.ignore_power_taps && event.key == KEY_POWER &&
+           event.gesture == KEY_GESTURE_PRESS;
+}
+
 static void dispatch_key_events(uint32_t now_ms)
 {
     KeyEvent event;
     while (!app.powered_off && key_tracker_next_event(&app.keys, &event)) {
+        if (ignored_power_tap(event)) {
+            continue;
+        }
         PowerKeyOutcome outcome = power_policy_key(&app.power, event, now_ms);
         if (outcome.shutdown) {
             shut_down(GOODBYE_TEXT);
@@ -564,7 +573,7 @@ void app_start(void)
     frame_stats_reset(&app.update_stats);
     frame_stats_reset(&app.draw_stats);
     frame_stats_reset(&app.send_stats);
-    app.options = (AppOptions){.show_frame_time = false};
+    app.options = (AppOptions){.show_frame_time = false, .ignore_power_taps = false};
     app.toast = (Toast){.visible = false};
     app.powered_off = false;
     app.saying_goodbye = false;

@@ -86,6 +86,19 @@ static const char *frame_time_value(const void *context)
     return options->show_frame_time ? "On" : "Off";
 }
 
+static ScreenAction toggle_power_taps(void *context)
+{
+    AppOptions *options = context;
+    options->ignore_power_taps = !options->ignore_power_taps;
+    return screen_action_none();
+}
+
+static const char *power_taps_value(const void *context)
+{
+    const AppOptions *options = context;
+    return options->ignore_power_taps ? "Ignored" : "Normal";
+}
+
 static const char *firmware_value(const void *context)
 {
     (void)context;
@@ -443,6 +456,10 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         open_item("Bluetooth", bluetooth_screen_init(&screens->bluetooth, theme));
     screens->diagnostics_items[20] =
         (MenuItem){.label = "Stall test", .select = run_stall_test, .context = NULL, .value = NULL};
+    screens->diagnostics_items[21] = (MenuItem){.label = "Power taps",
+                                                .select = toggle_power_taps,
+                                                .context = options,
+                                                .value = power_taps_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }
