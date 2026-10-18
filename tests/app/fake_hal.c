@@ -67,6 +67,7 @@ typedef struct FakeHal {
     int write_count;
     uint32_t clock_mhz;
     int stall_test_count;
+    int presents_at_power_on;
     bool refuse_clock_switch;
     int test_tone_count;
     int loop_bench_count;
@@ -176,7 +177,15 @@ void hal_display_present(void)
 
 void hal_display_set_power(bool on)
 {
+    if (on && !fake.display_on) {
+        fake.presents_at_power_on = fake.present_count;
+    }
     fake.display_on = on;
+}
+
+int fake_hal_presents_at_power_on(void)
+{
+    return fake.presents_at_power_on;
 }
 
 void hal_display_set_brightness(uint8_t level)

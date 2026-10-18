@@ -5,6 +5,7 @@
 #include "device/backlight.h"
 #include "device/panel.h"
 #include "gpio.h"
+#include "hal/clock.h"
 #include "hal/display.h"
 #include "registers.h"
 
@@ -38,6 +39,9 @@ static uint32_t port_shadow;
 static uint8_t brightness;
 static bool backlight_on;
 static bool pwm_running;
+static uint32_t pwm_period;
+static bool ramping;
+static uint32_t ramp_started_ms;
 
 static void write_port(uint32_t word)
 {
@@ -163,6 +167,7 @@ static void run_pwm(BacklightPwm pwm)
     register_write(PWM_COUNTER, 0);
     register_write(PWM_PERIOD, pwm.period);
     register_write(PWM_CONTROL, PWM_CONTROL_RUN);
+    pwm_period = pwm.period;
     gpio_output(BACKLIGHT, true);
     gpio_mux(BACKLIGHT, GPIO_FUNCTION_ALTERNATE);
 }
@@ -188,12 +193,36 @@ bool board_display_lit(void)
 
 void board_backlight_full(void)
 {
+    ramping = false;
     backlight_on = true;
     drive_backlight(true);
 }
 
+static void start_fade_in(void)
+{
+    ramping = true;
+    ramp_started_ms = hal_clock_milliseconds();
+    run_pwm(backlight_pwm(board_pclk_hz(), backlight_ramp_percent(0, 0)));
+}
+
+void board_display_service(void)
+{
+    if (!ramping) {
+        return;
+    }
+    uint32_t elapsed_ms = hal_clock_milliseconds() - ramp_started_ms;
+    if (elapsed_ms >= BACKLIGHT_RAMP_MS || !pwm_running) {
+        ramping = false;
+        apply_backlight();
+        return;
+    }
+    uint32_t percent = backlight_ramp_percent(backlight_percent(brightness), elapsed_ms);
+    register_write(PWM_DUTY, pwm_period * percent / 100u);
+}
+
 void board_backlight_off(void)
 {
+    ramping = false;
     backlight_on = false;
     drive_backlight(false);
 }
@@ -232,15 +261,21 @@ void hal_display_present(void)
 void hal_display_set_power(bool on)
 {
     board_start_record_step(on ? HAL_START_STEP_BACKLIGHT_ON : HAL_START_STEP_BACKLIGHT_OFF);
+    bool was_on = backlight_on;
     backlight_on = on;
-    apply_backlight();
+    ramping = false;
+    if (on && !was_on) {
+        start_fade_in();
+    } else {
+        apply_backlight();
+    }
     board_start_record_step_done();
 }
 
 void hal_display_set_brightness(uint8_t level)
 {
     brightness = level;
-    if (backlight_on) {
+    if (backlight_on && !ramping) {
         apply_backlight();
     }
 }

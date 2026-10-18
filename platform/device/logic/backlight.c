@@ -27,3 +27,12 @@ BacklightPwm backlight_pwm(uint32_t pclk_hz, uint32_t percent)
     uint32_t period = pclk_hz / PWM_HZ;
     return (BacklightPwm){.full = false, .period = period, .duty = period * percent / FULL_PERCENT};
 }
+
+uint32_t backlight_ramp_percent(uint32_t target_percent, uint32_t elapsed_ms)
+{
+    if (elapsed_ms >= BACKLIGHT_RAMP_MS) {
+        return target_percent;
+    }
+    uint32_t percent = target_percent * elapsed_ms / BACKLIGHT_RAMP_MS;
+    return percent > 0 ? percent : 1;
+}

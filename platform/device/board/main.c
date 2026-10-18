@@ -117,6 +117,7 @@ void board_main(void)
     for (;;) {
         board_stall_beat();
         app_step();
+        board_display_service();
         check_usb();
         sleep_while_dark();
     }

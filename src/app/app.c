@@ -79,6 +79,7 @@ typedef struct AppState {
     LowBattery low_battery;
     uint32_t battery_check_ms;
     bool usb_power;
+    bool light_after_frame;
     const char *goodbye_text;
     Toast toast;
     StatusBarState status_bar;
@@ -143,10 +144,21 @@ static void use_wanted_clock(void)
     }
 }
 
+static void light_after_first_frame(void)
+{
+    if (app.light_after_frame) {
+        app.light_after_frame = false;
+        hal_display_set_power(true);
+    }
+}
+
 static void set_display(bool on)
 {
     app.display_on = on;
-    hal_display_set_power(on);
+    app.light_after_frame = on;
+    if (!on) {
+        hal_display_set_power(false);
+    }
     use_wanted_clock();
     if (screen_stack_depth(&app.stack) > 0) {
         use_screen_key_behaviors();
@@ -602,6 +614,7 @@ void app_step(void)
     frame_stats_record(&app.update_stats, hal_clock_microseconds() - started_us);
     if (app.display_on) {
         render_frame();
+        light_after_first_frame();
     }
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
 }
@@ -614,6 +627,7 @@ void app_show_notice(const char *title, const char *message)
         set_display(true);
     }
     render((FrameDrawer){.draw = draw_notice, .context = screen}, false);
+    light_after_first_frame();
 }
 
 void app_show_splash(void)

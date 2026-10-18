@@ -15,6 +15,7 @@ void board_delay_ms(uint32_t milliseconds);
 void board_delay_us(uint32_t microseconds);
 void board_display_start(void);
 void board_display_after_clock_change(void);
+void board_display_service(void);
 void board_backlight_off(void);
 void board_backlight_full(void);
 bool board_display_lit(void);

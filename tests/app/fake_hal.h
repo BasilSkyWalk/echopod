@@ -48,6 +48,7 @@ int fake_hal_write_count(void);
 long fake_hal_pixels_written(void);
 int fake_hal_present_count(void);
 bool fake_hal_display_on(void);
+int fake_hal_presents_at_power_on(void);
 uint8_t fake_hal_display_brightness(void);
 void fake_hal_set_battery(HalBattery battery);
 int fake_hal_power_off_count(void);

@@ -584,6 +584,18 @@ static void going_back_slides_the_screen_out_to_the_right(void)
     CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
 }
 
+static void waking_draws_a_frame_before_the_backlight_comes_on(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_POWER);
+    CHECK(!fake_hal_display_on());
+    int presents = fake_hal_present_count();
+    tap(KEY_POWER);
+    CHECK(fake_hal_display_on());
+    CHECK(fake_hal_presents_at_power_on() > presents);
+}
+
 static void the_clock_never_changes_with_the_screen_while_audio_is_up(void)
 {
     start_app_with_library();
@@ -1391,6 +1403,7 @@ int main(void)
         TEST_CASE(saved_settings_are_restored_at_start),
         TEST_CASE(a_new_screen_slides_in_from_the_right),
         TEST_CASE(going_back_slides_the_screen_out_to_the_right),
+        TEST_CASE(waking_draws_a_frame_before_the_backlight_comes_on),
         TEST_CASE(the_clock_never_changes_with_the_screen_while_audio_is_up),
         TEST_CASE(with_the_screen_off_the_cpu_drops_to_96_mhz_once_audio_is_down),
         TEST_CASE(the_player_turns_itself_off_after_five_idle_minutes_on_battery),
