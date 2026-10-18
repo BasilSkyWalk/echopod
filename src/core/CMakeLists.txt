@@ -4,6 +4,7 @@ add_library(echo_core STATIC
     frame_stats.c
     hash.c
     key_tracker.c
+    low_battery.c
     power_policy.c
     random.c
     string_builder.c

@@ -4,7 +4,9 @@
 
 #include "app_internal.h"
 #include "app_screens.h"
+#include "core/deadline.h"
 #include "core/key_tracker.h"
+#include "core/low_battery.h"
 #include "core/power_policy.h"
 #include "cover_cache.h"
 #include "default_theme.h"
@@ -32,7 +34,8 @@
 #include "ui/toast.h"
 
 enum {
-    STRIP_HEIGHT = 34
+    STRIP_HEIGHT = 34,
+    BATTERY_CHECK_MS = 250
 };
 
 static const KeyConfig KEY_CONFIG = {
@@ -73,6 +76,9 @@ typedef struct AppState {
     FavoritesStore favorites;
     CoverCache covers;
     PowerPolicy power;
+    LowBattery low_battery;
+    uint32_t battery_check_ms;
+    const char *goodbye_text;
     Toast toast;
     StatusBarState status_bar;
     AppScreens screens;
@@ -97,6 +103,7 @@ static const uint32_t SCREEN_OFF_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
 static const char SPLASH_TEXT[] = "Echo Mini";
 static const char GOODBYE_TEXT[] = "Goodbye";
+static const char BATTERY_LOW_TEXT[] = "Battery low";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_HEIGHT];
 
@@ -157,8 +164,9 @@ static void finish_shut_down(void)
     hal_power_off();
 }
 
-static void shut_down(void)
+static void shut_down(const char *text)
 {
+    app.goodbye_text = text;
     save_session();
     if (!app.display_on) {
         finish_shut_down();
@@ -268,7 +276,7 @@ static void dispatch_key_events(uint32_t now_ms)
     while (!app.powered_off && key_tracker_next_event(&app.keys, &event)) {
         PowerKeyOutcome outcome = power_policy_key(&app.power, event, now_ms);
         if (outcome.shutdown) {
-            shut_down();
+            shut_down(GOODBYE_TEXT);
         } else if (outcome.background) {
             run_background(event);
         } else if (!outcome.consumed) {
@@ -277,10 +285,26 @@ static void dispatch_key_events(uint32_t now_ms)
     }
 }
 
+static bool battery_empty(uint32_t now_ms)
+{
+    if (!deadline_reached(now_ms, app.battery_check_ms)) {
+        return false;
+    }
+    app.battery_check_ms = now_ms + BATTERY_CHECK_MS;
+    HalBattery battery = hal_power_battery();
+    LowBatteryReading reading = {
+        .known = battery.known, .millivolts = battery.millivolts, .usb_power = battery.usb_power};
+    return low_battery_update(&app.low_battery, reading, now_ms);
+}
+
 static void update_power(uint32_t now_ms)
 {
+    if (!app.saying_goodbye && battery_empty(now_ms)) {
+        shut_down(BATTERY_LOW_TEXT);
+        return;
+    }
     if (power_policy_update(&app.power, now_ms)) {
-        shut_down();
+        shut_down(GOODBYE_TEXT);
         return;
     }
     if (app.power.display_on == app.display_on) {
@@ -316,7 +340,7 @@ static void draw_fade(Canvas *canvas, const Fade *fade, const char *text)
 static bool draw_running_fade(Canvas *canvas)
 {
     if (app.saying_goodbye) {
-        draw_fade(canvas, &app.goodbye, GOODBYE_TEXT);
+        draw_fade(canvas, &app.goodbye, app.goodbye_text);
         return true;
     }
     if (!fade_finished(&app.splash, app.now_ms)) {
@@ -513,6 +537,9 @@ void app_start(void)
     app.toast = (Toast){.visible = false};
     app.powered_off = false;
     app.saying_goodbye = false;
+    app.goodbye_text = GOODBYE_TEXT;
+    low_battery_init(&app.low_battery);
+    app.battery_check_ms = now_ms;
     app.splash = (Fade){.active = false};
     app.now_ms = now_ms;
     settings_store_load(&app.settings);

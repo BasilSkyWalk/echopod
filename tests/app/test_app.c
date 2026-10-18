@@ -749,6 +749,32 @@ static void the_sleep_timer_turns_the_player_off(void)
     CHECK_EQUAL(1, fake_hal_power_off_count());
 }
 
+static void an_empty_battery_saves_and_turns_the_player_off(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    int writes = fake_hal_write_count();
+    fake_hal_set_battery((HalBattery){.known = true, .percent = 0, .millivolts = 3400});
+    wait_ms(300);
+    wait_ms(1900);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    wait_ms(300);
+    CHECK(fake_hal_write_count() > writes);
+    wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(1, fake_hal_power_off_count());
+}
+
+static void an_empty_battery_on_usb_power_keeps_playing(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    fake_hal_set_battery(
+        (HalBattery){.known = true, .percent = 0, .millivolts = 3400, .usb_power = true});
+    wait_ms(5000);
+    wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+}
+
 static bool toast_is(const char *expected)
 {
     return app_toast_text() != NULL && strcmp(expected, app_toast_text()) == 0;
@@ -1318,6 +1344,8 @@ int main(void)
         TEST_CASE(the_splash_ignores_keys_until_it_ends),
         TEST_CASE(the_splash_draws_over_the_home_screen),
         TEST_CASE(the_sleep_timer_turns_the_player_off),
+        TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
+        TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),
         TEST_CASE(holding_play_in_favorites_removes_the_album),
         TEST_CASE(favorites_survive_a_restart),
