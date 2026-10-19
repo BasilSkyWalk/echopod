@@ -447,3 +447,29 @@ class OverlayTest(unittest.TestCase):
                         (".data", SHT_PROGBITS, SHF_ALLOC | 1, 0x0307B000, b"\x01", 1)])
         with self.assertRaises(make_image.ImageError):
             make_image.overlay_from_elf(elf)
+
+
+class Core1ModuleTest(unittest.TestCase):
+    def test_the_mp3_program_follows_its_header_sector(self):
+        program = bytes(range(256)) * 3
+        image = build(core1_mp3=program)
+        offset = make_image.CORE1_MP3_OFFSET
+        self.assertEqual(b"EC1M", image[offset:offset + 4])
+        self.assertEqual(len(program), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(program), word(image, offset + 8))
+        start = offset + make_image.CORE1_MODULE_HEADER_SIZE
+        self.assertEqual(program, image[start:start + len(program)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_the_mp3_program_sits_after_the_overlay_space(self):
+        self.assertGreaterEqual(make_image.CORE1_MP3_OFFSET,
+                                make_image.OVERLAY_OFFSET + make_image.OVERLAY_CAPACITY)
+        self.assertEqual(0, make_image.CORE1_MP3_OFFSET % 512)
+
+    def test_a_program_bigger_than_core_1_code_ram_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(core1_mp3=bytes(make_image.CORE1_MODULE_CAPACITY + 1))
+
+    def test_no_program_leaves_the_space_empty(self):
+        offset = make_image.CORE1_MP3_OFFSET
+        self.assertEqual(bytes(16), build()[offset:offset + 16])

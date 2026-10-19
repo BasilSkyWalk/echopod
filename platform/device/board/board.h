@@ -31,7 +31,12 @@ void board_stall_pause(bool paused);
 void board_panic_stall(uint32_t pc, uint32_t lr);
 void board_panic_fault(uint32_t pc, uint32_t lr, uint32_t status);
 const char *board_audio_current_path(void);
-bool board_core1_start_stream(void);
+typedef enum Core1Program {
+    CORE1_PROGRAM_FLAC,
+    CORE1_PROGRAM_MP3
+} Core1Program;
+
+bool board_core1_start_stream(Core1Program program);
 void board_core1_stop(void);
 bool board_core1_streaming(void);
 void board_audio_before_clock_change(void);

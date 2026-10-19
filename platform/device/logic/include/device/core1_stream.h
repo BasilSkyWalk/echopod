@@ -29,6 +29,7 @@ typedef struct StreamControl {
     uint32_t min_block;
     uint32_t max_block;
     uint32_t total_samples;
+    uint32_t first_sample;
     uint32_t start_offset;
     uint32_t end_offset;
     uint32_t written;
@@ -44,9 +45,38 @@ typedef struct StreamRegion {
     uint32_t ring_bytes;
 } StreamRegion;
 
+typedef enum Core1DecodeResult {
+    CORE1_DECODED,
+    CORE1_STARVED,
+    CORE1_FINISHED,
+    CORE1_FAILED
+} Core1DecodeResult;
+
+typedef struct Core1Block {
+    const int32_t *channels[FLAC_MAX_CHANNELS];
+    uint32_t first_sample;
+    uint32_t samples;
+    uint32_t position;
+} Core1Block;
+
+typedef struct Core1Decoder {
+    void (*start)(void *context, FlacInput input, FlacInfo info, uint32_t first_sample,
+                  const bool *starved);
+    Core1DecodeResult (*decode)(void *context, Core1Block *block);
+    void *context;
+} Core1Decoder;
+
+typedef struct Core1Flac {
+    FlacDecoder *decoder;
+    const bool *starved;
+} Core1Flac;
+
+Core1Decoder core1_flac_decoder(Core1Flac *flac, FlacDecoder *decoder);
+
 typedef struct Core1Stream {
     StreamRegion region;
-    FlacDecoder *decoder;
+    Core1Decoder decoder;
+    uint32_t channels;
     uint32_t generation;
     uint32_t start_offset;
     uint32_t end_offset;
@@ -55,7 +85,7 @@ typedef struct Core1Stream {
     bool starved;
 } Core1Stream;
 
-void core1_stream_init(Core1Stream *stream, StreamRegion region, FlacDecoder *decoder);
+void core1_stream_init(Core1Stream *stream, StreamRegion region, Core1Decoder decoder);
 bool core1_stream_step(Core1Stream *stream);
 
 typedef struct Core1Source {
@@ -72,9 +102,11 @@ typedef struct Core1Source {
     uint8_t channels;
     bool streaming;
     bool read_failed;
+    bool file_open;
 } Core1Source;
 
 void core1_source_init(Core1Source *source, StreamRegion region, FlacFileOpener files,
                        FlacDecoder *decoder, uint32_t fill_budget);
 void core1_source_fill(Core1Source *source);
 AudioSource core1_source_interface(Core1Source *source);
+AudioSource core1_source_mp3_interface(Core1Source *source);

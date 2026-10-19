@@ -141,16 +141,26 @@ static bool wait_for_reply(const Core1Bus *bus, uint32_t timeout_ms)
     return true;
 }
 
+void core1_hold(const Core1Bus *bus)
+{
+    bus->write(bus->context, CRU_RESETS_30, CORE1_HOLD);
+}
+
+void core1_prepare(const Core1Bus *bus)
+{
+    clear_shared(bus);
+    bus->write(bus->context, MAILBOX_B2A_STATUS, MAILBOX_ALL_CHANNELS);
+    bus->write(bus->context, MAILBOX_A2B_STATUS, MAILBOX_ALL_CHANNELS);
+}
+
 Core1Result core1_load(const Core1Bus *bus, const uint8_t *image, uint32_t length)
 {
     if (length > CORE1_CODE_BYTES) {
         return CORE1_TOO_BIG;
     }
-    bus->write(bus->context, CRU_RESETS_30, CORE1_HOLD);
+    core1_hold(bus);
     copy_image(bus, image, length);
-    clear_shared(bus);
-    bus->write(bus->context, MAILBOX_B2A_STATUS, MAILBOX_ALL_CHANNELS);
-    bus->write(bus->context, MAILBOX_A2B_STATUS, MAILBOX_ALL_CHANNELS);
+    core1_prepare(bus);
     return CORE1_OK;
 }
 

@@ -47,6 +47,31 @@ target_link_options(echo_core1 PRIVATE
     -T${ECHO_CORE1_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1.map
 )
+add_executable(echo_core1_mp3
+    core1/mp3_main.c
+    core1/startup.c
+    core1/no_heap.c
+    board/libc.c
+)
+set(ECHO_CORE1_MP3_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1_mp3.ld)
+set_target_properties(echo_core1_mp3 PROPERTIES
+    SUFFIX .elf
+    LINK_DEPENDS ${ECHO_CORE1_MP3_LINKER_SCRIPT}
+)
+target_include_directories(echo_core1_mp3 PRIVATE board)
+target_link_libraries(echo_core1_mp3 PRIVATE echo_device_logic echo_libmad echo_options gcc)
+target_link_options(echo_core1_mp3 PRIVATE
+    -T${ECHO_CORE1_MP3_LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1_mp3.map
+)
+set(ECHO_CORE1_MP3_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1_mp3.bin)
+add_custom_command(
+    OUTPUT ${ECHO_CORE1_MP3_BINARY}
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:echo_core1_mp3> core1_mp3.bin
+    DEPENDS echo_core1_mp3
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    VERBATIM
+)
 set(ECHO_CORE1_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1.bin)
 set(ECHO_CORE1_OBJECT ${CMAKE_CURRENT_BINARY_DIR}/core1_image.o)
 add_custom_command(
@@ -110,9 +135,11 @@ if(EXISTS ${ECHO_REFERENCE_IMG})
             --reference ${ECHO_REFERENCE_IMG}
             --elf $<TARGET_FILE:echo_device>
             --overlay $<TARGET_FILE:echo_rescan_overlay>
+            --core1-mp3 ${ECHO_CORE1_MP3_BINARY}
             --output ${ECHO_DEVICE_IMAGE}
         BYPRODUCTS ${ECHO_DEVICE_IMAGE}
-        DEPENDS echo_device echo_rescan_overlay ${PROJECT_SOURCE_DIR}/tools/make_image.py
+        DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY}
+            ${PROJECT_SOURCE_DIR}/tools/make_image.py
         VERBATIM
     )
 else()

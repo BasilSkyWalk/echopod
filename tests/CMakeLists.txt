@@ -164,6 +164,16 @@ echo_add_unit_test(NAME test_audio_engine
     LIBRARIES echo_device_logic
 )
 target_compile_definitions(test_audio_engine PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_mp3_probe
+    SOURCES device/test_mp3_probe.c
+    LIBRARIES echo_device_logic
+)
+target_compile_definitions(test_mp3_probe PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_mp3_decoder
+    SOURCES device/test_mp3_decoder.c
+    LIBRARIES echo_device_logic echo_libmad
+)
+target_compile_definitions(test_mp3_decoder PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_core1_stream
     SOURCES device/test_core1_stream.c
     LIBRARIES echo_device_logic

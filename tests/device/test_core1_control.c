@@ -230,6 +230,19 @@ static void load_leaves_core_1_held_until_run(void)
     CHECK(fake.core1_running);
 }
 
+static void a_program_placed_in_core_1_ram_runs_after_hold_and_prepare(void)
+{
+    reset_fake();
+    core1_hold(&BUS);
+    int held = index_of_write(CORE1_RUN_RESET, 0x00040004u, 0);
+    CHECK(held >= 0);
+    core1_prepare(&BUS);
+    CHECK(index_of_write(CORE1_SHARED_BASE, 0, held) > held);
+    CHECK(!fake.core1_running);
+    CHECK_EQUAL(CORE1_OK, core1_run(&BUS, 200));
+    CHECK(fake.core1_running);
+}
+
 static void run_waits_as_long_as_asked(void)
 {
     reset_fake();
@@ -286,6 +299,7 @@ int main(void)
         TEST_CASE(start_reports_no_reply_after_200_ms),
         TEST_CASE(start_checks_the_command_and_the_ready_word),
         TEST_CASE(load_leaves_core_1_held_until_run),
+        TEST_CASE(a_program_placed_in_core_1_ram_runs_after_hold_and_prepare),
         TEST_CASE(run_waits_as_long_as_asked),
         TEST_CASE(an_image_larger_than_core_1_code_ram_is_refused),
         TEST_CASE(stop_holds_core_1_and_powers_the_domain_down),

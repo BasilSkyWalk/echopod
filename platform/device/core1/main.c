@@ -14,6 +14,7 @@
 void core1_main(void);
 
 static FlacDecoder decoder;
+static Core1Flac flac;
 static Core1Stream stream;
 static uint32_t input_bytes;
 
@@ -111,7 +112,7 @@ void core1_main(void)
     if (register_read(CORE1_SHARED_COMMAND) != CORE1_COMMAND_STREAM) {
         return;
     }
-    core1_stream_init(&stream, core1_region(), &decoder);
+    core1_stream_init(&stream, core1_region(), core1_flac_decoder(&flac, &decoder));
     for (;;) {
         core1_stream_step(&stream);
     }

@@ -22,6 +22,10 @@ OVERLAY_BASE = 0x0307A000
 OVERLAY_CAPACITY = 0x25000
 OVERLAY_HEADER_SIZE = 16
 OVERLAY_MAGIC = b"EOVL"
+CORE1_MP3_OFFSET = 0x240000
+CORE1_MODULE_CAPACITY = 0x20000
+CORE1_MODULE_HEADER_SIZE = 512
+CORE1_MODULE_MAGIC = b"EC1M"
 TABLE_CAPACITY = 91
 TABLE_OFFSET = 0x208
 ROW = struct.Struct("<4I")
@@ -68,6 +72,7 @@ class ImageParts:
     payload: bytes
     marker: bytes
     overlay: bytes = b""
+    core1_mp3: bytes = b""
 
 
 def crc_table():
@@ -157,6 +162,7 @@ def assemble(parts):
     image[FW_SIZE:FW_SIZE + HEADER_SIZE] = image[:HEADER_SIZE]
     image[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE] = parts.marker
     place_overlay(image, parts)
+    place_core1_module(image, parts.core1_mp3)
     end = fw_end(FW_SIZE)
     struct.pack_into("<I", image, end, crc32(image[:end]))
     return bytes(image)
@@ -172,6 +178,17 @@ def place_overlay(image, parts):
         raise ImageError("the payload reaches the overlay")
     header = OVERLAY_MAGIC + struct.pack("<III", len(overlay), crc32(overlay[OVERLAY_HEADER_SIZE:]), 0)
     image[OVERLAY_OFFSET:OVERLAY_OFFSET + len(overlay)] = header + overlay[OVERLAY_HEADER_SIZE:]
+
+
+def place_core1_module(image, program):
+    if not program:
+        return
+    if len(program) > CORE1_MODULE_CAPACITY:
+        raise ImageError(f"the core 1 program must fit {CORE1_MODULE_CAPACITY:#x} bytes")
+    header = CORE1_MODULE_MAGIC + struct.pack("<III", len(program), crc32(program), 0)
+    start = CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE
+    image[CORE1_MP3_OFFSET:CORE1_MP3_OFFSET + len(header)] = header
+    image[start:start + len(program)] = program
 
 
 def split_image(image):
@@ -225,7 +242,7 @@ def fw1_end(payload):
     return PAYLOAD_OFFSET + (used + 3) // 4 * 4
 
 
-def build_image(reference, firmware, brand, build_tag, date, overlay=b""):
+def build_image(reference, firmware, brand, build_tag, date, overlay=b"", core1_mp3=b""):
     check_firmware(firmware)
     if len(reference) != IMAGE_SIZE or word(reference, FW_SIZE_OFFSET) != FW_SIZE:
         raise ImageError("the reference does not have the 5 MiB shape")
@@ -243,7 +260,7 @@ def build_image(reference, firmware, brand, build_tag, date, overlay=b""):
     ]
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     marker = reference[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE]
-    return assemble(ImageParts(bytes(header), tuple(rows), payload, marker, overlay))
+    return assemble(ImageParts(bytes(header), tuple(rows), payload, marker, overlay, core1_mp3))
 
 
 def validate_image(image):
@@ -370,6 +387,7 @@ def parse_arguments(argv):
     parser.add_argument("--build-tag", help="defaults to the short git commit, + when dirty")
     parser.add_argument("--date", type=parse_date, help="YYYY-MM-DD; defaults to today")
     parser.add_argument("--overlay", type=Path, help="rescan overlay ELF linked at 0x0307A000")
+    parser.add_argument("--core1-mp3", type=Path, help="core 1 MP3 program, a raw binary")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -382,7 +400,9 @@ def main(argv=None):
         reference = load_reference(arguments.reference)
         firmware = firmware_from_elf(arguments.elf.read_bytes())
         overlay = overlay_from_elf(arguments.overlay.read_bytes()) if arguments.overlay else b""
-        image = build_image(reference, firmware, arguments.brand, build_tag, date, overlay)
+        core1_mp3 = arguments.core1_mp3.read_bytes() if arguments.core1_mp3 else b""
+        image = build_image(reference, firmware, arguments.brand, build_tag, date, overlay,
+                            core1_mp3)
     except ImageError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -393,7 +413,7 @@ def main(argv=None):
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_bytes(image)
     print(f"wrote {arguments.output} ({build_tag}): code {len(firmware.code):,} bytes, "
-          f"overlay {len(overlay):,} bytes, "
+          f"overlay {len(overlay):,} bytes, core 1 MP3 {len(core1_mp3):,} bytes, "
           f".data {len(firmware.data)} bytes, .bss {firmware.bss_size:,} bytes, "
           f"crc {word(image, fw_end(FW_SIZE)):#010x}")
     return 0

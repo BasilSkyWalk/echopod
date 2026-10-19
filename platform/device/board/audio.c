@@ -11,6 +11,7 @@
 #include "device/dac_sequence.h"
 #include "device/dma_loop.h"
 #include "device/flac_source.h"
+#include "device/mp3_probe.h"
 #include "device/wav_source.h"
 #include "dmac.h"
 #include "hal/audio.h"
@@ -39,6 +40,7 @@ enum {
 typedef enum SourceKind {
     SOURCE_FLAC,
     SOURCE_WAV,
+    SOURCE_MP3,
     SOURCE_UNKNOWN
 } SourceKind;
 
@@ -149,13 +151,19 @@ static SourceKind kind_of(const char *path)
     if (!read || tag_is(magic, "fLaC")) {
         return SOURCE_FLAC;
     }
-    return tag_is(magic, "RIFF") && tag_is(magic + 8, "WAVE") ? SOURCE_WAV : SOURCE_UNKNOWN;
+    if (tag_is(magic, "RIFF") && tag_is(magic + 8, "WAVE")) {
+        return SOURCE_WAV;
+    }
+    return mp3_signature(magic) ? SOURCE_MP3 : SOURCE_UNKNOWN;
 }
 
 static AudioSource chosen_source(void)
 {
     if (source_kind == SOURCE_WAV) {
         return wav_source_interface(&wav_source);
+    }
+    if (source_kind == SOURCE_MP3) {
+        return core1_source_mp3_interface(&core1_source);
     }
     return using_core1 ? core1_source_interface(&core1_source)
                        : flac_source_interface(&software_source);
@@ -170,7 +178,13 @@ static bool open_chosen(void *context, const char *path, uint32_t start_ms, Audi
         return false;
     }
     if (source_kind == SOURCE_FLAC) {
-        using_core1 = board_core1_start_stream();
+        using_core1 = board_core1_start_stream(CORE1_PROGRAM_FLAC);
+    }
+    if (source_kind == SOURCE_MP3) {
+        using_core1 = board_core1_start_stream(CORE1_PROGRAM_MP3);
+        if (!using_core1) {
+            return false;
+        }
     }
     AudioSource source = chosen_source();
     return source.open(source.context, path, start_ms, track);

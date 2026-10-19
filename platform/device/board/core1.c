@@ -4,6 +4,8 @@
 #include "board.h"
 #include "codec/flac.h"
 #include "device/core1_control.h"
+#include "device/image_crc.h"
+#include "emmc.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
 #include "hal/system.h"
@@ -16,11 +18,16 @@ enum {
     WORD_BYTES = 4,
     DECODE_TIMEOUT_MS = 10000,
     REPLY_TIMEOUT_MS = 200,
-    MICROSECONDS_PER_SECOND = 1000000
+    MICROSECONDS_PER_SECOND = 1000000,
+    SECTOR_BYTES = 512,
+    MP3_PROGRAM_OFFSET = 0x240000,
+    PROGRAM_MAGIC = 0x4D314345,
+    STAGING_SECTORS = STAGING_WORDS * WORD_BYTES / SECTOR_BYTES
 };
 
 static uint32_t staging[STAGING_WORDS];
 static bool streaming;
+static Core1Program streaming_program;
 static FlacBits header_bits;
 
 extern const uint8_t _binary_core1_bin_start[];
@@ -71,21 +78,77 @@ static HalCore1Status status_of(Core1Result result)
     return HAL_CORE1_BAD_REPLY;
 }
 
-bool board_core1_start_stream(void)
+static uint32_t le32(const uint8_t *bytes)
 {
-    if (streaming) {
+    return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 | (uint32_t)bytes[2] << 16 |
+           (uint32_t)bytes[3] << 24;
+}
+
+static bool copy_program_sectors(uint32_t first_sector, uint32_t size, uint32_t expected_crc)
+{
+    uint32_t crc = 0;
+    for (uint32_t done = 0; done < size; done += sizeof staging) {
+        uint32_t chunk = size - done < sizeof staging ? size - done : (uint32_t)sizeof staging;
+        uint32_t sectors = (chunk + SECTOR_BYTES - 1) / SECTOR_BYTES;
+        if (!emmc_read(NULL, first_sector + done / SECTOR_BYTES, sectors, staging)) {
+            return false;
+        }
+        crc = image_crc_update(crc, (const uint8_t *)staging, chunk);
+        for (uint32_t word = 0; word * WORD_BYTES < chunk; word++) {
+            register_write(CORE1_CODE_BASE + done + word * WORD_BYTES, staging[word]);
+        }
+    }
+    return crc == expected_crc;
+}
+
+static Core1Result place_mp3_program(void)
+{
+    EmmcInfo info;
+    if (hal_system_restart_pending() || !emmc_start(&info)) {
+        return CORE1_NO_REPLY;
+    }
+    uint32_t header_sector = info.layout.slot_1 + MP3_PROGRAM_OFFSET / SECTOR_BYTES;
+    if (!emmc_read(NULL, header_sector, 1, staging)) {
+        return CORE1_NO_REPLY;
+    }
+    const uint8_t *header = (const uint8_t *)staging;
+    uint32_t size = le32(header + 4);
+    uint32_t crc = le32(header + 8);
+    if (le32(header) != PROGRAM_MAGIC || size == 0 || size > CORE1_CODE_BYTES) {
+        return CORE1_BAD_REPLY;
+    }
+    core1_hold(&BUS);
+    if (!copy_program_sectors(header_sector + 1, size, crc)) {
+        return CORE1_BAD_REPLY;
+    }
+    core1_prepare(&BUS);
+    return CORE1_OK;
+}
+
+static Core1Result place_program(Core1Program program)
+{
+    if (program == CORE1_PROGRAM_MP3) {
+        return place_mp3_program();
+    }
+    uint32_t length = (uint32_t)(_binary_core1_bin_end - _binary_core1_bin_start);
+    return core1_load(&BUS, _binary_core1_bin_start, length);
+}
+
+bool board_core1_start_stream(Core1Program program)
+{
+    if (streaming && streaming_program == program) {
         return true;
     }
+    board_core1_stop();
     uint32_t pll_mhz = hal_system_clock_mhz();
     if (pll_mhz < LOWEST_PLL_MHZ) {
         return false;
     }
     board_start_record_step(HAL_START_STEP_CORE1_START);
     uint32_t divider = core1_divider_for(pll_mhz);
-    uint32_t length = (uint32_t)(_binary_core1_bin_end - _binary_core1_bin_start);
     Core1Result result = core1_power_up(&BUS, pll_mhz, divider);
     if (result == CORE1_OK) {
-        result = core1_load(&BUS, _binary_core1_bin_start, length);
+        result = place_program(program);
     }
     if (result == CORE1_OK) {
         register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_STREAM);
@@ -97,6 +160,7 @@ bool board_core1_start_stream(void)
         return false;
     }
     streaming = true;
+    streaming_program = program;
     return true;
 }
 

@@ -54,6 +54,8 @@ typedef struct Core1Bus {
 
 uint32_t core1_divider_for(uint32_t pll_mhz);
 Core1Result core1_power_up(const Core1Bus *bus, uint32_t pll_mhz, uint32_t divider);
+void core1_hold(const Core1Bus *bus);
+void core1_prepare(const Core1Bus *bus);
 Core1Result core1_load(const Core1Bus *bus, const uint8_t *image, uint32_t length);
 Core1Result core1_run(const Core1Bus *bus, uint32_t timeout_ms);
 Core1Result core1_start(const Core1Bus *bus, const uint8_t *image, uint32_t length);

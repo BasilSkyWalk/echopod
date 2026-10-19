@@ -2,6 +2,13 @@
 
 #include <stddef.h>
 
+#include "device/mp3_probe.h"
+
+enum {
+    MP3_OUTPUT_BITS = 24,
+    MILLISECONDS_PER_SECOND = 1000
+};
+
 static void publish(void)
 {
     __atomic_thread_fence(__ATOMIC_RELEASE);
@@ -17,7 +24,48 @@ static uint32_t smaller(uint32_t a, uint32_t b)
     return a < b ? a : b;
 }
 
-void core1_stream_init(Core1Stream *stream, StreamRegion region, FlacDecoder *decoder)
+static void start_flac(void *context, FlacInput input, FlacInfo info, uint32_t first_sample,
+                       const bool *starved)
+{
+    Core1Flac *flac = context;
+    (void)first_sample;
+    flac->starved = starved;
+    flac_start(flac->decoder, input, info);
+}
+
+static Core1DecodeResult decode_flac(void *context, Core1Block *block)
+{
+    Core1Flac *flac = context;
+    FlacDecoder *decoder = flac->decoder;
+    uint32_t frame_start = flac_position(decoder);
+    FlacResult result = flac_decode_frame(decoder);
+    if (*flac->starved) {
+        flac_rewind(decoder, frame_start);
+        return CORE1_STARVED;
+    }
+    if (result == FLAC_END) {
+        return CORE1_FINISHED;
+    }
+    if (result != FLAC_OK) {
+        return CORE1_FAILED;
+    }
+    for (int channel = 0; channel < FLAC_MAX_CHANNELS; channel++) {
+        block->channels[channel] =
+            flac_channel(decoder, channel < decoder->info.channels ? channel : 0);
+    }
+    block->first_sample = decoder->frame_first_sample;
+    block->samples = decoder->block_samples;
+    block->position = flac_position(decoder);
+    return CORE1_DECODED;
+}
+
+Core1Decoder core1_flac_decoder(Core1Flac *flac, FlacDecoder *decoder)
+{
+    *flac = (Core1Flac){.decoder = decoder, .starved = NULL};
+    return (Core1Decoder){start_flac, decode_flac, flac};
+}
+
+void core1_stream_init(Core1Stream *stream, StreamRegion region, Core1Decoder decoder)
 {
     *stream = (Core1Stream){.region = region, .decoder = decoder};
 }
@@ -67,44 +115,46 @@ static void adopt(Core1Stream *stream, uint32_t generation)
     stream->generation = generation;
     stream->start_offset = control->start_offset;
     stream->end_offset = control->end_offset;
+    stream->channels =
+        control->channels < FLAC_MAX_CHANNELS ? control->channels : FLAC_MAX_CHANNELS;
     stream->slot = 0;
     stream->finished = false;
     stream->starved = false;
     FlacInput input = {
         .read = read_ring, .context = stream, .size = stream->end_offset - stream->start_offset};
-    flac_start(stream->decoder, input, info);
+    stream->decoder.start(stream->decoder.context, input, info, control->first_sample,
+                          &stream->starved);
     control->released = stream->start_offset;
     publish();
     control->acked_generation = generation;
 }
 
-static void copy_channels(Core1Stream *stream, uint32_t slot)
+static void copy_channels(Core1Stream *stream, uint32_t slot, const Core1Block *block)
 {
-    const FlacDecoder *decoder = stream->decoder;
-    for (uint32_t channel = 0; channel < decoder->info.channels; channel++) {
-        const int32_t *from = flac_channel(decoder, (int)channel);
+    for (uint32_t channel = 0; channel < stream->channels; channel++) {
+        const int32_t *from = block->channels[channel];
         int32_t *to = stream->region.samples[slot][channel];
-        for (uint32_t index = 0; index < decoder->block_samples; index++) {
+        for (uint32_t index = 0; index < block->samples; index++) {
             to[index] = from[index];
         }
     }
 }
 
-static void fill_slot(Core1Stream *stream, FlacResult result)
+static void fill_slot(Core1Stream *stream, Core1DecodeResult result, const Core1Block *block)
 {
     volatile StreamControl *control = stream->region.control;
     volatile StreamSlot *slot = &control->slots[stream->slot];
     uint32_t outcome = AUDIO_FRAME_ERROR;
-    if (result == FLAC_OK) {
-        copy_channels(stream, stream->slot);
-        slot->first_sample = stream->decoder->frame_first_sample;
-        slot->samples = stream->decoder->block_samples;
-        control->released = stream->start_offset + flac_position(stream->decoder);
+    if (result == CORE1_DECODED) {
+        copy_channels(stream, stream->slot, block);
+        slot->first_sample = block->first_sample;
+        slot->samples = block->samples;
+        control->released = stream->start_offset + block->position;
         outcome = AUDIO_FRAME_READY;
     } else {
         slot->first_sample = 0;
         slot->samples = 0;
-        outcome = result == FLAC_END ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
+        outcome = result == CORE1_FINISHED ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
         stream->finished = true;
     }
     slot->generation = stream->generation;
@@ -132,19 +182,17 @@ bool core1_stream_step(Core1Stream *stream)
     if (control->slots[stream->slot].state != STREAM_SLOT_EMPTY) {
         return false;
     }
-    FlacDecoder *decoder = stream->decoder;
-    uint32_t frame_start = flac_position(decoder);
     stream->starved = false;
-    FlacResult result = flac_decode_frame(decoder);
+    Core1Block block = {0};
+    Core1DecodeResult result = stream->decoder.decode(stream->decoder.context, &block);
     if (control->generation != stream->generation) {
         return true;
     }
-    if (stream->starved) {
-        flac_rewind(decoder, frame_start);
+    if (result == CORE1_STARVED) {
         stream->starved = false;
         return false;
     }
-    fill_slot(stream, result);
+    fill_slot(stream, result, &block);
     return true;
 }
 
@@ -162,6 +210,10 @@ static void stop_streaming(Core1Source *source)
         source->streaming = false;
     }
     flac_source_close(&source->flac);
+    if (source->file_open) {
+        source->flac.files.close(source->flac.files.context);
+        source->file_open = false;
+    }
 }
 
 static uint32_t next_generation(Core1Source *source)
@@ -197,6 +249,7 @@ static bool open_stream(void *context, const char *path, uint32_t start_ms, Audi
     control->min_block = info->min_block;
     control->max_block = info->max_block;
     control->total_samples = info->total_samples;
+    control->first_sample = 0;
     control->start_offset = source->start_offset;
     control->end_offset = source->end_offset;
     control->written = source->written;
@@ -286,4 +339,57 @@ static void close_stream(void *context)
 AudioSource core1_source_interface(Core1Source *source)
 {
     return (AudioSource){open_stream, next_frame, release_frame, close_stream, source};
+}
+
+static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
+{
+    Core1Source *source = context;
+    stop_streaming(source);
+    FlacFileOpener files = source->flac.files;
+    if (!files.open(files.context, path, &source->input)) {
+        return false;
+    }
+    source->file_open = true;
+    Mp3Stream mp3;
+    if (!mp3_probe(source->input, &mp3)) {
+        stop_streaming(source);
+        return false;
+    }
+    uint32_t target = (uint32_t)((uint64_t)start_ms * mp3.sample_rate / MILLISECONDS_PER_SECOND);
+    target = target < mp3.total_samples ? target : mp3.total_samples;
+    source->start_offset = mp3_seek_offset(&mp3, target);
+    source->end_offset = mp3.audio_end;
+    source->written = source->start_offset;
+    source->slot = 0;
+    source->read_failed = false;
+    source->bits_per_sample = MP3_OUTPUT_BITS;
+    source->channels = mp3.channels;
+    *track = (AudioTrackInfo){.stream = {.sample_rate = mp3.sample_rate,
+                                         .channels = mp3.channels,
+                                         .bits_per_sample = 0,
+                                         .min_block = mp3.samples_per_frame,
+                                         .max_block = mp3.samples_per_frame,
+                                         .total_samples = mp3.total_samples},
+                              .audio_bytes = mp3.audio_end - mp3.audio_start,
+                              .codec = AUDIO_CODEC_MP3};
+    volatile StreamControl *control = source->region.control;
+    control->sample_rate = mp3.sample_rate;
+    control->channels = mp3.channels;
+    control->bits_per_sample = MP3_OUTPUT_BITS;
+    control->min_block = mp3.samples_per_frame;
+    control->max_block = mp3.samples_per_frame;
+    control->total_samples = mp3.total_samples;
+    control->first_sample = target;
+    control->start_offset = source->start_offset;
+    control->end_offset = source->end_offset;
+    control->written = source->written;
+    publish();
+    control->generation = next_generation(source);
+    source->streaming = true;
+    return true;
+}
+
+AudioSource core1_source_mp3_interface(Core1Source *source)
+{
+    return (AudioSource){open_mp3, next_frame, release_frame, close_stream, source};
 }
