@@ -21,7 +21,8 @@ enum {
     RING_BLOCKS = 4,
     BLOCK_WORDS = 4000,
     RING_WORDS = RING_BLOCKS * BLOCK_WORDS,
-    PREFILL_WORDS = 8000,
+    WORDS_PER_FRAME = 2,
+    PREFILL_FRAMES = 4000,
     PREFILL_TIMEOUT_MS = 1000,
     FILL_BUDGET_BYTES = 8192,
     IDLE_SHUTDOWN_MS = 3000,
@@ -73,7 +74,7 @@ static uint32_t larger(uint32_t a, uint32_t b)
     return a > b ? a : b;
 }
 
-static void pump(uint32_t consumed_words)
+static void pump(uint32_t consumed_frames)
 {
     uint32_t frames = audio_engine_stats(&engine).frames;
     read_us_pending = 0;
@@ -81,7 +82,7 @@ static void pump(uint32_t consumed_words)
     if (using_core1) {
         core1_source_fill(&core1_source);
     }
-    audio_engine_pump(&engine, consumed_words);
+    audio_engine_pump(&engine, consumed_frames);
     uint32_t elapsed_us = hal_clock_microseconds() - decode_started_us;
     stats.busy_us += elapsed_us;
     if (audio_engine_stats(&engine).frames == frames) {
@@ -170,8 +171,10 @@ static void update_consumed(void)
     if (!transferring) {
         return;
     }
-    uint32_t position = dma_loop_position(dmac_source(), ring_address(), ring_words);
-    consumed += (position + ring_words - last_position) % ring_words;
+    uint32_t frames = ring_words / WORDS_PER_FRAME;
+    uint32_t position =
+        dma_loop_position(dmac_source(), ring_address(), ring_words) / WORDS_PER_FRAME;
+    consumed += (position + frames - last_position) % frames;
     last_position = position;
 }
 
@@ -232,7 +235,7 @@ static bool start_output(void)
         return false;
     }
     uint32_t started_ms = hal_clock_milliseconds();
-    while (audio_engine_buffered(&engine, 0) < PREFILL_WORDS &&
+    while (audio_engine_buffered(&engine, 0) < PREFILL_FRAMES &&
            hal_clock_milliseconds() - started_ms < PREFILL_TIMEOUT_MS) {
         pump(0);
     }
@@ -456,8 +459,8 @@ HalToneResult hal_audio_dma_tone_start(void)
     int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
     for (uint32_t index = 0; index < RING_WORDS; index++) {
-        uint16_t sample = (uint16_t)samples[index % TONE_PERIOD_SAMPLES];
-        ring[index] = (uint32_t)sample | (uint32_t)sample << 16;
+        uint32_t frame = index / WORDS_PER_FRAME;
+        ring[index] = (uint32_t)(uint16_t)samples[frame % TONE_PERIOD_SAMPLES] << 16;
     }
     dac_path_output_on();
     if (!start_transfer(RING_WORDS)) {

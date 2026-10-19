@@ -53,6 +53,7 @@
 #define CRU_I2S_OUTPUT 0x03000000u
 #define CRU_I2S_CLOCK 0x10000000u
 #define I2S_FORMAT_16_BIT_STEREO 0x000Fu
+#define I2S_FORMAT_32_BIT_WORDS 0x401Fu
 #define I2S_INTERRUPTS 0x01F00102u
 #define I2S_INTERRUPTS_FOR_DMA 0x01F00100u
 #define I2S_DMA_TX 0x00000110u
@@ -295,7 +296,7 @@ static void start_acodec(const uint8_t *row)
     set_bits(ACODEC_MUX_CONTROL, 1u << 2, 1u << 2);
 }
 
-static void start_i2s(uint32_t divider, uint32_t interrupts, bool transfer)
+static void start_i2s(uint32_t divider, uint32_t format, uint32_t interrupts, bool transfer)
 {
     cru_reset(RESET_I2S1, true);
     board_delay_ms(I2S_RESET_MS);
@@ -314,8 +315,8 @@ static void start_i2s(uint32_t divider, uint32_t interrupts, bool transfer)
     uint32_t start = hal_clock_milliseconds();
     while (register_read(I2S_CLR) != 0 && hal_clock_milliseconds() - start < I2C_TIMEOUT_MS) {
     }
-    register_write(I2S_TXCR, I2S_FORMAT_16_BIT_STEREO);
-    register_write(I2S_RXCR, I2S_FORMAT_16_BIT_STEREO);
+    register_write(I2S_TXCR, format);
+    register_write(I2S_RXCR, format);
     register_write(I2S_CKR, i2s_clock_register(divider));
     register_write(I2S_INTCR, interrupts);
     if (transfer) {
@@ -417,8 +418,8 @@ static const AudioRate *rate_of(uint32_t rate)
     return NULL;
 }
 
-static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, uint32_t interrupts,
-                                      bool transfer)
+static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, uint32_t format,
+                                      uint32_t interrupts, bool transfer)
 {
     detail = (HalToneDetail){.stage = I2C_STAGE_NONE, .pending = 0};
     cru_gate(GATE_GPIO1, true);
@@ -431,7 +432,7 @@ static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, u
         return HAL_TONE_NO_DAC;
     }
     start_acodec(rate->acodec);
-    start_i2s(divider, interrupts, transfer);
+    start_i2s(divider, format, interrupts, transfer);
     DacResult configured = dac_configure(&BUS, rate->dac_byte);
     if (configured != DAC_READY) {
         dac_output_off(&BUS);
@@ -457,8 +458,8 @@ HalToneResult hal_audio_test_tone(void)
 {
     hal_audio_dma_tone_stop();
     const AudioRate *rate = rate_of(TONE_RATE_HZ);
-    HalToneResult result =
-        start_audio_path(rate, i2s_divider_truncated(rate->mclk, rate->rate), I2S_INTERRUPTS, true);
+    HalToneResult result = start_audio_path(rate, i2s_divider_truncated(rate->mclk, rate->rate),
+                                            I2S_FORMAT_16_BIT_STEREO, I2S_INTERRUPTS, true);
     if (result != HAL_TONE_PLAYED) {
         return result;
     }
@@ -474,7 +475,7 @@ HalToneResult dac_path_start(uint32_t sample_rate)
         return HAL_TONE_SETUP_FAILED;
     }
     return start_audio_path(rate, i2s_divider_rounded(rate->mclk, rate->rate),
-                            I2S_INTERRUPTS_FOR_DMA, false);
+                            I2S_FORMAT_32_BIT_WORDS, I2S_INTERRUPTS_FOR_DMA, false);
 }
 
 void dac_path_stop(void)

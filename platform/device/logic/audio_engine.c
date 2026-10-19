@@ -5,9 +5,11 @@
 enum {
     UNITY_GAIN = 65536,
     GAIN_SHIFT = 16,
-    OUTPUT_BITS = 16,
-    SAMPLE_MAX = 32767,
-    SAMPLE_MIN = -32768,
+    OUTPUT_BITS = 24,
+    WORD_BITS = 32,
+    WORDS_PER_FRAME = 2,
+    SAMPLE_MAX = 8388607,
+    SAMPLE_MIN = -8388608,
     MILLISECONDS_PER_SECOND = 1000,
     STEP_GAIN_Q16 = 58409
 };
@@ -207,14 +209,27 @@ static int32_t to_output(int32_t sample, int bits, uint32_t gain)
     return rounded > SAMPLE_MAX ? SAMPLE_MAX : rounded < SAMPLE_MIN ? SAMPLE_MIN : (int32_t)rounded;
 }
 
-static uint32_t free_space(const AudioEngine *engine)
+static uint32_t ring_frames(const AudioEngine *engine)
 {
-    return engine->config.ring_words - (engine->produced - engine->consumed);
+    return engine->config.ring_words / WORDS_PER_FRAME;
 }
 
-static void write_word(AudioEngine *engine, uint32_t word)
+static uint32_t free_space(const AudioEngine *engine)
 {
-    engine->config.ring[engine->produced % engine->config.ring_words] = word;
+    return ring_frames(engine) - (engine->produced - engine->consumed);
+}
+
+static uint32_t output_word(int32_t sample)
+{
+    return (uint32_t)sample << (WORD_BITS - OUTPUT_BITS);
+}
+
+static void write_frame(AudioEngine *engine, int32_t left, int32_t right)
+{
+    uint32_t *slot =
+        &engine->config.ring[WORDS_PER_FRAME * (engine->produced % ring_frames(engine))];
+    slot[0] = output_word(left);
+    slot[1] = output_word(right);
     engine->produced++;
 }
 
@@ -225,9 +240,8 @@ static void copy_pending(AudioEngine *engine)
     int bits = engine->frame.bits;
     while (engine->pending_frames > 0 && free_space(engine) > 0) {
         uint32_t index = engine->pending_offset;
-        int32_t l = to_output(left[index], bits, engine->gain);
-        int32_t r = to_output(right[index], bits, engine->gain);
-        write_word(engine, (uint32_t)(uint16_t)l | (uint32_t)(uint16_t)r << 16);
+        write_frame(engine, to_output(left[index], bits, engine->gain),
+                    to_output(right[index], bits, engine->gain));
         engine->pending_offset++;
         engine->pending_frames--;
     }
@@ -330,7 +344,7 @@ void audio_engine_pump(AudioEngine *engine, uint32_t consumed)
     }
     if (!engine->decoding) {
         while (free_space(engine) > 0) {
-            write_word(engine, 0);
+            write_frame(engine, 0, 0);
         }
     }
 }
