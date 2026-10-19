@@ -30,6 +30,8 @@ static uint32_t staging[STAGING_WORDS];
 static bool streaming;
 static bool accel_known;
 static uint32_t accel_classes;
+
+static HalCore1Accel run_accel_test(void);
 static Core1Program streaming_program;
 static FlacBits header_bits;
 
@@ -132,6 +134,9 @@ bool board_core1_start_stream(Core1Program program)
         return true;
     }
     board_core1_stop();
+    if (program == CORE1_PROGRAM_FLAC && !accel_known && hal_system_clock_mhz() >= LOWEST_PLL_MHZ) {
+        (void)run_accel_test();
+    }
     uint32_t pll_mhz = hal_system_clock_mhz();
     if (pll_mhz < LOWEST_PLL_MHZ) {
         return false;
@@ -144,6 +149,7 @@ bool board_core1_start_stream(Core1Program program)
     }
     if (result == CORE1_OK) {
         register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_STREAM);
+        register_write(CORE1_SHARED_ACCEL_CLASSES, accel_classes);
         result = core1_run(&BUS, REPLY_TIMEOUT_MS);
     }
     board_start_record_step_done();
@@ -291,11 +297,8 @@ static HalCore1Accel accel_results(HalCore1Accel result)
     return result;
 }
 
-HalCore1Accel hal_system_core1_accel_test(void)
+static HalCore1Accel run_accel_test(void)
 {
-    if (streaming_music()) {
-        return (HalCore1Accel){.status = HAL_CORE1_BUSY};
-    }
     board_core1_stop();
     uint32_t pll_mhz = hal_system_clock_mhz();
     if (pll_mhz < LOWEST_PLL_MHZ) {
@@ -319,6 +322,14 @@ HalCore1Accel hal_system_core1_accel_test(void)
     return result;
 }
 
+HalCore1Accel hal_system_core1_accel_test(void)
+{
+    if (streaming_music()) {
+        return (HalCore1Accel){.status = HAL_CORE1_BUSY};
+    }
+    return run_accel_test();
+}
+
 static const char *decode_test_path(void)
 {
     const char *current = board_audio_current_path();
@@ -334,7 +345,7 @@ HalCore1Decode hal_system_core1_decode_test(void)
         return (HalCore1Decode){.status = HAL_CORE1_BUSY};
     }
     if (!accel_known) {
-        (void)hal_system_core1_accel_test();
+        (void)run_accel_test();
     }
     board_core1_stop();
     uint32_t pll_mhz = hal_system_clock_mhz();

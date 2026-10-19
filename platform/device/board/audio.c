@@ -20,11 +20,12 @@
 #include "hal/system.h"
 
 enum {
-    RING_BLOCKS = 4,
+    RING_BLOCKS = 9,
     BLOCK_WORDS = 4000,
     RING_WORDS = RING_BLOCKS * BLOCK_WORDS,
     WORDS_PER_FRAME = 2,
-    PREFILL_FRAMES = 4000,
+    RING_FRAMES = RING_WORDS / WORDS_PER_FRAME,
+    PREFILL_DIVISOR = 10,
     PREFILL_TIMEOUT_MS = 1000,
     FILL_BUDGET_BYTES = 8192,
     IDLE_SHUTDOWN_MS = 3000,
@@ -34,7 +35,7 @@ enum {
     TONE_AMPLITUDE = 9000,
     MILLISECONDS_PER_SECOND = 1000,
     JACK_POLL_MS = 10,
-    HIGH_RAM_RING = 0x0307A000,
+    MUSIC_RING = 0x0307A000,
     SNIFF_BYTES = 12
 };
 
@@ -58,7 +59,6 @@ static bool using_core1;
 static bool resume_after_clock_change;
 static bool paused_before_clock_change;
 static uint32_t position_before_clock_change;
-static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
 static DmaItem items[RING_BLOCKS];
 static HalFile file;
@@ -72,7 +72,6 @@ static uint32_t ring_words;
 static bool stopped_waiting;
 static uint32_t stopped_since_ms;
 static bool tone_active;
-static bool ring_in_high_ram;
 static char last_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint8_t volume_level;
 static bool volume_set;
@@ -230,6 +229,11 @@ static void close_chosen(void *context)
     source.close(source.context);
 }
 
+static uint32_t *ring(void)
+{
+    return (uint32_t *)(uintptr_t)MUSIC_RING;
+}
+
 static void ensure_engine(void)
 {
     if (engine_ready) {
@@ -241,18 +245,13 @@ static void ensure_engine(void)
     wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
     audio_engine_init(
-        &engine, (AudioEngineConfig){.source = source, .ring = ring, .ring_words = RING_WORDS});
+        &engine, (AudioEngineConfig){.source = source, .ring = ring(), .ring_words = RING_WORDS});
     engine_ready = true;
-}
-
-static uint32_t *active_ring(void)
-{
-    return ring_in_high_ram ? (uint32_t *)(uintptr_t)HIGH_RAM_RING : ring;
 }
 
 static uint32_t ring_address(void)
 {
-    return (uint32_t)(uintptr_t)active_ring();
+    return MUSIC_RING;
 }
 
 static void update_consumed(void)
@@ -335,7 +334,9 @@ static bool start_output(bool audible)
         return false;
     }
     uint32_t started_ms = hal_clock_milliseconds();
-    while (audio_engine_buffered(&engine, 0) < PREFILL_FRAMES &&
+    uint32_t prefill = audio_engine_rate(&engine) / PREFILL_DIVISOR;
+    prefill = prefill < RING_FRAMES * 3 / 4 ? prefill : RING_FRAMES * 3 / 4;
+    while (audio_engine_buffered(&engine, 0) < prefill &&
            hal_clock_milliseconds() - started_ms < PREFILL_TIMEOUT_MS) {
         pump(0);
     }
@@ -351,7 +352,6 @@ static void stop_tone(void)
         stop_path();
         tone_active = false;
     }
-    ring_in_high_ram = false;
 }
 
 static void ensure_audio_clock(void)
@@ -614,7 +614,7 @@ HalAudioStats hal_audio_stats(void)
     return result;
 }
 
-HalToneResult hal_audio_dma_tone_start(HalToneMemory memory)
+HalToneResult hal_audio_dma_tone_start(void)
 {
     ensure_engine();
     stop_tone();
@@ -630,8 +630,7 @@ HalToneResult hal_audio_dma_tone_start(HalToneMemory memory)
     }
     path_up = true;
     path_rate = TONE_RATE_HZ;
-    ring_in_high_ram = memory == HAL_TONE_MEMORY_HIGH;
-    uint32_t *words = active_ring();
+    uint32_t *words = ring();
     int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
     for (uint32_t index = 0; index < RING_WORDS; index++) {

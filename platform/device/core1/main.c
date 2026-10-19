@@ -169,6 +169,7 @@ void core1_main(void)
     if (register_read(CORE1_SHARED_COMMAND) != CORE1_COMMAND_STREAM) {
         return;
     }
+    use_accelerator(register_read(CORE1_SHARED_ACCEL_CLASSES));
     core1_stream_init(&stream, core1_region(), core1_flac_decoder(&flac, &decoder));
     for (;;) {
         core1_stream_step(&stream);

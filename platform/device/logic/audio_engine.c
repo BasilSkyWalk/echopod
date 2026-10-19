@@ -14,7 +14,7 @@ enum {
     STEP_GAIN_Q16 = 58409
 };
 
-static const uint32_t SUPPORTED_RATES[] = {44100, 48000, 88200, 96000};
+static const uint32_t SUPPORTED_RATES[] = {44100, 48000, 88200, 96000, 192000};
 
 static void copy_path(char *destination, const char *source)
 {

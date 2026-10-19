@@ -88,17 +88,19 @@ typedef struct ScriptedSource {
     int frames_left;
     int releases;
     int closes;
+    uint32_t rate;
 } ScriptedSource;
 
 static ScriptedSource scripted;
 
 static bool scripted_open(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
-    (void)context;
     (void)path;
     (void)start_ms;
+    const ScriptedSource *source_state = context;
+    uint32_t rate = source_state->rate == 0 ? 44100 : source_state->rate;
     *track = (AudioTrackInfo){
-        .stream = {.sample_rate = 44100, .channels = 2, .bits_per_sample = 16, .max_block = 16}};
+        .stream = {.sample_rate = rate, .channels = 2, .bits_per_sample = 16, .max_block = 16}};
     return true;
 }
 
@@ -366,6 +368,23 @@ static void a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate(void)
     CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
 }
 
+static bool scripted_rate_plays(uint32_t rate)
+{
+    start_scripted_engine(0, 1);
+    scripted.rate = rate;
+    return audio_engine_play(&engine, "scripted", 0, 1);
+}
+
+static void rates_up_to_192_khz_play_but_176_4_is_refused(void)
+{
+    CHECK(scripted_rate_plays(192000));
+    CHECK_EQUAL(192000u, audio_engine_rate(&engine));
+    CHECK(scripted_rate_plays(96000));
+    CHECK(!scripted_rate_plays(176400));
+    CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
+    CHECK_EQUAL(176400u, audio_engine_refusal(&engine).sample_rate);
+}
+
 static void a_missing_file_is_refused(void)
 {
     start_engine();
@@ -477,6 +496,7 @@ int main(void)
         TEST_CASE(volume_scales_the_samples),
         TEST_CASE(mono_plays_on_both_channels),
         TEST_CASE(an_unsupported_rate_is_refused),
+        TEST_CASE(rates_up_to_192_khz_play_but_176_4_is_refused),
         TEST_CASE(a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate),
         TEST_CASE(a_missing_file_is_refused),
         TEST_CASE(the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size),

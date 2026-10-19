@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "board.h"
 #include "device/image_crc.h"
 #include "emmc.h"
 #include "hal/system.h"
@@ -42,6 +43,7 @@ const void *hal_system_load_rescan_code(void)
     if (hal_system_restart_pending() || !emmc_start(&info)) {
         return NULL;
     }
+    board_audio_shut_down();
     uint32_t first_sector = info.layout.slot_1 + OVERLAY_IMAGE_OFFSET / SECTOR_BYTES;
     if (!emmc_read(NULL, first_sector, 1, header)) {
         return NULL;
