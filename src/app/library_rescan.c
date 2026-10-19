@@ -106,6 +106,10 @@ RescanOutcome library_rescan_run(RescanProgress progress)
 {
     static RescanFiles files;
     RescanOutcome outcome = {.result = SCAN_NO_MUSIC_ROOT};
+    if (hal_system_restart_pending()) {
+        outcome.result = SCAN_RESTART_NEEDED;
+        return outcome;
+    }
     uint32_t capacity = reserved_size();
     if (!music_root_exists()) {
         return outcome;
@@ -155,6 +159,8 @@ static const char *error_text(ScanResult result)
         return "No room for the library: run save_files.py";
     case SCAN_NO_CODE:
         return "Rescan code missing: reinstall the update";
+    case SCAN_RESTART_NEEDED:
+        return "Restart the player to finish the update";
     }
     return "";
 }

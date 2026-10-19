@@ -20,6 +20,12 @@ static const char UPDATE_PATH[] = "/HIFIEC90.IMG";
 static FatVolume volume;
 static FatFile file;
 static uint32_t last_percent;
+static bool flash_rewritten;
+
+bool hal_system_restart_pending(void)
+{
+    return flash_rewritten;
+}
 
 static bool read_update(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
@@ -64,6 +70,7 @@ static void install(const UpdateFile *update, const UpdateStorage *storage)
 {
     last_percent = 0;
     show_percent(0);
+    flash_rewritten = true;
     if (updater_install(update, storage, (UpdateProgress){report, NULL})) {
         app_show_notice("Update installed",
                         "Unplug USB, then hold Power to turn off and on again.");

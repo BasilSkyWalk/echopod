@@ -69,6 +69,7 @@ typedef struct FakeHal {
     uint32_t clock_mhz;
     int stall_test_count;
     int keep_alive_count;
+    bool restart_pending;
     int scratch_borrows;
     bool empty_card;
     int library_writes;
@@ -746,6 +747,16 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
 HalHighRamTest hal_system_high_ram_test(void)
 {
     return (HalHighRamTest){.status = HAL_HIGH_RAM_UNAVAILABLE};
+}
+
+void fake_hal_set_restart_pending(bool pending)
+{
+    fake.restart_pending = pending;
+}
+
+bool hal_system_restart_pending(void)
+{
+    return fake.restart_pending;
 }
 
 const void *hal_system_load_rescan_code(void)

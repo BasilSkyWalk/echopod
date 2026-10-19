@@ -823,6 +823,18 @@ static void a_rescan_of_an_empty_card_writes_an_empty_library(void)
     CHECK(toast_is("Library: 0 tracks"));
 }
 
+static void a_rescan_after_an_installed_update_asks_for_a_restart(void)
+{
+    start_app_with_library();
+    fake_hal_set_empty_card(true);
+    fake_hal_set_restart_pending(true);
+    app_request_rescan();
+    step();
+    CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
+    CHECK_EQUAL(0, fake_hal_library_writes());
+    CHECK(toast_is("Restart the player to finish the update"));
+}
+
 static void a_rescan_keeps_the_stall_watch_fed(void)
 {
     start_app_with_library();
@@ -1470,6 +1482,7 @@ int main(void)
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),
+        TEST_CASE(a_rescan_after_an_installed_update_asks_for_a_restart),
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
         TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),

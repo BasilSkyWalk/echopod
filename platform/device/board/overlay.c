@@ -39,7 +39,7 @@ const void *hal_system_load_rescan_code(void)
 {
     static uint32_t header[SECTOR_BYTES / 4];
     EmmcInfo info;
-    if (!emmc_start(&info)) {
+    if (hal_system_restart_pending() || !emmc_start(&info)) {
         return NULL;
     }
     uint32_t first_sector = info.layout.slot_1 + OVERLAY_IMAGE_OFFSET / SECTOR_BYTES;

@@ -28,6 +28,11 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     return true;
 }
 
+bool hal_system_restart_pending(void)
+{
+    return false;
+}
+
 const void *hal_system_load_rescan_code(void)
 {
     return &LIBRARY_SCAN_ENTRY;

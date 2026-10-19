@@ -40,7 +40,8 @@ typedef enum ScanResult {
     SCAN_PATH_TOO_LONG,
     SCAN_WRITE_FAILED,
     SCAN_NO_ROOM,
-    SCAN_NO_CODE
+    SCAN_NO_CODE,
+    SCAN_RESTART_NEEDED
 } ScanResult;
 
 typedef struct ScanStats {
