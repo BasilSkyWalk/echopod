@@ -304,3 +304,14 @@ void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t
         return;
     }
 }
+
+void diagnostics_jack_pin_text(HalJackPin pin, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append(&builder, pin.high ? "high, boot fn" : "low, boot fn");
+    string_builder_append_unsigned(&builder, pin.boot_function);
+    string_builder_append(&builder, pin.boot_output ? " out" : " in");
+    if (pin.pull) {
+        string_builder_append(&builder, " pull");
+    }
+}

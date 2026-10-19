@@ -511,6 +511,11 @@ HalDmaToneStatus hal_audio_dma_tone_status(void)
     return (HalDmaToneStatus){.running = fake.dma_tone_running, .position = 0};
 }
 
+HalJackPins hal_audio_jack_pins(void)
+{
+    return (HalJackPins){.single_ended = {.high = false}, .balanced = {.high = true}};
+}
+
 HalAudioStatus hal_audio_status(void)
 {
     return fake.audio.status;

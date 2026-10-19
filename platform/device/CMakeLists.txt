@@ -10,6 +10,7 @@ add_executable(echo_device
     board/display.c
     board/emmc.c
     board/gpio.c
+    board/jack.c
     board/high_ram.c
     board/input.c
     board/libc.c

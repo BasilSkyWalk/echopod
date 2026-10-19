@@ -209,6 +209,19 @@ static void the_boot_hold_row_shows_how_the_rom_left_the_pin(void)
     CHECK(text_is("fn2 output low", text));
 }
 
+static void a_jack_row_shows_the_live_level_and_how_the_rom_left_the_pin(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_jack_pin_text(
+        (HalJackPin){.high = true, .boot_function = 0, .boot_output = false, .pull = true}, text,
+        sizeof text);
+    CHECK(text_is("high, boot fn0 in pull", text));
+    diagnostics_jack_pin_text(
+        (HalJackPin){.high = false, .boot_function = 1, .boot_output = true, .pull = false}, text,
+        sizeof text);
+    CHECK(text_is("low, boot fn1 out", text));
+}
+
 static void the_last_start_row_tells_cold_starts_resets_and_faults_apart(void)
 {
     char text[DIAGNOSTICS_VALUE_CAPACITY];
@@ -290,6 +303,7 @@ int main(void)
         TEST_CASE(the_last_battery_row_shows_the_reading_before_the_start),
         TEST_CASE(the_high_ram_row_reports_each_outcome),
         TEST_CASE(the_boot_hold_row_shows_how_the_rom_left_the_pin),
+        TEST_CASE(a_jack_row_shows_the_live_level_and_how_the_rom_left_the_pin),
         TEST_CASE(the_battery_row_shows_millivolts_and_the_charger_state),
         TEST_CASE(the_core_1_row_is_empty_until_run),
         TEST_CASE(a_core_1_run_shows_its_clock_and_loop_cycles),

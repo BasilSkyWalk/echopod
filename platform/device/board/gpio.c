@@ -5,6 +5,7 @@
 enum {
     GRF_MUX_PORT_STRIDE = 0x20,
     GRF_MUX_PINS_PER_REGISTER = 8,
+    GRF_PULL_OFFSET = 0x10,
     GRF_WRITE_ENABLE_SHIFT = 16
 };
 
@@ -20,6 +21,13 @@ void gpio_mux(GpioPin pin, uint32_t function)
                        4u * (uint32_t)(pin.pin / GRF_MUX_PINS_PER_REGISTER);
     uint32_t shift = 2u * (uint32_t)(pin.pin % GRF_MUX_PINS_PER_REGISTER);
     register_write(address, (function | (3u << GRF_WRITE_ENABLE_SHIFT)) << shift);
+}
+
+bool gpio_pull_enabled(GpioPin pin)
+{
+    uint32_t address = GRF_BASE + GRF_PULL_OFFSET + GRF_MUX_PORT_STRIDE * pin.port +
+                       4u * (uint32_t)(pin.pin / GRF_MUX_PINS_PER_REGISTER);
+    return (register_read(address) >> (pin.pin % GRF_MUX_PINS_PER_REGISTER) & 1u) != 0;
 }
 
 static void set_bit(uint32_t address, uint8_t bit, bool value)

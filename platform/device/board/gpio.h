@@ -21,3 +21,4 @@ bool gpio_output_level(GpioPin pin);
 void gpio_output(GpioPin pin, bool level);
 void gpio_input(GpioPin pin);
 bool gpio_read(GpioPin pin);
+bool gpio_pull_enabled(GpioPin pin);

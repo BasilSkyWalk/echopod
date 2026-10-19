@@ -81,6 +81,18 @@ typedef struct HalDmaToneStatus {
     uint32_t position;
 } HalDmaToneStatus;
 
+typedef struct HalJackPin {
+    bool high;
+    uint8_t boot_function;
+    bool boot_output;
+    bool pull;
+} HalJackPin;
+
+typedef struct HalJackPins {
+    HalJackPin single_ended;
+    HalJackPin balanced;
+} HalJackPins;
+
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token);
 void hal_audio_queue_next(const char *path, uint32_t token);
 void hal_audio_pause(void);
@@ -97,3 +109,4 @@ HalToneDetail hal_audio_tone_detail(void);
 HalToneResult hal_audio_dma_tone_start(void);
 void hal_audio_dma_tone_stop(void);
 HalDmaToneStatus hal_audio_dma_tone_status(void);
+HalJackPins hal_audio_jack_pins(void);

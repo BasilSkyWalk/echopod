@@ -208,6 +208,25 @@ static const char *boot_hold_value(const void *context)
     return boot_hold_text;
 }
 
+static char jack_single_ended_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char jack_balanced_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *jack_single_ended_value(const void *context)
+{
+    (void)context;
+    diagnostics_jack_pin_text(hal_audio_jack_pins().single_ended, jack_single_ended_text,
+                              sizeof jack_single_ended_text);
+    return jack_single_ended_text;
+}
+
+static const char *jack_balanced_value(const void *context)
+{
+    (void)context;
+    diagnostics_jack_pin_text(hal_audio_jack_pins().balanced, jack_balanced_text,
+                              sizeof jack_balanced_text);
+    return jack_balanced_text;
+}
+
 static char start_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static const char *start_value(const void *context)
@@ -483,6 +502,10 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = toggle_power_taps,
                                                 .context = options,
                                                 .value = power_taps_value};
+    screens->diagnostics_items[23] = (MenuItem){
+        .label = "Jack 3.5", .select = NULL, .context = NULL, .value = jack_single_ended_value};
+    screens->diagnostics_items[24] = (MenuItem){
+        .label = "Jack 4.4", .select = NULL, .context = NULL, .value = jack_balanced_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }
