@@ -169,6 +169,12 @@ echo_add_unit_test(NAME test_core1_stream
     LIBRARIES echo_device_logic
 )
 target_compile_definitions(test_core1_stream PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_cover_grid
+    SOURCES image/test_cover_grid.c
+    LIBRARIES echo_image
+)
+add_executable(cover_decode_tool image/cover_decode_tool.c)
+target_link_libraries(cover_decode_tool PRIVATE echo_image echo_options)
 echo_add_unit_test(NAME test_fat
     SOURCES device/test_fat.c device/sparse_card.c
     LIBRARIES echo_device_logic
@@ -286,6 +292,12 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
     add_test(NAME tools_unit_tests
         COMMAND ${ECHO_TOOLS_PYTHON} -m unittest discover -s ${PROJECT_SOURCE_DIR}/tools/tests
     )
+    add_test(NAME cover_decode_matches_pillow
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/check_cover_decode.py
+            --tool $<TARGET_FILE:cover_decode_tool>
+            --work ${CMAKE_CURRENT_BINARY_DIR}/cover_decode
+    )
+    set_tests_properties(cover_decode_matches_pillow PROPERTIES TIMEOUT 1200)
     add_test(NAME fonts_up_to_date
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/font_build.py
             --config ${PROJECT_SOURCE_DIR}/assets/fonts/fonts.json
