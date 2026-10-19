@@ -25,6 +25,11 @@ typedef struct DacBus {
     void *context;
 } DacBus;
 
+typedef enum DacCurve {
+    DAC_CURVE_SINGLE_ENDED,
+    DAC_CURVE_BALANCED
+} DacCurve;
+
 enum {
     DAC_LEFT_ADDRESS = 0x60,
     DAC_RIGHT_ADDRESS = 0x66,
@@ -40,4 +45,5 @@ void dac_output_off(const DacBus *bus);
 void dac_set_muted(const DacBus *bus, bool muted, uint8_t volume);
 void dac_set_volume(const DacBus *bus, uint8_t volume);
 void dac_set_gain(const DacBus *bus, bool high);
-uint8_t dac_volume_value(uint8_t level);
+uint8_t dac_volume_value(uint8_t level, DacCurve curve);
+uint8_t dac_ramp_next(uint8_t current, uint8_t target);

@@ -30,7 +30,8 @@ enum {
     TONE_RATE_HZ = 44100,
     TONE_PERIOD_SAMPLES = 100,
     TONE_AMPLITUDE = 9000,
-    MILLISECONDS_PER_SECOND = 1000
+    MILLISECONDS_PER_SECOND = 1000,
+    JACK_POLL_MS = 10
 };
 
 static FlacDecoder decoder;
@@ -54,6 +55,10 @@ static uint32_t ring_words;
 static bool stopped_waiting;
 static uint32_t stopped_since_ms;
 static bool tone_active;
+static uint8_t volume_level;
+static bool volume_set;
+static HalAudioOutput output_setting;
+static uint32_t last_jack_poll_ms;
 static HalAudioStats stats;
 static uint32_t read_us_pending;
 static uint32_t output_started_us;
@@ -178,6 +183,14 @@ static void update_consumed(void)
     last_position = position;
 }
 
+static void serve_fade(void)
+{
+    if (engine_ready && transferring && !tone_active) {
+        update_consumed();
+        pump(consumed);
+    }
+}
+
 static void stop_transfer(void)
 {
     if (!transferring) {
@@ -213,7 +226,7 @@ static bool ensure_path(uint32_t rate)
     return true;
 }
 
-static bool start_transfer(uint32_t words)
+static bool start_transfer(uint32_t words, bool audible)
 {
     ring_words = words;
     consumed = 0;
@@ -223,13 +236,16 @@ static bool start_transfer(uint32_t words)
         !dmac_start_loop(&items[0])) {
         return false;
     }
-    dac_path_set_muted(false);
     dac_path_start_transfer();
     transferring = true;
+    dac_path_set_fade_service(serve_fade);
+    if (audible) {
+        dac_path_set_muted(false);
+    }
     return true;
 }
 
-static bool start_output(void)
+static bool start_output(bool audible)
 {
     if (!ensure_path(audio_engine_rate(&engine))) {
         return false;
@@ -242,7 +258,7 @@ static bool start_output(void)
     stats = (HalAudioStats){0};
     output_started_us = hal_clock_microseconds();
     stopped_waiting = false;
-    return start_transfer(RING_WORDS);
+    return start_transfer(RING_WORDS, audible);
 }
 
 static void stop_tone(void)
@@ -269,7 +285,7 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
     if (!audio_engine_play(&engine, path, start_ms, token)) {
         return false;
     }
-    if (!start_output()) {
+    if (!start_output(true)) {
         audio_engine_stop(&engine);
         return false;
     }
@@ -302,25 +318,54 @@ void hal_audio_resume(void)
     audio_engine_resume(&engine);
 }
 
-void hal_audio_seek(uint32_t position_ms)
+static void seek_to(uint32_t position_ms, bool paused)
 {
     ensure_engine();
     ensure_audio_clock();
-    bool paused = audio_engine_status(&engine).state == AUDIO_ENGINE_PAUSED;
     stop_transfer();
-    if (!audio_engine_seek(&engine, position_ms) || !start_output()) {
+    if (!audio_engine_seek(&engine, position_ms) || !start_output(!paused)) {
         audio_engine_stop(&engine);
         return;
     }
     if (paused) {
+        audio_engine_pause(&engine);
         dac_path_set_muted(true);
         dmac_suspend();
     }
 }
 
+void hal_audio_seek(uint32_t position_ms)
+{
+    ensure_engine();
+    seek_to(position_ms, audio_engine_status(&engine).state == AUDIO_ENGINE_PAUSED);
+}
+
+static DacCurve output_curve(void)
+{
+    switch (output_setting) {
+    case HAL_AUDIO_OUTPUT_SINGLE_ENDED:
+        return DAC_CURVE_SINGLE_ENDED;
+    case HAL_AUDIO_OUTPUT_BALANCED:
+        return DAC_CURVE_BALANCED;
+    case HAL_AUDIO_OUTPUT_AUTO:
+        break;
+    }
+    return hal_audio_jack() == HAL_AUDIO_JACK_BALANCED ? DAC_CURVE_BALANCED
+                                                       : DAC_CURVE_SINGLE_ENDED;
+}
+
+static void apply_volume(void)
+{
+    if (volume_set) {
+        dac_path_set_volume(dac_volume_value(volume_level, output_curve()));
+    }
+}
+
 void hal_audio_set_volume(uint8_t level)
 {
-    dac_path_set_volume(dac_volume_value(level));
+    volume_level = level;
+    volume_set = true;
+    apply_volume();
 }
 
 void hal_audio_set_gain(HalAudioGain gain)
@@ -330,7 +375,8 @@ void hal_audio_set_gain(HalAudioGain gain)
 
 void hal_audio_set_output(HalAudioOutput output)
 {
-    (void)output;
+    output_setting = output;
+    apply_volume();
 }
 
 static HalAudioState state_of(AudioEngineState state)
@@ -388,7 +434,7 @@ static void change_rate(void)
     }
     stop_transfer();
     audio_engine_restart(&engine);
-    if (!start_output()) {
+    if (!start_output(true)) {
         audio_engine_stop(&engine);
     }
 }
@@ -413,8 +459,21 @@ static void shut_down_when_idle(void)
     }
 }
 
+static void poll_jack(void)
+{
+    uint32_t now_ms = hal_clock_milliseconds();
+    if (now_ms - last_jack_poll_ms < JACK_POLL_MS) {
+        return;
+    }
+    last_jack_poll_ms = now_ms;
+    if (board_jack_poll() && output_setting == HAL_AUDIO_OUTPUT_AUTO) {
+        apply_volume();
+    }
+}
+
 void hal_audio_service(void)
 {
+    poll_jack();
     if (!engine_ready || !transferring || tone_active) {
         return;
     }
@@ -463,11 +522,12 @@ HalToneResult hal_audio_dma_tone_start(void)
         ring[index] = (uint32_t)(uint16_t)samples[frame % TONE_PERIOD_SAMPLES] << 16;
     }
     dac_path_output_on();
-    if (!start_transfer(RING_WORDS)) {
+    tone_active = true;
+    if (!start_transfer(RING_WORDS, true)) {
+        tone_active = false;
         stop_path();
         return HAL_TONE_NO_DMAC;
     }
-    tone_active = true;
     return HAL_TONE_PLAYED;
 }
 
@@ -513,10 +573,7 @@ void board_audio_after_clock_change(void)
         return;
     }
     resume_after_clock_change = false;
-    hal_audio_seek(position_before_clock_change);
-    if (paused_before_clock_change) {
-        hal_audio_pause();
-    }
+    seek_to(position_before_clock_change, paused_before_clock_change);
 }
 
 void board_audio_shut_down(void)

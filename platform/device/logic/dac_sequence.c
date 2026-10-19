@@ -26,6 +26,8 @@ typedef struct Write {
 
 enum {
     TOP_VOLUME_VALUE = 0x7A,
+    BALANCED_TOP_VOLUME_VALUE = 0x7D,
+    RAMP_STEP = 6,
     VOLUME_STEP_NUMERATOR = 12,
     VOLUME_STEP_DENOMINATOR = 5,
     GAIN_HIGH_VALUE = 0x31,
@@ -222,13 +224,14 @@ void dac_set_gain(const DacBus *bus, bool high)
     write_both(bus, HEADPHONE_GAIN, high ? GAIN_HIGH_VALUE : GAIN_LOW_VALUE);
 }
 
-uint8_t dac_volume_value(uint8_t level)
+uint8_t dac_volume_value(uint8_t level, DacCurve curve)
 {
     if (level == 0) {
         return DAC_VOLUME_MUTED;
     }
     uint32_t capped = level < DAC_VOLUME_LEVELS ? level : DAC_VOLUME_LEVELS;
-    return (uint8_t)(TOP_VOLUME_VALUE - VOLUME_STEP_NUMERATOR * capped / VOLUME_STEP_DENOMINATOR);
+    uint32_t top = curve == DAC_CURVE_BALANCED ? BALANCED_TOP_VOLUME_VALUE : TOP_VOLUME_VALUE;
+    return (uint8_t)(top - VOLUME_STEP_NUMERATOR * capped / VOLUME_STEP_DENOMINATOR);
 }
 
 void dac_output_on(const DacBus *bus, uint8_t volume)
@@ -264,4 +267,12 @@ void dac_set_muted(const DacBus *bus, bool muted, uint8_t volume)
     }
     dac_set_volume(bus, volume);
     set_pin(bus, DAC_PIN_MUTE, false);
+}
+
+uint8_t dac_ramp_next(uint8_t current, uint8_t target)
+{
+    if (current < target) {
+        return target - current > RAMP_STEP ? (uint8_t)(current + RAMP_STEP) : target;
+    }
+    return current - target > RAMP_STEP ? (uint8_t)(current - RAMP_STEP) : target;
 }

@@ -90,7 +90,8 @@ enum {
     TONE_GAP_MS = 400,
     I2S_RESET_MS = 1,
     I2S_CLEAR_MS = 2,
-    ACODEC_SETTLE_MS = 5
+    ACODEC_SETTLE_MS = 5,
+    FADE_STEP_US = 2000
 };
 
 typedef enum I2cStage {
@@ -129,6 +130,8 @@ static bool volume_known;
 static bool gain_high;
 static bool dac_up;
 static bool muted;
+static uint8_t applied_volume;
+static void (*fade_service)(void);
 
 static void note_failure(I2cStage stage)
 {
@@ -392,6 +395,7 @@ static bool play_tone_segments(void)
     static int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
     dac_output_on(&BUS, current_volume());
+    applied_volume = current_volume();
     if (!play_for(samples, TONE_PERIOD_SAMPLES, TONE_SEGMENT_MS) ||
         !play_for(NULL, 1, TONE_GAP_MS)) {
         return false;
@@ -444,6 +448,7 @@ static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, u
     }
     dac_up = true;
     muted = true;
+    applied_volume = DAC_VOLUME_MUTED;
     return HAL_TONE_PLAYED;
 }
 
@@ -451,6 +456,7 @@ static void stop_audio_path(void)
 {
     dac_up = false;
     dac_output_off(&BUS);
+    applied_volume = DAC_VOLUME_MUTED;
     stop_i2s();
 }
 
@@ -483,16 +489,47 @@ void dac_path_stop(void)
     stop_audio_path();
 }
 
+void dac_path_set_fade_service(void (*service)(void))
+{
+    fade_service = service;
+}
+
+static void wait_serving(uint32_t microseconds)
+{
+    uint32_t start = hal_clock_microseconds();
+    do {
+        if (fade_service != NULL) {
+            fade_service();
+        }
+    } while (hal_clock_microseconds() - start < microseconds);
+}
+
+static void fade_to(uint8_t target)
+{
+    while (applied_volume != target) {
+        applied_volume = dac_ramp_next(applied_volume, target);
+        dac_set_volume(&BUS, applied_volume);
+        wait_serving(FADE_STEP_US);
+    }
+}
+
 void dac_path_output_on(void)
 {
-    dac_output_on(&BUS, current_volume());
-    muted = false;
+    dac_output_on(&BUS, DAC_VOLUME_MUTED);
+    applied_volume = DAC_VOLUME_MUTED;
+    muted = true;
 }
 
 void dac_path_set_muted(bool mute)
 {
-    dac_set_muted(&BUS, mute, current_volume());
     muted = mute;
+    if (mute) {
+        fade_to(DAC_VOLUME_MUTED);
+        dac_set_muted(&BUS, true, DAC_VOLUME_MUTED);
+        return;
+    }
+    dac_set_muted(&BUS, false, applied_volume);
+    fade_to(current_volume());
 }
 
 void dac_path_set_volume(uint8_t value)
@@ -500,7 +537,7 @@ void dac_path_set_volume(uint8_t value)
     volume_value = value;
     volume_known = true;
     if (dac_up && !muted) {
-        dac_set_volume(&BUS, value);
+        fade_to(value);
     }
 }
 
