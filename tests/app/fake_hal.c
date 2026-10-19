@@ -68,6 +68,7 @@ typedef struct FakeHal {
     int write_count;
     uint32_t clock_mhz;
     int stall_test_count;
+    int keep_alive_count;
     int scratch_borrows;
     bool empty_card;
     int library_writes;
@@ -555,6 +556,16 @@ void hal_system_stall_test(void)
 int fake_hal_stall_test_count(void)
 {
     return fake.stall_test_count;
+}
+
+void hal_system_keep_alive(void)
+{
+    fake.keep_alive_count++;
+}
+
+int fake_hal_keep_alive_count(void)
+{
+    return fake.keep_alive_count;
 }
 
 HalLoopCycles hal_system_loop_cycles(void)

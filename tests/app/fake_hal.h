@@ -18,6 +18,7 @@ void fake_hal_refuse_clock_switch(void);
 void fake_hal_audio_set_idle(bool idle);
 int fake_hal_test_tone_count(void);
 int fake_hal_stall_test_count(void);
+int fake_hal_keep_alive_count(void);
 int fake_hal_scratch_borrow_count(void);
 void fake_hal_set_empty_card(bool empty);
 int fake_hal_library_writes(void);

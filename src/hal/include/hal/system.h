@@ -25,6 +25,7 @@ typedef struct HalLoopCycles {
 
 HalLoopCycles hal_system_loop_cycles(void);
 void hal_system_stall_test(void);
+void hal_system_keep_alive(void);
 typedef enum HalHighRamStatus {
     HAL_HIGH_RAM_OK,
     HAL_HIGH_RAM_UNAVAILABLE,

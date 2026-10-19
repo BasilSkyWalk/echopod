@@ -25,6 +25,7 @@ static bool open_dir(void *context, const char *path)
 static bool next_entry(void *context, ScanEntry *entry)
 {
     RescanFiles *files = context;
+    hal_system_keep_alive();
     if (!hal_dir_next(&files->dir, &files->entry)) {
         return false;
     }
@@ -67,12 +68,14 @@ static void close_file(void *context)
 static bool write_library(void *context, uint32_t offset, const void *bytes, uint32_t length)
 {
     (void)context;
+    hal_system_keep_alive();
     return hal_file_write_at(LIBRARY_PATH, offset, bytes, length);
 }
 
 static void report(void *context, uint32_t files, uint32_t tracks)
 {
     RescanFiles *rescan = context;
+    hal_system_keep_alive();
     if (rescan->progress != NULL) {
         rescan->progress(files, tracks);
     }

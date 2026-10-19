@@ -53,6 +53,10 @@ void hal_system_stall_test(void)
 {
 }
 
+void hal_system_keep_alive(void)
+{
+}
+
 HalLoopCycles hal_system_loop_cycles(void)
 {
     return (HalLoopCycles){0};

@@ -823,6 +823,16 @@ static void a_rescan_of_an_empty_card_writes_an_empty_library(void)
     CHECK(toast_is("Library: 0 tracks"));
 }
 
+static void a_rescan_keeps_the_stall_watch_fed(void)
+{
+    start_app_with_library();
+    fake_hal_set_empty_card(true);
+    app_request_rescan();
+    int before = fake_hal_keep_alive_count();
+    step();
+    CHECK(fake_hal_keep_alive_count() > before);
+}
+
 static void the_sleep_timer_turns_the_player_off(void)
 {
     start_app_with_library();
@@ -1459,6 +1469,7 @@ int main(void)
         TEST_CASE(the_sleep_timer_turns_the_player_off),
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
+        TEST_CASE(a_rescan_keeps_the_stall_watch_fed),
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
         TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),

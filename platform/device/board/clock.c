@@ -94,6 +94,11 @@ void board_stall_beat(void)
     stall_watch_beat(&stall_watch, hal_clock_milliseconds());
 }
 
+void hal_system_keep_alive(void)
+{
+    board_stall_beat();
+}
+
 void board_stall_pause(bool paused)
 {
     uint32_t primask = irq_save();
