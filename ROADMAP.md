@@ -26,9 +26,9 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 
 | Feature | Status | Notes |
 |---|---|---|
-| FLAC / MP3 / WAV playback | in progress | dr_libs in the simulator. On the device: our own FLAC decoder (`src/codec`, bit-exact on the test files) decoding on core 1 with a DMA ring engine, at the right rate (16-bit output). WAV (PCM 8–32-bit, core 0) and MP3 (libmad on core 1, loaded from the image) on the device, picked by file content; a refused track says why (for example 192 kHz). 176.4/192 kHz to come |
+| FLAC / MP3 / WAV playback | device | dr_libs in the simulator. On the device: our own FLAC decoder (`src/codec`, bit-exact on the test files) decoding on core 1 with a DMA ring engine, at the right rate (16-bit output). WAV (PCM 8–32-bit, core 0) and MP3 (libmad on core 1, loaded from the image) on the device, picked by file content; a refused track says why (for example 192 kHz). 176.4/192 kHz to come |
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
-| Gapless | sim | Token-based hand-over through the audio HAL |
+| Gapless | device | Token-based hand-over through the audio HAL |
 | Resume after power-off | device | `/.echo/resume.bin`, overwritten in place (written on hardware 2026-10-18); the player now creates the file itself on a new card |
 | Library DB from SD scan | device | Built on the player: on a new card at first start, from Settings → Rescan library, and after USB changes the card; every stock format and playlists, byte for byte like the PC (`tools/library_index.py`). The player creates its own `/.echo` files (FAT16/FAT32/exFAT, fsck-checked) and builds `covers.bin` after each scan. On hardware 2026-10-19 (`6c56fe3`): scan and covers took about 2 minutes for 1,414 tracks, 129 covers matching the PC export |
 | Browse: Artist / Album Artist / Album / Genre / Folder / All Songs / Playlists / Favorites | sim | Selecting a track plays the list from it |
