@@ -27,6 +27,7 @@ enum {
     RESET_SETTLE_MS = 30,
     RESET_READY_MS = 120,
     CLEAR_ROWS = 10,
+    PIXELS_PER_YIELD = 32,
     PWM_GATE = 0x90,
     PWM_RESET = 0x17,
     PWM_RESET_MS = 1
@@ -74,6 +75,9 @@ static void bus_pixels(void *context, const uint16_t *pixels, uint32_t count)
     volatile uint32_t *port = register_at(GPIO0_BASE + GPIO_DATA);
     uint32_t base = panel_bus_word(port_shadow, 0, true);
     for (uint32_t index = 0; index < count; index++) {
+        if (index % PIXELS_PER_YIELD == 0) {
+            board_audio_yield();
+        }
         uint32_t pixel = pixels[index];
         uint32_t high = base | (pixel >> 8) << PANEL_BUS_DATA_SHIFT;
         uint32_t low = base | (pixel & 0xFFu) << PANEL_BUS_DATA_SHIFT;

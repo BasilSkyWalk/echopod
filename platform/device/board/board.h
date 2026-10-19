@@ -43,6 +43,7 @@ bool board_core1_streaming(void);
 void board_audio_before_clock_change(void);
 void board_audio_after_clock_change(void);
 void board_audio_shut_down(void);
+void board_audio_yield(void);
 void board_wait_for_key(void);
 void board_main(void);
 bool board_usb_listening(void);

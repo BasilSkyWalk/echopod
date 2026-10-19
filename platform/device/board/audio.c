@@ -35,7 +35,9 @@ enum {
     MILLISECONDS_PER_SECOND = 1000,
     JACK_POLL_MS = 10,
     MUSIC_RING = 0x0307A000,
-    SNIFF_BYTES = 12
+    SNIFF_BYTES = 12,
+    FIFO_COMFORTABLE_WORDS = 16,
+    YIELD_POLLS = 400
 };
 
 typedef enum SourceKind {
@@ -582,6 +584,18 @@ static void poll_jack(void)
     last_jack_poll_ms = now_ms;
     if (board_jack_poll() && output_setting == HAL_AUDIO_OUTPUT_AUTO) {
         apply_volume();
+    }
+}
+
+void board_audio_yield(void)
+{
+    if (!transferring && !tone_active) {
+        return;
+    }
+    for (int poll = 0; poll < YIELD_POLLS; poll++) {
+        if (dac_path_fifo_level() >= FIFO_COMFORTABLE_WORDS) {
+            return;
+        }
     }
 }
 
