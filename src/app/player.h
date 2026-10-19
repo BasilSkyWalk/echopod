@@ -52,6 +52,7 @@ typedef struct Player {
     uint32_t next_token;
     PlayQueueCursor next_cursor;
     uint32_t last_save_ms;
+    HalAudioJack jack;
 } Player;
 
 extern const char PLAYER_RESUME_PATH[];

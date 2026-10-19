@@ -24,6 +24,12 @@ typedef enum HalAudioOutput {
     HAL_AUDIO_OUTPUT_BALANCED
 } HalAudioOutput;
 
+typedef enum HalAudioJack {
+    HAL_AUDIO_JACK_NONE,
+    HAL_AUDIO_JACK_SINGLE_ENDED,
+    HAL_AUDIO_JACK_BALANCED
+} HalAudioJack;
+
 typedef enum HalAudioCodec {
     HAL_AUDIO_CODEC_UNKNOWN,
     HAL_AUDIO_CODEC_FLAC,
@@ -110,3 +116,4 @@ HalToneResult hal_audio_dma_tone_start(void);
 void hal_audio_dma_tone_stop(void);
 HalDmaToneStatus hal_audio_dma_tone_status(void);
 HalJackPins hal_audio_jack_pins(void);
+HalAudioJack hal_audio_jack(void);

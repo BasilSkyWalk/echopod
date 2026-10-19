@@ -33,6 +33,8 @@ typedef struct FakeAudio {
     uint8_t volume;
     HalAudioGain gain;
     HalAudioOutput output;
+    int refused_plays;
+    HalAudioJack jack;
 } FakeAudio;
 
 typedef struct WrittenFile {
@@ -110,6 +112,7 @@ static FakeHal fake;
 void fake_hal_reset(void)
 {
     fake = (FakeHal){0};
+    fake.audio.jack = HAL_AUDIO_JACK_SINGLE_ENDED;
     fake.audio.status.idle = true;
 }
 
@@ -344,6 +347,11 @@ void fake_hal_audio_finish_track(void)
     fake.audio.has_queued = false;
 }
 
+void fake_hal_audio_refuse_plays(int count)
+{
+    fake.audio.refused_plays = count;
+}
+
 void fake_hal_audio_fail_track(void)
 {
     fake.audio.status.state = HAL_AUDIO_STOPPED;
@@ -397,9 +405,15 @@ int fake_hal_write_count(void)
 
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 {
+    fake.audio.play_count++;
+    if (fake.audio.refused_plays > 0) {
+        fake.audio.refused_plays--;
+        fake.audio.status = (HalAudioStatus){
+            .state = HAL_AUDIO_STOPPED, .token = token, .failed = true, .idle = false};
+        return false;
+    }
     copy_path(fake.audio.playing_path, path);
     fake.audio.play_start_ms = start_ms;
-    fake.audio.play_count++;
     fake.audio.status = (HalAudioStatus){.state = HAL_AUDIO_PLAYING,
                                          .token = token,
                                          .position_ms = start_ms,
@@ -509,6 +523,16 @@ void hal_audio_dma_tone_stop(void)
 HalDmaToneStatus hal_audio_dma_tone_status(void)
 {
     return (HalDmaToneStatus){.running = fake.dma_tone_running, .position = 0};
+}
+
+HalAudioJack hal_audio_jack(void)
+{
+    return fake.audio.jack;
+}
+
+void fake_hal_audio_set_jack(HalAudioJack jack)
+{
+    fake.audio.jack = jack;
 }
 
 HalJackPins hal_audio_jack_pins(void)

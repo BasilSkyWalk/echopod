@@ -18,6 +18,7 @@ add_library(echo_device_logic STATIC
     fat_names.c
     fat_reserve.c
     image_crc.c
+    jack_sense.c
     key_ladder.c
     key_scanner.c
     msc.c

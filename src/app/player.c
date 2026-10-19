@@ -88,6 +88,25 @@ static void restart_track(Player *player)
     }
 }
 
+static bool start_playable(Player *player, uint32_t start_ms, int direction, bool wrap)
+{
+    if (start_current(player, start_ms)) {
+        return true;
+    }
+    for (uint16_t tries = 1; tries < player->queue.count; tries++) {
+        PlayQueueCursor target;
+        if (!play_queue_neighbor(&player->queue, direction, wrap, &target)) {
+            break;
+        }
+        play_queue_move_to(&player->queue, target);
+        if (start_current(player, 0)) {
+            return true;
+        }
+    }
+    become_idle(player);
+    return false;
+}
+
 static bool move_and_start(Player *player, int direction, bool wrap)
 {
     PlayQueueCursor target;
@@ -95,7 +114,7 @@ static bool move_and_start(Player *player, int direction, bool wrap)
         return false;
     }
     play_queue_move_to(&player->queue, target);
-    return start_current(player, 0);
+    return start_playable(player, 0, direction, wrap);
 }
 
 void player_init(Player *player, const Library *library)
@@ -112,6 +131,7 @@ void player_init(Player *player, const Library *library)
     player->token_counter = 0;
     player->current_token = 0;
     player->last_save_ms = 0;
+    player->jack = hal_audio_jack();
     become_idle(player);
     hal_audio_set_volume(player->volume);
 }
@@ -124,7 +144,8 @@ bool player_play_list(Player *player, BrowseQuery source, uint32_t position, uin
     }
     PlayQueuePlan plan = {
         .source = source, .anchor_track = item.index, .shuffle = player->shuffle, .seed = seed};
-    if (!play_queue_build(&player->queue, player->library, plan) || !start_current(player, 0)) {
+    if (!play_queue_build(&player->queue, player->library, plan) ||
+        !start_playable(player, 0, 1, player->repeat == REPEAT_ALL)) {
         return false;
     }
     player_save(player);
@@ -247,8 +268,19 @@ static void save_periodically(Player *player, uint32_t now_ms)
     }
 }
 
+static void follow_jack(Player *player)
+{
+    HalAudioJack jack = hal_audio_jack();
+    bool unplugged = player->jack != HAL_AUDIO_JACK_NONE && jack == HAL_AUDIO_JACK_NONE;
+    player->jack = jack;
+    if (unplugged && player->state == PLAYER_PLAYING) {
+        player_toggle_pause(player);
+    }
+}
+
 void player_update(Player *player, uint32_t now_ms)
 {
+    follow_jack(player);
     if (!player->loaded) {
         return;
     }

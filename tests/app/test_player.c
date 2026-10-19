@@ -208,6 +208,74 @@ static void an_unplayable_track_is_skipped(void)
     CHECK_EQUAL(PLAYER_PLAYING, player_status(started).state);
 }
 
+static void a_chosen_track_that_cannot_open_is_skipped(void)
+{
+    Player *started = fresh_player();
+    fake_hal_audio_refuse_plays(1);
+    CHECK(player_play_list(started, back_in_black(), 0, SEED));
+    CHECK(path_is(fake_hal_audio_playing_path(), SHOOT_TO_THRILL_PATH));
+    CHECK_EQUAL(PLAYER_PLAYING, player_status(started).state);
+}
+
+static void a_next_track_that_cannot_open_is_skipped_around_with_repeat_all(void)
+{
+    Player *started = fresh_player();
+    player_set_repeat(started, REPEAT_ALL);
+    CHECK(player_play_list(started, back_in_black(), 0, SEED));
+    fake_hal_audio_fail_track();
+    fake_hal_audio_refuse_plays(1);
+    player_update(started, 100);
+    CHECK(path_is(fake_hal_audio_playing_path(), HELLS_BELLS_PATH));
+    CHECK_EQUAL(PLAYER_PLAYING, player_status(started).state);
+}
+
+static void the_player_stops_when_no_track_can_play(void)
+{
+    Player *started = fresh_player();
+    player_set_repeat(started, REPEAT_ALL);
+    fake_hal_audio_refuse_plays(100);
+    CHECK(!player_play_list(started, back_in_black(), 0, SEED));
+    CHECK_EQUAL(PLAYER_IDLE, player_status(started).state);
+    CHECK(fake_hal_audio_play_count() <= 3);
+}
+
+static void pulling_the_headphones_out_pauses_playback(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_set_jack(HAL_AUDIO_JACK_NONE);
+    player_update(started, 100);
+    CHECK_EQUAL(PLAYER_PAUSED, player_status(started).state);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+}
+
+static void plugging_the_headphones_back_in_does_not_resume(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_set_jack(HAL_AUDIO_JACK_NONE);
+    player_update(started, 100);
+    fake_hal_audio_set_jack(HAL_AUDIO_JACK_SINGLE_ENDED);
+    player_update(started, 200);
+    CHECK_EQUAL(PLAYER_PAUSED, player_status(started).state);
+}
+
+static void switching_from_one_jack_to_the_other_keeps_playing(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_set_jack(HAL_AUDIO_JACK_BALANCED);
+    player_update(started, 100);
+    CHECK_EQUAL(PLAYER_PLAYING, player_status(started).state);
+}
+
+static void starting_with_nothing_plugged_in_still_plays(void)
+{
+    fake_hal_reset();
+    fake_hal_audio_set_jack(HAL_AUDIO_JACK_NONE);
+    player_init(&player, fixture_library_open(&fixture));
+    CHECK(player_play_list(&player, back_in_black(), 0, SEED));
+    player_update(&player, 100);
+    CHECK_EQUAL(PLAYER_PLAYING, player_status(&player).state);
+}
+
 static void volume_changes_are_clamped_and_sent(void)
 {
     Player *started = playing(0);
@@ -288,6 +356,13 @@ int main(void)
         TEST_CASE(seeking_a_resumed_track_moves_where_it_will_start),
         TEST_CASE(pausing_and_resuming_follow_the_toggle),
         TEST_CASE(an_unplayable_track_is_skipped),
+        TEST_CASE(a_chosen_track_that_cannot_open_is_skipped),
+        TEST_CASE(a_next_track_that_cannot_open_is_skipped_around_with_repeat_all),
+        TEST_CASE(the_player_stops_when_no_track_can_play),
+        TEST_CASE(pulling_the_headphones_out_pauses_playback),
+        TEST_CASE(plugging_the_headphones_back_in_does_not_resume),
+        TEST_CASE(switching_from_one_jack_to_the_other_keeps_playing),
+        TEST_CASE(starting_with_nothing_plugged_in_still_plays),
         TEST_CASE(volume_changes_are_clamped_and_sent),
         TEST_CASE(changing_shuffle_keeps_the_current_track_playing),
         TEST_CASE(a_saved_session_resumes_paused_at_its_position),
