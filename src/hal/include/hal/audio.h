@@ -94,6 +94,11 @@ typedef struct HalToneDetail {
     uint8_t pending;
 } HalToneDetail;
 
+typedef enum HalToneMemory {
+    HAL_TONE_MEMORY_MAIN,
+    HAL_TONE_MEMORY_HIGH
+} HalToneMemory;
+
 typedef struct HalDmaToneStatus {
     bool running;
     uint32_t position;
@@ -124,7 +129,7 @@ HalAudioStats hal_audio_stats(void);
 void hal_audio_service(void);
 HalToneResult hal_audio_test_tone(void);
 HalToneDetail hal_audio_tone_detail(void);
-HalToneResult hal_audio_dma_tone_start(void);
+HalToneResult hal_audio_dma_tone_start(HalToneMemory memory);
 void hal_audio_dma_tone_stop(void);
 HalDmaToneStatus hal_audio_dma_tone_status(void);
 HalJackPins hal_audio_jack_pins(void);

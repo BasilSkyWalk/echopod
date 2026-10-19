@@ -52,6 +52,7 @@ enum {
     DIAGNOSTICS_STOPWATCH_INDEX = 6,
     DIAGNOSTICS_TEST_TONE_INDEX = 7,
     DIAGNOSTICS_DMA_TONE_INDEX = 8,
+    DIAGNOSTICS_HIGH_RAM_TONE_INDEX = 25,
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
     DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
@@ -1386,6 +1387,26 @@ static void the_dma_tone_starts_and_stops_from_one_row(void)
     CHECK(title_is("Diagnostics"));
 }
 
+static void the_high_ram_tone_plays_from_high_ram(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_HIGH_RAM_TONE_INDEX);
+    tap(KEY_PLAY);
+    CHECK(hal_audio_dma_tone_status().running);
+    CHECK_EQUAL(HAL_TONE_MEMORY_HIGH, fake_hal_dma_tone_memory());
+    tap(KEY_PLAY);
+    CHECK(!hal_audio_dma_tone_status().running);
+    open_diagnostics_row(DIAGNOSTICS_DMA_TONE_INDEX);
+}
+
+static void the_plain_dma_tone_plays_from_main_ram(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_DMA_TONE_INDEX);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(HAL_TONE_MEMORY_MAIN, fake_hal_dma_tone_memory());
+}
+
 static void the_loop_benchmark_runs_once_per_press(void)
 {
     start_app();
@@ -1499,6 +1520,8 @@ int main(void)
         TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
         TEST_CASE(the_test_tone_plays_once_per_press),
         TEST_CASE(the_dma_tone_starts_and_stops_from_one_row),
+        TEST_CASE(the_high_ram_tone_plays_from_high_ram),
+        TEST_CASE(the_plain_dma_tone_plays_from_main_ram),
         TEST_CASE(the_stall_test_row_freezes_the_main_loop_on_purpose),
         TEST_CASE(ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off),
         TEST_CASE(the_loop_benchmark_runs_once_per_press),

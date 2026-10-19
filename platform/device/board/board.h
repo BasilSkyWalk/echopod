@@ -31,6 +31,7 @@ void board_stall_pause(bool paused);
 void board_panic_stall(uint32_t pc, uint32_t lr);
 void board_panic_fault(uint32_t pc, uint32_t lr, uint32_t status);
 const char *board_audio_current_path(void);
+const char *board_audio_last_path(void);
 typedef enum Core1Program {
     CORE1_PROGRAM_FLAC,
     CORE1_PROGRAM_MP3

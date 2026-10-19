@@ -98,6 +98,7 @@ typedef struct FakeHal {
     int core1_test_count;
     int core1_decode_count;
     bool dma_tone_running;
+    HalToneMemory dma_tone_memory;
     int audio_service_count;
     HalBluetoothStatus bluetooth;
     bool bluetooth_powered;
@@ -510,8 +511,14 @@ HalBootClocks hal_system_boot_clocks(void)
     return (HalBootClocks){0};
 }
 
-HalToneResult hal_audio_dma_tone_start(void)
+HalToneMemory fake_hal_dma_tone_memory(void)
 {
+    return fake.dma_tone_memory;
+}
+
+HalToneResult hal_audio_dma_tone_start(HalToneMemory memory)
+{
+    fake.dma_tone_memory = memory;
     fake.dma_tone_running = true;
     return HAL_TONE_PLAYED;
 }

@@ -273,16 +273,27 @@ static Core1Result run_decode(const HalFile *file, FlacInfo info, uint32_t audio
     return core1_run(&BUS, DECODE_TIMEOUT_MS);
 }
 
+static const char *decode_test_path(void)
+{
+    const char *current = board_audio_current_path();
+    if (current != NULL && current[0] != '\0') {
+        return current;
+    }
+    return board_audio_last_path();
+}
+
 HalCore1Decode hal_system_core1_decode_test(void)
 {
-    if (streaming) {
+    const char *current = board_audio_current_path();
+    if (streaming && current != NULL && current[0] != '\0') {
         return (HalCore1Decode){.status = HAL_CORE1_BUSY};
     }
+    board_core1_stop();
     uint32_t pll_mhz = hal_system_clock_mhz();
     if (pll_mhz < LOWEST_PLL_MHZ) {
         return (HalCore1Decode){.status = HAL_CORE1_NEEDS_PLL};
     }
-    const char *path = board_audio_current_path();
+    const char *path = decode_test_path();
     if (path == NULL) {
         return (HalCore1Decode){.status = HAL_CORE1_NO_TRACK};
     }

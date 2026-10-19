@@ -307,24 +307,26 @@ static ScreenAction toggle_dma_tone(void *context)
         tone->stopped = true;
         return screen_action_none();
     }
-    tone->result = hal_audio_dma_tone_start();
+    tone->result = hal_audio_dma_tone_start(tone->memory);
     tone->tried = true;
     tone->stopped = false;
     return screen_action_none();
 }
 
 static char dma_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char high_ram_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static const char *dma_tone_value(const void *context)
 {
     const DmaToneOption *tone = context;
+    char *text = tone->memory == HAL_TONE_MEMORY_HIGH ? high_ram_tone_text : dma_tone_text;
     DmaToneView view = {.tried = tone->tried,
                         .stopped = tone->stopped,
                         .result = tone->result,
                         .status = hal_audio_dma_tone_status(),
                         .detail = hal_audio_tone_detail()};
-    diagnostics_dma_tone_text(view, dma_tone_text, sizeof dma_tone_text);
-    return dma_tone_text;
+    diagnostics_dma_tone_text(view, text, DIAGNOSTICS_VALUE_CAPACITY);
+    return text;
 }
 
 static bool player_has_track(const void *context)
@@ -454,8 +456,14 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                .select = play_test_tone,
                                                .context = &screens->tone,
                                                .value = tone_value};
-    screens->dma_tone =
-        (DmaToneOption){.tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
+    screens->dma_tone = (DmaToneOption){.memory = HAL_TONE_MEMORY_MAIN,
+                                        .tried = false,
+                                        .stopped = false,
+                                        .result = HAL_TONE_PLAYED};
+    screens->high_ram_tone = (DmaToneOption){.memory = HAL_TONE_MEMORY_HIGH,
+                                             .tried = false,
+                                             .stopped = false,
+                                             .result = HAL_TONE_PLAYED};
     screens->diagnostics_items[8] = (MenuItem){.label = "DMA tone",
                                                .select = toggle_dma_tone,
                                                .context = &screens->dma_tone,
@@ -506,6 +514,10 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         .label = "Jack 3.5", .select = NULL, .context = NULL, .value = jack_single_ended_value};
     screens->diagnostics_items[24] = (MenuItem){
         .label = "Jack 4.4", .select = NULL, .context = NULL, .value = jack_balanced_value};
+    screens->diagnostics_items[25] = (MenuItem){.label = "DMA tone HR",
+                                                .select = toggle_dma_tone,
+                                                .context = &screens->high_ram_tone,
+                                                .value = dma_tone_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

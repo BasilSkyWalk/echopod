@@ -34,6 +34,7 @@ enum {
     TONE_AMPLITUDE = 9000,
     MILLISECONDS_PER_SECOND = 1000,
     JACK_POLL_MS = 10,
+    HIGH_RAM_RING = 0x0307A000,
     SNIFF_BYTES = 12
 };
 
@@ -71,6 +72,8 @@ static uint32_t ring_words;
 static bool stopped_waiting;
 static uint32_t stopped_since_ms;
 static bool tone_active;
+static bool ring_in_high_ram;
+static char last_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint8_t volume_level;
 static bool volume_set;
 static HalAudioOutput output_setting;
@@ -169,9 +172,25 @@ static AudioSource chosen_source(void)
                        : flac_source_interface(&software_source);
 }
 
+static void remember_path(const char *path)
+{
+    uint32_t index = 0;
+    while (path[index] != '\0' && index + 1 < AUDIO_ENGINE_PATH_CAPACITY) {
+        last_path[index] = path[index];
+        index++;
+    }
+    last_path[index] = '\0';
+}
+
+const char *board_audio_last_path(void)
+{
+    return last_path[0] != '\0' ? last_path : NULL;
+}
+
 static bool open_chosen(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     (void)context;
+    remember_path(path);
     source_kind = kind_of(path);
     unknown_format = source_kind == SOURCE_UNKNOWN;
     if (unknown_format) {
@@ -226,9 +245,14 @@ static void ensure_engine(void)
     engine_ready = true;
 }
 
+static uint32_t *active_ring(void)
+{
+    return ring_in_high_ram ? (uint32_t *)(uintptr_t)HIGH_RAM_RING : ring;
+}
+
 static uint32_t ring_address(void)
 {
-    return (uint32_t)(uintptr_t)ring;
+    return (uint32_t)(uintptr_t)active_ring();
 }
 
 static void update_consumed(void)
@@ -327,6 +351,7 @@ static void stop_tone(void)
         stop_path();
         tone_active = false;
     }
+    ring_in_high_ram = false;
 }
 
 static void ensure_audio_clock(void)
@@ -589,7 +614,7 @@ HalAudioStats hal_audio_stats(void)
     return result;
 }
 
-HalToneResult hal_audio_dma_tone_start(void)
+HalToneResult hal_audio_dma_tone_start(HalToneMemory memory)
 {
     ensure_engine();
     stop_tone();
@@ -605,11 +630,13 @@ HalToneResult hal_audio_dma_tone_start(void)
     }
     path_up = true;
     path_rate = TONE_RATE_HZ;
+    ring_in_high_ram = memory == HAL_TONE_MEMORY_HIGH;
+    uint32_t *words = active_ring();
     int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
     for (uint32_t index = 0; index < RING_WORDS; index++) {
         uint32_t frame = index / WORDS_PER_FRAME;
-        ring[index] = (uint32_t)(uint16_t)samples[frame % TONE_PERIOD_SAMPLES] << 16;
+        words[index] = (uint32_t)(uint16_t)samples[frame % TONE_PERIOD_SAMPLES] << 16;
     }
     dac_path_output_on();
     tone_active = true;
