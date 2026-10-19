@@ -102,6 +102,21 @@ typedef struct HalCore1Decode {
     uint32_t average_us;
     uint32_t longest_us;
     uint32_t block_us;
+    uint32_t lpc_in_hardware;
 } HalCore1Decode;
 
 HalCore1Decode hal_system_core1_decode_test(void);
+
+typedef struct HalCore1Accel {
+    HalCore1Status status;
+    uint32_t mhz;
+    bool narrow_ok;
+    bool wide_ok;
+    bool timed_out;
+    uint8_t failed_vector;
+    uint32_t failed_sample;
+    uint32_t hardware_us;
+    uint32_t software_us;
+} HalCore1Accel;
+
+HalCore1Accel hal_system_core1_accel_test(void);

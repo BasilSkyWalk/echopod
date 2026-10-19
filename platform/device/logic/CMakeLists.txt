@@ -44,6 +44,7 @@ add_library(echo_device_logic STATIC
     fat_layout.c
     fat_names.c
     fat_reserve.c
+    flac_accel.c
     image_crc.c
     jack_sense.c
     key_ladder.c

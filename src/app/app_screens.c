@@ -172,6 +172,24 @@ static const char *core1_value(const void *context)
     return core1_text;
 }
 
+static char core1_accel_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static ScreenAction run_core1_accel_test(void *context)
+{
+    Core1AccelOption *accel = context;
+    accel->result = hal_system_core1_accel_test();
+    accel->run = true;
+    return screen_action_none();
+}
+
+static const char *core1_accel_value(const void *context)
+{
+    const Core1AccelOption *accel = context;
+    diagnostics_core1_accel_text(accel->run, accel->result, core1_accel_text,
+                                 sizeof core1_accel_text);
+    return core1_accel_text;
+}
+
 static char core1_decode_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static ScreenAction run_core1_decode_test(void *context)
@@ -518,6 +536,11 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = toggle_dma_tone,
                                                 .context = &screens->high_ram_tone,
                                                 .value = dma_tone_value};
+    screens->core1_accel = (Core1AccelOption){.run = false};
+    screens->diagnostics_items[26] = (MenuItem){.label = "LPC accel",
+                                                .select = run_core1_accel_test,
+                                                .context = &screens->core1_accel,
+                                                .value = core1_accel_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

@@ -73,7 +73,6 @@ add_custom_command(
     VERBATIM
 )
 set(ECHO_CORE1_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1.bin)
-set(ECHO_CORE1_OBJECT ${CMAKE_CURRENT_BINARY_DIR}/core1_image.o)
 add_custom_command(
     OUTPUT ${ECHO_CORE1_BINARY}
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:echo_core1> core1.bin
@@ -81,17 +80,6 @@ add_custom_command(
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     VERBATIM
 )
-add_custom_command(
-    OUTPUT ${ECHO_CORE1_OBJECT}
-    COMMAND ${CMAKE_OBJCOPY} -I binary -O elf32-littlearm -B arm
-        --rename-section .data=.rodata.core1_image,alloc,load,readonly,data,contents
-        core1.bin core1_image.o
-    DEPENDS ${ECHO_CORE1_BINARY}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    VERBATIM
-)
-set_source_files_properties(${ECHO_CORE1_OBJECT} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
-target_sources(echo_device PRIVATE ${ECHO_CORE1_OBJECT})
 
 set(ECHO_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/echo_device.ld)
 set_target_properties(echo_device PROPERTIES
@@ -136,9 +124,10 @@ if(EXISTS ${ECHO_REFERENCE_IMG})
             --elf $<TARGET_FILE:echo_device>
             --overlay $<TARGET_FILE:echo_rescan_overlay>
             --core1-mp3 ${ECHO_CORE1_MP3_BINARY}
+            --core1-flac ${ECHO_CORE1_BINARY}
             --output ${ECHO_DEVICE_IMAGE}
         BYPRODUCTS ${ECHO_DEVICE_IMAGE}
-        DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY}
+        DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
             ${PROJECT_SOURCE_DIR}/tools/make_image.py
         VERBATIM
     )

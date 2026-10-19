@@ -231,6 +231,48 @@ void diagnostics_core1_decode_text(bool run, HalCore1Decode result, char *text, 
     string_builder_append_unsigned(&builder, rounded_milliseconds(result.block_us));
     string_builder_append(&builder, " ms max ");
     string_builder_append_unsigned(&builder, rounded_milliseconds(result.longest_us));
+    if (result.lpc_in_hardware > 0) {
+        string_builder_append(&builder, " hw");
+    }
+}
+
+static void append_tenths(StringBuilder *builder, uint32_t microseconds)
+{
+    uint32_t tenths = (microseconds + 50u) / 100u;
+    string_builder_append_unsigned(builder, tenths / 10u);
+    string_builder_append_char(builder, '.');
+    string_builder_append_unsigned(builder, tenths % 10u);
+}
+
+void diagnostics_core1_accel_text(bool run, HalCore1Accel result, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!run) {
+        return;
+    }
+    if (result.status != HAL_CORE1_RAN) {
+        string_builder_append(&builder, core1_failure_text(result.status));
+        return;
+    }
+    if (result.timed_out) {
+        string_builder_append(&builder, "Timeout at t");
+        string_builder_append_unsigned(&builder, result.failed_vector);
+        return;
+    }
+    string_builder_append(&builder, result.narrow_ok ? "N ok" : "N no");
+    string_builder_append(&builder, result.wide_ok ? " W ok" : " W no");
+    if (result.failed_vector > 0) {
+        string_builder_append(&builder, " t");
+        string_builder_append_unsigned(&builder, result.failed_vector);
+        string_builder_append_char(&builder, '@');
+        string_builder_append_unsigned(&builder, result.failed_sample);
+        return;
+    }
+    string_builder_append_char(&builder, ' ');
+    append_tenths(&builder, result.hardware_us);
+    string_builder_append_char(&builder, '/');
+    append_tenths(&builder, result.software_us);
+    string_builder_append(&builder, " ms");
 }
 
 void diagnostics_battery_text(HalBattery battery, char *text, size_t capacity)

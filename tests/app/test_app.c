@@ -53,6 +53,7 @@ enum {
     DIAGNOSTICS_TEST_TONE_INDEX = 7,
     DIAGNOSTICS_DMA_TONE_INDEX = 8,
     DIAGNOSTICS_HIGH_RAM_TONE_INDEX = 25,
+    DIAGNOSTICS_ACCEL_INDEX = 26,
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
     DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
@@ -1437,6 +1438,16 @@ static void the_core_1_decode_test_runs_once_per_press(void)
     CHECK(title_is("Diagnostics"));
 }
 
+static void the_accelerator_test_runs_once_per_press(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_ACCEL_INDEX);
+    CHECK_EQUAL(0, fake_hal_core1_accel_count());
+    tap(KEY_PLAY);
+    CHECK_EQUAL(1, fake_hal_core1_accel_count());
+    CHECK(title_is("Diagnostics"));
+}
+
 static void a_clock_that_does_not_lock_stays_where_it_was(void)
 {
     start_app();
@@ -1527,6 +1538,7 @@ int main(void)
         TEST_CASE(the_loop_benchmark_runs_once_per_press),
         TEST_CASE(the_core_1_test_runs_once_per_press),
         TEST_CASE(the_core_1_decode_test_runs_once_per_press),
+        TEST_CASE(the_accelerator_test_runs_once_per_press),
         TEST_CASE(a_clock_that_does_not_lock_stays_where_it_was),
         TEST_CASE(the_stopwatch_stays_open_after_waking),
         TEST_CASE(menu_does_nothing_while_nothing_plays),

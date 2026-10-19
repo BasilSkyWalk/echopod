@@ -83,6 +83,64 @@ static bool decodes_exactly(const char *name, uint32_t rate, int channels, int b
     return ok;
 }
 
+typedef struct HookLog {
+    int calls;
+    bool accept;
+    uint32_t widest;
+    uint32_t largest_order;
+} HookLog;
+
+static HookLog hook_log;
+
+static bool restore_in_test(void *context, int32_t *samples, FlacLpcJob job)
+{
+    HookLog *log = context;
+    log->calls++;
+    log->widest = job.width > log->widest ? job.width : log->widest;
+    log->largest_order = job.order > log->largest_order ? job.order : log->largest_order;
+    if (!log->accept) {
+        return false;
+    }
+    for (uint32_t index = job.order; index < job.block_size; index++) {
+        int64_t sum = 0;
+        for (uint32_t tap = 0; tap < job.order; tap++) {
+            sum += (int64_t)job.coefficients[tap] * samples[index - 1 - tap];
+        }
+        samples[index] += (int32_t)(sum >> job.shift);
+    }
+    return true;
+}
+
+static bool decodes_through_hook(const char *name, uint32_t rate, int channels, int bits,
+                                 bool accept)
+{
+    hook_log = (HookLog){.accept = accept};
+    flac_set_lpc_hook(&decoder, (FlacLpcHook){restore_in_test, &hook_log});
+    bool ok = decodes_exactly(name, rate, channels, bits);
+    flac_set_lpc_hook(&decoder, (FlacLpcHook){NULL, NULL});
+    return ok;
+}
+
+static void an_lpc_hook_that_restores_gives_the_same_samples(void)
+{
+    CHECK(decodes_through_hook("lpc_24_96k_stereo", 96000, 2, 24, true));
+    CHECK(hook_log.calls > 0);
+    CHECK(hook_log.widest >= 24);
+    CHECK(hook_log.largest_order >= 3);
+}
+
+static void a_hook_that_declines_leaves_the_restore_to_software(void)
+{
+    CHECK(decodes_through_hook("lpc_16_44k_stereo", 44100, 2, 16, false));
+    CHECK(hook_log.calls > 0);
+}
+
+static void fixed_predictors_never_reach_the_hook(void)
+{
+    CHECK(decodes_through_hook("fixed_16_mono", 44100, 1, 16, true));
+    CHECK_EQUAL(0, hook_log.calls);
+}
+
 static void sixteen_bit_lpc_stereo_decodes_exactly(void)
 {
     CHECK(decodes_exactly("lpc_16_44k_stereo", 44100, 2, 16));
@@ -305,6 +363,9 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(sixteen_bit_lpc_stereo_decodes_exactly),
+        TEST_CASE(an_lpc_hook_that_restores_gives_the_same_samples),
+        TEST_CASE(a_hook_that_declines_leaves_the_restore_to_software),
+        TEST_CASE(fixed_predictors_never_reach_the_hook),
         TEST_CASE(twenty_four_bit_96k_decodes_exactly),
         TEST_CASE(fixed_predictors_decode_exactly),
         TEST_CASE(constant_and_verbatim_subframes_decode_exactly),

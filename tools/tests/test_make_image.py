@@ -470,6 +470,19 @@ class Core1ModuleTest(unittest.TestCase):
         with self.assertRaises(make_image.ImageError):
             build(core1_mp3=bytes(make_image.CORE1_MODULE_CAPACITY + 1))
 
+    def test_the_flac_program_has_its_own_slot_after_the_mp3_one(self):
+        program = bytes(range(200)) * 5
+        image = build(core1_flac=program, core1_mp3=b"\x11" * 300)
+        offset = make_image.CORE1_FLAC_OFFSET
+        self.assertGreaterEqual(offset, make_image.CORE1_MP3_OFFSET +
+                                make_image.CORE1_MODULE_HEADER_SIZE +
+                                make_image.CORE1_MODULE_CAPACITY)
+        self.assertEqual(b"EC1M", image[offset:offset + 4])
+        self.assertEqual(len(program), word(image, offset + 4))
+        start = offset + make_image.CORE1_MODULE_HEADER_SIZE
+        self.assertEqual(program, image[start:start + len(program)])
+        self.assertEqual([], make_image.validate_image(image))
+
     def test_no_program_leaves_the_space_empty(self):
         offset = make_image.CORE1_MP3_OFFSET
         self.assertEqual(bytes(16), build()[offset:offset + 16])

@@ -161,6 +161,49 @@ static void the_core_1_decode_row_shows_average_block_time_against_real_time(voi
     CHECK(text_is("", text));
 }
 
+static void the_accelerator_row_shows_both_classes_and_the_timing(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_core1_accel_text(false, (HalCore1Accel){0}, text, sizeof text);
+    CHECK(text_is("", text));
+    diagnostics_core1_accel_text(true,
+                                 (HalCore1Accel){.status = HAL_CORE1_RAN,
+                                                 .narrow_ok = true,
+                                                 .wide_ok = true,
+                                                 .hardware_us = 1230,
+                                                 .software_us = 9760},
+                                 text, sizeof text);
+    CHECK(text_is("N ok W ok 1.2/9.8 ms", text));
+    diagnostics_core1_accel_text(
+        true,
+        (HalCore1Accel){
+            .status = HAL_CORE1_RAN, .narrow_ok = true, .failed_vector = 9, .failed_sample = 123},
+        text, sizeof text);
+    CHECK(text_is("N ok W no t9@123", text));
+    diagnostics_core1_accel_text(
+        true, (HalCore1Accel){.status = HAL_CORE1_RAN, .timed_out = true, .failed_vector = 5}, text,
+        sizeof text);
+    CHECK(text_is("Timeout at t5", text));
+    diagnostics_core1_accel_text(true, (HalCore1Accel){.status = HAL_CORE1_NO_REPLY}, text,
+                                 sizeof text);
+    CHECK(text_is("No reply", text));
+}
+
+static void a_decode_that_used_the_accelerator_says_so(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_core1_decode_text(true,
+                                  (HalCore1Decode){.status = HAL_CORE1_RAN,
+                                                   .mhz = 100,
+                                                   .blocks = 10,
+                                                   .average_us = 18200,
+                                                   .longest_us = 21000,
+                                                   .block_us = 24000,
+                                                   .lpc_in_hardware = 40},
+                                  text, sizeof text);
+    CHECK(text_is("100: 18/24 ms max 21 hw", text));
+}
+
 static void a_core_1_decode_without_blocks_or_track_says_so(void)
 {
     char text[DIAGNOSTICS_VALUE_CAPACITY];
@@ -310,6 +353,8 @@ int main(void)
         TEST_CASE(core_1_failures_name_the_step),
         TEST_CASE(the_core_1_decode_row_shows_average_block_time_against_real_time),
         TEST_CASE(a_core_1_decode_without_blocks_or_track_says_so),
+        TEST_CASE(the_accelerator_row_shows_both_classes_and_the_timing),
+        TEST_CASE(a_decode_that_used_the_accelerator_says_so),
         TEST_CASE(the_loop_row_shows_cycles_per_iteration),
         TEST_CASE(a_running_tone_shows_the_read_position),
         TEST_CASE(a_tone_that_ended_by_itself_says_so),

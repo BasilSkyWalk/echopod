@@ -27,7 +27,7 @@
 enum {
     HOME_ITEM_COUNT = 4,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 26,
+    DIAGNOSTICS_ITEM_COUNT = 27,
     START_PATH_CAPACITY = 2
 };
 
@@ -64,6 +64,11 @@ typedef struct Core1DecodeOption {
     bool run;
     HalCore1Decode result;
 } Core1DecodeOption;
+
+typedef struct Core1AccelOption {
+    bool run;
+    HalCore1Accel result;
+} Core1AccelOption;
 
 typedef struct DmaToneOption {
     HalToneMemory memory;
@@ -103,6 +108,7 @@ typedef struct AppScreens {
     LoopOption loop;
     Core1Option core1;
     Core1DecodeOption core1_decode;
+    Core1AccelOption core1_accel;
     MenuItem home_items[HOME_ITEM_COUNT];
     HomeArt home_art;
     MenuItem music_items[MUSIC_ITEM_COUNT];

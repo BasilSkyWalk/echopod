@@ -32,6 +32,7 @@ int fake_hal_scratch_outstanding(void);
 int fake_hal_loop_bench_count(void);
 int fake_hal_core1_test_count(void);
 int fake_hal_core1_decode_count(void);
+int fake_hal_core1_accel_count(void);
 int fake_hal_audio_service_count(void);
 HalBluetoothStatus *fake_hal_bluetooth(void);
 bool fake_hal_bluetooth_powered(void);

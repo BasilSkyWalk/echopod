@@ -21,17 +21,17 @@ enum {
     MICROSECONDS_PER_SECOND = 1000000,
     SECTOR_BYTES = 512,
     MP3_PROGRAM_OFFSET = 0x240000,
+    FLAC_PROGRAM_OFFSET = 0x280000,
     PROGRAM_MAGIC = 0x4D314345,
     STAGING_SECTORS = STAGING_WORDS * WORD_BYTES / SECTOR_BYTES
 };
 
 static uint32_t staging[STAGING_WORDS];
 static bool streaming;
+static bool accel_known;
+static uint32_t accel_classes;
 static Core1Program streaming_program;
 static FlacBits header_bits;
-
-extern const uint8_t _binary_core1_bin_start[];
-extern const uint8_t _binary_core1_bin_end[];
 
 static uint32_t bus_read(void *context, uint32_t address)
 {
@@ -101,13 +101,14 @@ static bool copy_program_sectors(uint32_t first_sector, uint32_t size, uint32_t 
     return crc == expected_crc;
 }
 
-static Core1Result place_mp3_program(void)
+static Core1Result place_program(Core1Program program)
 {
     EmmcInfo info;
     if (hal_system_restart_pending() || !emmc_start(&info)) {
         return CORE1_NO_REPLY;
     }
-    uint32_t header_sector = info.layout.slot_1 + MP3_PROGRAM_OFFSET / SECTOR_BYTES;
+    uint32_t offset = program == CORE1_PROGRAM_MP3 ? MP3_PROGRAM_OFFSET : FLAC_PROGRAM_OFFSET;
+    uint32_t header_sector = info.layout.slot_1 + offset / SECTOR_BYTES;
     if (!emmc_read(NULL, header_sector, 1, staging)) {
         return CORE1_NO_REPLY;
     }
@@ -123,15 +124,6 @@ static Core1Result place_mp3_program(void)
     }
     core1_prepare(&BUS);
     return CORE1_OK;
-}
-
-static Core1Result place_program(Core1Program program)
-{
-    if (program == CORE1_PROGRAM_MP3) {
-        return place_mp3_program();
-    }
-    uint32_t length = (uint32_t)(_binary_core1_bin_end - _binary_core1_bin_start);
-    return core1_load(&BUS, _binary_core1_bin_start, length);
 }
 
 bool board_core1_start_stream(Core1Program program)
@@ -192,8 +184,10 @@ HalCore1Test hal_system_core1_test(void)
     HalCore1Test test = {.status = HAL_CORE1_RAN, .mhz = pll_mhz / divider};
     Core1Result result = core1_power_up(&BUS, pll_mhz, divider);
     if (result == CORE1_OK) {
-        uint32_t length = (uint32_t)(_binary_core1_bin_end - _binary_core1_bin_start);
-        result = core1_start(&BUS, _binary_core1_bin_start, length);
+        result = place_program(CORE1_PROGRAM_FLAC);
+    }
+    if (result == CORE1_OK) {
+        result = core1_run(&BUS, REPLY_TIMEOUT_MS);
     }
     if (result == CORE1_OK) {
         test.cycles = (HalLoopCycles){.register_centi = register_read(CORE1_SHARED_REGISTER_CENTI),
@@ -227,6 +221,7 @@ static bool copy_audio(const HalFile *file, uint32_t audio_offset, uint32_t leng
 static void share_info(FlacInfo info, uint32_t input_bytes)
 {
     register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_DECODE);
+    register_write(CORE1_SHARED_ACCEL_CLASSES, accel_classes);
     register_write(CORE1_SHARED_INPUT_BYTES, input_bytes);
     register_write(CORE1_SHARED_SAMPLE_RATE, info.sample_rate);
     register_write(CORE1_SHARED_CHANNELS, info.channels);
@@ -244,6 +239,7 @@ static HalCore1Decode decode_results(HalCore1Decode result, FlacInfo info)
     result.average_us =
         blocks == 0 ? 0 : register_read(CORE1_SHARED_TICKS_TOTAL) / blocks / ticks_per_us;
     result.longest_us = register_read(CORE1_SHARED_TICKS_LONGEST) / ticks_per_us;
+    result.lpc_in_hardware = register_read(CORE1_SHARED_ACCEL_RESTORED);
     result.block_us =
         info.sample_rate == 0
             ? 0
@@ -258,8 +254,7 @@ static Core1Result run_decode(const HalFile *file, FlacInfo info, uint32_t audio
     if (result != CORE1_OK) {
         return result;
     }
-    uint32_t length = (uint32_t)(_binary_core1_bin_end - _binary_core1_bin_start);
-    result = core1_load(&BUS, _binary_core1_bin_start, length);
+    result = place_program(CORE1_PROGRAM_FLAC);
     if (result != CORE1_OK) {
         return result;
     }
@@ -273,6 +268,57 @@ static Core1Result run_decode(const HalFile *file, FlacInfo info, uint32_t audio
     return core1_run(&BUS, DECODE_TIMEOUT_MS);
 }
 
+static bool streaming_music(void)
+{
+    const char *current = board_audio_current_path();
+    return streaming && current != NULL && current[0] != '\0';
+}
+
+static HalCore1Accel accel_results(HalCore1Accel result)
+{
+    uint32_t status = register_read(CORE1_SHARED_ACCEL_STATUS);
+    uint32_t failed = register_read(CORE1_SHARED_ACCEL_FAILED);
+    uint32_t ticks_per_us = result.mhz == 0 ? 1 : result.mhz;
+    result.narrow_ok = (status & CORE1_ACCEL_NARROW) != 0;
+    result.wide_ok = (status & CORE1_ACCEL_WIDE) != 0;
+    result.timed_out = (status & CORE1_ACCEL_TIMED_OUT) != 0;
+    result.failed_vector = (uint8_t)(failed >> 16);
+    result.failed_sample = failed & 0xFFFFu;
+    result.hardware_us = register_read(CORE1_SHARED_ACCEL_HARDWARE_TICKS) / ticks_per_us;
+    result.software_us = register_read(CORE1_SHARED_ACCEL_SOFTWARE_TICKS) / ticks_per_us;
+    accel_known = true;
+    accel_classes = status & (CORE1_ACCEL_NARROW | CORE1_ACCEL_WIDE);
+    return result;
+}
+
+HalCore1Accel hal_system_core1_accel_test(void)
+{
+    if (streaming_music()) {
+        return (HalCore1Accel){.status = HAL_CORE1_BUSY};
+    }
+    board_core1_stop();
+    uint32_t pll_mhz = hal_system_clock_mhz();
+    if (pll_mhz < LOWEST_PLL_MHZ) {
+        return (HalCore1Accel){.status = HAL_CORE1_NEEDS_PLL};
+    }
+    uint32_t divider = core1_divider_for(pll_mhz);
+    HalCore1Accel result = {.status = HAL_CORE1_RAN, .mhz = pll_mhz / divider};
+    Core1Result ran = core1_power_up(&BUS, pll_mhz, divider);
+    if (ran == CORE1_OK) {
+        ran = place_program(CORE1_PROGRAM_FLAC);
+    }
+    if (ran == CORE1_OK) {
+        register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_ACCEL);
+        ran = core1_run(&BUS, DECODE_TIMEOUT_MS);
+    }
+    if (ran == CORE1_OK) {
+        result = accel_results(result);
+    }
+    Core1Result stopped = core1_stop(&BUS);
+    result.status = status_of(ran != CORE1_OK ? ran : stopped);
+    return result;
+}
+
 static const char *decode_test_path(void)
 {
     const char *current = board_audio_current_path();
@@ -284,9 +330,11 @@ static const char *decode_test_path(void)
 
 HalCore1Decode hal_system_core1_decode_test(void)
 {
-    const char *current = board_audio_current_path();
-    if (streaming && current != NULL && current[0] != '\0') {
+    if (streaming_music()) {
         return (HalCore1Decode){.status = HAL_CORE1_BUSY};
+    }
+    if (!accel_known) {
+        (void)hal_system_core1_accel_test();
     }
     board_core1_stop();
     uint32_t pll_mhz = hal_system_clock_mhz();

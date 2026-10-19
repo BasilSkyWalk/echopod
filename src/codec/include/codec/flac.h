@@ -46,6 +46,20 @@ typedef struct FlacBits {
     bool failed;
 } FlacBits;
 
+typedef struct FlacLpcJob {
+    const int32_t *coefficients;
+    uint32_t block_size;
+    uint32_t order;
+    uint32_t shift;
+    uint32_t width;
+    uint32_t precision;
+} FlacLpcJob;
+
+typedef struct FlacLpcHook {
+    bool (*restore)(void *context, int32_t *samples, FlacLpcJob job);
+    void *context;
+} FlacLpcHook;
+
 typedef struct FlacDecoder {
     FlacBits bits;
     FlacInfo info;
@@ -53,6 +67,7 @@ typedef struct FlacDecoder {
     uint32_t decoded_samples;
     uint32_t block_samples;
     uint32_t frame_first_sample;
+    FlacLpcHook lpc_hook;
     int32_t samples[FLAC_MAX_CHANNELS][FLAC_MAX_BLOCK];
 } FlacDecoder;
 
@@ -65,3 +80,4 @@ void flac_rewind(FlacDecoder *decoder, uint32_t position);
 FlacResult flac_decode_frame(FlacDecoder *decoder);
 FlacResult flac_seek(FlacDecoder *decoder, uint32_t sample);
 const int32_t *flac_channel(const FlacDecoder *decoder, int channel);
+void flac_set_lpc_hook(FlacDecoder *decoder, FlacLpcHook hook);
