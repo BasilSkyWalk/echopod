@@ -336,6 +336,19 @@ enum {
     HIGH_TONE_RATE = 192000
 };
 
+static ScreenAction toggle_ring(void *context)
+{
+    (void)context;
+    hal_audio_use_main_ram_ring(!hal_audio_ring_in_main_ram());
+    return screen_action_none();
+}
+
+static const char *ring_value(const void *context)
+{
+    (void)context;
+    return hal_audio_ring_in_main_ram() ? "Main RAM" : "High RAM";
+}
+
 static char dma_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
 static char high_rate_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
 
@@ -542,6 +555,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = toggle_dma_tone,
                                                 .context = &screens->high_rate_tone,
                                                 .value = dma_tone_value};
+    screens->diagnostics_items[27] =
+        (MenuItem){.label = "Ring", .select = toggle_ring, .context = NULL, .value = ring_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

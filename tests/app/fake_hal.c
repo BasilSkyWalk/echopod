@@ -100,6 +100,7 @@ typedef struct FakeHal {
     int core1_accel_count;
     bool dma_tone_running;
     uint32_t dma_tone_rate;
+    bool main_ram_ring;
     int audio_service_count;
     HalBluetoothStatus bluetooth;
     bool bluetooth_powered;
@@ -510,6 +511,16 @@ HalToneDetail hal_audio_tone_detail(void)
 HalBootClocks hal_system_boot_clocks(void)
 {
     return (HalBootClocks){0};
+}
+
+void hal_audio_use_main_ram_ring(bool main_ram)
+{
+    fake.main_ram_ring = main_ram;
+}
+
+bool hal_audio_ring_in_main_ram(void)
+{
+    return fake.main_ram_ring;
 }
 
 uint32_t fake_hal_dma_tone_rate(void)

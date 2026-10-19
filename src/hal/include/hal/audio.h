@@ -131,3 +131,5 @@ HalDmaToneStatus hal_audio_dma_tone_status(void);
 HalJackPins hal_audio_jack_pins(void);
 HalAudioJack hal_audio_jack(void);
 HalAudioRefusal hal_audio_refusal(void);
+void hal_audio_use_main_ram_ring(bool main_ram);
+bool hal_audio_ring_in_main_ram(void);
