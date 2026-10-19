@@ -51,7 +51,7 @@ typedef struct FakeFile {
 } FakeFile;
 
 enum {
-    STORE_SLOTS = 2,
+    STORE_SLOTS = 4,
     STORE_CAPACITY = 512 * 1024
 };
 
@@ -99,6 +99,7 @@ typedef struct FakeHal {
     int core1_decode_count;
     int core1_accel_count;
     bool dma_tone_running;
+    uint32_t dma_tone_rate;
     int audio_service_count;
     HalBluetoothStatus bluetooth;
     bool bluetooth_powered;
@@ -511,8 +512,14 @@ HalBootClocks hal_system_boot_clocks(void)
     return (HalBootClocks){0};
 }
 
-HalToneResult hal_audio_dma_tone_start(void)
+uint32_t fake_hal_dma_tone_rate(void)
 {
+    return fake.dma_tone_rate;
+}
+
+HalToneResult hal_audio_dma_tone_start(uint32_t sample_rate)
+{
+    fake.dma_tone_rate = sample_rate;
     fake.dma_tone_running = true;
     return HAL_TONE_PLAYED;
 }

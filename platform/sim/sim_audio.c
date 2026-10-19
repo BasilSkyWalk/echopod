@@ -316,8 +316,9 @@ HalToneDetail hal_audio_tone_detail(void)
     return (HalToneDetail){.stage = 0, .pending = 0};
 }
 
-HalToneResult hal_audio_dma_tone_start(void)
+HalToneResult hal_audio_dma_tone_start(uint32_t sample_rate)
 {
+    (void)sample_rate;
     dma_tone_running = true;
     return HAL_TONE_PLAYED;
 }

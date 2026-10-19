@@ -53,6 +53,7 @@ enum {
     DIAGNOSTICS_TEST_TONE_INDEX = 7,
     DIAGNOSTICS_DMA_TONE_INDEX = 8,
     DIAGNOSTICS_ACCEL_INDEX = 25,
+    DIAGNOSTICS_HIGH_RATE_TONE_INDEX = 26,
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
     DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
@@ -265,11 +266,12 @@ static void the_frame_overlay_shows_the_audio_numbers(void)
     char text[FRAME_OVERLAY_TEXT_CAPACITY];
     HalAudioStats stats = {.buffered_ms = 340,
                            .underruns = 2,
+                           .output_underruns = 7,
                            .decode_total_us = 100000,
                            .busy_us = 640000,
                            .elapsed_us = 1000000};
     frame_overlay_format_audio(stats, text, sizeof text);
-    CHECK(strcmp("b340 x2 L64%", text) == 0);
+    CHECK(strcmp("b340 x2 o7 L64%", text) == 0);
 }
 
 static void the_frame_overlay_shows_average_and_longest_block_times(void)
@@ -290,7 +292,7 @@ static void the_frame_overlay_shows_zero_before_any_block(void)
     frame_overlay_format_block_times((HalAudioStats){0}, text, sizeof text);
     CHECK(strcmp("d0/0 c0/0", text) == 0);
     frame_overlay_format_audio((HalAudioStats){0}, text, sizeof text);
-    CHECK(strcmp("b0 x0 L0%", text) == 0);
+    CHECK(strcmp("b0 x0 o0 L0%", text) == 0);
 }
 
 static void open_music_entry(int index)
@@ -853,6 +855,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/favorites.bin"));
     CHECK_EQUAL(4 * 1024 * 1024, fake_hal_reserved_size("/.echo/library.db"));
     CHECK_EQUAL(32 * 1024 * 1024, fake_hal_reserved_size("/.echo/covers.bin"));
+    CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/scan.bin"));
     step();
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
     CHECK(toast_is("Library: 0 tracks"));
@@ -861,9 +864,40 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(5, fake_hal_reserve_count());
+    CHECK_EQUAL(6, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
+}
+
+static void unchanged_music_is_not_rescanned_after_usb(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    step();
+    CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
+    app_request_rescan_if_music_changed();
+    step();
+    CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
+}
+
+static void a_different_stored_fingerprint_is_rescanned_after_usb(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    step();
+    static const uint8_t BLANK[16] = {0};
+    CHECK(hal_file_write_at("/.echo/scan.bin", 0, BLANK, sizeof BLANK));
+    app_request_rescan_if_music_changed();
+    step();
+    CHECK_EQUAL(2, fake_hal_scratch_borrow_count());
+}
+
+static void a_card_that_cannot_be_walked_is_rescanned_after_usb(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    step();
+    fake_hal_set_empty_card(false);
+    app_request_rescan_if_music_changed();
+    step();
+    CHECK(toast_is("No music found on the card"));
 }
 
 static void a_full_card_says_it_is_full(void)
@@ -1387,6 +1421,25 @@ static void the_dma_tone_starts_and_stops_from_one_row(void)
     CHECK(title_is("Diagnostics"));
 }
 
+static void the_high_rate_tone_plays_at_192_khz(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_HIGH_RATE_TONE_INDEX);
+    tap(KEY_PLAY);
+    CHECK(hal_audio_dma_tone_status().running);
+    CHECK_EQUAL(192000u, fake_hal_dma_tone_rate());
+    tap(KEY_PLAY);
+    CHECK(!hal_audio_dma_tone_status().running);
+}
+
+static void the_dma_tone_plays_at_44_1_khz(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_DMA_TONE_INDEX);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(44100u, fake_hal_dma_tone_rate());
+}
+
 static void the_loop_benchmark_runs_once_per_press(void)
 {
     start_app();
@@ -1510,6 +1563,8 @@ int main(void)
         TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
         TEST_CASE(the_test_tone_plays_once_per_press),
         TEST_CASE(the_dma_tone_starts_and_stops_from_one_row),
+        TEST_CASE(the_high_rate_tone_plays_at_192_khz),
+        TEST_CASE(the_dma_tone_plays_at_44_1_khz),
         TEST_CASE(the_stall_test_row_freezes_the_main_loop_on_purpose),
         TEST_CASE(ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off),
         TEST_CASE(the_loop_benchmark_runs_once_per_press),
@@ -1559,6 +1614,9 @@ int main(void)
         TEST_CASE(a_rescan_after_an_installed_update_asks_for_a_restart),
         TEST_CASE(a_fresh_card_gets_the_player_files_and_a_first_scan),
         TEST_CASE(a_card_that_has_the_files_is_not_rescanned),
+        TEST_CASE(unchanged_music_is_not_rescanned_after_usb),
+        TEST_CASE(a_different_stored_fingerprint_is_rescanned_after_usb),
+        TEST_CASE(a_card_that_cannot_be_walked_is_rescanned_after_usb),
         TEST_CASE(a_full_card_says_it_is_full),
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
         TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),

@@ -30,7 +30,6 @@ enum {
     FILL_BUDGET_BYTES = 8192,
     IDLE_SHUTDOWN_MS = 3000,
     AUDIO_CLOCK_MHZ = 200,
-    TONE_RATE_HZ = 44100,
     TONE_PERIOD_SAMPLES = 100,
     TONE_AMPLITUDE = 9000,
     MILLISECONDS_PER_SECOND = 1000,
@@ -589,6 +588,9 @@ static void poll_jack(void)
 void hal_audio_service(void)
 {
     poll_jack();
+    if ((transferring || tone_active) && dac_path_take_underrun()) {
+        stats.output_underruns++;
+    }
     if (!engine_ready || !transferring || tone_active) {
         return;
     }
@@ -614,7 +616,7 @@ HalAudioStats hal_audio_stats(void)
     return result;
 }
 
-HalToneResult hal_audio_dma_tone_start(void)
+HalToneResult hal_audio_dma_tone_start(uint32_t sample_rate)
 {
     ensure_engine();
     stop_tone();
@@ -624,12 +626,12 @@ HalToneResult hal_audio_dma_tone_start(void)
         return HAL_TONE_NO_DMAC;
     }
     stop_path();
-    HalToneResult result = dac_path_start(TONE_RATE_HZ);
+    HalToneResult result = dac_path_start(sample_rate);
     if (result != HAL_TONE_PLAYED) {
         return result;
     }
     path_up = true;
-    path_rate = TONE_RATE_HZ;
+    path_rate = sample_rate;
     uint32_t *words = ring();
     int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);

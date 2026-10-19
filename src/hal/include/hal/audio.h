@@ -69,6 +69,7 @@ typedef struct HalAudioStatus {
 typedef struct HalAudioStats {
     uint32_t buffered_ms;
     uint32_t underruns;
+    uint32_t output_underruns;
     uint32_t blocks;
     uint32_t decode_us;
     uint32_t decode_max_us;
@@ -124,7 +125,7 @@ HalAudioStats hal_audio_stats(void);
 void hal_audio_service(void);
 HalToneResult hal_audio_test_tone(void);
 HalToneDetail hal_audio_tone_detail(void);
-HalToneResult hal_audio_dma_tone_start(void);
+HalToneResult hal_audio_dma_tone_start(uint32_t sample_rate);
 void hal_audio_dma_tone_stop(void);
 HalDmaToneStatus hal_audio_dma_tone_status(void);
 HalJackPins hal_audio_jack_pins(void);

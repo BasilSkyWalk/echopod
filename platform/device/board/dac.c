@@ -33,6 +33,7 @@
 #define I2S_FIFOLR (I2S1_BASE + 0x0Cu)
 #define I2S_DMACR (I2S1_BASE + 0x10u)
 #define I2S_INTCR (I2S1_BASE + 0x14u)
+#define I2S_INTSR (I2S1_BASE + 0x18u)
 #define I2S_XFER (I2S1_BASE + 0x1Cu)
 #define I2S_CLR (I2S1_BASE + 0x20u)
 #define I2S_TXDR (I2S1_BASE + 0x24u)
@@ -55,7 +56,9 @@
 #define I2S_FORMAT_16_BIT_STEREO 0x000Fu
 #define I2S_FORMAT_32_BIT_WORDS 0x401Fu
 #define I2S_INTERRUPTS 0x01F00102u
-#define I2S_INTERRUPTS_FOR_DMA 0x01F00100u
+#define I2S_INTERRUPTS_FOR_DMA 0x01F00102u
+#define I2S_UNDERRUN 0x00000002u
+#define I2S_CLEAR_UNDERRUN 0x00000004u
 #define I2S_DMA_TX 0x00000110u
 #define I2C_MRXADDR_VALID 0x01000000u
 
@@ -546,6 +549,15 @@ void dac_path_set_gain(bool high)
     if (dac_up) {
         dac_set_gain(&BUS, high);
     }
+}
+
+bool dac_path_take_underrun(void)
+{
+    if (!dac_up || (register_read(I2S_INTSR) & I2S_UNDERRUN) == 0) {
+        return false;
+    }
+    register_write(I2S_INTCR, I2S_INTERRUPTS_FOR_DMA | I2S_CLEAR_UNDERRUN);
+    return true;
 }
 
 void dac_path_start_transfer(void)

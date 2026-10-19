@@ -11,4 +11,5 @@ int app_screen_depth(void);
 void app_show_notice(const char *title, const char *message);
 void app_wake(void);
 void app_request_rescan(void);
+void app_request_rescan_if_music_changed(void);
 void app_show_splash(void);

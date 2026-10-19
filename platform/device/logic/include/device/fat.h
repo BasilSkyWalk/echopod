@@ -68,6 +68,7 @@ typedef struct FatDirCursor {
 typedef struct FatDirEntry {
     FatFile file;
     bool hidden;
+    uint32_t modified;
     char name[FAT_NAME_CAPACITY];
 } FatDirEntry;
 

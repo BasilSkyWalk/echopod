@@ -184,6 +184,7 @@ bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
     entry->directory = listed.file.directory;
     entry->hidden = listed.hidden;
     entry->size = listed.file.directory ? 0 : listed.file.size;
+    entry->modified = listed.modified;
     for (size_t index = 0; index < sizeof entry->name; index++) {
         entry->name[index] = listed.name[index];
     }

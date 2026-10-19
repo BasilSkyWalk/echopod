@@ -7,6 +7,7 @@ enum {
     ENTRY_END = 0x00,
     ENTRY_FILE = 0x85,
     ENTRY_STREAM = 0xC0,
+    MODIFIED_TIMESTAMP = 12,
     ENTRY_NAME = 0xC1,
     ATTRIBUTE_HIDDEN = 0x02,
     ATTRIBUTE_DIRECTORY = 0x10,
@@ -25,6 +26,7 @@ typedef struct EntrySet {
     uint32_t data_high;
     uint8_t secondaries;
     uint8_t name_length;
+    uint32_t modified;
     bool directory;
     bool hidden;
     bool contiguous;
@@ -82,6 +84,7 @@ static bool read_set(FatVolume *volume, FatFile *directory, uint32_t index, Entr
     set->secondaries = entry[1];
     set->directory = (fat_le16(entry + 4) & ATTRIBUTE_DIRECTORY) != 0;
     set->hidden = (fat_le16(entry + 4) & ATTRIBUTE_HIDDEN) != 0;
+    set->modified = fat_le32(entry + MODIFIED_TIMESTAMP);
     return set->secondaries >= MINIMUM_SECONDARIES && set->secondaries <= MAXIMUM_SECONDARIES &&
            read_stream(volume, directory, index + 1, set);
 }
@@ -126,6 +129,7 @@ bool exfat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *foun
         read_names(volume, &cursor->directory, index + 1, &set);
         if (file_from_set(&set, &found->file)) {
             found->hidden = set.hidden;
+            found->modified = set.modified;
             fat_utf8_from_units(volume->long_name, set.name_length, found->name,
                                 sizeof found->name);
             return true;

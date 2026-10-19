@@ -11,6 +11,8 @@ enum {
     ENTRY_END = 0x00,
     ENTRY_DELETED = 0xE5,
     ATTRIBUTES = 11,
+    WRITE_TIME = 22,
+    WRITE_DATE = 24,
     ATTRIBUTE_HIDDEN = 0x02,
     ATTRIBUTE_VOLUME_ID = 0x08,
     ATTRIBUTE_DIRECTORY = 0x10,
@@ -259,6 +261,7 @@ static void fill_entry(FatVolume *volume, const LongName *long_name, const uint8
 {
     found->file = entry_file(volume, entry);
     found->hidden = (entry[ATTRIBUTES] & ATTRIBUTE_HIDDEN) != 0;
+    found->modified = (uint32_t)fat_le16(entry + WRITE_DATE) << 16 | fat_le16(entry + WRITE_TIME);
     if (long_name_applies(long_name, entry)) {
         size_t limit = (size_t)long_name->entries * CHARACTERS_PER_ENTRY;
         fat_utf8_from_units(volume->long_name, limit, found->name, sizeof found->name);

@@ -25,6 +25,7 @@
 #include "hal/power.h"
 #include "library_rescan.h"
 #include "library_store.h"
+#include "music_check.h"
 #include "player.h"
 #include "settings_store.h"
 #include "ui/fade.h"
@@ -84,6 +85,7 @@ typedef struct AppState {
     uint32_t battery_check_ms;
     bool usb_power;
     bool rescan_requested;
+    bool music_check_requested;
     bool light_after_frame;
     const char *goodbye_text;
     Toast toast;
@@ -655,10 +657,12 @@ static void run_rescan(void)
 {
     app_show_notice("Scanning library", "Starting...");
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
+    MusicFingerprint print = music_check_fingerprint();
     RescanOutcome outcome = library_rescan_run(progress);
     static char message[48];
     const char *text = library_rescan_message(outcome, message, sizeof message);
     if (outcome.result == SCAN_OK) {
+        music_check_remember(print);
         app_start();
     }
     app_wake();
@@ -670,10 +674,19 @@ void app_request_rescan(void)
     app.rescan_requested = true;
 }
 
+void app_request_rescan_if_music_changed(void)
+{
+    app.music_check_requested = true;
+}
+
 void app_step(void)
 {
     if (app.powered_off) {
         return;
+    }
+    if (app.music_check_requested) {
+        app.music_check_requested = false;
+        app.rescan_requested |= !music_check_unchanged();
     }
     if (app.rescan_requested) {
         app.rescan_requested = false;

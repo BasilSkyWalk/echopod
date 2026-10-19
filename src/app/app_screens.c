@@ -325,24 +325,31 @@ static ScreenAction toggle_dma_tone(void *context)
         tone->stopped = true;
         return screen_action_none();
     }
-    tone->result = hal_audio_dma_tone_start();
+    tone->result = hal_audio_dma_tone_start(tone->sample_rate);
     tone->tried = true;
     tone->stopped = false;
     return screen_action_none();
 }
 
+enum {
+    LOW_TONE_RATE = 44100,
+    HIGH_TONE_RATE = 192000
+};
+
 static char dma_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char high_rate_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static const char *dma_tone_value(const void *context)
 {
     const DmaToneOption *tone = context;
+    char *text = tone->sample_rate == HIGH_TONE_RATE ? high_rate_tone_text : dma_tone_text;
     DmaToneView view = {.tried = tone->tried,
                         .stopped = tone->stopped,
                         .result = tone->result,
                         .status = hal_audio_dma_tone_status(),
                         .detail = hal_audio_tone_detail()};
-    diagnostics_dma_tone_text(view, dma_tone_text, sizeof dma_tone_text);
-    return dma_tone_text;
+    diagnostics_dma_tone_text(view, text, DIAGNOSTICS_VALUE_CAPACITY);
+    return text;
 }
 
 static bool player_has_track(const void *context)
@@ -472,8 +479,10 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                .select = play_test_tone,
                                                .context = &screens->tone,
                                                .value = tone_value};
-    screens->dma_tone =
-        (DmaToneOption){.tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
+    screens->dma_tone = (DmaToneOption){
+        .sample_rate = LOW_TONE_RATE, .tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
+    screens->high_rate_tone = (DmaToneOption){
+        .sample_rate = HIGH_TONE_RATE, .tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
     screens->diagnostics_items[8] = (MenuItem){.label = "DMA tone",
                                                .select = toggle_dma_tone,
                                                .context = &screens->dma_tone,
@@ -529,6 +538,10 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = run_core1_accel_test,
                                                 .context = &screens->core1_accel,
                                                 .value = core1_accel_value};
+    screens->diagnostics_items[26] = (MenuItem){.label = "Tone 192k",
+                                                .select = toggle_dma_tone,
+                                                .context = &screens->high_rate_tone,
+                                                .value = dma_tone_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

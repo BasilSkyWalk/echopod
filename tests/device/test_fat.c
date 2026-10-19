@@ -436,6 +436,8 @@ static void check_root_listing(const char *name)
     CHECK(notes.found);
     CHECK(!notes.match.file.directory);
     CHECK_EQUAL(700, notes.match.file.size);
+    CHECK_EQUAL(2026u, (notes.match.modified >> 25) + 1980u);
+    CHECK_EQUAL(10u, notes.match.modified >> 21 & 15u);
     CHECK(list(card, "/", "README.TXT").found);
     CHECK(list(card, "/", ".echo").found);
     CHECK(!list(card, "/", ".").found);

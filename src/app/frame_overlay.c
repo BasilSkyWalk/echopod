@@ -65,6 +65,8 @@ void frame_overlay_format_audio(HalAudioStats stats, char *text, size_t capacity
     string_builder_append_unsigned(&builder, stats.buffered_ms);
     string_builder_append(&builder, " x");
     string_builder_append_unsigned(&builder, stats.underruns);
+    string_builder_append(&builder, " o");
+    string_builder_append_unsigned(&builder, stats.output_underruns);
     string_builder_append(&builder, " L");
     string_builder_append_unsigned(&builder, share_percent(stats.busy_us, stats.elapsed_us));
     string_builder_append(&builder, "%");

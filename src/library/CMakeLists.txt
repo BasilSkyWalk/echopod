@@ -4,6 +4,7 @@ add_library(echo_library STATIC
     favorites.c
     library.c
     library_browse.c
+    music_fingerprint.c
 )
 target_include_directories(echo_library PUBLIC include)
 target_link_libraries(echo_library

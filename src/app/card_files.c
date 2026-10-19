@@ -7,6 +7,7 @@
 #include "favorites_store.h"
 #include "hal/storage.h"
 #include "library_store.h"
+#include "music_check.h"
 #include "player.h"
 #include "settings_store.h"
 
@@ -24,7 +25,7 @@ typedef struct CardFile {
 static const CardFile CARD_FILES[] = {
     {SETTINGS_STORE_PATH, SMALL_FILE_BYTES},  {PLAYER_RESUME_PATH, SMALL_FILE_BYTES},
     {FAVORITES_STORE_PATH, SMALL_FILE_BYTES}, {LIBRARY_STORE_PATH, LIBRARY_FILE_BYTES},
-    {COVER_CACHE_PATH, COVERS_FILE_BYTES},
+    {COVER_CACHE_PATH, COVERS_FILE_BYTES},    {MUSIC_CHECK_PATH, SMALL_FILE_BYTES},
 };
 
 CardFilesReport card_files_prepare(void)

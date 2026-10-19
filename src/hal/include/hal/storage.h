@@ -39,6 +39,7 @@ typedef struct HalDirEntry {
     bool directory;
     bool hidden;
     uint32_t size;
+    uint32_t modified;
     char name[HAL_NAME_CAPACITY];
 } HalDirEntry;
 

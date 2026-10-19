@@ -11,6 +11,7 @@ add_library(echo_app STATIC
     frame_overlay.c
     home_art.c
     library_rescan.c
+    music_check.c
     library_store.c
     player.c
     settings_screens.c

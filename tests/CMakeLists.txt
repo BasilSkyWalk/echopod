@@ -46,7 +46,7 @@ endforeach()
 
 echo_add_unit_test(NAME test_settings SOURCES settings/test_settings.c LIBRARIES echo_settings)
 
-foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader)
+foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader music_fingerprint)
     echo_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES echo_library_fixtures

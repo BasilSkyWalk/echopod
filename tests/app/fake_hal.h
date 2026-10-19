@@ -51,6 +51,7 @@ void fake_hal_audio_finish_track(void);
 void fake_hal_audio_fail_track(void);
 void fake_hal_audio_refuse_plays(int count);
 void fake_hal_audio_set_jack(HalAudioJack jack);
+uint32_t fake_hal_dma_tone_rate(void);
 void fake_hal_audio_set_refusal(HalAudioRefusal refusal);
 void fake_hal_audio_set_position(uint32_t position_ms);
 void fake_hal_audio_set_format(HalAudioFormat format);
