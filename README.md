@@ -2,7 +2,7 @@
 
 A custom firmware app layer for the Snowsky Echo Mini digital audio player. It has an iPod-style Cover Flow browser, a library database, album favorites and M3U playlists. Development happens in a macOS simulator; the device port builds on [ReChord](https://github.com/brnomt/ReChord).
 
-Status: early development. Nothing here can be flashed yet.
+Status: early development, testing on hardware.
 
 ## Build and run the simulator (macOS)
 
@@ -18,18 +18,22 @@ ctest --preset dev
 ### Use your music library
 
 ```sh
-.venv/bin/python tools/library_index.py --music /path/to/music --output build/library/library.db
-.venv/bin/python tools/cover_export.py --music /path/to/music --output build/library/covers.bin
-./build/dev/platform/sim/echo_sim --card /path/to/music --system-dir build/library
+mkdir -p build/system
+./build/dev/platform/sim/echo_sim --card /path/to/music --system-dir build/system
 ```
 
-The indexer and the cover exporter only read the music folder. The exporter uses embedded front covers, or a `cover`/`folder` image next to the tracks. On the device, the database goes in `/.echo/library.db` on the card, and the covers in `/.echo/covers.bin`. The format is described in `docs/library-format.md`.
+The simulator behaves like the player: on the first start it creates `library.db`, `covers.bin` and the save files in the system folder, scans the music folder (every format stock lists, plus `.m3u`/`.m3u8` playlists) and finds the album covers. Settings → Rescan library scans again. The music folder is only ever read.
 
-The player saves its settings, favorites and resume spot by overwriting files that already exist on the card; it never creates files. Make them once (it keeps any saved bytes and only pads short files):
+The PC tools still work and write the same formats (`tools/library_index.py`, `tools/cover_export.py`), but the player doesn't need them.
 
-```sh
-.venv/bin/python tools/save_files.py --echo /Volumes/<card>/.echo
-```
+## Testing on a player
+
+1. Install the firmware (`docs/device-install.md`). The first install on a stock unit is a maskrom write from a Mac; later updates are a file copy.
+2. Put music on a microSD card (FAT32 or exFAT), in any folder layout, and insert it.
+3. Switch on. The player creates `/.echo` on the card, scans it ("Scanning library", then "Finding covers") and shows "Library: N tracks, M covers".
+4. After copying music over USB, eject both drives: the player rescans by itself. Settings → Rescan library does it on demand.
+
+Nothing else on the card needs a computer. Covers come from art embedded in each album's first track (FLAC, MP3/WAV/DSF/DFF ID3, MP4, APE, WMA) or a `cover`/`folder`/`front`/`albumart` JPEG or PNG next to the tracks.
 
 ### Simulator keys
 

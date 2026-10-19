@@ -16,8 +16,10 @@ platform/sim        platform/device
             gfx        playback
               \            |
                \        library
-                \         |
-                   core
+                \         |    \
+                 \        |   image
+                   \      |    /
+                      core
 ```
 
 | Layer | Path | May depend on | Purpose |
@@ -26,7 +28,8 @@ platform/sim        platform/device
 | gfx | `src/gfx` | core | RGB565 colors and blending, rectangles, clipped canvases, strip rendering, 4-bit anti-aliased text, images drawn into perspective quads |
 | fonts | `src/fonts` | gfx | Generated glyph tables (see Generated code) |
 | ui | `src/ui` | core, gfx | Screen interface and stack, navigation intents, list view, menus, choice screens, messages, toasts, header and status icons, labels, marquee, fades, Cover Flow layout and motion, theme type |
-| library | `src/library` | core | Byte sources, a 4×512 B block cache, the library database reader, browse queries, the favorites set and the covers file reader (see `docs/library-format.md`) |
+| image | `src/image` | core | Cover decoding for the rescan: a bump arena, a buffered reader, the 112 px area-average grid, inflate, PNG and JPEG (see Covers on the device) |
+| library | `src/library` | core, image | Byte sources, a 4×512 B block cache, the library database reader, browse queries, the favorites set and the covers file reader (see `docs/library-format.md`) |
 | codec | `src/codec` | core | FLAC decoding (up to 2 channels, 24 bits, 4,608-sample blocks) from a read callback, with header and frame CRC checks, and seeking by bisection on frame headers |
 | playback | `src/playback` | core, library | Play queue (list order, songs shuffle, album shuffle, repeat, gapless look-ahead) and the resume file format |
 | settings | `src/settings` | core, playback | The settings values, their defaults and option tables, and the settings file format |
@@ -77,6 +80,17 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 - `app/library_rescan` checks for a music root (`/`) and a reserved `/.echo/library.db` (its size is the capacity), then asks `hal_system_load_rescan_code` for the indexer's `LibraryScanEntry` and `hal_system_borrow_scratch` for working memory, and runs the scan with the HAL adapted to `ScanFileSystem`. The database goes out through `hal_file_write_at` and is never written unless it fits.
 - The indexer is its own library (`echo_library_scan`). The simulator and the tests link it and return its entry table directly. On the device it doesn't fit the 157 KB code window, so it's built as `echo_rescan_overlay`: linked at `0x0307A000` against the main ELF's symbols (`--just-symbols`, plus libgcc for the double helpers), with a 16-byte header (magic `EOVL`, size, CRC of the rest, reserved) before the entry table. `tools/make_image.py --overlay` stores it at image offset `0x200000`, beyond the `fw1 end` the header records and inside the area the trailer CRC covers and our updater writes. `board/overlay.c` reads it from firmware slot 1 into HIGHRAM0 on every rescan and checks the magic, the size and the CRC before calling it.
 - On the device the scratch memory is core 1's RAM (`0x01000000–0x0105FFFF`, 384 KB): playback is stopped, core 1's domain is powered up with the core held in reset, and it's powered down again afterwards.
+
+## Covers on the device
+
+- After a rescan writes `library.db`, `library_rescan_run` asks the same entry table for `covers` (`library/cover_build`) and passes the scan's scratch memory, the file adapters, `library.db` to read back and `/.echo/covers.bin` to write in place. It shows "Finding covers" with "N of M albums". The toast then reads "Library: N tracks, M covers", or ", no covers" if `covers.bin` is missing or the cover pass failed.
+- For each album (in album order) it takes the first art it finds, as `tools/cover_export.py` does: the embedded picture of the album's first track (a front cover wins over any other picture, `track_tags_read`), otherwise `cover`, `folder`, `front` or `albumart` with `.jpg`, `.jpeg` or `.png` (any case, the first by name when several share a stem) in the album's folders in track order. An embedded picture that fails to decode leaves the album without a cover, as on the PC. Unlike the PC, MP4 `covr` art counts; Ogg's base64 pictures still don't. A key already stored is skipped.
+- Records are written as they're decoded, after an index sized for every album that fits (`(capacity − 16) / (8 + 31,360)`, 1,069 for 32 MB), so records can start before the count is known. The header is zeroed first, and the sorted index and the `EMCV` header go last, so an interrupted pass reads as no covers.
+- `image/cover_image` sniffs JPEG or PNG and decodes into `image/cover_grid`: the centred square crop is area-averaged into 112 × 112 cells per channel with 9-bit fractional weights (each source sample adds `value × wx × wy`, sums wrap without undefined behaviour), and the 56 px half is the exact average of 2 × 2 cells. Per-channel sample sizes let chroma at half resolution sit on the same grid; YCbCr converts to RGB (JFIF) per cell, then to RGB565 like the PC.
+- PNG: every colour type and depth (1–16 bits, palette, grey, alpha ignored as Pillow's `convert("RGB")` does), Adam7, all five filters, IDAT across chunks, zlib through `image/inflate` (32 KB window, 9-bit fast tables). Rows below the crop stop the decode. A row up to 64 KB is allowed.
+- JPEG: baseline and progressive Huffman (SOF0, 1, 2), 1 or 3 components, sampling factors that divide the maximum, restart intervals, Adobe RGB. It decodes at 1/1, 1/2, 1/4 or 1/8 scale (the largest that keeps the crop at 112 px or more); each reduced sample is the exact area average of its pixels (cosines averaged over the sample, all 64 coefficients), and 1/8 is the DC term alone. Baseline scans stop below the crop. Progressive decoding needs no coefficient store: every scan's contribution is linear, so DC first and refinement scans and AC first scans add straight into the grid; AC refinement scans, and AC bands that can't change the reduced samples, are skipped. CMYK, 12-bit, lossless and arithmetic-coded files are refused. More than 8 bytes of padding past a marker fail the scan, so a truncated or lying file can't spin through millions of empty blocks.
+- Memory comes from the scan's scratch (384 KB): the builder's state with one record (about 44 KB with the index), then the decoder's arena: the grid (154 KB), a 4 KB reader and up to 160 KB for PNG rows, the inflate window and tables (JPEG needs about 13 KB). Nothing is static, so it runs from the overlay.
+- `test_cover_grid` checks the averaging, `cover_decode_matches_pillow` (`tools/check_cover_decode.py`) makes 28 images with Pillow and a hand-written PNG encoder and compares the decoder with an exact area average of Pillow's decode (PNG within one RGB565 step; JPEG mean ≤ 3 and 99 % ≤ 40, the rest is libjpeg's smoothed chroma upsampling against our block chroma), checks that broken and unsupported files are refused, and fuzzes every image (truncations and byte changes) under UBSan. `cover_build_matches_reference` builds a music folder with each art rule and checks `covers.bin` end to end.
 
 ## Library
 

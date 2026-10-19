@@ -218,11 +218,24 @@ if(ECHO_BUILD_SIM)
     )
     echo_add_unit_test(NAME test_library_scan
         SOURCES library/test_library_scan.c
-        LIBRARIES echo_library echo_library_scan echo_sim_storage
+        LIBRARIES echo_library_scan echo_sim_storage
     )
     target_compile_definitions(test_library_scan PRIVATE
         ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
     )
+    add_executable(cover_build_tool library/cover_build_tool.c)
+    target_link_libraries(cover_build_tool PRIVATE echo_library_scan echo_sim_storage
+        echo_options)
+    if(EXISTS ${PROJECT_SOURCE_DIR}/.venv/bin/python)
+        add_test(NAME cover_build_matches_reference
+            COMMAND ${PROJECT_SOURCE_DIR}/.venv/bin/python
+                ${PROJECT_SOURCE_DIR}/tools/check_cover_build.py
+                --tool $<TARGET_FILE:cover_build_tool>
+                --fixtures ${CMAKE_CURRENT_SOURCE_DIR}/fixtures
+                --work ${CMAKE_CURRENT_BINARY_DIR}/cover_build
+        )
+        set_tests_properties(cover_build_matches_reference PROPERTIES TIMEOUT 600)
+    endif()
     add_test(NAME sim_headless_smoke
         COMMAND echo_sim --headless --frames 30 --screenshot ${CMAKE_BINARY_DIR}/sim_smoke.bmp
     )

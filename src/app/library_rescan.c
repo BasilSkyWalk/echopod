@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "core/string_builder.h"
+#include "cover_cache.h"
 #include "hal/storage.h"
 #include "hal/system.h"
 #include "library_store.h"
@@ -12,6 +13,7 @@ static const char MUSIC_ROOT[] = "/";
 typedef struct RescanFiles {
     HalDir dir;
     HalFile file;
+    HalFile library;
     HalDirEntry entry;
     RescanProgress progress;
 } RescanFiles;
@@ -45,6 +47,7 @@ static void close_dir(void *context)
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
     RescanFiles *files = context;
+    hal_system_keep_alive();
     return hal_file_read(files->file, offset, buffer, length);
 }
 
@@ -76,15 +79,38 @@ static void report(void *context, uint32_t files, uint32_t tracks)
 {
     RescanFiles *rescan = context;
     hal_system_keep_alive();
-    if (rescan->progress != NULL) {
-        rescan->progress(files, tracks);
+    if (rescan->progress.tracks != NULL) {
+        rescan->progress.tracks(files, tracks);
     }
 }
 
-static uint32_t reserved_size(void)
+static bool read_library(void *context, uint32_t offset, void *buffer, uint32_t length)
+{
+    RescanFiles *files = context;
+    hal_system_keep_alive();
+    return hal_file_read(files->library, offset, buffer, length);
+}
+
+static bool write_covers(void *context, uint32_t offset, const void *bytes, uint32_t length)
+{
+    (void)context;
+    hal_system_keep_alive();
+    return hal_file_write_at(COVER_CACHE_PATH, offset, bytes, length);
+}
+
+static void report_covers(void *context, uint32_t done, uint32_t total)
+{
+    RescanFiles *rescan = context;
+    hal_system_keep_alive();
+    if (rescan->progress.covers != NULL) {
+        rescan->progress.covers(done, total);
+    }
+}
+
+static uint32_t reserved_size_of(const char *path)
 {
     HalFile file;
-    if (!hal_file_open(&file, LIBRARY_STORE_PATH)) {
+    if (!hal_file_open(&file, path)) {
         return 0;
     }
     uint32_t size = file.size;
@@ -102,15 +128,42 @@ static bool music_root_exists(void)
     return true;
 }
 
+static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *scan,
+                               CoverStats *stats)
+{
+    RescanFiles *files = scan->files.context;
+    uint32_t capacity = reserved_size_of(COVER_CACHE_PATH);
+    *stats = (CoverStats){.albums = 0, .covers = 0, .missing = 0};
+    if (capacity == 0) {
+        return SCAN_NO_ROOM;
+    }
+    if (!hal_file_open(&files->library, LIBRARY_STORE_PATH)) {
+        return SCAN_WRITE_FAILED;
+    }
+    CoverJob job = {
+        .files = scan->files,
+        .library = {read_library, files},
+        .library_size = files->library.size,
+        .sink = {write_covers, NULL},
+        .capacity = capacity,
+        .memory = scan->memory,
+        .size = scan->size,
+        .progress = {report_covers, files},
+    };
+    ScanResult result = entry->covers(&job, stats);
+    hal_file_close(&files->library);
+    return result;
+}
+
 RescanOutcome library_rescan_run(RescanProgress progress)
 {
     static RescanFiles files;
-    RescanOutcome outcome = {.result = SCAN_NO_MUSIC_ROOT};
+    RescanOutcome outcome = {.result = SCAN_NO_MUSIC_ROOT, .cover_result = SCAN_OK};
     if (hal_system_restart_pending()) {
         outcome.result = SCAN_RESTART_NEEDED;
         return outcome;
     }
-    uint32_t capacity = reserved_size();
+    uint32_t capacity = reserved_size_of(LIBRARY_STORE_PATH);
     if (!music_root_exists()) {
         return outcome;
     }
@@ -135,6 +188,9 @@ RescanOutcome library_rescan_run(RescanProgress progress)
         .progress = {report, &files},
     };
     outcome.result = memory != NULL ? entry->scan(&job, &outcome.stats) : SCAN_OUT_OF_MEMORY;
+    if (outcome.result == SCAN_OK) {
+        outcome.cover_result = build_covers(entry, &job, &outcome.covers);
+    }
     hal_system_return_scratch();
     return outcome;
 }
@@ -156,7 +212,7 @@ static const char *error_text(ScanResult result)
     case SCAN_WRITE_FAILED:
         return "Could not write the library";
     case SCAN_NO_ROOM:
-        return "No room for the library: run save_files.py";
+        return "No room for the library on the card";
     case SCAN_NO_CODE:
         return "Rescan code missing: reinstall the update";
     case SCAN_RESTART_NEEDED:
@@ -174,5 +230,12 @@ const char *library_rescan_message(RescanOutcome outcome, char *text, uint32_t c
     string_builder_append(&builder, "Library: ");
     string_builder_append_unsigned(&builder, outcome.stats.tracks);
     string_builder_append(&builder, outcome.stats.tracks == 1 ? " track" : " tracks");
+    if (outcome.cover_result != SCAN_OK) {
+        string_builder_append(&builder, ", no covers");
+    } else if (outcome.covers.albums > 0) {
+        string_builder_append(&builder, ", ");
+        string_builder_append_unsigned(&builder, outcome.covers.covers);
+        string_builder_append(&builder, outcome.covers.covers == 1 ? " cover" : " covers");
+    }
     return text;
 }

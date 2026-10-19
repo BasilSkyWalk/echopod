@@ -27,6 +27,7 @@ uint32_t fake_hal_reserved_size(const char *path);
 int fake_hal_scratch_borrow_count(void);
 void fake_hal_set_empty_card(bool empty);
 int fake_hal_library_writes(void);
+int fake_hal_covers_writes(void);
 int fake_hal_scratch_outstanding(void);
 int fake_hal_loop_bench_count(void);
 int fake_hal_core1_test_count(void);

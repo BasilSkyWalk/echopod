@@ -12,6 +12,7 @@ target_link_libraries(echo_library
 )
 
 add_library(echo_library_scan STATIC
+    cover_build.c
     library_builder.c
     library_builder_encode.c
     library_builder_model.c
@@ -34,6 +35,6 @@ add_library(echo_library_scan STATIC
 )
 target_include_directories(echo_library_scan PUBLIC include)
 target_link_libraries(echo_library_scan
-    PUBLIC echo_core
+    PUBLIC echo_core echo_image echo_library
     PRIVATE echo_options
 )

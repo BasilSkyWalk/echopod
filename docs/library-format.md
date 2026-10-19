@@ -109,7 +109,7 @@ Favorites outlive a re-index, so they don't store album indices. An album's key 
 
 ## Covers file
 
-`tools/cover_export.py` writes `/.echo/covers.bin`. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
+The player builds `/.echo/covers.bin` after every rescan (see `docs/architecture.md`, Covers on the device); `tools/cover_export.py` writes the same format on a PC. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -121,7 +121,7 @@ Favorites outlive a re-index, so they don't store album indices. An album's key 
 | 12 | `u32` | reserved (0) |
 | 16 | count × 8 B | index: `u32 album key`, `u32 record offset`, sorted by key |
 
-Each record is the full cover (112 × 112 pixels) followed by the half cover (56 × 56), as little-endian RGB565 rows, top to bottom. That's 31,360 bytes per album, so about 6.8 MB for 217 albums.
+Each record is the full cover (112 × 112 pixels) followed by the half cover (56 × 56), as little-endian RGB565 rows, top to bottom. That's 31,360 bytes per album, so about 6.8 MB for 217 albums. Readers follow the record offsets, so records may start after a larger index: the player reserves index room for every album that fits the file before it knows how many have art.
 
 The exporter takes, for each album:
 1. the first embedded front cover (picture type 3) in any of its tracks

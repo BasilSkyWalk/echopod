@@ -29,8 +29,8 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 | FLAC / MP3 / WAV playback | in progress | dr_libs in the simulator. On the device: our own FLAC decoder (`src/codec`, bit-exact on the test files) and a DMA ring engine; plays at the right rate on the device but too slowly for 96 kHz on core 0, so decoding moves to core 1 (NOTES, Next session). MP3/WAV not on the device |
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
 | Gapless | sim | Token-based hand-over through the audio HAL |
-| Resume after power-off | device | `/.echo/resume.bin`; on the device it overwrites a file made by `tools/save_files.py` (settings and resume written on hardware 2026-10-18). Next: the player creates its `/.echo` files itself, so no PC step is needed (before covers) |
-| Library DB from SD scan | in progress | Built on the PC (`tools/library_index.py`) or on the player: Settings → Rescan library (and after USB changes the card) indexes every stock format with playlists, byte for byte like the PC (sim; first device run 2026-10-19 finished, stall false alarm fixed in `69d5795`). Runs from a HIGHRAM0 overlay. Next: the player creates its own files, then covers on the device |
+| Resume after power-off | device | `/.echo/resume.bin`, overwritten in place (written on hardware 2026-10-18); the player now creates the file itself on a new card |
+| Library DB from SD scan | in progress | Built on the player: on a new card at first start, from Settings → Rescan library, and after USB changes the card; every stock format and playlists, byte for byte like the PC (`tools/library_index.py`). The player creates its own `/.echo` files (FAT16/FAT32/exFAT, fsck-checked) and builds `covers.bin` after each scan. First device scan 2026-10-19 worked; file creation and covers untried on hardware |
 | Browse: Artist / Album Artist / Album / Genre / Folder / All Songs / Playlists / Favorites | sim | Selecting a track plays the list from it |
 | Now Playing: art, info, progress, seek | in progress | Info, progress, times, state, modes, volume and seek done; the cover isn't shown on Now Playing yet |
 | Queue, shuffle, repeat | sim | Shuffle Songs/Albums, Repeat One/All, seeded |
@@ -43,7 +43,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 
 | Feature | Status | Notes |
 |---|---|---|
-| Cover Flow album browser | sim | Perspective covers from a 69 KB cache, by album artist |
+| Cover Flow album browser | sim | Perspective covers from a 69 KB cache, by album artist. Covers are built on the player after each rescan (JPEG baseline and progressive, PNG; sim, device untried) |
 | Album favorites | sim | Hold Play on an album; Music → Favorites |
 | Configurable home screen | sim | Start screen setting: Main menu, Now Playing, Albums, Artists, Favorites, Playlists |
 | M3U playlists | sim | Resolved by the PC indexer, including MusicBee's Windows paths |

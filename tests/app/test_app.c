@@ -874,6 +874,16 @@ static void a_rescan_after_an_installed_update_asks_for_a_restart(void)
     CHECK(toast_is("Restart the player to finish the update"));
 }
 
+static void a_rescan_rebuilds_the_covers_file(void)
+{
+    start_app_with_library();
+    fake_hal_set_empty_card(true);
+    app_request_rescan();
+    step();
+    CHECK(fake_hal_covers_writes() > 0);
+    CHECK(toast_is("Library: 0 tracks"));
+}
+
 static void a_rescan_keeps_the_stall_watch_fed(void)
 {
     start_app_with_library();
@@ -1521,6 +1531,7 @@ int main(void)
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),
+        TEST_CASE(a_rescan_rebuilds_the_covers_file),
         TEST_CASE(a_rescan_after_an_installed_update_asks_for_a_restart),
         TEST_CASE(a_fresh_card_gets_the_player_files_and_a_first_scan),
         TEST_CASE(a_card_that_has_the_files_is_not_rescanned),

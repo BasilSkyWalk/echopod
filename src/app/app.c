@@ -621,10 +621,28 @@ static void show_rescan_progress(uint32_t files, uint32_t tracks)
     app_show_notice("Scanning library", text);
 }
 
+static void show_cover_progress(uint32_t done, uint32_t total)
+{
+    static uint32_t shown_ms;
+    uint32_t now_ms = hal_clock_milliseconds();
+    if (done > 0 && done < total && now_ms - shown_ms < RESCAN_PROGRESS_MS) {
+        return;
+    }
+    shown_ms = now_ms;
+    static char text[48];
+    StringBuilder builder = string_builder_make(text, sizeof text);
+    string_builder_append_unsigned(&builder, done);
+    string_builder_append(&builder, " of ");
+    string_builder_append_unsigned(&builder, total);
+    string_builder_append(&builder, " albums");
+    app_show_notice("Finding covers", text);
+}
+
 static void run_rescan(void)
 {
     app_show_notice("Scanning library", "Starting...");
-    RescanOutcome outcome = library_rescan_run(show_rescan_progress);
+    RescanProgress progress = {show_rescan_progress, show_cover_progress};
+    RescanOutcome outcome = library_rescan_run(progress);
     static char message[48];
     const char *text = library_rescan_message(outcome, message, sizeof message);
     if (outcome.result == SCAN_OK) {

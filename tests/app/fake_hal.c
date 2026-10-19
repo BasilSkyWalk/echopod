@@ -44,7 +44,15 @@ typedef struct FakeFile {
     const char *path;
     const uint8_t *bytes;
     uint32_t size;
+    uint32_t stored;
 } FakeFile;
+
+enum {
+    STORE_SLOTS = 2,
+    STORE_CAPACITY = 512 * 1024
+};
+
+static uint8_t stores[STORE_SLOTS][STORE_CAPACITY];
 
 typedef struct FakeHal {
     const char *version;
@@ -77,6 +85,8 @@ typedef struct FakeHal {
     int scratch_borrows;
     bool empty_card;
     int library_writes;
+    int covers_writes;
+    const char *store_used[STORE_SLOTS];
     int scratch_outstanding;
     int presents_at_power_on;
     bool refuse_clock_switch;
@@ -134,7 +144,8 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
 
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size)
 {
-    fake.files[fake.file_count++] = (FakeFile){.path = path, .bytes = bytes, .size = size};
+    fake.files[fake.file_count++] =
+        (FakeFile){.path = path, .bytes = bytes, .size = size, .stored = size};
 }
 
 void fake_hal_set_milliseconds(uint32_t now_ms)
@@ -282,10 +293,10 @@ bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
     if (offset > source->size || length > source->size - offset) {
         return false;
     }
-    if (source->bytes == NULL) {
-        memset(buffer, 0, length);
-    } else {
-        memcpy(buffer, source->bytes + offset, length);
+    uint32_t stored = source->bytes == NULL ? 0 : source->stored;
+    for (uint32_t index = 0; index < length; index++) {
+        uint32_t position = offset + index;
+        ((uint8_t *)buffer)[index] = position < stored ? source->bytes[position] : 0;
     }
     return true;
 }
@@ -523,6 +534,8 @@ static void register_written(const char *path, uint32_t length)
             fake.files[index].size = length;
             fake.files[index].bytes =
                 fake.files[index].bytes == NULL ? slot->bytes : fake.files[index].bytes;
+            fake.files[index].stored =
+                fake.files[index].bytes == slot->bytes ? length : fake.files[index].stored;
             return;
         }
     }
@@ -704,6 +717,11 @@ void fake_hal_set_empty_card(bool empty)
     fake.empty_card = empty;
 }
 
+int fake_hal_covers_writes(void)
+{
+    return fake.covers_writes;
+}
+
 int fake_hal_library_writes(void)
 {
     return fake.library_writes;
@@ -723,7 +741,7 @@ void hal_dir_close(HalDir *dir)
 
 void *hal_system_borrow_scratch(uint32_t *size)
 {
-    static uint8_t scratch[128 * 1024];
+    static uint8_t scratch[384 * 1024];
     fake.scratch_borrows++;
     fake.scratch_outstanding++;
     *size = sizeof scratch;
@@ -745,12 +763,52 @@ int fake_hal_scratch_outstanding(void)
     return fake.scratch_outstanding;
 }
 
+static FakeFile *fake_file(const char *path)
+{
+    for (int index = 0; index < fake.file_count; index++) {
+        if (strcmp(fake.files[index].path, path) == 0) {
+            return &fake.files[index];
+        }
+    }
+    return NULL;
+}
+
+static uint8_t *store_for(FakeFile *file)
+{
+    for (int slot = 0; slot < STORE_SLOTS; slot++) {
+        if (file->bytes == stores[slot]) {
+            return stores[slot];
+        }
+    }
+    for (int slot = 0; slot < STORE_SLOTS; slot++) {
+        if (fake.store_used[slot] == NULL) {
+            fake.store_used[slot] = file->path;
+            uint32_t kept = file->bytes == NULL ? 0 : file->stored;
+            kept = kept < STORE_CAPACITY ? kept : STORE_CAPACITY;
+            memset(stores[slot], 0, STORE_CAPACITY);
+            if (kept > 0) {
+                memcpy(stores[slot], file->bytes, kept);
+            }
+            file->bytes = stores[slot];
+            file->stored = STORE_CAPACITY < file->size ? STORE_CAPACITY : file->size;
+            return stores[slot];
+        }
+    }
+    return NULL;
+}
+
 bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)
 {
-    (void)offset;
-    (void)bytes;
-    (void)length;
+    FakeFile *file = fake_file(path);
+    if (file == NULL || offset > file->size || length > file->size - offset) {
+        return false;
+    }
+    uint8_t *store = store_for(file);
+    if (store != NULL && offset + length <= file->stored) {
+        memcpy(store + offset, bytes, length);
+    }
     fake.library_writes += strcmp(path, "/.echo/library.db") == 0;
+    fake.covers_writes += strcmp(path, "/.echo/covers.bin") == 0;
     return true;
 }
 
