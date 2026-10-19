@@ -332,6 +332,11 @@ HalDmaToneStatus hal_audio_dma_tone_status(void)
     return (HalDmaToneStatus){.running = dma_tone_running, .position = 0};
 }
 
+HalAudioRefusal hal_audio_refusal(void)
+{
+    return (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_UNREADABLE, .sample_rate = 0};
+}
+
 HalAudioJack hal_audio_jack(void)
 {
     return HAL_AUDIO_JACK_SINGLE_ENDED;

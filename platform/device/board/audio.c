@@ -11,6 +11,7 @@
 #include "device/dac_sequence.h"
 #include "device/dma_loop.h"
 #include "device/flac_source.h"
+#include "device/wav_source.h"
 #include "dmac.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -31,10 +32,23 @@ enum {
     TONE_PERIOD_SAMPLES = 100,
     TONE_AMPLITUDE = 9000,
     MILLISECONDS_PER_SECOND = 1000,
-    JACK_POLL_MS = 10
+    JACK_POLL_MS = 10,
+    SNIFF_BYTES = 12
 };
 
-static FlacDecoder decoder;
+typedef enum SourceKind {
+    SOURCE_FLAC,
+    SOURCE_WAV,
+    SOURCE_UNKNOWN
+} SourceKind;
+
+static union {
+    FlacDecoder flac;
+    WavBuffers wav;
+} decoding;
+static WavSource wav_source;
+static SourceKind source_kind;
+static bool unknown_format;
 static FlacSource software_source;
 static Core1Source core1_source;
 static bool using_core1;
@@ -117,8 +131,32 @@ static void close_file(void *context)
     hal_file_close(&file);
 }
 
+static bool tag_is(const uint8_t *bytes, const char *tag)
+{
+    return bytes[0] == (uint8_t)tag[0] && bytes[1] == (uint8_t)tag[1] &&
+           bytes[2] == (uint8_t)tag[2] && bytes[3] == (uint8_t)tag[3];
+}
+
+static SourceKind kind_of(const char *path)
+{
+    FlacInput input;
+    if (!open_file(NULL, path, &input)) {
+        return SOURCE_FLAC;
+    }
+    uint8_t magic[SNIFF_BYTES] = {0};
+    bool read = input.size >= SNIFF_BYTES && input.read(input.context, 0, magic, sizeof magic);
+    close_file(NULL);
+    if (!read || tag_is(magic, "fLaC")) {
+        return SOURCE_FLAC;
+    }
+    return tag_is(magic, "RIFF") && tag_is(magic + 8, "WAVE") ? SOURCE_WAV : SOURCE_UNKNOWN;
+}
+
 static AudioSource chosen_source(void)
 {
+    if (source_kind == SOURCE_WAV) {
+        return wav_source_interface(&wav_source);
+    }
     return using_core1 ? core1_source_interface(&core1_source)
                        : flac_source_interface(&software_source);
 }
@@ -126,7 +164,14 @@ static AudioSource chosen_source(void)
 static bool open_chosen(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     (void)context;
-    using_core1 = board_core1_start_stream();
+    source_kind = kind_of(path);
+    unknown_format = source_kind == SOURCE_UNKNOWN;
+    if (unknown_format) {
+        return false;
+    }
+    if (source_kind == SOURCE_FLAC) {
+        using_core1 = board_core1_start_stream();
+    }
     AudioSource source = chosen_source();
     return source.open(source.context, path, start_ms, track);
 }
@@ -158,8 +203,9 @@ static void ensure_engine(void)
         return;
     }
     FlacFileOpener files = {.open = open_file, .close = close_file, .context = NULL};
-    flac_source_init(&software_source, files, &decoder);
-    core1_source_init(&core1_source, core1_region(), files, &decoder, FILL_BUDGET_BYTES);
+    flac_source_init(&software_source, files, &decoding.flac);
+    core1_source_init(&core1_source, core1_region(), files, &decoding.flac, FILL_BUDGET_BYTES);
+    wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
     audio_engine_init(
         &engine, (AudioEngineConfig){.source = source, .ring = ring, .ring_words = RING_WORDS});
@@ -392,6 +438,36 @@ static HalAudioState state_of(AudioEngineState state)
     return HAL_AUDIO_STOPPED;
 }
 
+static HalAudioCodec codec_of(AudioCodec codec)
+{
+    switch (codec) {
+    case AUDIO_CODEC_WAV:
+        return HAL_AUDIO_CODEC_WAV;
+    case AUDIO_CODEC_MP3:
+        return HAL_AUDIO_CODEC_MP3;
+    case AUDIO_CODEC_FLAC:
+        break;
+    }
+    return HAL_AUDIO_CODEC_FLAC;
+}
+
+HalAudioRefusal hal_audio_refusal(void)
+{
+    ensure_engine();
+    AudioRefusal refusal = audio_engine_refusal(&engine);
+    switch (refusal.problem) {
+    case AUDIO_REFUSAL_RATE:
+        return (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE,
+                                 .sample_rate = refusal.sample_rate};
+    case AUDIO_REFUSAL_UNREADABLE:
+        return (HalAudioRefusal){.problem = unknown_format ? HAL_AUDIO_PROBLEM_FORMAT
+                                                           : HAL_AUDIO_PROBLEM_UNREADABLE};
+    case AUDIO_REFUSAL_NONE:
+        break;
+    }
+    return (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_NONE};
+}
+
 static HalAudioFormat format_of(AudioTrackInfo track)
 {
     FlacInfo stream = track.stream;
@@ -399,7 +475,7 @@ static HalAudioFormat format_of(AudioTrackInfo track)
         return (HalAudioFormat){.codec = HAL_AUDIO_CODEC_UNKNOWN};
     }
     return (HalAudioFormat){
-        .codec = HAL_AUDIO_CODEC_FLAC,
+        .codec = codec_of(track.codec),
         .sample_rate = stream.sample_rate,
         .bits_per_sample = stream.bits_per_sample,
         .channels = stream.channels,

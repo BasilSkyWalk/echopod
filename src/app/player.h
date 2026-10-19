@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "hal/audio.h"
@@ -53,6 +54,8 @@ typedef struct Player {
     PlayQueueCursor next_cursor;
     uint32_t last_save_ms;
     HalAudioJack jack;
+    uint32_t refusal_count;
+    HalAudioRefusal refusal;
 } Player;
 
 extern const char PLAYER_RESUME_PATH[];
@@ -66,6 +69,7 @@ void player_change_volume(Player *player, int delta);
 void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed);
 void player_set_repeat(Player *player, RepeatMode repeat);
 void player_update(Player *player, uint32_t now_ms);
+void player_refusal_text(HalAudioRefusal refusal, char *text, size_t capacity);
 bool player_save(Player *player);
 bool player_restore(Player *player);
 PlayerStatus player_status(const Player *player);

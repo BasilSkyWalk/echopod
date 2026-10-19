@@ -26,7 +26,7 @@ Status: `todo` · `in progress` · `sim` (works in the simulator) · `device` (w
 
 | Feature | Status | Notes |
 |---|---|---|
-| FLAC / MP3 / WAV playback | in progress | dr_libs in the simulator. On the device: our own FLAC decoder (`src/codec`, bit-exact on the test files) decoding on core 1 with a DMA ring engine, at the right rate (16-bit output). MP3/WAV not on the device |
+| FLAC / MP3 / WAV playback | in progress | dr_libs in the simulator. On the device: our own FLAC decoder (`src/codec`, bit-exact on the test files) decoding on core 1 with a DMA ring engine, at the right rate (16-bit output). WAV (PCM 8–32-bit) on the device, picked by file content; a refused track says why (for example 192 kHz). MP3 and 176.4/192 kHz to come |
 | ALAC / APE | todo | Only leaked SDK binaries exist; deferred |
 | Gapless | sim | Token-based hand-over through the audio HAL |
 | Resume after power-off | device | `/.echo/resume.bin`, overwritten in place (written on hardware 2026-10-18); the player now creates the file itself on a new card |

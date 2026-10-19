@@ -87,6 +87,7 @@ typedef struct AppState {
     bool light_after_frame;
     const char *goodbye_text;
     Toast toast;
+    uint32_t shown_refusals;
     StatusBarState status_bar;
     AppScreens screens;
     MessageScreen notice;
@@ -638,6 +639,18 @@ static void show_cover_progress(uint32_t done, uint32_t total)
     app_show_notice("Finding covers", text);
 }
 
+static void explain_refusals(uint32_t now_ms)
+{
+    static char text[48];
+    uint32_t count = app.player.refusal_count;
+    bool fresh = count > app.shown_refusals;
+    app.shown_refusals = count;
+    if (fresh) {
+        player_refusal_text(app.player.refusal, text, sizeof text);
+        toast_show(&app.toast, text, now_ms);
+    }
+}
+
 static void run_rescan(void)
 {
     app_show_notice("Scanning library", "Starting...");
@@ -684,6 +697,7 @@ void app_step(void)
     }
     if (!app.powered_off) {
         player_update(&app.player, now_ms);
+        explain_refusals(now_ms);
         update_power(now_ms);
     }
     if (app.powered_off) {

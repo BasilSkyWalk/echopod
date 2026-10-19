@@ -801,6 +801,17 @@ static bool toast_is(const char *expected)
     return app_toast_text() != NULL && strcmp(expected, app_toast_text()) == 0;
 }
 
+static void a_refused_track_says_why_it_was_skipped(void)
+{
+    start_app_with_library();
+    fake_hal_audio_set_refusal(
+        (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE, .sample_rate = 192000});
+    fake_hal_audio_refuse_plays(1);
+    play_first_album_track();
+    CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
+    CHECK(toast_is("192 kHz isn't supported yet"));
+}
+
 static void rescanning_without_a_card_says_so(void)
 {
     start_app_with_library();
@@ -1528,6 +1539,7 @@ int main(void)
         TEST_CASE(the_splash_ignores_keys_until_it_ends),
         TEST_CASE(the_splash_draws_over_the_home_screen),
         TEST_CASE(the_sleep_timer_turns_the_player_off),
+        TEST_CASE(a_refused_track_says_why_it_was_skipped),
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),

@@ -76,12 +76,15 @@ static bool open_track(AudioEngine *engine, const char *path, uint32_t start_ms)
 {
     AudioTrackInfo track;
     if (!engine->config.source.open(engine->config.source.context, path, start_ms, &track)) {
+        engine->refusal = (AudioRefusal){.problem = AUDIO_REFUSAL_UNREADABLE};
         return false;
     }
     FlacInfo info = track.stream;
     engine->decoding = true;
     if (!rate_supported(info.sample_rate)) {
         close_file(engine);
+        engine->refusal =
+            (AudioRefusal){.problem = AUDIO_REFUSAL_RATE, .sample_rate = info.sample_rate};
         return false;
     }
     engine->skip_frames =
@@ -404,4 +407,9 @@ AudioEngineStatus audio_engine_status(const AudioEngine *engine)
 const char *audio_engine_current_path(const AudioEngine *engine)
 {
     return engine->segment_count == 0 ? NULL : engine->segments[0].path;
+}
+
+AudioRefusal audio_engine_refusal(const AudioEngine *engine)
+{
+    return engine->refusal;
 }

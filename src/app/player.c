@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/format.h"
 #include "core/string_builder.h"
 #include "hal/storage.h"
 #include "playback/resume_state.h"
@@ -71,6 +72,8 @@ static bool start_current(Player *player, uint32_t start_ms)
     player->current_token = new_token(player);
     player->loaded = hal_audio_play(path, start_ms, player->current_token);
     if (!player->loaded) {
+        player->refusal = hal_audio_refusal();
+        player->refusal_count++;
         become_idle(player);
         return false;
     }
@@ -132,6 +135,8 @@ void player_init(Player *player, const Library *library)
     player->current_token = 0;
     player->last_save_ms = 0;
     player->jack = hal_audio_jack();
+    player->refusal_count = 0;
+    player->refusal = (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_NONE};
     become_idle(player);
     hal_audio_set_volume(player->volume);
 }
@@ -377,4 +382,25 @@ PlayerStatus player_status(const Player *player)
         .place = player->has_track ? play_queue_place(&player->queue) : (PlayQueuePlace){0, 0},
         .format = current_format(player),
     };
+}
+
+void player_refusal_text(HalAudioRefusal refusal, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    switch (refusal.problem) {
+    case HAL_AUDIO_PROBLEM_RATE: {
+        char rate[16];
+        format_sample_rate(refusal.sample_rate, rate, sizeof rate);
+        string_builder_append(&builder, rate);
+        string_builder_append(&builder, " isn't supported yet");
+        return;
+    }
+    case HAL_AUDIO_PROBLEM_FORMAT:
+        string_builder_append(&builder, "This file type isn't supported yet");
+        return;
+    case HAL_AUDIO_PROBLEM_UNREADABLE:
+    case HAL_AUDIO_PROBLEM_NONE:
+        break;
+    }
+    string_builder_append(&builder, "Couldn't read the track");
 }

@@ -239,6 +239,34 @@ static void the_player_stops_when_no_track_can_play(void)
     CHECK(fake_hal_audio_play_count() <= 3);
 }
 
+static void each_refused_track_is_counted_with_its_reason(void)
+{
+    Player *started = fresh_player();
+    fake_hal_audio_set_refusal(
+        (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE, .sample_rate = 192000});
+    fake_hal_audio_refuse_plays(1);
+    CHECK(player_play_list(started, back_in_black(), 0, SEED));
+    CHECK_EQUAL(1u, started->refusal_count);
+    CHECK_EQUAL(HAL_AUDIO_PROBLEM_RATE, started->refusal.problem);
+    CHECK_EQUAL(192000u, started->refusal.sample_rate);
+}
+
+static void refusals_explain_themselves(void)
+{
+    char text[48];
+    player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE, .sample_rate = 192000},
+                        text, sizeof text);
+    CHECK(path_is(text, "192 kHz isn't supported yet"));
+    player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE, .sample_rate = 176400},
+                        text, sizeof text);
+    CHECK(path_is(text, "176.4 kHz isn't supported yet"));
+    player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_FORMAT}, text, sizeof text);
+    CHECK(path_is(text, "This file type isn't supported yet"));
+    player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_UNREADABLE}, text,
+                        sizeof text);
+    CHECK(path_is(text, "Couldn't read the track"));
+}
+
 static void pulling_the_headphones_out_pauses_playback(void)
 {
     Player *started = playing(0);
@@ -359,6 +387,8 @@ int main(void)
         TEST_CASE(a_chosen_track_that_cannot_open_is_skipped),
         TEST_CASE(a_next_track_that_cannot_open_is_skipped_around_with_repeat_all),
         TEST_CASE(the_player_stops_when_no_track_can_play),
+        TEST_CASE(each_refused_track_is_counted_with_its_reason),
+        TEST_CASE(refusals_explain_themselves),
         TEST_CASE(pulling_the_headphones_out_pauses_playback),
         TEST_CASE(plugging_the_headphones_back_in_does_not_resume),
         TEST_CASE(switching_from_one_jack_to_the_other_keeps_playing),

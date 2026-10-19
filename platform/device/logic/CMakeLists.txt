@@ -31,6 +31,7 @@ add_library(echo_device_logic STATIC
     tick_clock.c
     updater.c
     usb_device.c
+    wav_source.c
 )
 target_include_directories(echo_device_logic PUBLIC include)
 target_link_libraries(echo_device_logic

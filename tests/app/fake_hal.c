@@ -35,6 +35,7 @@ typedef struct FakeAudio {
     HalAudioOutput output;
     int refused_plays;
     HalAudioJack jack;
+    HalAudioRefusal refusal;
 } FakeAudio;
 
 typedef struct WrittenFile {
@@ -523,6 +524,16 @@ void hal_audio_dma_tone_stop(void)
 HalDmaToneStatus hal_audio_dma_tone_status(void)
 {
     return (HalDmaToneStatus){.running = fake.dma_tone_running, .position = 0};
+}
+
+HalAudioRefusal hal_audio_refusal(void)
+{
+    return fake.audio.refusal;
+}
+
+void fake_hal_audio_set_refusal(HalAudioRefusal refusal)
+{
+    fake.audio.refusal = refusal;
 }
 
 HalAudioJack hal_audio_jack(void)

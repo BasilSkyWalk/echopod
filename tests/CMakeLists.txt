@@ -138,7 +138,7 @@ echo_add_unit_test(NAME test_test_pattern_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
-foreach(device_test audio_math backlight battery_gauge panic_text stall_watch bt_module core1_control start_record dac_sequence dma_loop jack_sense key_ladder key_scanner msc panel pll sd_card tick_clock updater usb_device)
+foreach(device_test audio_math backlight battery_gauge panic_text stall_watch bt_module core1_control start_record dac_sequence dma_loop jack_sense key_ladder key_scanner msc panel pll sd_card tick_clock updater usb_device wav_source)
     echo_add_unit_test(NAME test_${device_test}
         SOURCES device/test_${device_test}.c
         LIBRARIES echo_device_logic

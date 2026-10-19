@@ -32,9 +32,16 @@ typedef struct AudioFrame {
     uint8_t bits;
 } AudioFrame;
 
+typedef enum AudioCodec {
+    AUDIO_CODEC_FLAC,
+    AUDIO_CODEC_WAV,
+    AUDIO_CODEC_MP3
+} AudioCodec;
+
 typedef struct AudioTrackInfo {
     FlacInfo stream;
     uint32_t audio_bytes;
+    AudioCodec codec;
 } AudioTrackInfo;
 
 typedef struct AudioSource {
@@ -50,6 +57,17 @@ typedef struct AudioEngineConfig {
     uint32_t *ring;
     uint32_t ring_words;
 } AudioEngineConfig;
+
+typedef enum AudioRefusalProblem {
+    AUDIO_REFUSAL_NONE,
+    AUDIO_REFUSAL_UNREADABLE,
+    AUDIO_REFUSAL_RATE
+} AudioRefusalProblem;
+
+typedef struct AudioRefusal {
+    AudioRefusalProblem problem;
+    uint32_t sample_rate;
+} AudioRefusal;
 
 typedef struct AudioSegment {
     uint32_t token;
@@ -98,6 +116,7 @@ typedef struct AudioEngine {
     char next_path[AUDIO_ENGINE_PATH_CAPACITY];
     uint32_t gain;
     AudioEngineStats stats;
+    AudioRefusal refusal;
 } AudioEngine;
 
 void audio_engine_init(AudioEngine *engine, AudioEngineConfig config);
@@ -117,3 +136,4 @@ void audio_engine_restart(AudioEngine *engine);
 uint32_t audio_engine_rate(const AudioEngine *engine);
 uint32_t audio_engine_buffered(const AudioEngine *engine, uint32_t consumed);
 AudioEngineStatus audio_engine_status(const AudioEngine *engine);
+AudioRefusal audio_engine_refusal(const AudioEngine *engine);

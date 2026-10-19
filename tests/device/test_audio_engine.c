@@ -350,12 +350,27 @@ static void an_unsupported_rate_is_refused(void)
     start_engine();
     CHECK(!audio_engine_play(&engine, "independent_16", 0, 1));
     CHECK_EQUAL(AUDIO_ENGINE_STOPPED, audio_engine_status(&engine).state);
+    AudioRefusal refusal = audio_engine_refusal(&engine);
+    CHECK_EQUAL(AUDIO_REFUSAL_RATE, refusal.problem);
+    CHECK_EQUAL(22050u, refusal.sample_rate);
+}
+
+static void a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "independent_16", 4);
+    pump_until_full(0);
+    audio_engine_pump(&engine, 3001);
+    CHECK(audio_engine_status(&engine).failed);
+    CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
 }
 
 static void a_missing_file_is_refused(void)
 {
     start_engine();
     CHECK(!audio_engine_play(&engine, "no_such_file", 0, 1));
+    CHECK_EQUAL(AUDIO_REFUSAL_UNREADABLE, audio_engine_refusal(&engine).problem);
 }
 
 static void the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size(void)
@@ -462,6 +477,7 @@ int main(void)
         TEST_CASE(volume_scales_the_samples),
         TEST_CASE(mono_plays_on_both_channels),
         TEST_CASE(an_unsupported_rate_is_refused),
+        TEST_CASE(a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate),
         TEST_CASE(a_missing_file_is_refused),
         TEST_CASE(the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size),
     };

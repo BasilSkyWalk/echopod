@@ -30,6 +30,18 @@ typedef enum HalAudioJack {
     HAL_AUDIO_JACK_BALANCED
 } HalAudioJack;
 
+typedef enum HalAudioProblem {
+    HAL_AUDIO_PROBLEM_NONE,
+    HAL_AUDIO_PROBLEM_UNREADABLE,
+    HAL_AUDIO_PROBLEM_FORMAT,
+    HAL_AUDIO_PROBLEM_RATE
+} HalAudioProblem;
+
+typedef struct HalAudioRefusal {
+    HalAudioProblem problem;
+    uint32_t sample_rate;
+} HalAudioRefusal;
+
 typedef enum HalAudioCodec {
     HAL_AUDIO_CODEC_UNKNOWN,
     HAL_AUDIO_CODEC_FLAC,
@@ -117,3 +129,4 @@ void hal_audio_dma_tone_stop(void);
 HalDmaToneStatus hal_audio_dma_tone_status(void);
 HalJackPins hal_audio_jack_pins(void);
 HalAudioJack hal_audio_jack(void);
+HalAudioRefusal hal_audio_refusal(void);
