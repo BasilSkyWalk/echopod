@@ -4,6 +4,7 @@ MEMORY
 {
     DATA_RAM (rw) : ORIGIN = 0x03004000, LENGTH = 0x48000
     CODE_RAM (rx) : ORIGIN = 0x03050000, LENGTH = 0x2666C
+    HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x25000
 }
 
 SECTIONS
@@ -37,6 +38,12 @@ SECTIONS
         . = ALIGN(4);
         device_noinit_end = .;
     } > DATA_RAM
+
+    .high_ram (NOLOAD) :
+    {
+        *(.high_ram .high_ram.*)
+        . = ALIGN(4);
+    } > HIGH_RAM
 
     .comment 0 : { *(.comment) }
     .ARM.attributes 0 : { *(.ARM.attributes) }

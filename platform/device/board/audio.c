@@ -20,11 +20,11 @@
 #include "hal/system.h"
 
 enum {
-    RING_BLOCKS = 9,
+    RING_BLOCKS = 7,
     BLOCK_WORDS = 4000,
     RING_WORDS = RING_BLOCKS * BLOCK_WORDS,
     WORDS_PER_FRAME = 2,
-    MAIN_RING_WORDS = 4 * BLOCK_WORDS,
+    RING_FRAMES = RING_WORDS / WORDS_PER_FRAME,
     PREFILL_DIVISOR = 10,
     PREFILL_TIMEOUT_MS = 1000,
     FILL_BUDGET_BYTES = 8192,
@@ -34,10 +34,7 @@ enum {
     TONE_AMPLITUDE = 9000,
     MILLISECONDS_PER_SECOND = 1000,
     JACK_POLL_MS = 10,
-    MUSIC_RING = 0x0307A000,
-    SNIFF_BYTES = 12,
-    FIFO_COMFORTABLE_WORDS = 16,
-    YIELD_POLLS = 400
+    SNIFF_BYTES = 12
 };
 
 typedef enum SourceKind {
@@ -50,7 +47,8 @@ typedef enum SourceKind {
 static union {
     FlacDecoder flac;
     WavBuffers wav;
-} decoding;
+} decoding __attribute__((section(".high_ram")));
+static uint32_t music_ring[RING_WORDS];
 static WavSource wav_source;
 static SourceKind source_kind;
 static bool unknown_format;
@@ -73,8 +71,6 @@ static uint32_t ring_words;
 static bool stopped_waiting;
 static uint32_t stopped_since_ms;
 static bool tone_active;
-static bool ring_in_main_ram;
-static uint32_t main_ring[MAIN_RING_WORDS];
 static char last_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint8_t volume_level;
 static bool volume_set;
@@ -234,12 +230,7 @@ static void close_chosen(void *context)
 
 static uint32_t *ring(void)
 {
-    return ring_in_main_ram ? main_ring : (uint32_t *)(uintptr_t)MUSIC_RING;
-}
-
-static uint32_t ring_total_words(void)
-{
-    return ring_in_main_ram ? MAIN_RING_WORDS : RING_WORDS;
+    return music_ring;
 }
 
 static void ensure_engine(void)
@@ -253,14 +244,13 @@ static void ensure_engine(void)
     wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
     audio_engine_init(
-        &engine,
-        (AudioEngineConfig){.source = source, .ring = ring(), .ring_words = ring_total_words()});
+        &engine, (AudioEngineConfig){.source = source, .ring = ring(), .ring_words = RING_WORDS});
     engine_ready = true;
 }
 
 static uint32_t ring_address(void)
 {
-    return (uint32_t)(uintptr_t)ring();
+    return (uint32_t)(uintptr_t)music_ring;
 }
 
 static void update_consumed(void)
@@ -344,8 +334,7 @@ static bool start_output(bool audible)
     }
     uint32_t started_ms = hal_clock_milliseconds();
     uint32_t prefill = audio_engine_rate(&engine) / PREFILL_DIVISOR;
-    uint32_t frames = ring_total_words() / WORDS_PER_FRAME;
-    prefill = prefill < frames * 3 / 4 ? prefill : frames * 3 / 4;
+    prefill = prefill < RING_FRAMES * 3 / 4 ? prefill : RING_FRAMES * 3 / 4;
     while (audio_engine_buffered(&engine, 0) < prefill &&
            hal_clock_milliseconds() - started_ms < PREFILL_TIMEOUT_MS) {
         pump(0);
@@ -353,7 +342,7 @@ static bool start_output(bool audible)
     stats = (HalAudioStats){0};
     output_started_us = hal_clock_microseconds();
     stopped_waiting = false;
-    return start_transfer(ring_total_words(), audible);
+    return start_transfer(RING_WORDS, audible);
 }
 
 static void stop_tone(void)
@@ -596,33 +585,6 @@ static void poll_jack(void)
     }
 }
 
-void hal_audio_use_main_ram_ring(bool main_ram)
-{
-    board_audio_shut_down();
-    ring_in_main_ram = main_ram;
-    if (engine_ready) {
-        engine.config.ring = ring();
-        engine.config.ring_words = ring_total_words();
-    }
-}
-
-bool hal_audio_ring_in_main_ram(void)
-{
-    return ring_in_main_ram;
-}
-
-void board_audio_yield(void)
-{
-    if (!transferring && !tone_active) {
-        return;
-    }
-    for (int poll = 0; poll < YIELD_POLLS; poll++) {
-        if (dac_path_fifo_level() >= FIFO_COMFORTABLE_WORDS) {
-            return;
-        }
-    }
-}
-
 void hal_audio_service(void)
 {
     poll_jack();
@@ -673,13 +635,13 @@ HalToneResult hal_audio_dma_tone_start(uint32_t sample_rate)
     uint32_t *words = ring();
     int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
-    for (uint32_t index = 0; index < ring_total_words(); index++) {
+    for (uint32_t index = 0; index < RING_WORDS; index++) {
         uint32_t frame = index / WORDS_PER_FRAME;
         words[index] = (uint32_t)(uint16_t)samples[frame % TONE_PERIOD_SAMPLES] << 16;
     }
     dac_path_output_on();
     tone_active = true;
-    if (!start_transfer(ring_total_words(), true)) {
+    if (!start_transfer(RING_WORDS, true)) {
         tone_active = false;
         stop_path();
         return HAL_TONE_NO_DMAC;

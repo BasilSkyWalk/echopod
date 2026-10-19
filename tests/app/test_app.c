@@ -54,7 +54,6 @@ enum {
     DIAGNOSTICS_DMA_TONE_INDEX = 8,
     DIAGNOSTICS_ACCEL_INDEX = 25,
     DIAGNOSTICS_HIGH_RATE_TONE_INDEX = 26,
-    DIAGNOSTICS_RING_INDEX = 27,
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
     DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
@@ -1441,17 +1440,6 @@ static void the_dma_tone_plays_at_44_1_khz(void)
     CHECK_EQUAL(44100u, fake_hal_dma_tone_rate());
 }
 
-static void the_ring_row_switches_where_audio_plays_from(void)
-{
-    start_app();
-    CHECK(!hal_audio_ring_in_main_ram());
-    open_diagnostics_row(DIAGNOSTICS_RING_INDEX);
-    tap(KEY_PLAY);
-    CHECK(hal_audio_ring_in_main_ram());
-    tap(KEY_PLAY);
-    CHECK(!hal_audio_ring_in_main_ram());
-}
-
 static void the_loop_benchmark_runs_once_per_press(void)
 {
     start_app();
@@ -1576,7 +1564,6 @@ int main(void)
         TEST_CASE(the_test_tone_plays_once_per_press),
         TEST_CASE(the_dma_tone_starts_and_stops_from_one_row),
         TEST_CASE(the_high_rate_tone_plays_at_192_khz),
-        TEST_CASE(the_ring_row_switches_where_audio_plays_from),
         TEST_CASE(the_dma_tone_plays_at_44_1_khz),
         TEST_CASE(the_stall_test_row_freezes_the_main_loop_on_purpose),
         TEST_CASE(ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off),

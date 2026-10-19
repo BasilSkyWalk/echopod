@@ -59,8 +59,7 @@
 #define I2S_INTERRUPTS_FOR_DMA 0x01F00102u
 #define I2S_UNDERRUN 0x00000002u
 #define I2S_CLEAR_UNDERRUN 0x00000004u
-#define I2S_DMA_TX 0x00000118u
-#define I2S_TX_LEVEL_MASK 0x3Fu
+#define I2S_DMA_TX 0x00000110u
 #define I2C_MRXADDR_VALID 0x01000000u
 
 enum {
@@ -550,11 +549,6 @@ void dac_path_set_gain(bool high)
     if (dac_up) {
         dac_set_gain(&BUS, high);
     }
-}
-
-uint32_t dac_path_fifo_level(void)
-{
-    return register_read(I2S_FIFOLR) & I2S_TX_LEVEL_MASK;
 }
 
 bool dac_path_take_underrun(void)

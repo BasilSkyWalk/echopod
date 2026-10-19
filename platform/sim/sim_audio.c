@@ -333,16 +333,6 @@ HalDmaToneStatus hal_audio_dma_tone_status(void)
     return (HalDmaToneStatus){.running = dma_tone_running, .position = 0};
 }
 
-void hal_audio_use_main_ram_ring(bool main_ram)
-{
-    (void)main_ram;
-}
-
-bool hal_audio_ring_in_main_ram(void)
-{
-    return false;
-}
-
 HalAudioRefusal hal_audio_refusal(void)
 {
     return (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_UNREADABLE, .sample_rate = 0};
