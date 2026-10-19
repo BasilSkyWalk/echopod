@@ -70,6 +70,10 @@ typedef struct FakeHal {
     int stall_test_count;
     int keep_alive_count;
     bool restart_pending;
+    HalReserveResult reserve_result;
+    const char *reserved_paths[FILE_CAPACITY];
+    uint32_t reserved_sizes[FILE_CAPACITY];
+    int reserve_count;
     int scratch_borrows;
     bool empty_card;
     int library_writes;
@@ -278,7 +282,11 @@ bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
     if (offset > source->size || length > source->size - offset) {
         return false;
     }
-    memcpy(buffer, source->bytes + offset, length);
+    if (source->bytes == NULL) {
+        memset(buffer, 0, length);
+    } else {
+        memcpy(buffer, source->bytes + offset, length);
+    }
     return true;
 }
 
@@ -513,6 +521,8 @@ static void register_written(const char *path, uint32_t length)
     for (int index = 0; index < fake.file_count; index++) {
         if (strcmp(fake.files[index].path, path) == 0) {
             fake.files[index].size = length;
+            fake.files[index].bytes =
+                fake.files[index].bytes == NULL ? slot->bytes : fake.files[index].bytes;
             return;
         }
     }
@@ -747,6 +757,43 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
 HalHighRamTest hal_system_high_ram_test(void)
 {
     return (HalHighRamTest){.status = HAL_HIGH_RAM_UNAVAILABLE};
+}
+
+void fake_hal_set_reserve_result(HalReserveResult result)
+{
+    fake.reserve_result = result;
+}
+
+HalReserveResult hal_file_reserve(const char *path, uint32_t size)
+{
+    if (fake.reserve_count < FILE_CAPACITY) {
+        fake.reserved_paths[fake.reserve_count] = path;
+        fake.reserved_sizes[fake.reserve_count] = size;
+    }
+    fake.reserve_count++;
+    HalFile existing;
+    if (hal_file_open(&existing, path)) {
+        return HAL_RESERVE_EXISTS;
+    }
+    if (fake.reserve_result == HAL_RESERVE_CREATED) {
+        fake_hal_add_file(path, NULL, size);
+    }
+    return fake.reserve_result;
+}
+
+int fake_hal_reserve_count(void)
+{
+    return fake.reserve_count;
+}
+
+uint32_t fake_hal_reserved_size(const char *path)
+{
+    for (int index = 0; index < fake.reserve_count && index < FILE_CAPACITY; index++) {
+        if (strcmp(fake.reserved_paths[index], path) == 0) {
+            return fake.reserved_sizes[index];
+        }
+    }
+    return 0;
 }
 
 void fake_hal_set_restart_pending(bool pending)

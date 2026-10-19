@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-static const char LIBRARY_PATH[] = "/.echo/library.db";
+const char LIBRARY_STORE_PATH[] = "/.echo/library.db";
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
@@ -14,7 +14,7 @@ bool library_store_open(LibraryStore *store)
 {
     store->available = false;
     store->library = (Library){.source = {.read = NULL, .context = NULL}};
-    if (!hal_file_open(&store->file, LIBRARY_PATH)) {
+    if (!hal_file_open(&store->file, LIBRARY_STORE_PATH)) {
         return false;
     }
     ByteSource file_source = {.read = read_file, .context = store};

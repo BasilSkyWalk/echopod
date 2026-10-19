@@ -54,6 +54,8 @@ typedef struct Player {
     uint32_t last_save_ms;
 } Player;
 
+extern const char PLAYER_RESUME_PATH[];
+
 void player_init(Player *player, const Library *library);
 bool player_play_list(Player *player, BrowseQuery source, uint32_t position, uint32_t seed);
 void player_toggle_pause(Player *player);

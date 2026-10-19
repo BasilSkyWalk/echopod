@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "hal/storage.h"
 
@@ -153,6 +154,26 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
     bool written =
         fseek(handle, (long)offset, SEEK_SET) == 0 && fwrite(bytes, 1, length, handle) == length;
     return fclose(handle) == 0 && written;
+}
+
+HalReserveResult hal_file_reserve(const char *path, uint32_t size)
+{
+    char resolved[PATH_CAPACITY];
+    struct stat existing;
+    if (size == 0 || !is_system_path(path) ||
+        !sim_storage_host_path(path, resolved, sizeof resolved)) {
+        return HAL_RESERVE_FAILED;
+    }
+    if (stat(resolved, &existing) == 0) {
+        return HAL_RESERVE_EXISTS;
+    }
+    FILE *handle = fopen(resolved, "wb");
+    if (handle == NULL) {
+        return HAL_RESERVE_FAILED;
+    }
+    bool sized = ftruncate(fileno(handle), (off_t)size) == 0;
+    sized = fclose(handle) == 0 && sized;
+    return sized ? HAL_RESERVE_CREATED : HAL_RESERVE_FAILED;
 }
 
 void sim_storage_close_all(void)

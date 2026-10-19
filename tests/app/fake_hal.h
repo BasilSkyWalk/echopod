@@ -7,6 +7,7 @@
 #include "hal/audio.h"
 #include "hal/bluetooth.h"
 #include "hal/power.h"
+#include "hal/storage.h"
 
 void fake_hal_reset(void);
 void fake_hal_set_version(const char *version);
@@ -20,6 +21,9 @@ int fake_hal_test_tone_count(void);
 int fake_hal_stall_test_count(void);
 int fake_hal_keep_alive_count(void);
 void fake_hal_set_restart_pending(bool pending);
+void fake_hal_set_reserve_result(HalReserveResult result);
+int fake_hal_reserve_count(void);
+uint32_t fake_hal_reserved_size(const char *path);
 int fake_hal_scratch_borrow_count(void);
 void fake_hal_set_empty_card(bool empty);
 int fake_hal_library_writes(void);

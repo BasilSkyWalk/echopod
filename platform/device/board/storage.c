@@ -105,6 +105,43 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
     return written;
 }
 
+static BlockDevice card_device;
+
+static bool read_and_beat(void *context, uint32_t lba, uint32_t count, void *buffer)
+{
+    board_stall_beat();
+    return card_device.read(context, lba, count, buffer);
+}
+
+static HalReserveResult reserve_result(FatReserveResult result)
+{
+    switch (result) {
+    case FAT_RESERVE_EXISTS:
+        return HAL_RESERVE_EXISTS;
+    case FAT_RESERVE_CREATED:
+        return HAL_RESERVE_CREATED;
+    case FAT_RESERVE_NO_SPACE:
+        return HAL_RESERVE_NO_SPACE;
+    case FAT_RESERVE_FAILED:
+        return HAL_RESERVE_FAILED;
+    }
+    return HAL_RESERVE_FAILED;
+}
+
+HalReserveResult hal_file_reserve(const char *path, uint32_t size)
+{
+    if (!mounted()) {
+        return HAL_RESERVE_FAILED;
+    }
+    card_device = volume.device;
+    volume.device.read = read_and_beat;
+    board_start_record_step(HAL_START_STEP_CARD_WRITE);
+    FatReserveResult result = fat_reserve(&volume, path, size);
+    board_start_record_step_done();
+    volume.device = card_device;
+    return reserve_result(result);
+}
+
 void storage_reset(void)
 {
     mount_state = MOUNT_NOT_TRIED;

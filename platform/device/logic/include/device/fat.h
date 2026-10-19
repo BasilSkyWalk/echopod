@@ -9,8 +9,17 @@ enum {
     FAT_SECTOR_SIZE = 512,
     FAT_CACHE_SECTORS = 8,
     FAT_LONG_NAME_CAPACITY = 260,
-    FAT_NAME_CAPACITY = 768
+    FAT_NAME_CAPACITY = 768,
+    FAT_RESERVE_CLEARED_BYTES = 4096,
+    FAT_RESERVE_NAME_LIMIT = 64
 };
+
+typedef enum FatReserveResult {
+    FAT_RESERVE_EXISTS,
+    FAT_RESERVE_CREATED,
+    FAT_RESERVE_NO_SPACE,
+    FAT_RESERVE_FAILED
+} FatReserveResult;
 
 typedef enum FatType {
     FAT_TYPE_16 = 16,
@@ -32,6 +41,9 @@ typedef struct FatVolume {
     FatType type;
     uint32_t volume_start;
     uint32_t fat_start;
+    uint32_t fat_sectors;
+    uint32_t fat_count;
+    uint32_t info_sector;
     uint32_t root_start;
     uint32_t root_sectors;
     uint32_t root_cluster;
@@ -66,3 +78,5 @@ bool fat_open(FatVolume *volume, const char *path, FatFile *file);
 bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, uint32_t length);
 bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *bytes,
                uint32_t length);
+FatReserveResult fat_reserve(FatVolume *volume, const char *path, uint32_t size);
+bool fat_file_sector(FatVolume *volume, FatFile *file, uint32_t sector_index, uint32_t *lba);

@@ -6,7 +6,7 @@
 #include "hal/storage.h"
 #include "playback/resume_state.h"
 
-static const char RESUME_PATH[] = "/.echo/resume.bin";
+const char PLAYER_RESUME_PATH[] = "/.echo/resume.bin";
 
 static uint32_t current_position(const Player *player)
 {
@@ -277,14 +277,14 @@ bool player_save(Player *player)
     };
     uint8_t bytes[RESUME_STATE_SIZE];
     resume_state_encode(&state, bytes);
-    return hal_file_write(RESUME_PATH, bytes, sizeof bytes);
+    return hal_file_write(PLAYER_RESUME_PATH, bytes, sizeof bytes);
 }
 
 static bool read_resume_state(ResumeState *state)
 {
     HalFile file;
     uint8_t bytes[RESUME_STATE_SIZE];
-    if (!hal_file_open(&file, RESUME_PATH)) {
+    if (!hal_file_open(&file, PLAYER_RESUME_PATH)) {
         return false;
     }
     bool read = file.size >= RESUME_STATE_SIZE && hal_file_read(file, 0, bytes, sizeof bytes);

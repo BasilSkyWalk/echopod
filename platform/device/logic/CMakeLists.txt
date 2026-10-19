@@ -11,9 +11,12 @@ add_library(echo_device_logic STATIC
     dma_loop.c
     emmc_layout.c
     exfat.c
+    exfat_create.c
     fat.c
+    fat_create.c
     fat_layout.c
     fat_names.c
+    fat_reserve.c
     image_crc.c
     key_ladder.c
     key_scanner.c

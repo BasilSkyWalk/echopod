@@ -61,6 +61,61 @@ bool fat_read_sector(FatVolume *volume, uint32_t lba)
     return fat_read_run(volume, lba, 1);
 }
 
+uint8_t *fat_sector_for_update(FatVolume *volume, uint32_t lba)
+{
+    if (!fat_read_run(volume, lba, 1)) {
+        return NULL;
+    }
+    return (uint8_t *)volume->cache + volume->cache_index * FAT_SECTOR_SIZE;
+}
+
+bool fat_commit_sector(FatVolume *volume, uint32_t lba)
+{
+    if (volume->fat_sector_lba == lba) {
+        volume->fat_sector_valid = false;
+    }
+    if (!fat_sector_cached(volume, lba) ||
+        !volume->device.write(volume->device.context, lba, 1, fat_cached_sector(volume))) {
+        volume->cache_count = 0;
+        return false;
+    }
+    return true;
+}
+
+bool fat_update_bytes(FatVolume *volume, uint32_t lba, uint32_t within, const uint8_t *bytes,
+                      uint32_t length)
+{
+    uint8_t *sector = fat_sector_for_update(volume, lba);
+    if (sector == NULL) {
+        return false;
+    }
+    for (uint32_t index = 0; index < length; index++) {
+        sector[within + index] = bytes[index];
+    }
+    return fat_commit_sector(volume, lba);
+}
+
+bool fat_clear_sectors(FatVolume *volume, uint32_t lba, uint32_t count)
+{
+    volume->cache_count = 0;
+    volume->fat_sector_valid = false;
+    uint8_t *zero = (uint8_t *)volume->cache;
+    for (uint32_t index = 0; index < FAT_SECTOR_SIZE; index++) {
+        zero[index] = 0;
+    }
+    for (uint32_t index = 0; index < count; index++) {
+        if (!volume->device.write(volume->device.context, lba + index, 1, zero)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+uint32_t fat_cluster_lba(const FatVolume *volume, uint32_t cluster)
+{
+    return volume->data_start + ((cluster - FIRST_CLUSTER) << volume->cluster_shift);
+}
+
 static bool is_exfat_boot_sector(const uint8_t *sector)
 {
     static const char NAME[] = "EXFAT   ";
@@ -108,6 +163,8 @@ static bool read_layout(FatVolume *volume, const uint8_t *boot)
     volume->root_sectors =
         (root_entries * DIRECTORY_ENTRY_SIZE + FAT_SECTOR_SIZE - 1) / FAT_SECTOR_SIZE;
     volume->fat_start = volume->volume_start + fat_le16(boot + 14);
+    volume->fat_sectors = fat_size;
+    volume->fat_count = boot[16];
     volume->root_start = volume->fat_start + boot[16] * fat_size;
     volume->data_start = volume->root_start + volume->root_sectors;
     volume->cluster_shift = log2_of(boot[13]);
@@ -118,6 +175,9 @@ static bool read_layout(FatVolume *volume, const uint8_t *boot)
     volume->cluster_count = (total - used) >> volume->cluster_shift;
     volume->root_cluster = fat_le32(boot + 44);
     volume->type = volume->cluster_count < FAT32_MINIMUM_CLUSTERS ? FAT_TYPE_16 : FAT_TYPE_32;
+    uint32_t info = fat_le16(boot + 48);
+    bool has_info = volume->type == FAT_TYPE_32 && info != 0 && info != 0xFFFF;
+    volume->info_sector = has_info ? volume->volume_start + info : 0;
     return volume->cluster_count >= FAT16_MINIMUM_CLUSTERS &&
            (volume->type == FAT_TYPE_32 || root_entries != 0);
 }
@@ -126,6 +186,8 @@ static bool read_exfat_layout(FatVolume *volume, const uint8_t *boot)
 {
     volume->type = FAT_TYPE_EXFAT;
     volume->fat_start = volume->volume_start + fat_le32(boot + 80);
+    volume->fat_sectors = fat_le32(boot + 84);
+    volume->fat_count = boot[110];
     volume->data_start = volume->volume_start + fat_le32(boot + 88);
     volume->cluster_count = fat_le32(boot + 92);
     volume->root_cluster = fat_le32(boot + 96);

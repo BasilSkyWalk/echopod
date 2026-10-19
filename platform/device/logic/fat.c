@@ -163,8 +163,8 @@ static bool find_fat_entry(FatVolume *volume, FatFile *directory, const char *na
     return false;
 }
 
-static bool find_entry(FatVolume *volume, FatFile *directory, const char *name, size_t length,
-                       FatFile *found)
+bool fat_find_entry(FatVolume *volume, FatFile *directory, const char *name, size_t length,
+                    FatFile *found)
 {
     if (volume->type == FAT_TYPE_EXFAT) {
         return exfat_find_entry(volume, directory, name, length, found);
@@ -191,7 +191,7 @@ static bool walk_path(FatVolume *volume, const char *path, FatFile *found, bool 
             continue;
         }
         size_t length = component_length(path);
-        if (!current.directory || !find_entry(volume, &current, path, length, &current)) {
+        if (!current.directory || !fat_find_entry(volume, &current, path, length, &current)) {
             return false;
         }
         *found_any = true;
@@ -332,23 +332,6 @@ bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, u
     return true;
 }
 
-static bool write_sector_part(FatVolume *volume, uint32_t lba, uint32_t within,
-                              const uint8_t *bytes, uint32_t chunk)
-{
-    if (!fat_read_run(volume, lba, 1)) {
-        return false;
-    }
-    uint8_t *sector = (uint8_t *)volume->cache + volume->cache_index * FAT_SECTOR_SIZE;
-    for (uint32_t index = 0; index < chunk; index++) {
-        sector[within + index] = bytes[index];
-    }
-    if (!volume->device.write(volume->device.context, lba, 1, sector)) {
-        volume->cache_count = 0;
-        return false;
-    }
-    return true;
-}
-
 bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *bytes,
                uint32_t length)
 {
@@ -361,7 +344,7 @@ bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *by
         uint32_t chunk = FAT_SECTOR_SIZE - within < length ? FAT_SECTOR_SIZE - within : length;
         uint32_t lba = 0;
         if (!fat_file_sector(volume, file, offset / FAT_SECTOR_SIZE, &lba) ||
-            !write_sector_part(volume, lba, within, in, chunk)) {
+            !fat_update_bytes(volume, lba, within, in, chunk)) {
             return false;
         }
         in += chunk;

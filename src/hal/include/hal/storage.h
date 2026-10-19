@@ -15,6 +15,19 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length);
 bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length);
 
 enum {
+    HAL_RESERVE_CLEARED_BYTES = 4096
+};
+
+typedef enum HalReserveResult {
+    HAL_RESERVE_EXISTS,
+    HAL_RESERVE_CREATED,
+    HAL_RESERVE_NO_SPACE,
+    HAL_RESERVE_FAILED
+} HalReserveResult;
+
+HalReserveResult hal_file_reserve(const char *path, uint32_t size);
+
+enum {
     HAL_NAME_CAPACITY = 768
 };
 

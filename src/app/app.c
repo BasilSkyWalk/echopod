@@ -4,6 +4,7 @@
 
 #include "app_internal.h"
 #include "app_screens.h"
+#include "card_files.h"
 #include "core/deadline.h"
 #include "core/key_tracker.h"
 #include "core/low_battery.h"
@@ -569,6 +570,16 @@ static void start_screens(uint32_t now_ms)
     use_screen_key_behaviors();
 }
 
+static void report_card_files(CardFilesReport files, uint32_t now_ms)
+{
+    if (files.card_full) {
+        toast_show(&app.toast, "The card is full", now_ms);
+    }
+    if (files.library_created) {
+        app.rescan_requested = true;
+    }
+}
+
 void app_start(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
@@ -587,10 +598,12 @@ void app_start(void)
     app.battery_check_ms = now_ms;
     app.splash = (Fade){.active = false};
     app.now_ms = now_ms;
+    CardFilesReport files = card_files_prepare();
     settings_store_load(&app.settings);
     start_playback();
     start_hardware(now_ms);
     start_screens(now_ms);
+    report_card_files(files, now_ms);
 }
 
 static void show_rescan_progress(uint32_t files, uint32_t tracks)

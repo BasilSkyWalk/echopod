@@ -175,6 +175,17 @@ echo_add_unit_test(NAME test_fat
 )
 target_compile_definitions(test_fat PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 set_tests_properties(test_fat PROPERTIES TIMEOUT 20)
+set(ECHO_CREATED_CARDS ${CMAKE_CURRENT_BINARY_DIR}/created_cards)
+file(MAKE_DIRECTORY ${ECHO_CREATED_CARDS})
+echo_add_unit_test(NAME test_fat_create
+    SOURCES device/test_fat_create.c device/sparse_card.c
+    LIBRARIES echo_device_logic
+)
+target_compile_definitions(test_fat_create PRIVATE
+    ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    ECHO_CREATED_DIR="${ECHO_CREATED_CARDS}"
+)
+set_tests_properties(test_fat_create PROPERTIES TIMEOUT 30 FIXTURES_SETUP created_cards)
 
 if(ECHO_BUILD_SIM)
     echo_add_unit_test(NAME test_sim_options
@@ -212,6 +223,22 @@ if(ECHO_BUILD_SIM)
 endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+find_program(FSCK_MSDOS fsck_msdos)
+find_program(FSCK_EXFAT fsck_exfat)
+if(FSCK_MSDOS AND FSCK_EXFAT)
+    add_test(NAME created_cards_pass_fsck
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_card_images.py
+            ${ECHO_CREATED_CARDS} --expect 4
+    )
+    set_tests_properties(created_cards_pass_fsck PROPERTIES
+        FIXTURES_REQUIRED created_cards
+        RESOURCE_LOCK disk_images
+        TIMEOUT 120
+    )
+else()
+    message(STATUS "fsck_msdos or fsck_exfat not found: created_cards_pass_fsck is skipped")
+endif()
 
 add_test(NAME no_comments
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_no_comments.py ${PROJECT_SOURCE_DIR}

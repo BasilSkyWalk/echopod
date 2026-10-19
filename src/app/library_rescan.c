@@ -5,8 +5,8 @@
 #include "core/string_builder.h"
 #include "hal/storage.h"
 #include "hal/system.h"
+#include "library_store.h"
 
-static const char LIBRARY_PATH[] = "/.echo/library.db";
 static const char MUSIC_ROOT[] = "/";
 
 typedef struct RescanFiles {
@@ -69,7 +69,7 @@ static bool write_library(void *context, uint32_t offset, const void *bytes, uin
 {
     (void)context;
     hal_system_keep_alive();
-    return hal_file_write_at(LIBRARY_PATH, offset, bytes, length);
+    return hal_file_write_at(LIBRARY_STORE_PATH, offset, bytes, length);
 }
 
 static void report(void *context, uint32_t files, uint32_t tracks)
@@ -84,7 +84,7 @@ static void report(void *context, uint32_t files, uint32_t tracks)
 static uint32_t reserved_size(void)
 {
     HalFile file;
-    if (!hal_file_open(&file, LIBRARY_PATH)) {
+    if (!hal_file_open(&file, LIBRARY_STORE_PATH)) {
         return 0;
     }
     uint32_t size = file.size;
