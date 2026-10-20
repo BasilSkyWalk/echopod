@@ -151,6 +151,7 @@ NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing)
     case KEY_BACK:
         return by_gesture(event.gesture, NOW_PLAYING_LEAVE, NOW_PLAYING_HOME);
     case KEY_MENU:
+        return by_gesture(event.gesture, NOW_PLAYING_UP_NEXT, NOW_PLAYING_NONE);
     case KEY_POWER:
         return NOW_PLAYING_NONE;
     }
@@ -268,6 +269,9 @@ static ScreenAction run_command(NowPlayingScreen *now_playing, NowPlayingCommand
         break;
     case NOW_PLAYING_LEAVE:
         return screen_action_pop();
+    case NOW_PLAYING_UP_NEXT:
+        return now_playing->config.up_next != NULL ? screen_action_push(now_playing->config.up_next)
+                                                   : screen_action_none();
     case NOW_PLAYING_HOME:
         now_playing->scrubbing = false;
         return screen_action_pop_to_root();

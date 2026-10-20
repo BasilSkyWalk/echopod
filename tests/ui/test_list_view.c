@@ -247,6 +247,20 @@ static void a_detail_is_drawn_in_the_secondary_color_at_the_right(void)
     CHECK(ui_test_area_has_color(&canvas, right_of_row_one, TEST_THEME.colors.text_secondary));
 }
 
+static void a_long_detail_stops_at_its_maximum_width(void)
+{
+    ListView view = list_of(2);
+    items.detail_at_one = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    model.detail_max_width = TEST_SCREEN_WIDTH / 3;
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
+    Rect left_half_of_row_one = {0, row_rect(1).y, TEST_SCREEN_WIDTH / 2, TEST_ROW_HEIGHT};
+    CHECK(!ui_test_area_has_color(&canvas, left_half_of_row_one, TEST_THEME.colors.text_secondary));
+    Rect right_of_row_one = {TEST_SCREEN_WIDTH / 2, row_rect(1).y, TEST_SCREEN_WIDTH / 2,
+                             TEST_ROW_HEIGHT};
+    CHECK(ui_test_area_has_color(&canvas, right_of_row_one, TEST_THEME.colors.text_secondary));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -268,6 +282,7 @@ int main(void)
         TEST_CASE(the_scrollbar_thumb_sits_inset_without_a_track),
         TEST_CASE(a_row_that_opens_something_shows_a_chevron),
         TEST_CASE(a_detail_is_drawn_in_the_secondary_color_at_the_right),
+        TEST_CASE(a_long_detail_stops_at_its_maximum_width),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

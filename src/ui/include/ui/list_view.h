@@ -12,6 +12,7 @@ typedef struct ListModel {
     const char *(*label)(const void *context, int index);
     const char *(*detail)(const void *context, int index);
     bool (*opens)(const void *context, int index);
+    int detail_max_width;
 } ListModel;
 
 typedef struct ListView {

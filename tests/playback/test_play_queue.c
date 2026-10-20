@@ -218,6 +218,21 @@ static void album_shuffle_previous_returns_to_the_last_track_of_the_album_before
     CHECK_EQUAL(JOGA, track);
 }
 
+static void stepping_works_from_any_place_without_moving_the_queue(void)
+{
+    PlayQueue *albums = built(album_tracks(BACK_IN_BLACK), HUNTER, SHUFFLE_ALBUMS, 3);
+    PlayQueueCursor joga;
+    PlayQueueCursor after_joga;
+    uint16_t track = 0;
+    CHECK(play_queue_step(albums, albums->cursor, 1, false, &joga));
+    CHECK(play_queue_step(albums, joga, 1, false, &after_joga));
+    CHECK(play_queue_track_at(albums, after_joga, &track));
+    LibraryAlbum album;
+    library_read_album(albums->library, albums->entries[1], &album);
+    CHECK_EQUAL(album.first_track, track);
+    CHECK_EQUAL(HUNTER, current_track(albums));
+}
+
 static void playlists_play_in_their_own_order(void)
 {
     BrowseQuery road_trip = {.kind = BROWSE_PLAYLIST_TRACKS,
@@ -249,6 +264,7 @@ int main(void)
         TEST_CASE(album_shuffle_finishes_an_album_before_the_next),
         TEST_CASE(album_shuffle_previous_returns_to_the_last_track_of_the_album_before),
         TEST_CASE(playlists_play_in_their_own_order),
+        TEST_CASE(stepping_works_from_any_place_without_moving_the_queue),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -1054,6 +1054,30 @@ static void play_next_with_nothing_playing_starts_the_song(void)
     CHECK(toast_is("Playing"));
 }
 
+static void menu_on_now_playing_opens_up_next(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_MENU);
+    CHECK(title_is("Up Next"));
+    tap(KEY_MENU);
+    CHECK(title_is("Now Playing"));
+    tap(KEY_MENU);
+    tap(KEY_BACK);
+    CHECK(title_is("Now Playing"));
+}
+
+static void choosing_a_song_in_up_next_plays_it(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_MENU);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Now Playing"));
+    CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
+}
+
 static void holding_play_on_an_album_adds_it_to_favorites(void)
 {
     start_app_with_library();
@@ -1578,7 +1602,8 @@ static void menu_opens_now_playing_from_anywhere_while_playing(void)
     CHECK(title_is("Now Playing"));
     int depth = app_screen_depth();
     tap(KEY_MENU);
-    CHECK_EQUAL(depth, app_screen_depth());
+    CHECK(title_is("Up Next"));
+    CHECK_EQUAL(depth + 1, app_screen_depth());
 }
 
 static void menu_does_nothing_while_nothing_plays(void)
@@ -1687,6 +1712,8 @@ int main(void)
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
         TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),
+        TEST_CASE(menu_on_now_playing_opens_up_next),
+        TEST_CASE(choosing_a_song_in_up_next_plays_it),
         TEST_CASE(holding_play_on_a_song_offers_up_next),
         TEST_CASE(play_next_from_a_list_queues_the_song),
         TEST_CASE(add_to_up_next_from_a_list_queues_the_song),

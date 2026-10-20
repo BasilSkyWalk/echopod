@@ -17,6 +17,7 @@
 #include "screens/now_playing_screen.h"
 #include "screens/stopwatch_screen.h"
 #include "screens/test_pattern_screen.h"
+#include "screens/up_next_screen.h"
 #include "settings/settings.h"
 #include "settings_screens.h"
 #include "settings_store.h"
@@ -95,6 +96,7 @@ typedef struct AppScreens {
     MessageScreen no_library;
     BrowsePool browse;
     NowPlayingScreen now_playing;
+    UpNextScreen up_next;
     CoverFlowScreen cover_flow;
     BrowseEntry browse_entries[MUSIC_ITEM_COUNT];
     TestPatternScreen test_pattern;

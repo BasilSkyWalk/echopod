@@ -147,9 +147,10 @@ bool play_queue_current(const PlayQueue *queue, uint16_t *track)
     return play_queue_track_at(queue, queue->cursor, track);
 }
 
-static bool neighbor_position(const PlayQueue *queue, int direction, bool wrap, uint16_t *result)
+static bool neighbor_position(const PlayQueue *queue, uint16_t from, int direction, bool wrap,
+                              uint16_t *result)
 {
-    int target = queue->cursor.position + direction;
+    int target = from + direction;
     if (target >= 0 && target < queue->count) {
         *result = (uint16_t)target;
         return true;
@@ -161,20 +162,20 @@ static bool neighbor_position(const PlayQueue *queue, int direction, bool wrap, 
     return true;
 }
 
-static bool album_neighbor(const PlayQueue *queue, int direction, bool wrap,
+static bool album_neighbor(const PlayQueue *queue, PlayQueueCursor from, int direction, bool wrap,
                            PlayQueueCursor *result)
 {
     LibraryAlbum album;
-    if (!album_at(queue, queue->cursor.position, &album)) {
+    if (!album_at(queue, from.position, &album)) {
         return false;
     }
-    int track = queue->cursor.album_track + direction;
+    int track = from.album_track + direction;
     if (track >= 0 && track < album.track_count) {
-        *result = (PlayQueueCursor){queue->cursor.position, (uint16_t)track};
+        *result = (PlayQueueCursor){from.position, (uint16_t)track};
         return true;
     }
     uint16_t position = 0;
-    if (!neighbor_position(queue, direction, wrap, &position) ||
+    if (!neighbor_position(queue, from.position, direction, wrap, &position) ||
         !album_at(queue, position, &album)) {
         return false;
     }
@@ -183,17 +184,23 @@ static bool album_neighbor(const PlayQueue *queue, int direction, bool wrap,
     return true;
 }
 
-bool play_queue_neighbor(const PlayQueue *queue, int direction, bool wrap, PlayQueueCursor *result)
+bool play_queue_step(const PlayQueue *queue, PlayQueueCursor from, int direction, bool wrap,
+                     PlayQueueCursor *result)
 {
     if (shuffles_albums(queue)) {
-        return album_neighbor(queue, direction, wrap, result);
+        return album_neighbor(queue, from, direction, wrap, result);
     }
     uint16_t position = 0;
-    if (!neighbor_position(queue, direction, wrap, &position)) {
+    if (!neighbor_position(queue, from.position, direction, wrap, &position)) {
         return false;
     }
     *result = (PlayQueueCursor){position, 0};
     return true;
+}
+
+bool play_queue_neighbor(const PlayQueue *queue, int direction, bool wrap, PlayQueueCursor *result)
+{
+    return play_queue_step(queue, queue->cursor, direction, wrap, result);
 }
 
 bool play_queue_upcoming(const PlayQueue *queue, RepeatMode repeat, PlayQueueCursor *result)

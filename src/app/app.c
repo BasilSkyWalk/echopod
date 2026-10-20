@@ -231,6 +231,13 @@ static bool opens_now_playing(KeyEvent event)
            player_status(&app.player).has_track && top_screen() != &app.screens.now_playing.screen;
 }
 
+static ScreenAction now_playing_action(void)
+{
+    return top_screen() == &app.screens.up_next.screen
+               ? screen_action_pop()
+               : screen_action_push(&app.screens.now_playing.screen);
+}
+
 static void start_slide(Screen *leaving, int depth_before, uint32_t now_ms)
 {
     if (top_screen() == leaving) {
@@ -251,7 +258,7 @@ static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
     Screen *screen = top_screen();
     int depth_before = screen_stack_depth(&app.stack);
     ScreenAction action = opens_now_playing(event)
-                              ? screen_action_push(&app.screens.now_playing.screen)
+                              ? now_playing_action()
                               : screen->handle_key(screen->context, event, now_ms);
     if (screen_stack_apply(&app.stack, action, now_ms)) {
         use_screen_key_behaviors();

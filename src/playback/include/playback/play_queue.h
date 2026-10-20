@@ -55,6 +55,8 @@ typedef struct PlayQueue {
 bool play_queue_build(PlayQueue *queue, const Library *library, PlayQueuePlan plan);
 bool play_queue_track_at(const PlayQueue *queue, PlayQueueCursor cursor, uint16_t *track);
 bool play_queue_current(const PlayQueue *queue, uint16_t *track);
+bool play_queue_step(const PlayQueue *queue, PlayQueueCursor from, int direction, bool wrap,
+                     PlayQueueCursor *result);
 bool play_queue_neighbor(const PlayQueue *queue, int direction, bool wrap, PlayQueueCursor *result);
 bool play_queue_upcoming(const PlayQueue *queue, RepeatMode repeat, PlayQueueCursor *result);
 void play_queue_move_to(PlayQueue *queue, PlayQueueCursor cursor);

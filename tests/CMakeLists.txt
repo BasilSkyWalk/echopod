@@ -112,6 +112,11 @@ echo_add_unit_test(NAME test_stores
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+echo_add_unit_test(NAME test_up_next_screen
+    SOURCES app/test_up_next_screen.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 echo_add_unit_test(NAME test_now_playing_screen
     SOURCES app/test_now_playing_screen.c app/fake_hal.c
     LIBRARIES echo_app echo_library_scan

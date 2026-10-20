@@ -120,6 +120,9 @@ static Row draw_detail(const ListView *view, Canvas *canvas, Row row)
     }
     TextStyle style = row_style(view, row.selected, view->theme->colors.text_secondary);
     int width = text_width(style.font, detail);
+    if (model->detail_max_width > 0 && width > model->detail_max_width) {
+        width = model->detail_max_width;
+    }
     Rect area = {row.text.x + row.text.width - width, row.text.y, width, row.text.height};
     label_draw(canvas, style, (Label){.area = area, .text = detail});
     row.text.width -= width + view->theme->metrics.detail_gap;

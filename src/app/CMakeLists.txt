@@ -20,6 +20,7 @@ add_library(echo_app STATIC
     screens/cover_flow_screen.c
     screens/font_sample_screen.c
     screens/now_playing_screen.c
+    screens/up_next_screen.c
     screens/stopwatch_screen.c
     screens/test_pattern_screen.c
 )
