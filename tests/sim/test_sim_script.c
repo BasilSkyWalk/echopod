@@ -70,11 +70,23 @@ static void long_presses_hold_for_the_hold_time(void)
     CHECK(!events[1].pressed);
 }
 
+static void a_held_suffix_holds_for_seconds(void)
+{
+    SimScript script;
+    CHECK(sim_script_parse("down:held", &script));
+    CHECK(script.steps[0].held);
+    SimScriptEvent events[SIM_SCRIPT_MAX_EVENTS];
+    CHECK_EQUAL(2, sim_script_schedule(&script, 0, events));
+    CHECK_EQUAL(KEY_VOLUME_UP, events[0].key);
+    CHECK_EQUAL(SIM_SCRIPT_HELD_FRAMES, events[1].frame);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(key_names_map_to_device_keys),
         TEST_CASE(a_long_suffix_holds_the_key),
+        TEST_CASE(a_held_suffix_holds_for_seconds),
         TEST_CASE(unknown_names_are_rejected),
         TEST_CASE(too_many_steps_are_rejected),
         TEST_CASE(taps_press_and_release_then_leave_a_gap),

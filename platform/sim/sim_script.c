@@ -14,22 +14,25 @@ static const KeyName KEY_NAMES[] = {
 };
 
 static const char LONG_SUFFIX[] = ":long";
+static const char HELD_SUFFIX[] = ":held";
 
-static bool has_long_suffix(const char *start, size_t length)
+static bool has_suffix(const char *start, size_t length, const char *suffix)
 {
-    size_t suffix_length = sizeof LONG_SUFFIX - 1;
+    size_t suffix_length = strlen(suffix);
     return length > suffix_length &&
-           strncmp(start + length - suffix_length, LONG_SUFFIX, suffix_length) == 0;
+           strncmp(start + length - suffix_length, suffix, suffix_length) == 0;
 }
 
 static bool parse_step(const char *start, size_t length, SimScriptStep *step)
 {
-    bool long_press = has_long_suffix(start, length);
-    size_t name_length = long_press ? length - (sizeof LONG_SUFFIX - 1) : length;
+    bool long_press = has_suffix(start, length, LONG_SUFFIX);
+    bool held = has_suffix(start, length, HELD_SUFFIX);
+    size_t name_length = long_press || held ? length - strlen(LONG_SUFFIX) : length;
     for (size_t index = 0; index < sizeof KEY_NAMES / sizeof KEY_NAMES[0]; index++) {
         const char *name = KEY_NAMES[index].name;
         if (strlen(name) == name_length && strncmp(start, name, name_length) == 0) {
-            *step = (SimScriptStep){.key = KEY_NAMES[index].key, .long_press = long_press};
+            *step = (SimScriptStep){
+                .key = KEY_NAMES[index].key, .long_press = long_press, .held = held};
             return true;
         }
     }
@@ -61,7 +64,9 @@ int sim_script_schedule(const SimScript *script, uint32_t first_frame, SimScript
     uint32_t frame = first_frame;
     for (int index = 0; index < script->count; index++) {
         const SimScriptStep *step = &script->steps[index];
-        uint32_t hold = step->long_press ? SIM_SCRIPT_HOLD_FRAMES : SIM_SCRIPT_TAP_FRAMES;
+        uint32_t hold = step->held         ? SIM_SCRIPT_HELD_FRAMES
+                        : step->long_press ? SIM_SCRIPT_HOLD_FRAMES
+                                           : SIM_SCRIPT_TAP_FRAMES;
         events[count++] = (SimScriptEvent){.frame = frame, .key = step->key, .pressed = true};
         events[count++] =
             (SimScriptEvent){.frame = frame + hold, .key = step->key, .pressed = false};

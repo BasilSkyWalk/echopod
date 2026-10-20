@@ -10,12 +10,14 @@ enum {
     SIM_SCRIPT_MAX_EVENTS = SIM_SCRIPT_MAX_STEPS * 2,
     SIM_SCRIPT_TAP_FRAMES = 2,
     SIM_SCRIPT_HOLD_FRAMES = 70,
+    SIM_SCRIPT_HELD_FRAMES = 300,
     SIM_SCRIPT_GAP_FRAMES = 8
 };
 
 typedef struct SimScriptStep {
     Key key;
     bool long_press;
+    bool held;
 } SimScriptStep;
 
 typedef struct SimScript {
