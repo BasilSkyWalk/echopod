@@ -9,7 +9,9 @@
 const char MUSIC_CHECK_PATH[] = "/.echo/scan.bin";
 
 enum {
-    RECORD_BYTES = 16,
+    PRINT_BYTES = 16,
+    VERSION_BYTES = 16,
+    RECORD_BYTES = PRINT_BYTES + VERSION_BYTES,
     RECORD_MAGIC = 0x4353454D
 };
 
@@ -68,16 +70,20 @@ static uint32_t get_word(const uint8_t *bytes)
            (uint32_t)bytes[3] << 24;
 }
 
-static bool read_record(MusicFingerprint *print)
+static bool read_bytes(uint8_t *bytes)
 {
     HalFile file;
-    uint8_t bytes[RECORD_BYTES];
     if (!hal_file_open(&file, MUSIC_CHECK_PATH)) {
         return false;
     }
-    bool read = file.size >= RECORD_BYTES && hal_file_read(file, 0, bytes, sizeof bytes);
+    bool read = file.size >= RECORD_BYTES && hal_file_read(file, 0, bytes, RECORD_BYTES);
     hal_file_close(&file);
-    if (!read || get_word(bytes) != RECORD_MAGIC) {
+    return read;
+}
+
+static bool decode_print(const uint8_t *bytes, MusicFingerprint *print)
+{
+    if (get_word(bytes) != RECORD_MAGIC) {
         return false;
     }
     *print = (MusicFingerprint){.complete = true,
@@ -87,21 +93,71 @@ static bool read_record(MusicFingerprint *print)
     return true;
 }
 
+static bool read_record(MusicFingerprint *print)
+{
+    uint8_t bytes[RECORD_BYTES];
+    return read_bytes(bytes) && decode_print(bytes, print);
+}
+
 bool music_check_unchanged(void)
 {
     MusicFingerprint stored;
     return read_record(&stored) && music_fingerprints_match(stored, music_check_fingerprint());
 }
 
-void music_check_remember(MusicFingerprint print)
+static void put_version(uint8_t *bytes)
 {
-    if (!print.complete) {
-        return;
+    const char *version = hal_system_version();
+    for (size_t index = 0; index < VERSION_BYTES; index++) {
+        bytes[index] = 0;
     }
+    for (size_t index = 0; index + 1 < VERSION_BYTES && version[index] != '\0'; index++) {
+        bytes[index] = (uint8_t)version[index];
+    }
+}
+
+static bool version_matches(const uint8_t *bytes)
+{
+    uint8_t current[VERSION_BYTES];
+    put_version(current);
+    for (size_t index = 0; index < VERSION_BYTES; index++) {
+        if (bytes[index] != current[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void write_record(MusicFingerprint print)
+{
     uint8_t bytes[RECORD_BYTES];
     put_word(bytes, RECORD_MAGIC);
     put_word(bytes + 4, print.first);
     put_word(bytes + 8, print.second);
     put_word(bytes + 12, print.entries);
+    put_version(bytes + PRINT_BYTES);
     (void)hal_file_write_at(MUSIC_CHECK_PATH, 0, bytes, sizeof bytes);
+}
+
+void music_check_remember(MusicFingerprint print)
+{
+    if (print.complete) {
+        write_record(print);
+    }
+}
+
+bool music_check_firmware_is_new(void)
+{
+    uint8_t bytes[RECORD_BYTES];
+    return read_bytes(bytes) && !version_matches(bytes + PRINT_BYTES);
+}
+
+void music_check_note_firmware(void)
+{
+    uint8_t bytes[RECORD_BYTES];
+    MusicFingerprint stored;
+    if (read_bytes(bytes) && decode_print(bytes, &stored) &&
+        !version_matches(bytes + PRINT_BYTES)) {
+        write_record(stored);
+    }
 }

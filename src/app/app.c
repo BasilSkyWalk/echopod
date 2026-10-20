@@ -587,6 +587,8 @@ static void report_card_files(CardFilesReport files, uint32_t now_ms)
     }
     if (files.library_created) {
         app.rescan_requested = true;
+    } else if (music_check_firmware_is_new()) {
+        app.music_check_requested = true;
     }
 }
 
@@ -692,7 +694,11 @@ void app_step(void)
     }
     if (app.music_check_requested) {
         app.music_check_requested = false;
-        app.rescan_requested |= hal_system_restart_pending() || !music_check_unchanged();
+        bool changed = hal_system_restart_pending() || !music_check_unchanged();
+        if (!changed) {
+            music_check_note_firmware();
+        }
+        app.rescan_requested |= changed;
     }
     if (app.rescan_requested) {
         app.rescan_requested = false;
