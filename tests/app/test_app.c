@@ -10,6 +10,7 @@
 #include "gfx/text.h"
 #include "hal/display.h"
 #include "hal/system.h"
+#include "library_rescan.h"
 #include "settings/settings.h"
 #include "settings_store.h"
 #include "ui/slide.h"
@@ -935,6 +936,39 @@ static void the_music_check_after_an_installed_update_skips_the_walk(void)
     CHECK(toast_is("Restart the player to finish the update"));
 }
 
+static void a_rescan_without_scratch_memory_says_so(void)
+{
+    start_app_with_library();
+    fake_hal_set_empty_card(true);
+    fake_hal_refuse_scratch(true);
+    app_request_rescan();
+    step();
+    fake_hal_refuse_scratch(false);
+    CHECK(toast_is("Couldn't free memory for the scan"));
+}
+
+static bool rescan_message_is(ScanResult result, const char *expected)
+{
+    char text[48];
+    RescanOutcome outcome = {.result = result};
+    return strcmp(expected, library_rescan_message(outcome, text, sizeof text)) == 0;
+}
+
+static void each_way_a_scan_runs_out_has_its_own_message(void)
+{
+    CHECK(rescan_message_is(SCAN_OUT_OF_MEMORY, "Library too big for the player's memory"));
+    CHECK(rescan_message_is(SCAN_TOO_MANY, "Too many tracks for the player"));
+}
+
+static void a_rescan_borrows_the_idle_audio_buffer_for_its_listing(void)
+{
+    start_app_with_library();
+    fake_hal_set_empty_card(true);
+    app_request_rescan();
+    step();
+    CHECK_EQUAL(1, fake_hal_listing_borrow_count());
+}
+
 static void a_rescan_rebuilds_the_covers_file(void)
 {
     start_app_with_library();
@@ -1726,6 +1760,9 @@ int main(void)
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),
         TEST_CASE(a_rescan_rebuilds_the_covers_file),
         TEST_CASE(a_rescan_after_an_installed_update_asks_for_a_restart),
+        TEST_CASE(a_rescan_without_scratch_memory_says_so),
+        TEST_CASE(a_rescan_borrows_the_idle_audio_buffer_for_its_listing),
+        TEST_CASE(each_way_a_scan_runs_out_has_its_own_message),
         TEST_CASE(the_music_check_after_an_installed_update_skips_the_walk),
         TEST_CASE(a_fresh_card_gets_the_player_files_and_a_first_scan),
         TEST_CASE(a_card_that_has_the_files_is_not_rescanned),

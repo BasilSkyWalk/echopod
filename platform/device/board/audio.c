@@ -248,6 +248,13 @@ static void ensure_engine(void)
     engine_ready = true;
 }
 
+void *hal_system_borrow_listing(uint32_t *size)
+{
+    board_audio_shut_down();
+    *size = (uint32_t)sizeof music_ring;
+    return music_ring;
+}
+
 static uint32_t ring_address(void)
 {
     return (uint32_t)(uintptr_t)music_ring;

@@ -117,8 +117,11 @@ int main(int argc, char **argv)
     sim_storage_configure(argv[1], NULL);
     ScanFileSystem system = {open_dir, next_entry, close_dir, open_file, close_file, &files};
     ScanStats scan_stats;
-    ScanJob scan = {system,           memory,      sizeof memory, {write_output, &library},
-                    LIBRARY_CAPACITY, {NULL, NULL}};
+    ScanJob scan = {.files = system,
+                    .memory = memory,
+                    .size = sizeof memory,
+                    .sink = {write_output, &library},
+                    .capacity = LIBRARY_CAPACITY};
     ScanResult result = library_scan(&scan, &scan_stats);
     if (result != SCAN_OK) {
         fprintf(stderr, "scan failed: %d\n", result);

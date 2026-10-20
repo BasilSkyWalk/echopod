@@ -179,15 +179,19 @@ RescanOutcome library_rescan_run(RescanProgress progress)
     files.progress = progress;
     uint32_t size = 0;
     void *memory = hal_system_borrow_scratch(&size);
+    uint32_t listing_size = 0;
+    void *listing = memory != NULL ? hal_system_borrow_listing(&listing_size) : NULL;
     ScanJob job = {
         .files = {open_dir, next_entry, close_dir, open_file, close_file, &files},
         .memory = memory,
         .size = size,
+        .listing = listing,
+        .listing_size = listing_size,
         .sink = {write_library, NULL},
         .capacity = capacity,
         .progress = {report, &files},
     };
-    outcome.result = memory != NULL ? entry->scan(&job, &outcome.stats) : SCAN_OUT_OF_MEMORY;
+    outcome.result = memory != NULL ? entry->scan(&job, &outcome.stats) : SCAN_NO_SCRATCH;
     if (outcome.result == SCAN_OK) {
         outcome.cover_result = build_covers(entry, &job, &outcome.covers);
     }
@@ -203,8 +207,11 @@ static const char *error_text(ScanResult result)
     case SCAN_NO_MUSIC_ROOT:
         return "No music found on the card";
     case SCAN_OUT_OF_MEMORY:
+        return "Library too big for the player's memory";
     case SCAN_TOO_MANY:
-        return "Library too big for the player";
+        return "Too many tracks for the player";
+    case SCAN_NO_SCRATCH:
+        return "Couldn't free memory for the scan";
     case SCAN_FOLDER_TOO_BIG:
         return "A folder holds too many files";
     case SCAN_PATH_TOO_LONG:

@@ -156,6 +156,31 @@ static void scanning_folders_and_playlists_matches_the_pc_indexer(void)
     free(expected);
 }
 
+static void a_separate_listing_leaves_the_memory_to_the_builder(void)
+{
+    static uint8_t memory[30 * 1024];
+    static uint8_t listing[16 * 1024];
+    static HostFiles files;
+    static Output output;
+    sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
+    output.length = 0;
+    ScanJob job = {
+        .files = {open_dir, next_entry, close_dir, open_file, close_file, &files},
+        .memory = memory,
+        .size = sizeof memory,
+        .listing = listing,
+        .listing_size = sizeof listing,
+        .sink = {write_output, &output},
+    };
+    ScanStats stats;
+    CHECK_EQUAL(SCAN_OK, library_scan(&job, &stats));
+    uint32_t expected_size = 0;
+    uint8_t *expected = read_fixture("scan_music.db", &expected_size);
+    CHECK_EQUAL(expected_size, stats.length);
+    CHECK_EQUAL(0, memcmp(expected, output.bytes, expected_size));
+    free(expected);
+}
+
 static void a_missing_music_root_says_so(void)
 {
     static Output output;
@@ -171,6 +196,7 @@ int main(void)
         TEST_CASE(scanning_the_tag_fixtures_matches_the_pc_indexer),
         TEST_CASE(scanning_folders_and_playlists_matches_the_pc_indexer),
         TEST_CASE(a_missing_music_root_says_so),
+        TEST_CASE(a_separate_listing_leaves_the_memory_to_the_builder),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

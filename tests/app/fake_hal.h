@@ -26,6 +26,8 @@ void fake_hal_set_reserve_result(HalReserveResult result);
 int fake_hal_reserve_count(void);
 uint32_t fake_hal_reserved_size(const char *path);
 int fake_hal_scratch_borrow_count(void);
+void fake_hal_refuse_scratch(bool refused);
+int fake_hal_listing_borrow_count(void);
 void fake_hal_set_empty_card(bool empty);
 int fake_hal_dir_open_count(void);
 int fake_hal_library_writes(void);

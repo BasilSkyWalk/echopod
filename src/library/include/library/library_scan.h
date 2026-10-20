@@ -41,7 +41,8 @@ typedef enum ScanResult {
     SCAN_WRITE_FAILED,
     SCAN_NO_ROOM,
     SCAN_NO_CODE,
-    SCAN_RESTART_NEEDED
+    SCAN_RESTART_NEEDED,
+    SCAN_NO_SCRATCH
 } ScanResult;
 
 typedef struct ScanStats {
@@ -55,6 +56,8 @@ typedef struct ScanJob {
     ScanFileSystem files;
     void *memory;
     uint32_t size;
+    void *listing;
+    uint32_t listing_size;
     ByteSink sink;
     uint32_t capacity;
     ScanProgress progress;

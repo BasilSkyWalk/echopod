@@ -80,6 +80,8 @@ typedef struct FakeHal {
     uint32_t clock_mhz;
     int stall_test_count;
     int watchdog_test_count;
+    bool scratch_refused;
+    int listing_borrows;
     int keep_alive_count;
     bool restart_pending;
     HalReserveResult reserve_result;
@@ -820,6 +822,10 @@ void *hal_system_borrow_scratch(uint32_t *size)
 {
     static uint8_t scratch[384 * 1024];
     fake.scratch_borrows++;
+    if (fake.scratch_refused) {
+        *size = 0;
+        return NULL;
+    }
     fake.scratch_outstanding++;
     *size = sizeof scratch;
     return scratch;
@@ -827,7 +833,27 @@ void *hal_system_borrow_scratch(uint32_t *size)
 
 void hal_system_return_scratch(void)
 {
-    fake.scratch_outstanding--;
+    if (!fake.scratch_refused) {
+        fake.scratch_outstanding--;
+    }
+}
+
+void *hal_system_borrow_listing(uint32_t *size)
+{
+    static uint8_t listing[96 * 1024];
+    fake.listing_borrows++;
+    *size = sizeof listing;
+    return listing;
+}
+
+int fake_hal_listing_borrow_count(void)
+{
+    return fake.listing_borrows;
+}
+
+void fake_hal_refuse_scratch(bool refused)
+{
+    fake.scratch_refused = refused;
 }
 
 int fake_hal_scratch_borrow_count(void)

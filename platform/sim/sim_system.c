@@ -50,6 +50,13 @@ void *hal_system_borrow_scratch(uint32_t *size)
     return scratch;
 }
 
+void *hal_system_borrow_listing(uint32_t *size)
+{
+    static uint8_t listing[96 * 1024];
+    *size = sizeof listing;
+    return listing;
+}
+
 void hal_system_return_scratch(void)
 {
 }
