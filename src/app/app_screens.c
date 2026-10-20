@@ -340,16 +340,30 @@ static ScreenAction toggle_dma_tone(void *context)
 
 enum {
     LOW_TONE_RATE = 44100,
-    HIGH_TONE_RATE = 192000
+    HIGH_TONE_RATE = 192000,
+    TONE_176_RATE = 176400
 };
 
 static char dma_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
 static char high_rate_tone_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char tone_176_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static char *tone_text_for(uint32_t sample_rate)
+{
+    switch (sample_rate) {
+    case HIGH_TONE_RATE:
+        return high_rate_tone_text;
+    case TONE_176_RATE:
+        return tone_176_text;
+    default:
+        return dma_tone_text;
+    }
+}
 
 static const char *dma_tone_value(const void *context)
 {
     const DmaToneOption *tone = context;
-    char *text = tone->sample_rate == HIGH_TONE_RATE ? high_rate_tone_text : dma_tone_text;
+    char *text = tone_text_for(tone->sample_rate);
     DmaToneView view = {.tried = tone->tried,
                         .stopped = tone->stopped,
                         .result = tone->result,
@@ -490,6 +504,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         .sample_rate = LOW_TONE_RATE, .tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
     screens->high_rate_tone = (DmaToneOption){
         .sample_rate = HIGH_TONE_RATE, .tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
+    screens->tone_176 = (DmaToneOption){
+        .sample_rate = TONE_176_RATE, .tried = false, .stopped = false, .result = HAL_TONE_PLAYED};
     screens->diagnostics_items[8] = (MenuItem){.label = "DMA tone",
                                                .select = toggle_dma_tone,
                                                .context = &screens->dma_tone,
@@ -551,6 +567,10 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .value = dma_tone_value};
     screens->diagnostics_items[27] = (MenuItem){
         .label = "Watchdog test", .select = run_watchdog_test, .context = NULL, .value = NULL};
+    screens->diagnostics_items[28] = (MenuItem){.label = "Tone 176k",
+                                                .select = toggle_dma_tone,
+                                                .context = &screens->tone_176,
+                                                .value = dma_tone_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

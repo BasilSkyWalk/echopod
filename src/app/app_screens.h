@@ -28,7 +28,7 @@
 enum {
     HOME_ITEM_COUNT = 4,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 28,
+    DIAGNOSTICS_ITEM_COUNT = 29,
     START_PATH_CAPACITY = 2
 };
 
@@ -107,6 +107,7 @@ typedef struct AppScreens {
     ToneOption tone;
     DmaToneOption dma_tone;
     DmaToneOption high_rate_tone;
+    DmaToneOption tone_176;
     LoopOption loop;
     Core1Option core1;
     Core1DecodeOption core1_decode;

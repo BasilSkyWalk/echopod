@@ -55,6 +55,7 @@ enum {
     DIAGNOSTICS_ACCEL_INDEX = 25,
     DIAGNOSTICS_HIGH_RATE_TONE_INDEX = 26,
     DIAGNOSTICS_WATCHDOG_TEST_INDEX = 27,
+    DIAGNOSTICS_TONE_176_INDEX = 28,
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
     DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
@@ -1531,6 +1532,17 @@ static void the_high_rate_tone_plays_at_192_khz(void)
     CHECK(!hal_audio_dma_tone_status().running);
 }
 
+static void the_176_khz_tone_plays_at_176_4_khz(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_TONE_176_INDEX);
+    tap(KEY_PLAY);
+    CHECK(hal_audio_dma_tone_status().running);
+    CHECK_EQUAL(176400u, fake_hal_dma_tone_rate());
+    tap(KEY_PLAY);
+    CHECK(!hal_audio_dma_tone_status().running);
+}
+
 static void the_dma_tone_plays_at_44_1_khz(void)
 {
     start_app();
@@ -1664,6 +1676,7 @@ int main(void)
         TEST_CASE(the_test_tone_plays_once_per_press),
         TEST_CASE(the_dma_tone_starts_and_stops_from_one_row),
         TEST_CASE(the_high_rate_tone_plays_at_192_khz),
+        TEST_CASE(the_176_khz_tone_plays_at_176_4_khz),
         TEST_CASE(the_dma_tone_plays_at_44_1_khz),
         TEST_CASE(the_stall_test_row_freezes_the_main_loop_on_purpose),
         TEST_CASE(the_watchdog_test_row_stops_everything_on_purpose),
