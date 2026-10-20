@@ -181,6 +181,16 @@ static void long_press_timing_survives_clock_wraparound(void)
     CHECK_EQUAL(KEY_GESTURE_LONG_PRESS, next_gesture(&tracker, KEY_MENU));
 }
 
+static void a_press_stamped_after_the_update_time_is_not_a_long_press(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_key_down(&tracker, KEY_POWER, 1005);
+    key_tracker_update(&tracker, 1000);
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_POWER));
+    key_tracker_key_up(&tracker, KEY_POWER, 1100);
+    CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_POWER));
+}
+
 static KeyTracker hold_repeat_tracker(void)
 {
     KeyTracker tracker = make_tracker();
@@ -266,6 +276,7 @@ int main(void)
         TEST_CASE(a_full_queue_keeps_the_oldest_events),
         TEST_CASE(repeat_timing_survives_clock_wraparound),
         TEST_CASE(long_press_timing_survives_clock_wraparound),
+        TEST_CASE(a_press_stamped_after_the_update_time_is_not_a_long_press),
         TEST_CASE(a_hold_repeat_key_taps_on_release),
         TEST_CASE(a_held_hold_repeat_key_long_presses_then_repeats),
         TEST_CASE(changing_a_behavior_leaves_other_keys_alone),

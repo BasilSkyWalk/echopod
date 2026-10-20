@@ -20,8 +20,8 @@ static uint32_t long_press_ms(const KeyTracker *tracker, Key key)
 
 static bool long_press_due(const KeyTracker *tracker, Key key, uint32_t now_ms)
 {
-    uint32_t held_for_ms = now_ms - tracker->states[key].pressed_at_ms;
-    return held_for_ms >= long_press_ms(tracker, key);
+    return deadline_reached(now_ms,
+                            tracker->states[key].pressed_at_ms + long_press_ms(tracker, key));
 }
 
 static void push_event(KeyTracker *tracker, Key key, KeyGesture gesture)
