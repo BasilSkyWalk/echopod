@@ -87,6 +87,7 @@ typedef struct FakeHal {
     int reserve_count;
     int scratch_borrows;
     bool empty_card;
+    int dir_opens;
     int library_writes;
     int covers_writes;
     const char *store_used[STORE_SLOTS];
@@ -767,6 +768,7 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
 bool hal_dir_open(HalDir *dir, const char *path)
 {
     (void)path;
+    fake.dir_opens++;
     dir->handle = fake.empty_card ? 0 : -1;
     return fake.empty_card;
 }
@@ -774,6 +776,11 @@ bool hal_dir_open(HalDir *dir, const char *path)
 void fake_hal_set_empty_card(bool empty)
 {
     fake.empty_card = empty;
+}
+
+int fake_hal_dir_open_count(void)
+{
+    return fake.dir_opens;
 }
 
 int fake_hal_covers_writes(void)

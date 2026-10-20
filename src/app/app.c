@@ -657,12 +657,11 @@ static void run_rescan(void)
 {
     app_show_notice("Scanning library", "Starting...");
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
-    MusicFingerprint print = music_check_fingerprint();
     RescanOutcome outcome = library_rescan_run(progress);
     static char message[48];
     const char *text = library_rescan_message(outcome, message, sizeof message);
     if (outcome.result == SCAN_OK) {
-        music_check_remember(print);
+        music_check_remember(music_check_fingerprint());
         app_start();
     }
     app_wake();
@@ -686,7 +685,7 @@ void app_step(void)
     }
     if (app.music_check_requested) {
         app.music_check_requested = false;
-        app.rescan_requested |= !music_check_unchanged();
+        app.rescan_requested |= hal_system_restart_pending() || !music_check_unchanged();
     }
     if (app.rescan_requested) {
         app.rescan_requested = false;
