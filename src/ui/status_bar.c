@@ -9,6 +9,8 @@ enum {
     BORDER = 1,
     FILL_INSET = 2,
     NUB_DIVISOR = 5,
+    BOLT_WIDTH_TENTHS = 6,
+    TENTHS = 10,
     FULL_PERCENT = 100
 };
 
@@ -55,18 +57,27 @@ static int percent_gap(const Theme *theme)
     return theme->metrics.padding / 2 > 0 ? theme->metrics.padding / 2 : 1;
 }
 
-Rect status_bar_percent_area(const Theme *theme, const char *text)
+Rect status_bar_bolt_area(const Theme *theme)
 {
     Rect battery = status_bar_battery_area(theme);
-    int width = text_width(theme->fonts.small, text);
-    return (Rect){battery.x - percent_gap(theme) - width, battery.y, width, battery.height};
+    int width = theme->metrics.status_icon_size * BOLT_WIDTH_TENTHS / TENTHS;
+    int bolt_width = width > 0 ? width : 1;
+    return (Rect){battery.x - percent_gap(theme) - bolt_width, battery.y, bolt_width,
+                  battery.height};
 }
 
-static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent)
+Rect status_bar_percent_area(const Theme *theme, const char *text, bool charging)
+{
+    Rect beside = charging ? status_bar_bolt_area(theme) : status_bar_battery_area(theme);
+    int width = text_width(theme->fonts.small, text);
+    return (Rect){beside.x - percent_gap(theme) - width, beside.y, width, beside.height};
+}
+
+static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent, bool charging)
 {
     char text[STATUS_BAR_PERCENT_CAPACITY];
     status_bar_percent_text(percent, text, sizeof text);
-    Rect area = status_bar_percent_area(theme, text);
+    Rect area = status_bar_percent_area(theme, text, charging);
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.header_text};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, area, text), .text = text});
@@ -118,6 +129,9 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
     }
     if (state.battery_known) {
         draw_battery(canvas, theme, state);
-        draw_percent(canvas, theme, state.battery_percent);
+        if (state.charging) {
+            icon_draw_bolt(canvas, status_bar_bolt_area(theme), theme->colors.success);
+        }
+        draw_percent(canvas, theme, state.battery_percent, state.charging);
     }
 }

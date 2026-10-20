@@ -5,7 +5,10 @@
 enum {
     PAUSE_BAR_TENTHS = 3,
     TENTHS = 10,
-    SKIP_BAR_PARTS = 6
+    SKIP_BAR_PARTS = 6,
+    BOLT_STROKE_TENTHS = 5,
+    BOLT_UPPER_START_TENTHS = 5,
+    BOLT_LOWER_END_TENTHS = 5
 };
 
 static void draw_triangle(Canvas *canvas, Rect area, Color color, bool pointing_right)
@@ -58,4 +61,36 @@ void icon_draw_pause(Canvas *canvas, Rect area, Color color)
 void icon_draw_stop(Canvas *canvas, Rect area, Color color)
 {
     canvas_fill_rect(canvas, (Rect){area.x, area.y + 1, area.width - 2, area.height - 2}, color);
+}
+
+static void fill_row(Canvas *canvas, Rect area, int row, int left, int width, Color color)
+{
+    int clipped_left = left < 0 ? 0 : left;
+    int right = left + width > area.width ? area.width : left + width;
+    if (right > clipped_left) {
+        canvas_fill_rect(
+            canvas, (Rect){area.x + clipped_left, area.y + row, right - clipped_left, 1}, color);
+    }
+}
+
+void icon_draw_bolt(Canvas *canvas, Rect area, Color color)
+{
+    int middle = area.height / 2;
+    int stroke = area.width * BOLT_STROKE_TENTHS / TENTHS;
+    int upper_start = area.width * BOLT_UPPER_START_TENTHS / TENTHS;
+    int lower_end = area.width * BOLT_LOWER_END_TENTHS / TENTHS;
+    int stroke_width = stroke > 0 ? stroke : 1;
+    for (int row = 0; row < area.height; row++) {
+        if (row < middle) {
+            int left = upper_start - upper_start * row / (middle > 0 ? middle : 1);
+            fill_row(canvas, area, row, left, stroke_width, color);
+        } else if (row == middle) {
+            fill_row(canvas, area, row, 0, area.width, color);
+        } else {
+            int span = area.height - 1 - middle;
+            int right =
+                area.width - (area.width - lower_end) * (row - middle) / (span > 0 ? span : 1);
+            fill_row(canvas, area, row, right - stroke_width, stroke_width, color);
+        }
+    }
 }

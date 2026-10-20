@@ -118,7 +118,7 @@ static void the_percentage_sits_just_left_of_the_battery(void)
 {
     Theme theme = status_theme();
     Rect battery = status_bar_battery_area(&theme);
-    Rect percent = status_bar_percent_area(&theme, "73%");
+    Rect percent = status_bar_percent_area(&theme, "73%", false);
     CHECK(percent.width > 0);
     CHECK(percent.x + percent.width < battery.x);
     CHECK(percent.x + percent.width >= battery.x - theme.metrics.padding);
@@ -128,7 +128,7 @@ static void a_known_battery_shows_its_percentage(void)
 {
     Theme theme = status_theme();
     Canvas canvas = draw_status(&theme, battery_at(HALF_BATTERY, false));
-    Rect percent = status_bar_percent_area(&theme, "50%");
+    Rect percent = status_bar_percent_area(&theme, "50%", false);
     CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
 }
 
@@ -138,8 +138,30 @@ static void an_unknown_battery_shows_no_percentage(void)
     StatusBarState state = battery_at(HALF_BATTERY, false);
     state.battery_known = false;
     Canvas canvas = draw_status(&theme, state);
-    Rect percent = status_bar_percent_area(&theme, "50%");
+    Rect percent = status_bar_percent_area(&theme, "50%", false);
     CHECK(ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
+}
+
+static void a_charging_battery_has_a_bolt_beside_it(void)
+{
+    Theme theme = status_theme();
+    Rect bolt = status_bar_bolt_area(&theme);
+    Rect battery = status_bar_battery_area(&theme);
+    CHECK(bolt.x + bolt.width < battery.x);
+    Canvas charging = draw_status(&theme, battery_at(50, true));
+    CHECK(ui_test_area_has_color(&charging, bolt, theme.colors.success));
+    Canvas resting = draw_status(&theme, battery_at(50, false));
+    CHECK(!ui_test_area_has_color(&resting, bolt, theme.colors.success));
+}
+
+static void the_percentage_moves_left_of_the_bolt_while_charging(void)
+{
+    Theme theme = status_theme();
+    Rect bolt = status_bar_bolt_area(&theme);
+    Rect percent = status_bar_percent_area(&theme, "50%", true);
+    CHECK(percent.x + percent.width < bolt.x);
+    Canvas canvas = draw_status(&theme, battery_at(50, true));
+    CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
 }
 
 int main(void)
@@ -156,6 +178,8 @@ int main(void)
         TEST_CASE(the_fill_follows_the_charge),
         TEST_CASE(a_low_battery_is_drawn_in_the_danger_color),
         TEST_CASE(a_charging_battery_is_drawn_in_the_success_color),
+        TEST_CASE(a_charging_battery_has_a_bolt_beside_it),
+        TEST_CASE(the_percentage_moves_left_of_the_bolt_while_charging),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
