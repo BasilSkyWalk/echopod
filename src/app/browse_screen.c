@@ -243,11 +243,77 @@ static ScreenAction toggle_favorite(void *context, int index)
     return screen_action_none();
 }
 
+static const char *up_next_message(PlayerUpNextResult result, bool next)
+{
+    switch (result) {
+    case PLAYER_UP_NEXT_ADDED:
+        return next ? "Playing next" : "Added to Up Next";
+    case PLAYER_UP_NEXT_STARTED:
+        return "Playing";
+    case PLAYER_UP_NEXT_FULL:
+        return "Up Next is full";
+    case PLAYER_UP_NEXT_FAILED:
+        break;
+    }
+    return "Couldn't play the song";
+}
+
+static ScreenAction queue_song(BrowsePool *pool, bool next)
+{
+    SongActions *actions = &pool->song_actions;
+    Player *player = pool->config.player;
+    PlayerUpNextResult result = next ? player_play_next(player, actions->track)
+                                     : player_add_to_up_next(player, actions->track);
+    if (pool->config.toast != NULL) {
+        toast_show(pool->config.toast, up_next_message(result, next), actions->now_ms);
+    }
+    return screen_action_pop();
+}
+
+static ScreenAction play_song_next(void *context)
+{
+    return queue_song(context, true);
+}
+
+static ScreenAction add_song_to_up_next(void *context)
+{
+    return queue_song(context, false);
+}
+
+static ScreenAction open_song_actions(BrowseScreen *browse, int index, uint16_t track)
+{
+    BrowsePool *pool = browse->pool;
+    SongActions *actions = &pool->song_actions;
+    actions->track = track;
+    actions->now_ms = browse->now_ms;
+    StringBuilder title = string_builder_make(actions->title, sizeof actions->title);
+    string_builder_append(&title, row_label(browse, index));
+    actions->items[0] = (MenuItem){.label = "Play Next", .select = play_song_next, .context = pool};
+    actions->items[1] =
+        (MenuItem){.label = "Add to Up Next", .select = add_song_to_up_next, .context = pool};
+    MenuConfig config = {.title = actions->title,
+                         .items = actions->items,
+                         .item_count = SONG_ACTION_COUNT,
+                         .theme = pool->config.theme};
+    return screen_action_push(menu_screen_init(&actions->menu, config));
+}
+
+static ScreenAction hold_row(void *context, int index)
+{
+    BrowseScreen *browse = context;
+    BrowseItem item;
+    if (browse->pool->config.player != NULL && item_at(browse, index, &item) &&
+        item.kind == BROWSE_ITEM_TRACK) {
+        return open_song_actions(browse, index, item.index);
+    }
+    return toggle_favorite(context, index);
+}
+
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     BrowseScreen *browse = context;
     browse->now_ms = now_ms;
-    ListSelection selection = {.select = select_row, .hold = toggle_favorite, .context = browse};
+    ListSelection selection = {.select = select_row, .hold = hold_row, .context = browse};
     return list_navigation_handle(&browse->list, event, now_ms, selection);
 }
 

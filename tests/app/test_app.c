@@ -1002,6 +1002,58 @@ static void open_albums_and_hold_the_first(void)
     hold(KEY_PLAY);
 }
 
+static void open_first_album(void)
+{
+    open_music_entry(MUSIC_ALBUMS_INDEX);
+    tap(KEY_PLAY);
+}
+
+static void holding_play_on_a_song_offers_up_next(void)
+{
+    start_app_with_library();
+    open_first_album();
+    hold(KEY_PLAY);
+    CHECK(title_is("Hells Bells"));
+    tap(KEY_BACK);
+    CHECK(title_is("Back In Black"));
+}
+
+static void play_next_from_a_list_queues_the_song(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    move_down(1);
+    hold(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK(toast_is("Playing next"));
+    CHECK(title_is("Back In Black"));
+    CHECK(playing_path_is(HELLS_BELLS_PATH));
+}
+
+static void add_to_up_next_from_a_list_queues_the_song(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    tap(KEY_BACK);
+    move_down(1);
+    hold(KEY_PLAY);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(toast_is("Added to Up Next"));
+    CHECK(title_is("Back In Black"));
+}
+
+static void play_next_with_nothing_playing_starts_the_song(void)
+{
+    start_app_with_library();
+    open_first_album();
+    hold(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK(playing_path_is(HELLS_BELLS_PATH));
+    CHECK(toast_is("Playing"));
+}
+
 static void holding_play_on_an_album_adds_it_to_favorites(void)
 {
     start_app_with_library();
@@ -1635,6 +1687,10 @@ int main(void)
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
         TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),
+        TEST_CASE(holding_play_on_a_song_offers_up_next),
+        TEST_CASE(play_next_from_a_list_queues_the_song),
+        TEST_CASE(add_to_up_next_from_a_list_queues_the_song),
+        TEST_CASE(play_next_with_nothing_playing_starts_the_song),
         TEST_CASE(holding_play_in_favorites_removes_the_album),
         TEST_CASE(favorites_survive_a_restart),
         TEST_CASE(a_toast_disappears_after_a_while),
