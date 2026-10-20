@@ -17,6 +17,7 @@ typedef struct ResumeState {
     PlayQueueCursor cursor;
     uint16_t track;
     uint32_t position_ms;
+    bool from_up_next;
 } ResumeState;
 
 void resume_state_encode(const ResumeState *state, uint8_t *bytes);

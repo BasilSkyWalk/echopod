@@ -60,6 +60,18 @@ static void a_state_survives_a_round_trip(void)
     CHECK_EQUAL(original.cursor.album_track, decoded.cursor.album_track);
     CHECK_EQUAL(original.track, decoded.track);
     CHECK_EQUAL(original.position_ms, decoded.position_ms);
+    CHECK(!decoded.from_up_next);
+}
+
+static void a_song_from_up_next_is_remembered(void)
+{
+    ResumeState original = sample_state();
+    original.from_up_next = true;
+    uint8_t bytes[RESUME_STATE_SIZE];
+    ResumeState decoded;
+    resume_state_encode(&original, bytes);
+    CHECK(resume_state_decode(bytes, sizeof bytes, &decoded));
+    CHECK(decoded.from_up_next);
 }
 
 static void a_wrong_magic_is_rejected(void)
@@ -120,6 +132,7 @@ int main(void)
         TEST_CASE(a_state_survives_a_round_trip),       TEST_CASE(a_wrong_magic_is_rejected),
         TEST_CASE(a_corrupted_byte_fails_the_checksum), TEST_CASE(a_short_file_is_rejected),
         TEST_CASE(unknown_modes_are_rejected),          TEST_CASE(playlist_sources_are_accepted),
+        TEST_CASE(a_song_from_up_next_is_remembered),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

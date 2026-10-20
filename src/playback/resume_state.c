@@ -20,6 +20,7 @@ enum {
     TRACK_FIELD = 28,
     VOLUME_FIELD = 30,
     POSITION_FIELD = 32,
+    FROM_UP_NEXT_FIELD = 36,
     CHECKSUM_FIELD = 40,
     MAGIC_SIZE = 4,
     BITS_PER_BYTE = 8
@@ -79,6 +80,7 @@ void resume_state_encode(const ResumeState *state, uint8_t *bytes)
     put_u16(bytes, TRACK_FIELD, state->track);
     bytes[VOLUME_FIELD] = state->volume;
     put_u32(bytes, POSITION_FIELD, state->position_ms);
+    bytes[FROM_UP_NEXT_FIELD] = state->from_up_next ? 1 : 0;
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
@@ -134,6 +136,7 @@ bool resume_state_decode(const uint8_t *bytes, uint32_t length, ResumeState *sta
         .cursor = {get_u16(bytes, CURSOR_POSITION_FIELD), get_u16(bytes, CURSOR_ALBUM_TRACK_FIELD)},
         .track = get_u16(bytes, TRACK_FIELD),
         .position_ms = get_u32(bytes, POSITION_FIELD),
+        .from_up_next = bytes[FROM_UP_NEXT_FIELD] != 0,
     };
     return true;
 }

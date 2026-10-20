@@ -8,6 +8,7 @@
 #include "playback/resume_state.h"
 
 const char PLAYER_RESUME_PATH[] = "/.echo/resume.bin";
+const char PLAYER_UP_NEXT_PATH[] = "/.echo/upnext.bin";
 
 static uint32_t current_position(const Player *player)
 {
@@ -41,14 +42,45 @@ static void become_idle(Player *player)
     player->paused_position_ms = 0;
 }
 
+static void save_up_next(const Player *player)
+{
+    uint8_t bytes[UP_NEXT_STATE_SIZE];
+    up_next_encode(&player->up_next, player->fingerprint, bytes);
+    (void)hal_file_write(PLAYER_UP_NEXT_PATH, bytes, sizeof bytes);
+}
+
+static bool current_track(const Player *player, uint16_t *track)
+{
+    if (player->from_up_next) {
+        *track = player->track;
+        return true;
+    }
+    return play_queue_current(&player->queue, track);
+}
+
+static bool upcoming_track(Player *player, PlayQueueCursor *cursor, uint16_t *track)
+{
+    if (player->repeat == REPEAT_ONE && player->from_up_next) {
+        player->next_source = PLAYER_NEXT_SAME_SONG;
+        *track = player->track;
+        return true;
+    }
+    if (player->repeat != REPEAT_ONE && up_next_first(&player->up_next, track)) {
+        player->next_source = PLAYER_NEXT_FROM_UP_NEXT;
+        return true;
+    }
+    player->next_source = PLAYER_NEXT_FROM_QUEUE;
+    return play_queue_upcoming(&player->queue, player->repeat, cursor) &&
+           play_queue_track_at(&player->queue, *cursor, track);
+}
+
 static void queue_upcoming(Player *player)
 {
     char path[PLAYER_PATH_CAPACITY];
-    PlayQueueCursor upcoming;
+    PlayQueueCursor upcoming = player->queue.cursor;
     uint16_t track = 0;
-    player->has_next = play_queue_upcoming(&player->queue, player->repeat, &upcoming) &&
-                       play_queue_track_at(&player->queue, upcoming, &track) &&
-                       track_path(player, track, path, sizeof path);
+    player->has_next =
+        upcoming_track(player, &upcoming, &track) && track_path(player, track, path, sizeof path);
     if (!player->has_next) {
         hal_audio_queue_next(NULL, 0);
         return;
@@ -62,8 +94,7 @@ static bool start_current(Player *player, uint32_t start_ms)
 {
     char path[PLAYER_PATH_CAPACITY];
     uint16_t track = 0;
-    if (!play_queue_current(&player->queue, &track) ||
-        !track_path(player, track, path, sizeof path)) {
+    if (!current_track(player, &track) || !track_path(player, track, path, sizeof path)) {
         become_idle(player);
         return false;
     }
@@ -110,12 +141,37 @@ static bool start_playable(Player *player, uint32_t start_ms, int direction, boo
     return false;
 }
 
+static bool start_up_next(Player *player)
+{
+    uint16_t track = 0;
+    bool started = false;
+    while (!started && up_next_first(&player->up_next, &track)) {
+        up_next_drop(&player->up_next, 1);
+        player->from_up_next = true;
+        player->track = track;
+        started = start_current(player, 0);
+    }
+    if (!started) {
+        player->from_up_next = false;
+    }
+    save_up_next(player);
+    return started;
+}
+
 static bool move_and_start(Player *player, int direction, bool wrap)
 {
+    if (direction > 0 && player->up_next.count > 0 && start_up_next(player)) {
+        return true;
+    }
+    if (direction < 0 && player->from_up_next) {
+        player->from_up_next = false;
+        return start_playable(player, 0, direction, wrap);
+    }
     PlayQueueCursor target;
     if (!play_queue_neighbor(&player->queue, direction, wrap, &target)) {
         return false;
     }
+    player->from_up_next = false;
     play_queue_move_to(&player->queue, target);
     return start_playable(player, 0, direction, wrap);
 }
@@ -126,6 +182,9 @@ void player_init(Player *player, const Library *library)
     player->fingerprint = library_fingerprint(library);
     player->queue.library = library;
     player->queue.count = 0;
+    up_next_clear(&player->up_next);
+    player->from_up_next = false;
+    player->next_source = PLAYER_NEXT_FROM_QUEUE;
     player->repeat = REPEAT_OFF;
     player->shuffle = SHUFFLE_OFF;
     player->volume = PLAYER_DEFAULT_VOLUME;
@@ -147,6 +206,7 @@ bool player_play_list(Player *player, BrowseQuery source, uint32_t position, uin
     if (!browse_item(player->library, source, position, &item) || item.kind != BROWSE_ITEM_TRACK) {
         return false;
     }
+    player->from_up_next = false;
     PlayQueuePlan plan = {
         .source = source, .anchor_track = item.index, .shuffle = player->shuffle, .seed = seed};
     if (!play_queue_build(&player->queue, player->library, plan) ||
@@ -228,7 +288,9 @@ void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed)
         return;
     }
     PlayQueuePlan plan = player->queue.plan;
-    plan.anchor_track = player->track;
+    if (!play_queue_current(&player->queue, &plan.anchor_track)) {
+        plan.anchor_track = player->track;
+    }
     plan.shuffle = shuffle;
     plan.seed = seed;
     if (play_queue_build(&player->queue, player->library, plan) && player->loaded) {
@@ -245,10 +307,28 @@ void player_set_repeat(Player *player, RepeatMode repeat)
     }
 }
 
-static void advance_to_next(Player *player)
+static void take_next(Player *player)
 {
+    switch (player->next_source) {
+    case PLAYER_NEXT_FROM_UP_NEXT:
+        up_next_first(&player->up_next, &player->track);
+        up_next_drop(&player->up_next, 1);
+        player->from_up_next = true;
+        save_up_next(player);
+        return;
+    case PLAYER_NEXT_SAME_SONG:
+        return;
+    case PLAYER_NEXT_FROM_QUEUE:
+        break;
+    }
     play_queue_move_to(&player->queue, player->next_cursor);
     play_queue_current(&player->queue, &player->track);
+    player->from_up_next = false;
+}
+
+static void advance_to_next(Player *player)
+{
+    take_next(player);
     player->current_token = player->next_token;
     player->has_next = false;
     queue_upcoming(player);
@@ -262,6 +342,57 @@ static void finish_track(Player *player, bool failed)
     }
     become_idle(player);
     player_save(player);
+}
+
+static PlayerUpNextResult enqueue(Player *player, uint16_t track, bool next)
+{
+    if (!player->has_track) {
+        player->from_up_next = true;
+        player->track = track;
+        return start_current(player, 0) ? PLAYER_UP_NEXT_STARTED : PLAYER_UP_NEXT_FAILED;
+    }
+    bool added =
+        next ? up_next_play_next(&player->up_next, track) : up_next_add(&player->up_next, track);
+    if (!added) {
+        return PLAYER_UP_NEXT_FULL;
+    }
+    save_up_next(player);
+    if (player->loaded) {
+        queue_upcoming(player);
+    }
+    return PLAYER_UP_NEXT_ADDED;
+}
+
+PlayerUpNextResult player_play_next(Player *player, uint16_t track)
+{
+    return enqueue(player, track, true);
+}
+
+PlayerUpNextResult player_add_to_up_next(Player *player, uint16_t track)
+{
+    return enqueue(player, track, false);
+}
+
+bool player_jump_to_up_next(Player *player, uint16_t index)
+{
+    if (index >= player->up_next.count) {
+        return false;
+    }
+    up_next_drop(&player->up_next, index);
+    bool started = start_up_next(player);
+    player_save(player);
+    return started;
+}
+
+bool player_jump_to_queue(Player *player, PlayQueueCursor cursor)
+{
+    up_next_clear(&player->up_next);
+    save_up_next(player);
+    player->from_up_next = false;
+    play_queue_move_to(&player->queue, cursor);
+    bool started = start_playable(player, 0, 1, player->repeat == REPEAT_ALL);
+    player_save(player);
+    return started;
 }
 
 static void save_periodically(Player *player, uint32_t now_ms)
@@ -311,6 +442,7 @@ bool player_save(Player *player)
         .cursor = player->queue.cursor,
         .track = player->track,
         .position_ms = current_position(player),
+        .from_up_next = player->from_up_next,
     };
     uint8_t bytes[RESUME_STATE_SIZE];
     resume_state_encode(&state, bytes);
@@ -336,17 +468,34 @@ static bool rebuild_queue(Player *player, const ResumeState *state)
         return false;
     }
     play_queue_move_to(&player->queue, state->cursor);
-    return play_queue_current(&player->queue, &track) && track == state->track;
+    return play_queue_current(&player->queue, &track) &&
+           (state->from_up_next || track == state->track);
+}
+
+static void load_up_next(Player *player)
+{
+    HalFile file;
+    uint8_t bytes[UP_NEXT_STATE_SIZE];
+    if (!hal_file_open(&file, PLAYER_UP_NEXT_PATH)) {
+        return;
+    }
+    bool read = file.size >= UP_NEXT_STATE_SIZE && hal_file_read(file, 0, bytes, sizeof bytes);
+    hal_file_close(&file);
+    if (!read || !up_next_decode(bytes, sizeof bytes, player->fingerprint, &player->up_next)) {
+        up_next_clear(&player->up_next);
+    }
 }
 
 bool player_restore(Player *player)
 {
     ResumeState state;
+    load_up_next(player);
     if (!read_resume_state(&state) || state.library_fingerprint != player->fingerprint ||
         !rebuild_queue(player, &state)) {
         return false;
     }
     player->track = state.track;
+    player->from_up_next = state.from_up_next;
     player->has_track = true;
     player->repeat = state.repeat;
     player->shuffle = state.plan.shuffle;
