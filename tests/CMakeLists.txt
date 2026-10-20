@@ -79,7 +79,7 @@ add_library(echo_ui_fixtures STATIC gfx/tiny_font.c ui/ui_test_theme.c ui/ui_tes
 target_include_directories(echo_ui_fixtures PUBLIC gfx ui)
 target_link_libraries(echo_ui_fixtures PUBLIC echo_ui PRIVATE echo_options)
 
-foreach(ui_test theme_layout list_view list_navigation header menu_screen message_screen
+foreach(ui_test theme_layout list_view list_navigation fast_scroll header menu_screen message_screen
         choice_screen toast status_bar)
     echo_add_unit_test(NAME test_${ui_test}
         SOURCES ui/test_${ui_test}.c
@@ -109,6 +109,11 @@ echo_add_unit_test(NAME test_cover_cache
 )
 echo_add_unit_test(NAME test_stores
     SOURCES app/test_stores.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_browse_screen
+    SOURCES app/test_browse_screen.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )

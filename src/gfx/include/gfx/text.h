@@ -18,3 +18,5 @@ typedef struct TextSpan {
 int text_width(const Font *font, const char *text);
 int text_draw(Canvas *canvas, TextStyle style, Point pen, const char *text);
 int text_draw_span(Canvas *canvas, TextStyle style, Point pen, TextSpan span);
+void text_draw_glyph_scaled(Canvas *canvas, TextStyle style, Rect box, uint32_t codepoint,
+                            int scale);

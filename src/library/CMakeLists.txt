@@ -5,6 +5,7 @@ add_library(echo_library STATIC
     library.c
     library_browse.c
     music_fingerprint.c
+    sort_initial.c
 )
 target_include_directories(echo_library PUBLIC include)
 target_link_libraries(echo_library

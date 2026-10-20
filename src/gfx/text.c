@@ -73,3 +73,63 @@ int text_draw_span(Canvas *canvas, TextStyle style, Point pen, TextSpan span)
     }
     return pen.x;
 }
+
+enum {
+    SUBPIXEL_BITS = 8,
+    SUBPIXEL_ONE = 1 << SUBPIXEL_BITS,
+    SUBPIXEL_MASK = SUBPIXEL_ONE - 1,
+    FULL_LEVEL = 15,
+    EDGE_FLOOR = 4,
+    EDGE_CEILING = 11
+};
+
+static int level_at(const Font *font, const Glyph *glyph, int x, int y)
+{
+    if (x < 0 || y < 0 || x >= glyph->width || y >= glyph->height) {
+        return 0;
+    }
+    return font_glyph_level(font, glyph, x, y);
+}
+
+static int source_position(int target, int scale)
+{
+    return ((2 * target + 1) * SUBPIXEL_ONE) / (2 * scale) - SUBPIXEL_ONE / 2;
+}
+
+static uint8_t smoothed_level(const Font *font, const Glyph *glyph, int x, int y, int scale)
+{
+    int source_x = source_position(x, scale) + SUBPIXEL_ONE;
+    int source_y = source_position(y, scale) + SUBPIXEL_ONE;
+    int left = (source_x >> SUBPIXEL_BITS) - 1;
+    int top = (source_y >> SUBPIXEL_BITS) - 1;
+    int across = source_x & SUBPIXEL_MASK;
+    int down = source_y & SUBPIXEL_MASK;
+    int upper = level_at(font, glyph, left, top) * (SUBPIXEL_ONE - across) +
+                level_at(font, glyph, left + 1, top) * across;
+    int lower = level_at(font, glyph, left, top + 1) * (SUBPIXEL_ONE - across) +
+                level_at(font, glyph, left + 1, top + 1) * across;
+    int level = (upper * (SUBPIXEL_ONE - down) + lower * down) >> (2 * SUBPIXEL_BITS);
+    int sharpened = (level - EDGE_FLOOR) * FULL_LEVEL / (EDGE_CEILING - EDGE_FLOOR);
+    return (uint8_t)(sharpened < 0 ? 0 : sharpened > FULL_LEVEL ? FULL_LEVEL : sharpened);
+}
+
+void text_draw_glyph_scaled(Canvas *canvas, TextStyle style, Rect box, uint32_t codepoint,
+                            int scale)
+{
+    const Glyph *glyph = font_find_glyph(style.font, codepoint);
+    if (glyph == NULL || scale < 1) {
+        return;
+    }
+    int width = glyph->width * scale;
+    int height = glyph->height * scale;
+    Rect area = {box.x + (box.width - width) / 2, box.y + (box.height - height) / 2, width, height};
+    Rect visible = rect_intersection(rect_intersection(area, box), canvas->clip);
+    for (int y = visible.y; y < visible.y + visible.height; y++) {
+        for (int x = visible.x; x < visible.x + visible.width; x++) {
+            uint8_t level = smoothed_level(style.font, glyph, x - area.x, y - area.y, scale);
+            if (level > 0) {
+                canvas_blend_pixel(canvas, (Point){x, y}, style.color, level);
+            }
+        }
+    }
+}

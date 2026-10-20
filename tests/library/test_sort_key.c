@@ -115,9 +115,59 @@ static void every_kind_of_fold_run_applies(void)
     CHECK_EQUAL(0, strcmp("\xd0\xb6", key));
 }
 
+static int category(unsigned char first)
+{
+    if (first < 'a') {
+        return 0;
+    }
+    return first > 'z' ? 2 : 1;
+}
+
+static void the_initial_matches_the_first_byte_of_the_key(void)
+{
+    static const char *const NAMES[] = {"The Beatles",
+                                        "the  who",
+                                        "The",
+                                        "Thelonious",
+                                        "Th\xC3\xA9\xC3\xA2tre",
+                                        "  abba",
+                                        "\xC3\x86"
+                                        "gis",
+                                        "\xC3\x9F"
+                                        "tar",
+                                        "\xC3\x98"
+                                        "resund",
+                                        "\xC5\xBDi\xC5\xBE"
+                                        "ek",
+                                        "1999",
+                                        "!!!",
+                                        "{x}",
+                                        "\xE6\x97\xA5\xE6\x9C\xAC",
+                                        "\xC3\x91"
+                                        "and\xC3\xBA",
+                                        "\xC3\x89"
+                                        "DITH",
+                                        "the\tend",
+                                        "",
+                                        "Zz Top",
+                                        "\xC2\xA0"
+                                        "Nina"};
+    for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
+        char key[SORT_KEY_CAPACITY];
+        sort_key_make(NAMES[index], key, sizeof key);
+        unsigned char first = (unsigned char)key[0];
+        unsigned char initial = (unsigned char)sort_key_initial(NAMES[index]);
+        CHECK_EQUAL(category(first), category(initial));
+        if (category(first) == 1) {
+            CHECK_EQUAL(first, initial);
+        }
+    }
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_initial_matches_the_first_byte_of_the_key),
         TEST_CASE(keys_match_the_pc_indexer),
         TEST_CASE(comparison_follows_the_keys),
         TEST_CASE(a_long_text_is_cut_at_the_capacity),

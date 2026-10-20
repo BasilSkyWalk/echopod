@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "gfx/text.h"
 #include "ui/label.h"
 
 enum {
@@ -10,6 +11,9 @@ enum {
 };
 
 static const char CHEVRON[] = "\xE2\x80\xBA";
+static const char SECTION_LABELS[][2] = {"#", "A", "B", "C", "D", "E", "F", "G", "H", "I",
+                                         "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
+                                         "T", "U", "V", "W", "X", "Y", "Z", "#"};
 
 typedef struct Row {
     int index;
@@ -71,6 +75,85 @@ void list_view_move(ListView *view, int delta, bool wrap, uint32_t now_ms)
     view->selected = target;
     view->selection_changed_ms = now_ms;
     keep_selection_visible(view);
+}
+
+void list_view_start_scroll(ListView *view, int direction, uint32_t now_ms)
+{
+    view->scroll_started_ms = now_ms;
+    list_view_move(view, direction, true, now_ms);
+}
+
+static int section_at(const ListView *view, int index)
+{
+    return view->model->section(view->model->context, index);
+}
+
+static int first_of_section_at_least(const ListView *view, int section, int low, int high)
+{
+    while (low < high) {
+        int middle = low + (high - low) / 2;
+        if (section_at(view, middle) >= section) {
+            high = middle;
+        } else {
+            low = middle + 1;
+        }
+    }
+    return low;
+}
+
+static int section_jump_target(const ListView *view, int direction)
+{
+    int count = item_count(view);
+    int current = view->selected;
+    int section = section_at(view, current);
+    if (direction > 0) {
+        return first_of_section_at_least(view, section + 1, current + 1, count);
+    }
+    int start = first_of_section_at_least(view, section, 0, current);
+    if (start < current || current == 0) {
+        return start;
+    }
+    return first_of_section_at_least(view, section_at(view, current - 1), 0, current - 1);
+}
+
+void list_view_keep_scrolling(ListView *view, int direction, uint32_t now_ms)
+{
+    uint32_t held_ms = now_ms - view->scroll_started_ms;
+    if (held_ms < LIST_FAST_SCROLL_AFTER_MS) {
+        list_view_move(view, direction, false, now_ms);
+        return;
+    }
+    bool sectioned = view->model->section != NULL;
+    if (sectioned) {
+        view->section_shown_until_ms = now_ms + LIST_SECTION_SHOWN_MS;
+    }
+    if (held_ms < LIST_SECTION_JUMP_AFTER_MS) {
+        list_view_move(view, direction * LIST_FAST_SCROLL_ROWS, false, now_ms);
+    } else if (sectioned) {
+        list_view_select(view, section_jump_target(view, direction), now_ms);
+    } else {
+        list_view_move(view, direction * LIST_FASTEST_SCROLL_ROWS, false, now_ms);
+    }
+}
+
+int list_section_of_key(const char *key)
+{
+    unsigned char first = (unsigned char)key[0];
+    if (first < 'a') {
+        return LIST_SECTION_BEFORE_LETTERS;
+    }
+    if (first > 'z') {
+        return LIST_SECTION_AFTER_LETTERS;
+    }
+    return LIST_SECTION_FIRST_LETTER + (first - 'a');
+}
+
+const char *list_section_label(int section)
+{
+    if (section < LIST_SECTION_BEFORE_LETTERS || section > LIST_SECTION_AFTER_LETTERS) {
+        return SECTION_LABELS[LIST_SECTION_BEFORE_LETTERS];
+    }
+    return SECTION_LABELS[section];
 }
 
 void list_view_select(ListView *view, int index, uint32_t now_ms)
@@ -180,6 +263,24 @@ static Row make_row(const ListView *view, Rect rows, int position)
     return (Row){.index = index, .area = area, .text = text, .selected = index == view->selected};
 }
 
+static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32_t now_ms)
+{
+    if (view->model->section == NULL || item_count(view) == 0 ||
+        (int32_t)(now_ms - view->section_shown_until_ms) >= 0) {
+        return;
+    }
+    const Theme *theme = view->theme;
+    int side = area.height * 2 / 3 < area.width ? area.height * 2 / 3 : area.width;
+    Rect box = {area.x + (area.width - side) / 2, area.y + (area.height - side) / 2, side, side};
+    Rect inner = {box.x + 1, box.y + 1, side - 2, side - 2};
+    canvas_fill_rect(canvas, box, theme->colors.divider);
+    canvas_fill_rect(canvas, inner, theme->colors.header_background);
+    TextStyle style = {.font = theme->fonts.title, .color = theme->colors.header_text};
+    int scale = max_of(1, side / (font_line_height(style.font) + 4));
+    const char *label = list_section_label(section_at(view, view->selected));
+    text_draw_glyph_scaled(canvas, style, inner, (uint32_t)(unsigned char)label[0], scale);
+}
+
 void list_view_draw(const ListView *view, Canvas *canvas, Rect area, uint32_t now_ms)
 {
     canvas_fill_rect(canvas, area, view->theme->colors.background);
@@ -197,4 +298,5 @@ void list_view_draw(const ListView *view, Canvas *canvas, Rect area, uint32_t no
             draw_row(view, canvas, row, now_ms);
         }
     }
+    draw_section(view, canvas, area, now_ms);
 }

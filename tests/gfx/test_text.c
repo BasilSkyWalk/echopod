@@ -87,9 +87,24 @@ static void a_span_draws_only_its_bytes(void)
     CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 4, 1));
 }
 
+static void a_scaled_glyph_is_centred_in_its_box(void)
+{
+    Canvas canvas = blank_canvas();
+    text_draw_glyph_scaled(&canvas, INK_STYLE, (Rect){0, 0, WIDTH, HEIGHT}, 'A', 2);
+    CHECK(canvas_pixel_at(&canvas, 3, 0) != BACKGROUND);
+    CHECK(canvas_pixel_at(&canvas, 6, 3) != BACKGROUND);
+    CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 6, 0));
+    CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 3, 3));
+    for (int y = 0; y < HEIGHT; y++) {
+        CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 2, y));
+        CHECK_EQUAL(BACKGROUND, canvas_pixel_at(&canvas, 7, y));
+    }
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(a_scaled_glyph_is_centred_in_its_box),
         TEST_CASE(width_is_the_sum_of_advances),
         TEST_CASE(unknown_characters_measure_as_the_fallback),
         TEST_CASE(glyphs_sit_on_the_baseline_after_their_bearing),
