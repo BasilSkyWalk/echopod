@@ -97,6 +97,13 @@ static void a_real_change_moves_the_shown_percent(void)
     CHECK_EQUAL(36, battery_display_update(&display, 36));
 }
 
+static void a_boot_below_3400_mv_on_battery_switches_off(void)
+{
+    CHECK(battery_boot_cutoff(3399, false));
+    CHECK(!battery_boot_cutoff(3400, false));
+    CHECK(!battery_boot_cutoff(3000, true));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -111,6 +118,7 @@ int main(void)
         TEST_CASE(the_shown_percent_starts_at_the_first_level),
         TEST_CASE(a_one_point_wobble_keeps_the_shown_percent),
         TEST_CASE(a_real_change_moves_the_shown_percent),
+        TEST_CASE(a_boot_below_3400_mv_on_battery_switches_off),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

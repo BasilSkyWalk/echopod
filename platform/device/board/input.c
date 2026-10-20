@@ -20,7 +20,8 @@
 static const GpioPin POWER_KEY = {2, 5};
 
 enum {
-    SCANS_PER_BATTERY_READING = 20
+    SCANS_PER_BATTERY_READING = 20,
+    BOOT_READING_WAIT_MS = 2
 };
 
 static KeyScanner scanner;
@@ -48,6 +49,13 @@ static void record_battery(void)
     if (battery_gauge_known(&gauge)) {
         board_start_record_battery(battery_gauge_millivolts(&gauge));
     }
+}
+
+uint16_t board_battery_boot_reading(void)
+{
+    start_conversion(ADC_BATTERY_CHANNEL);
+    board_delay_ms(BOOT_READING_WAIT_MS);
+    return (uint16_t)(register_read(ADC_RESULT) & ADC_RESULT_MASK);
 }
 
 void board_input_start(void)

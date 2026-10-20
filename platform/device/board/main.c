@@ -2,7 +2,9 @@
 
 #include "app/app.h"
 #include "board.h"
+#include "device/battery_gauge.h"
 #include "hal/clock.h"
+#include "hal/power.h"
 #include "hal/system.h"
 #include "storage_reset.h"
 #include "update.h"
@@ -12,7 +14,8 @@
 
 enum {
     START_CLOCK_MHZ = 96,
-    HOST_WAIT_MS = 3000
+    HOST_WAIT_MS = 3000,
+    EMPTY_NOTICE_MS = 2000
 };
 
 typedef enum UsbState {
@@ -94,6 +97,16 @@ static void check_usb(void)
     }
 }
 
+static void switch_off_when_empty(uint32_t boot_millivolts)
+{
+    if (!battery_boot_cutoff(boot_millivolts, usb_vbus_present())) {
+        return;
+    }
+    app_show_notice("Battery low", "Charge the player to turn it on");
+    board_delay_ms(EMPTY_NOTICE_MS);
+    hal_power_off();
+}
+
 static void sleep_while_dark(void)
 {
     if (!board_display_lit()) {
@@ -110,8 +123,11 @@ void board_main(void)
     board_clock_start();
     board_stall_pause(true);
     hal_system_set_clock_mhz(START_CLOCK_MHZ);
+    board_watchdog_start();
+    uint32_t boot_millivolts = battery_millivolts(board_battery_boot_reading());
     board_input_start();
     board_display_start();
+    switch_off_when_empty(boot_millivolts);
     app_start();
     app_show_splash();
     board_stall_pause(false);

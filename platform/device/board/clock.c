@@ -78,6 +78,7 @@ void board_systick_handler(const uint32_t *frame)
         return;
     }
     periods_since_scan = 0;
+    board_watchdog_kick();
     uint32_t now_ms = tick_clock_milliseconds(&clock, read_counter());
     board_input_sample(now_ms);
     board_start_record_tick(now_ms);

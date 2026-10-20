@@ -153,12 +153,22 @@ static const char *core1_failure_text(HalCore1Status status)
 
 static const char *step_name(HalStartStep step, bool finished)
 {
-    static const char *const OPEN_NAMES[HAL_START_STEP_COUNT] = {
-        "",          "backlight on", "backlight off", "clock switch", "core 1 start", "core 1 stop",
-        "card write"};
-    static const char *const DONE_NAMES[HAL_START_STEP_COUNT] = {
-        "",          "Backlight on", "Backlight off", "Clock switch", "Core 1 start", "Core 1 stop",
-        "Card write"};
+    static const char *const OPEN_NAMES[HAL_START_STEP_COUNT] = {"",
+                                                                 "backlight on",
+                                                                 "backlight off",
+                                                                 "clock switch",
+                                                                 "core 1 start",
+                                                                 "core 1 stop",
+                                                                 "card write",
+                                                                 "watchdog test"};
+    static const char *const DONE_NAMES[HAL_START_STEP_COUNT] = {"",
+                                                                 "Backlight on",
+                                                                 "Backlight off",
+                                                                 "Clock switch",
+                                                                 "Core 1 start",
+                                                                 "Core 1 stop",
+                                                                 "Card write",
+                                                                 "Watchdog test"};
     return finished ? DONE_NAMES[step] : OPEN_NAMES[step];
 }
 

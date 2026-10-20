@@ -22,6 +22,7 @@ add_executable(echo_device
     board/power.c
     board/sd.c
     board/start_info.c
+    board/watchdog.c
     board/startup.c
     board/storage.c
     board/system.c

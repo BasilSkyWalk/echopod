@@ -29,6 +29,7 @@ add_library(echo_device_logic STATIC
     audio_math.c
     backlight.c
     battery_gauge.c
+    watchdog.c
     bt_module.c
     core1_control.c
     core1_mp3.c

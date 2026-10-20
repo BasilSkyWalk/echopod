@@ -29,7 +29,11 @@ void device_systick_entry(void);
 void board_stall_beat(void);
 void board_stall_pause(bool paused);
 void board_panic_stall(uint32_t pc, uint32_t lr);
-void board_panic_fault(uint32_t pc, uint32_t lr, uint32_t status);
+void board_panic_fault(const uint32_t *frame, uint32_t status);
+void board_watchdog_start(void);
+void board_watchdog_kick(void);
+void board_watchdog_after_clock_change(void);
+uint16_t board_battery_boot_reading(void);
 const char *board_audio_current_path(void);
 const char *board_audio_last_path(void);
 typedef enum Core1Program {

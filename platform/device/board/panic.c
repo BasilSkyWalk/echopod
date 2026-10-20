@@ -19,6 +19,10 @@ enum {
     HEX_DIGITS = 8,
     MILLISECONDS_PER_SECOND = 1000,
     POWER_HOLD_MS = 2000,
+    STACKED_LR_WORD = 5,
+    STACKED_PC_WORD = 6,
+    FRAME_WORDS = 8,
+    WORDS_PER_LINE = 3,
     WHITE = 0xFFFF,
     BLACK = 0x0000
 };
@@ -87,12 +91,39 @@ void board_panic_stall(uint32_t pc, uint32_t lr)
     draw_run_line();
 }
 
-void board_panic_fault(uint32_t pc, uint32_t lr, uint32_t status)
+static void draw_pair_line(const char *first_label, uint32_t first, const char *second_label,
+                           uint32_t second)
+{
+    char text[LINE_CAPACITY];
+    StringBuilder builder = string_builder_make(text, sizeof text);
+    string_builder_append(&builder, first_label);
+    append_hex(&builder, first);
+    string_builder_append_char(&builder, ' ');
+    string_builder_append(&builder, second_label);
+    append_hex(&builder, second);
+    draw_line(text);
+}
+
+static void draw_words_line(const uint32_t *words)
+{
+    char text[LINE_CAPACITY];
+    StringBuilder builder = string_builder_make(text, sizeof text);
+    for (int index = 0; index < WORDS_PER_LINE; index++) {
+        if (index > 0) {
+            string_builder_append_char(&builder, ' ');
+        }
+        append_hex(&builder, words[index]);
+    }
+    draw_line(text);
+}
+
+void board_panic_fault(const uint32_t *frame, uint32_t status)
 {
     start_screen("FAULT");
-    draw_hex_line("PC ", pc);
-    draw_hex_line("LR ", lr);
-    draw_hex_line("CFSR ", status);
+    draw_pair_line("PC ", frame[STACKED_PC_WORD], "LR ", frame[STACKED_LR_WORD]);
+    draw_pair_line("CFSR ", status, "SP ", (uint32_t)(uintptr_t)frame);
+    draw_words_line(frame + FRAME_WORDS);
+    draw_words_line(frame + FRAME_WORDS + WORDS_PER_LINE);
     draw_run_line();
 }
 

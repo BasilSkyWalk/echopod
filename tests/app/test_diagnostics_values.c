@@ -336,9 +336,21 @@ static void the_high_ram_row_reports_each_outcome(void)
     CHECK(text_is("Call gave 00000012", text));
 }
 
+static void the_watchdog_test_is_named_in_the_last_step_row(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_last_step_text((HalStartInfo){.warm = true,
+                                              .last_step = HAL_START_STEP_WATCHDOG_TEST,
+                                              .last_step_finished = false,
+                                              .last_step_ms = 12000},
+                               text, sizeof text);
+    CHECK(strcmp("In watchdog test at 12 s", text) == 0);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_watchdog_test_is_named_in_the_last_step_row),
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
         TEST_CASE(the_last_start_row_tells_cold_starts_resets_and_faults_apart),

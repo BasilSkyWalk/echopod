@@ -58,8 +58,9 @@ void device_fault_handler(const uint32_t *frame)
 {
     start_record_fault(&record, register_read(SCB_CFSR), register_read(SCB_HFSR),
                        frame[STACKED_PC_WORD]);
-    board_panic_fault(frame[STACKED_PC_WORD], frame[STACKED_LR_WORD], register_read(SCB_CFSR));
+    board_panic_fault(frame, register_read(SCB_CFSR));
     for (;;) {
+        board_watchdog_kick();
     }
 }
 

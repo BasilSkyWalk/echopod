@@ -72,6 +72,7 @@ static void run_from_crystal(void)
     power_down_pll();
     use_slow_speed_bits();
     current_mhz = CRYSTAL_MHZ;
+    board_watchdog_after_clock_change();
 }
 
 static void program_pll(const PllSetting *setting)
@@ -120,6 +121,7 @@ static bool run_from_pll(uint32_t mhz)
     register_write(CRU_MODE, MODE_FROM_PLL);
     board_clock_set_rate(mhz);
     current_mhz = mhz;
+    board_watchdog_after_clock_change();
     return true;
 }
 

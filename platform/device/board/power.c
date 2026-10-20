@@ -66,6 +66,7 @@ void board_power_cut(void)
     gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
     gpio_output(POWER_HOLD, false);
     for (;;) {
+        board_watchdog_kick();
     }
 }
 
@@ -85,5 +86,6 @@ void hal_power_off(void)
     gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
     gpio_output(POWER_HOLD, false);
     for (;;) {
+        board_watchdog_kick();
     }
 }

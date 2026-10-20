@@ -54,6 +54,7 @@ enum {
     DIAGNOSTICS_DMA_TONE_INDEX = 8,
     DIAGNOSTICS_ACCEL_INDEX = 25,
     DIAGNOSTICS_HIGH_RATE_TONE_INDEX = 26,
+    DIAGNOSTICS_WATCHDOG_TEST_INDEX = 27,
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
     DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
@@ -1486,6 +1487,15 @@ static void the_stall_test_row_freezes_the_main_loop_on_purpose(void)
     CHECK_EQUAL(1, fake_hal_stall_test_count());
 }
 
+static void the_watchdog_test_row_stops_everything_on_purpose(void)
+{
+    start_app();
+    open_diagnostics_row(DIAGNOSTICS_WATCHDOG_TEST_INDEX);
+    CHECK_EQUAL(0, fake_hal_watchdog_test_count());
+    tap(KEY_PLAY);
+    CHECK_EQUAL(1, fake_hal_watchdog_test_count());
+}
+
 static void ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off(void)
 {
     start_app();
@@ -1656,6 +1666,7 @@ int main(void)
         TEST_CASE(the_high_rate_tone_plays_at_192_khz),
         TEST_CASE(the_dma_tone_plays_at_44_1_khz),
         TEST_CASE(the_stall_test_row_freezes_the_main_loop_on_purpose),
+        TEST_CASE(the_watchdog_test_row_stops_everything_on_purpose),
         TEST_CASE(ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off),
         TEST_CASE(the_loop_benchmark_runs_once_per_press),
         TEST_CASE(the_core_1_test_runs_once_per_press),

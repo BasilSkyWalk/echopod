@@ -5,7 +5,8 @@
 
 enum {
     BATTERY_GAUGE_READINGS = 64,
-    BATTERY_DISPLAY_STEP = 2
+    BATTERY_DISPLAY_STEP = 2,
+    BATTERY_BOOT_CUTOFF_MILLIVOLTS = 3400
 };
 
 typedef struct BatteryGauge {
@@ -16,6 +17,7 @@ typedef struct BatteryGauge {
 
 uint32_t battery_millivolts(uint16_t raw);
 uint8_t battery_percent_for(uint32_t millivolts);
+bool battery_boot_cutoff(uint32_t millivolts, bool usb_power);
 void battery_gauge_init(BatteryGauge *gauge);
 void battery_gauge_add(BatteryGauge *gauge, uint16_t raw);
 bool battery_gauge_known(const BatteryGauge *gauge);

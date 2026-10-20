@@ -79,6 +79,7 @@ typedef struct FakeHal {
     int write_count;
     uint32_t clock_mhz;
     int stall_test_count;
+    int watchdog_test_count;
     int keep_alive_count;
     bool restart_pending;
     HalReserveResult reserve_result;
@@ -629,6 +630,16 @@ void hal_system_stall_test(void)
 int fake_hal_stall_test_count(void)
 {
     return fake.stall_test_count;
+}
+
+void hal_system_watchdog_test(void)
+{
+    fake.watchdog_test_count++;
+}
+
+int fake_hal_watchdog_test_count(void)
+{
+    return fake.watchdog_test_count;
 }
 
 void hal_system_keep_alive(void)

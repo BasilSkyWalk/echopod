@@ -17,6 +17,11 @@ uint32_t battery_millivolts(uint16_t raw)
     return (uint32_t)raw * FULL_SCALE_MILLIVOLTS / ADC_STEPS;
 }
 
+bool battery_boot_cutoff(uint32_t millivolts, bool usb_power)
+{
+    return !usb_power && millivolts < BATTERY_BOOT_CUTOFF_MILLIVOLTS;
+}
+
 uint8_t battery_percent_for(uint32_t millivolts)
 {
     size_t points = sizeof CURVE_MILLIVOLTS / sizeof CURVE_MILLIVOLTS[0];

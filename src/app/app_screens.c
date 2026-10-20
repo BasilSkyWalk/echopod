@@ -280,6 +280,13 @@ static ScreenAction run_stall_test(void *context)
     return screen_action_none();
 }
 
+static ScreenAction run_watchdog_test(void *context)
+{
+    (void)context;
+    hal_system_watchdog_test();
+    return screen_action_none();
+}
+
 static ScreenAction play_test_tone(void *context)
 {
     ToneOption *tone = context;
@@ -542,6 +549,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = toggle_dma_tone,
                                                 .context = &screens->high_rate_tone,
                                                 .value = dma_tone_value};
+    screens->diagnostics_items[27] = (MenuItem){
+        .label = "Watchdog test", .select = run_watchdog_test, .context = NULL, .value = NULL};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }
