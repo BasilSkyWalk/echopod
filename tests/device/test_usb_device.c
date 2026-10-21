@@ -152,6 +152,98 @@ static void unknown_requests_stall(void)
     CHECK_EQUAL(USB_REPLY_STALL, usb_device_setup(&device, setup(0x40, 0x33, 0, 0, 0)).kind);
 }
 
+static UsbDevice high_speed_device(UsbSpeed speed)
+{
+    UsbDevice device = ready_device();
+    usb_device_allow_high_speed(&device, true);
+    usb_device_set_speed(&device, speed);
+    return device;
+}
+
+static uint16_t packet_size_at(const uint8_t *configuration, int offset)
+{
+    return (uint16_t)(configuration[offset + 4] | configuration[offset + 5] << 8);
+}
+
+static void without_high_speed_the_qualifier_and_other_speed_stall(void)
+{
+    UsbDevice device = ready_device();
+    CHECK_EQUAL(USB_REPLY_STALL, usb_device_setup(&device, setup(0x80, 6, 0x0600, 0, 10)).kind);
+    CHECK_EQUAL(USB_REPLY_STALL, usb_device_setup(&device, setup(0x80, 6, 0x0700, 0, 255)).kind);
+    CHECK_EQUAL(USB_PACKET_SIZE, usb_device_bulk_packet_size(&device));
+}
+
+static void a_high_speed_device_has_a_qualifier(void)
+{
+    static const uint8_t expected[10] = {10, 6, 0x00, 0x02, 0, 0, 0, 64, 1, 0};
+    UsbDevice device = high_speed_device(USB_SPEED_FULL);
+    UsbReply reply = usb_device_setup(&device, setup(0x80, 6, 0x0600, 0, 10));
+    CHECK_EQUAL(USB_REPLY_DATA, reply.kind);
+    CHECK_EQUAL(10, reply.length);
+    if (reply.kind != USB_REPLY_DATA) {
+        return;
+    }
+    for (int index = 0; index < 10; index++) {
+        CHECK_EQUAL(expected[index], reply.data[index]);
+    }
+}
+
+static void at_high_speed_bulk_packets_are_512_bytes(void)
+{
+    UsbDevice device = high_speed_device(USB_SPEED_HIGH);
+    UsbReply reply = usb_device_setup(&device, setup(0x80, 6, 0x0200, 0, 255));
+    CHECK_EQUAL(32, reply.length);
+    CHECK_EQUAL(2, reply.data[1]);
+    CHECK_EQUAL(USB_ENDPOINT_BULK_IN, reply.data[18 + 2]);
+    CHECK_EQUAL(512, packet_size_at(reply.data, 18));
+    CHECK_EQUAL(512, packet_size_at(reply.data, 25));
+    CHECK_EQUAL(0, reply.data[25 + 6]);
+    CHECK_EQUAL(USB_HIGH_SPEED_PACKET_SIZE, usb_device_bulk_packet_size(&device));
+}
+
+static void at_high_speed_the_other_speed_is_full_speed(void)
+{
+    UsbDevice device = high_speed_device(USB_SPEED_HIGH);
+    UsbReply reply = usb_device_setup(&device, setup(0x80, 6, 0x0700, 0, 255));
+    CHECK_EQUAL(USB_REPLY_DATA, reply.kind);
+    CHECK_EQUAL(32, reply.length);
+    if (reply.kind != USB_REPLY_DATA) {
+        return;
+    }
+    CHECK_EQUAL(7, reply.data[1]);
+    CHECK_EQUAL(64, packet_size_at(reply.data, 18));
+    CHECK_EQUAL(64, packet_size_at(reply.data, 25));
+}
+
+static void at_full_speed_the_other_speed_is_high_speed(void)
+{
+    UsbDevice device = high_speed_device(USB_SPEED_FULL);
+    UsbReply current = usb_device_setup(&device, setup(0x80, 6, 0x0200, 0, 255));
+    CHECK_EQUAL(2, current.data[1]);
+    CHECK_EQUAL(64, packet_size_at(current.data, 18));
+    UsbReply other = usb_device_setup(&device, setup(0x80, 6, 0x0700, 0, 255));
+    CHECK_EQUAL(USB_REPLY_DATA, other.kind);
+    if (other.kind != USB_REPLY_DATA) {
+        return;
+    }
+    CHECK_EQUAL(7, other.data[1]);
+    CHECK_EQUAL(512, packet_size_at(other.data, 18));
+    CHECK_EQUAL(512, packet_size_at(other.data, 25));
+    CHECK_EQUAL(USB_PACKET_SIZE, usb_device_bulk_packet_size(&device));
+}
+
+static void a_short_configuration_request_still_gets_the_right_type(void)
+{
+    UsbDevice device = high_speed_device(USB_SPEED_HIGH);
+    UsbReply reply = usb_device_setup(&device, setup(0x80, 6, 0x0700, 0, 9));
+    CHECK_EQUAL(9, reply.length);
+    if (reply.kind != USB_REPLY_DATA) {
+        return;
+    }
+    CHECK_EQUAL(7, reply.data[1]);
+    CHECK_EQUAL(32, reply.data[2]);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -168,6 +260,12 @@ int main(void)
         TEST_CASE(get_max_lun_reports_the_last_lun),
         TEST_CASE(a_mass_storage_reset_is_acknowledged),
         TEST_CASE(unknown_requests_stall),
+        TEST_CASE(without_high_speed_the_qualifier_and_other_speed_stall),
+        TEST_CASE(a_high_speed_device_has_a_qualifier),
+        TEST_CASE(at_high_speed_bulk_packets_are_512_bytes),
+        TEST_CASE(at_high_speed_the_other_speed_is_full_speed),
+        TEST_CASE(at_full_speed_the_other_speed_is_high_speed),
+        TEST_CASE(a_short_configuration_request_still_gets_the_right_type),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

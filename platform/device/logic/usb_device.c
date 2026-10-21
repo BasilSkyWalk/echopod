@@ -24,6 +24,11 @@ enum {
     DESCRIPTOR_DEVICE = 1,
     DESCRIPTOR_CONFIGURATION = 2,
     DESCRIPTOR_STRING = 3,
+    DESCRIPTOR_DEVICE_QUALIFIER = 6,
+    DESCRIPTOR_OTHER_SPEED_CONFIGURATION = 7,
+    CONFIGURATION_TYPE_OFFSET = 1,
+    BULK_IN_PACKET_OFFSET = 22,
+    BULK_OUT_PACKET_OFFSET = 29,
     FEATURE_ENDPOINT_HALT = 0,
     STRING_SERIAL = 3
 };
@@ -67,6 +72,9 @@ static const uint8_t CONFIGURATION_DESCRIPTOR[] = {
     0,
     0,
 };
+
+static const uint8_t DEVICE_QUALIFIER[] = {10, 6, 0x00, 0x02, 0x00, 0x00, 0x00, USB_PACKET_SIZE,
+                                           1,  0};
 
 static const uint8_t LANGUAGES[] = {4, 3, 0x09, 0x04};
 static const uint8_t MANUFACTURER[] = {26,  3, 'e', 0, 'c', 0, 'h', 0, 'o', 0, '-', 0, 'm', 0,
@@ -121,7 +129,35 @@ static UsbReply string_descriptor(const UsbDevice *device, uint8_t index, UsbSet
     return data(STRINGS[index], STRINGS[index][0], setup);
 }
 
-static UsbReply descriptor(const UsbDevice *device, UsbSetup setup)
+static uint16_t packet_size(UsbSpeed speed)
+{
+    return speed == USB_SPEED_HIGH ? USB_HIGH_SPEED_PACKET_SIZE : USB_PACKET_SIZE;
+}
+
+static void put_packet_size(uint8_t *bytes, uint16_t size)
+{
+    bytes[0] = (uint8_t)size;
+    bytes[1] = (uint8_t)(size >> 8);
+}
+
+static UsbReply configuration(UsbDevice *device, uint8_t type, UsbSpeed speed, UsbSetup setup)
+{
+    uint8_t *reply = device->configuration_reply;
+    for (size_t index = 0; index < sizeof CONFIGURATION_DESCRIPTOR; index++) {
+        reply[index] = CONFIGURATION_DESCRIPTOR[index];
+    }
+    reply[CONFIGURATION_TYPE_OFFSET] = type;
+    put_packet_size(reply + BULK_IN_PACKET_OFFSET, packet_size(speed));
+    put_packet_size(reply + BULK_OUT_PACKET_OFFSET, packet_size(speed));
+    return data(reply, sizeof CONFIGURATION_DESCRIPTOR, setup);
+}
+
+static UsbSpeed other_speed(UsbSpeed speed)
+{
+    return speed == USB_SPEED_HIGH ? USB_SPEED_FULL : USB_SPEED_HIGH;
+}
+
+static UsbReply descriptor(UsbDevice *device, UsbSetup setup)
 {
     uint8_t type = (uint8_t)(setup.value >> 8);
     uint8_t index = (uint8_t)setup.value;
@@ -129,9 +165,17 @@ static UsbReply descriptor(const UsbDevice *device, UsbSetup setup)
     case DESCRIPTOR_DEVICE:
         return data(DEVICE_DESCRIPTOR, sizeof DEVICE_DESCRIPTOR, setup);
     case DESCRIPTOR_CONFIGURATION:
-        return data(CONFIGURATION_DESCRIPTOR, sizeof CONFIGURATION_DESCRIPTOR, setup);
+        return configuration(device, DESCRIPTOR_CONFIGURATION, device->speed, setup);
     case DESCRIPTOR_STRING:
         return string_descriptor(device, index, setup);
+    case DESCRIPTOR_DEVICE_QUALIFIER:
+        return device->high_speed_allowed ? data(DEVICE_QUALIFIER, sizeof DEVICE_QUALIFIER, setup)
+                                          : stall();
+    case DESCRIPTOR_OTHER_SPEED_CONFIGURATION:
+        return device->high_speed_allowed
+                   ? configuration(device, DESCRIPTOR_OTHER_SPEED_CONFIGURATION,
+                                   other_speed(device->speed), setup)
+                   : stall();
     default:
         return stall();
     }
@@ -214,4 +258,19 @@ UsbReply usb_device_setup(UsbDevice *device, UsbSetup setup)
     default:
         return stall();
     }
+}
+
+void usb_device_allow_high_speed(UsbDevice *device, bool allowed)
+{
+    device->high_speed_allowed = allowed;
+}
+
+void usb_device_set_speed(UsbDevice *device, UsbSpeed speed)
+{
+    device->speed = speed;
+}
+
+uint16_t usb_device_bulk_packet_size(const UsbDevice *device)
+{
+    return packet_size(device->speed);
 }
