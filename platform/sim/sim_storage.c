@@ -228,7 +228,8 @@ static bool describe(int slot, const char *name, HalDirEntry *entry)
     }
     entry->directory = S_ISDIR(status.st_mode);
     entry->hidden = name[0] == '.';
-    entry->size = entry->directory || status.st_size > UINT32_MAX ? 0 : (uint32_t)status.st_size;
+    entry->size =
+        entry->directory || (uint64_t)status.st_size > UINT32_MAX ? 0 : (uint32_t)status.st_size;
     entry->modified = (uint32_t)status.st_mtime;
     strcpy(entry->name, name);
     return true;

@@ -22,7 +22,6 @@ static FlacSource source;
 static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
 static Fixture opened;
-static int open_count;
 
 static Fixture load(const char *name, const char *extension)
 {
@@ -59,7 +58,6 @@ static bool open_file(void *context, const char *path, FlacInput *input)
     (void)context;
     free(opened.bytes);
     opened = load(path, "flac");
-    open_count++;
     *input = (FlacInput){.read = read_fixture, .context = &opened, .size = opened.size};
     return opened.size > 0;
 }
@@ -71,7 +69,6 @@ static void close_file(void *context)
 
 static void start_engine(void)
 {
-    open_count = 0;
     flac_source_init(&source,
                      (FlacFileOpener){.open = open_file, .close = close_file, .context = NULL},
                      &decoder);

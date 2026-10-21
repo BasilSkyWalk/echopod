@@ -92,8 +92,8 @@ static void three_pixels_per_cell_average_exactly(void)
 
 static double reference_cell(uint32_t span, uint32_t cell, const uint8_t *row)
 {
-    double low = (double)cell * span / FULL;
-    double high = (double)(cell + 1) * span / FULL;
+    double low = (double)cell * span / (double)FULL;
+    double high = (double)(cell + 1) * span / (double)FULL;
     double sum = 0.0;
     for (uint32_t x = (uint32_t)low; x < span && x < high; x++) {
         double from = x > low ? x : low;
