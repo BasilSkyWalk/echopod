@@ -28,6 +28,7 @@
 #define DIEPTXF1 0x104u
 #define DCFG 0x800u
 #define DCTL 0x804u
+#define DSTS 0x808u
 #define DIEPMSK 0x810u
 #define DOEPMSK 0x814u
 #define DAINT 0x818u
@@ -49,6 +50,10 @@
 #define GINTMSK_VALUE 0xC00C3C10u
 #define DCFG_CLEARED_BITS 0x7F3u
 #define DCFG_FULL_SPEED 0x1u
+#define DCFG_HIGH_SPEED 0x0u
+#define DSTS_SPEED_SHIFT 1
+#define DSTS_SPEED_MASK 0x3u
+#define DSTS_HIGH_SPEED 0x0u
 #define DCFG_ADDRESS_SHIFT 4
 #define DCFG_ADDRESS_MASK (0x7Fu << DCFG_ADDRESS_SHIFT)
 #define DCTL_SOFT_DISCONNECT (1u << 1)
@@ -232,7 +237,7 @@ static void capture_core_registers(void)
                                   .nptx_fifo = read_register(GNPTXFSIZ)};
 }
 
-static UsbConnectStep reset_core(void)
+static UsbConnectStep reset_core(bool high_speed)
 {
     set_bits(DCTL, DCTL_SOFT_DISCONNECT);
     uint32_t start = hal_clock_milliseconds();
@@ -250,7 +255,8 @@ static UsbConnectStep reset_core(void)
     board_delay_ms(CLOCK_GATE_MS);
     write_register(PCGCCTL, 0);
     set_bits(GAHBCFG, GAHBCFG_TX_EMPTY_LEVEL);
-    write_register(DCFG, (read_register(DCFG) & ~DCFG_CLEARED_BITS) | DCFG_FULL_SPEED);
+    uint32_t speed = high_speed ? DCFG_HIGH_SPEED : DCFG_FULL_SPEED;
+    write_register(DCFG, (read_register(DCFG) & ~DCFG_CLEARED_BITS) | speed);
     return USB_CONNECT_OK;
 }
 
@@ -297,7 +303,7 @@ static void reset_endpoint_zero(void)
 
 static UsbConnectStep prepare_core(UsbPort *port)
 {
-    UsbConnectStep step = reset_core();
+    UsbConnectStep step = reset_core(port->high_speed_allowed);
     if (step != USB_CONNECT_OK) {
         return step;
     }
@@ -314,6 +320,8 @@ UsbProbe usb_probe(void)
 
 bool usb_connect(UsbPort *port)
 {
+    port->bulk_packet = USB_PACKET_SIZE;
+    usb_device_set_speed(&port->device, USB_SPEED_FULL);
     port->connect_step = prepare_core(port);
     if (port->connect_step != USB_CONNECT_OK) {
         return false;
@@ -330,9 +338,9 @@ static void arm_setup(void)
     set_bits(out_control(0), EP_ENABLE | EP_CLEAR_NAK);
 }
 
-static void arm_bulk_out(void)
+static void arm_bulk_out(const UsbPort *port)
 {
-    write_register(out_control(BULK_ENDPOINT) + 0x10u, ONE_PACKET | USB_PACKET_SIZE);
+    write_register(out_control(BULK_ENDPOINT) + 0x10u, ONE_PACKET | port->bulk_packet);
     set_bits(out_control(BULK_ENDPOINT), EP_ENABLE | EP_CLEAR_NAK);
 }
 
@@ -397,11 +405,11 @@ static void handle_reset(UsbPort *port)
 static void activate_bulk_endpoints(const UsbPort *port)
 {
     uint32_t tx_fifo = port->dedicated_fifos ? 1u << EP_TX_FIFO_SHIFT : 0;
-    write_register(in_control(BULK_ENDPOINT), USB_PACKET_SIZE | tx_fifo | EP_BULK_ACTIVE);
-    write_register(out_control(BULK_ENDPOINT), USB_PACKET_SIZE | EP_BULK_ACTIVE);
+    write_register(in_control(BULK_ENDPOINT), port->bulk_packet | tx_fifo | EP_BULK_ACTIVE);
+    write_register(out_control(BULK_ENDPOINT), port->bulk_packet | EP_BULK_ACTIVE);
     set_bits(DAINTMSK, DAINT_EP1);
     set_bits(DCTL, DCTL_CLEAR_GLOBAL_IN_NAK);
-    arm_bulk_out();
+    arm_bulk_out(port);
 }
 
 static void clear_halt(uint16_t endpoint)
@@ -452,11 +460,11 @@ static void process_setup(UsbPort *port)
     }
 }
 
-static void read_fifo(uint32_t *words, uint32_t bytes)
+static void read_fifo(uint32_t *words, uint32_t capacity_words, uint32_t bytes)
 {
     for (uint32_t index = 0; index < (bytes + 3) / 4; index++) {
         uint32_t value = read_register(fifo(0));
-        if (index < USB_PACKET_SIZE / 4) {
+        if (index < capacity_words) {
             words[index] = value;
         }
     }
@@ -469,13 +477,14 @@ static void handle_receive(UsbPort *port)
     uint32_t count = (status >> RX_STATUS_COUNT_SHIFT) & RX_STATUS_COUNT_MASK;
     uint32_t type = (status >> RX_STATUS_TYPE_SHIFT) & RX_STATUS_TYPE_MASK;
     if (type == PACKET_SETUP_DATA) {
-        read_fifo(port->setup, count);
+        read_fifo(port->setup, sizeof port->setup / 4, count);
         port->setup_pending = true;
     } else if (type == PACKET_OUT_DATA) {
-        read_fifo(port->out_packet, count);
+        read_fifo(port->out_packet, sizeof port->out_packet / 4, count);
         if (endpoint == BULK_ENDPOINT) {
+            uint32_t capacity = sizeof port->out_packet;
             msc_receive(port->msc, (const uint8_t *)port->out_packet,
-                        count < USB_PACKET_SIZE ? count : USB_PACKET_SIZE);
+                        count < capacity ? count : capacity);
         }
     }
 }
@@ -495,7 +504,7 @@ static void handle_out_endpoints(UsbPort *port)
         uint32_t events = read_register(out_control(BULK_ENDPOINT) + 0x08u);
         write_register(out_control(BULK_ENDPOINT) + 0x08u, events);
         if ((events & EP_INT_TRANSFER_DONE) != 0) {
-            arm_bulk_out();
+            arm_bulk_out(port);
         }
     }
 }
@@ -528,7 +537,8 @@ static bool wait_for_space(const UsbPort *port, uint32_t endpoint, uint32_t word
 
 static bool send_bulk(const UsbPort *port, const uint32_t *words, uint32_t length)
 {
-    uint32_t packets = length == 0 ? 1 : (length + USB_PACKET_SIZE - 1) / USB_PACKET_SIZE;
+    uint32_t packet = port->bulk_packet;
+    uint32_t packets = length == 0 ? 1 : (length + packet - 1) / packet;
     uint32_t total_words = (length + 3) / 4;
     write_register(in_control(BULK_ENDPOINT) + 0x10u, packets << PACKET_COUNT_SHIFT | length);
     set_bits(in_control(BULK_ENDPOINT), EP_ENABLE | EP_CLEAR_NAK);
@@ -578,6 +588,14 @@ bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms)
     return false;
 }
 
+static void take_speed(UsbPort *port)
+{
+    uint32_t speed = (read_register(DSTS) >> DSTS_SPEED_SHIFT) & DSTS_SPEED_MASK;
+    bool high = port->high_speed_allowed && speed == DSTS_HIGH_SPEED;
+    usb_device_set_speed(&port->device, high ? USB_SPEED_HIGH : USB_SPEED_FULL);
+    port->bulk_packet = usb_device_bulk_packet_size(&port->device);
+}
+
 void usb_poll(UsbPort *port)
 {
     uint32_t events = read_register(GINTSTS);
@@ -585,6 +603,7 @@ void usb_poll(UsbPort *port)
         handle_reset(port);
     }
     if ((events & GINT_ENUMERATION_DONE) != 0) {
+        take_speed(port);
         arm_setup();
         write_register(GINTSTS, GINT_ENUMERATION_DONE);
     }

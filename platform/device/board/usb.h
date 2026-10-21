@@ -29,8 +29,10 @@ typedef struct UsbPort {
     bool configured;
     bool in_busy;
     bool setup_pending;
+    bool high_speed_allowed;
+    uint16_t bulk_packet;
     uint32_t setup[2];
-    uint32_t out_packet[USB_PACKET_SIZE / 4];
+    uint32_t out_packet[USB_HIGH_SPEED_PACKET_SIZE / 4];
     UsbDevice device;
     Msc *msc;
 } UsbPort;

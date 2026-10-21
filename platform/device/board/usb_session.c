@@ -5,6 +5,7 @@
 #include "app/app.h"
 #include "core/string_builder.h"
 #include "device/block_device.h"
+#include "device/usb_fallback.h"
 #include "emmc.h"
 #include "hal/clock.h"
 #include "sd.h"
@@ -20,7 +21,8 @@ enum {
     INTERNAL_LUN = 0,
     CARD_LUN = 1,
     LUN_COUNT = 2,
-    WRITE_BUFFER_SECTORS = 64
+    WRITE_BUFFER_SECTORS = 64,
+    WORKING_COMMANDS = 2
 };
 
 static EmmcInfo internal;
@@ -28,6 +30,8 @@ static bool card_present;
 static UsbReport report;
 static UsbPort port;
 static Msc msc;
+static UsbFallback fallback;
+static bool high_speed_failed;
 static uint32_t write_buffer[WRITE_BUFFER_SECTORS * MSC_SECTOR_SIZE / 4]
     __attribute__((section(".high_ram")));
 
@@ -45,8 +49,9 @@ static void prepare_port(void)
     report.internal_ready = emmc_start(&internal);
     char serial[SERIAL_DIGITS + 1];
     serial_text(internal.serial, serial);
-    port = (UsbPort){.msc = &msc};
+    port = (UsbPort){.msc = &msc, .high_speed_allowed = !high_speed_failed};
     usb_device_init(&port.device, serial, LUN_COUNT);
+    usb_device_allow_high_speed(&port.device, port.high_speed_allowed);
 }
 
 static void prepare_luns(void)
@@ -108,6 +113,22 @@ static bool stats_changed(MscStats now, MscStats shown)
     return now.write_failures != shown.write_failures || now.read_failures != shown.read_failures;
 }
 
+static bool session_works(void)
+{
+    return port.configured && msc_stats(&msc).commands >= WORKING_COMMANDS;
+}
+
+static void fall_back_to_full_speed(void)
+{
+    high_speed_failed = true;
+    port.high_speed_allowed = false;
+    port.configured = false;
+    port.in_busy = false;
+    usb_device_allow_high_speed(&port.device, false);
+    msc_reset(&msc);
+    usb_connect(&port);
+}
+
 static UsbSessionEnd serve(void)
 {
     MscStats shown = msc_stats(&msc);
@@ -120,6 +141,9 @@ static UsbSessionEnd serve(void)
             refreshed = hal_clock_milliseconds();
         }
         usb_poll(&port);
+        if (usb_fallback_due(&fallback, session_works(), hal_clock_milliseconds())) {
+            fall_back_to_full_speed();
+        }
         if (msc_finished(&msc)) {
             finish_last_reply();
             return USB_SESSION_EJECTED;
@@ -160,6 +184,7 @@ UsbSessionEnd usb_session_run(void)
     usb_silence_audio();
     UsbSessionEnd end = USB_SESSION_NO_HOST;
     if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
+        usb_fallback_start(&fallback, port.high_speed_allowed, hal_clock_milliseconds());
         app_show_notice("USB", card_present ? "Connected. Eject both drives to finish."
                                             : "Connected. Eject the drive to finish.");
         end = serve();
