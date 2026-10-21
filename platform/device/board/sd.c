@@ -4,6 +4,7 @@
 
 #include "board.h"
 #include "cru.h"
+#include "device/card_write.h"
 #include "device/sd_card.h"
 #include "gpio.h"
 #include "mmc.h"
@@ -29,7 +30,6 @@ enum {
     GATE_SD_BUS = 0x18,
     GATE_SD_CARD_CLOCK = 0x6B,
     RESET_SD = 0x12,
-    CMD_WRITE_BLOCK = 24,
     CMD_SEND_STATUS = 13,
     STATUS_TRIES = 1000,
     POWER_SETTLE_MS = 1,
@@ -152,24 +152,38 @@ static bool wait_for_transfer_state(void)
     return false;
 }
 
+static bool write_data(void *context, uint8_t command, uint32_t address, uint32_t count,
+                       const uint32_t *words)
+{
+    (void)context;
+    return mmc_write_blocks(&SD_HOST, command, address, count, words);
+}
+
+static bool stop_writing(void *context)
+{
+    (void)context;
+    return mmc_stop(&SD_HOST, sd_card_rca_argument(&card));
+}
+
+static bool wait_until_ready(void *context)
+{
+    (void)context;
+    if (wait_for_transfer_state()) {
+        return true;
+    }
+    mmc_note_failure(&SD_HOST, MMC_STEP_TRANSFER_STATE);
+    return false;
+}
+
+static const CardWriter WRITER = {write_data, stop_writing, wait_until_ready, NULL};
+
 bool sd_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
 {
     (void)context;
-    const uint32_t *words = buffer;
     if (!ready || lba >= card.sector_count || count > card.sector_count - lba) {
         return false;
     }
-    for (uint32_t index = 0; index < count; index++) {
-        uint32_t address = sd_card_address(&card, lba + index);
-        if (!mmc_write_block(&SD_HOST, CMD_WRITE_BLOCK, address, words + index * 128u)) {
-            return false;
-        }
-        if (!wait_for_transfer_state()) {
-            mmc_note_failure(&SD_HOST, MMC_STEP_TRANSFER_STATE);
-            return false;
-        }
-    }
-    return true;
+    return card_write(&WRITER, sd_card_address(&card, lba), count, buffer);
 }
 
 uint32_t sd_sector_count(void)

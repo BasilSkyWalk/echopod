@@ -37,7 +37,9 @@ bool mmc_command(const MmcHost *host, SdCommand command, uint32_t response[4]);
 bool mmc_read_block(const MmcHost *host, uint8_t index, uint32_t address, uint32_t *words);
 bool mmc_read_blocks(const MmcHost *host, uint32_t address, uint32_t count, uint32_t stop_argument,
                      uint32_t *words);
-bool mmc_write_block(const MmcHost *host, uint8_t index, uint32_t address, const uint32_t *words);
+bool mmc_write_blocks(const MmcHost *host, uint8_t index, uint32_t address, uint32_t count,
+                      const uint32_t *words);
+bool mmc_stop(const MmcHost *host, uint32_t argument);
 void mmc_set_clock(const MmcHost *host, SdClock clock);
 void mmc_set_bus_width(const MmcHost *host, uint8_t bits);
 void mmc_stop_clock(const MmcHost *host);

@@ -326,11 +326,11 @@ bool mmc_read_blocks(const MmcHost *host, uint32_t address, uint32_t count, uint
     return stop_transmission(host, stop_argument) && read;
 }
 
-static bool fill_fifo(const MmcHost *host, const uint32_t *words)
+static bool fill_fifo(const MmcHost *host, const uint32_t *words, uint32_t total)
 {
     uint32_t sent = 0;
     uint32_t start = hal_clock_milliseconds();
-    while (sent < BLOCK_WORDS) {
+    while (sent < total) {
         if ((read_register(host, MMC_RINTSTS) & INT_DATA_ABORT) != 0 ||
             hal_clock_milliseconds() - start > DATA_TIMEOUT_MS) {
             return false;
@@ -339,7 +339,10 @@ static bool fill_fifo(const MmcHost *host, const uint32_t *words)
         uint32_t count = (status >> STATUS_FIFO_COUNT_SHIFT) & STATUS_FIFO_COUNT_MASK;
         uint32_t depth = *host->fifo_depth;
         uint32_t space = count < depth ? depth - count : 0;
-        while (space-- > 0 && sent < BLOCK_WORDS) {
+        if (space > 0) {
+            start = hal_clock_milliseconds();
+        }
+        while (space-- > 0 && sent < total) {
             write_register(host, MMC_FIFO, words[sent++]);
         }
     }
@@ -353,20 +356,26 @@ static bool failed(const MmcHost *host, MmcStep step)
     return false;
 }
 
-bool mmc_write_block(const MmcHost *host, uint8_t index, uint32_t address, const uint32_t *words)
+bool mmc_stop(const MmcHost *host, uint32_t argument)
+{
+    return stop_transmission(host, argument);
+}
+
+bool mmc_write_blocks(const MmcHost *host, uint8_t index, uint32_t address, uint32_t count,
+                      const uint32_t *words)
 {
     if (!prepare_data(host)) {
         return failed(host, MMC_STEP_BUSY_BEFORE);
     }
     write_register(host, MMC_BLKSIZ, BLOCK_BYTES);
-    write_register(host, MMC_BYTCNT, BLOCK_BYTES);
+    write_register(host, MMC_BYTCNT, BLOCK_BYTES * count);
     write_register(host, MMC_RINTSTS, INT_ALL);
     write_register(host, MMC_CMDARG, address);
     write_register(host, MMC_CMD, CMD_BASE | CMD_DATA_READ | CMD_WRITE | index);
     if (!wait_clear(host, MMC_CMD, CMD_START, COMMAND_TIMEOUT_MS)) {
         return failed(host, MMC_STEP_COMMAND_START);
     }
-    if (!fill_fifo(host, words)) {
+    if (!fill_fifo(host, words, BLOCK_WORDS * count)) {
         return failed(host, MMC_STEP_FIFO);
     }
     if (!wait_any(host, MMC_RINTSTS, INT_DATA_FINISHED, DATA_TIMEOUT_MS)) {

@@ -31,6 +31,7 @@ add_library(echo_device_logic STATIC
     battery_gauge.c
     watchdog.c
     bt_module.c
+    card_write.c
     core1_control.c
     core1_mp3.c
     core1_stream.c

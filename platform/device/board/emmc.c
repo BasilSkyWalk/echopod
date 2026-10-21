@@ -4,6 +4,7 @@
 
 #include "board.h"
 #include "cru.h"
+#include "device/card_write.h"
 #include "mmc.h"
 #include "registers.h"
 
@@ -41,7 +42,6 @@ enum {
     CMD_SEND_STATUS = 13,
     CMD_SET_BLOCK_LENGTH = 16,
     CMD_READ_SINGLE_BLOCK = 17,
-    CMD_WRITE_BLOCK = 24,
     OCR_TRIES = 8000,
     STATUS_TRIES = 1000,
     EXT_CSD_SECTOR_COUNT = 212,
@@ -160,24 +160,38 @@ bool emmc_read(void *context, uint32_t lba, uint32_t count, void *buffer)
     return true;
 }
 
+static bool write_data(void *context, uint8_t command, uint32_t address, uint32_t count,
+                       const uint32_t *words)
+{
+    (void)context;
+    return mmc_write_blocks(&EMMC_HOST, command, address, count, words);
+}
+
+static bool stop_writing(void *context)
+{
+    (void)context;
+    return mmc_stop(&EMMC_HOST, RCA_ARGUMENT);
+}
+
+static bool wait_until_ready(void *context)
+{
+    (void)context;
+    if (wait_for_transfer_state()) {
+        return true;
+    }
+    mmc_note_failure(&EMMC_HOST, MMC_STEP_TRANSFER_STATE);
+    return false;
+}
+
+static const CardWriter WRITER = {write_data, stop_writing, wait_until_ready, NULL};
+
 bool emmc_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
 {
     (void)context;
-    const uint32_t *words = buffer;
     if (!started || !emmc_layout_allows_write(&emmc.layout, lba, count)) {
         return false;
     }
-    for (uint32_t index = 0; index < count; index++) {
-        if (!mmc_write_block(&EMMC_HOST, CMD_WRITE_BLOCK, lba + index,
-                             words + index * (BLOCK_LENGTH / 4))) {
-            return false;
-        }
-        if (!wait_for_transfer_state()) {
-            mmc_note_failure(&EMMC_HOST, MMC_STEP_TRANSFER_STATE);
-            return false;
-        }
-    }
-    return true;
+    return card_write(&WRITER, lba, count, buffer);
 }
 
 uint32_t emmc_fifo_depth_words(void)
