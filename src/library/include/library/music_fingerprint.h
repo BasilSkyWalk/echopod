@@ -17,9 +17,9 @@ typedef struct FingerprintEntry {
 } FingerprintEntry;
 
 typedef struct FingerprintFiles {
-    bool (*open_dir)(void *context, const char *path);
-    bool (*next_entry)(void *context, FingerprintEntry *entry);
-    void (*close_dir)(void *context);
+    bool (*open_dir)(void *context, uint32_t level, const char *path);
+    bool (*next_entry)(void *context, uint32_t level, FingerprintEntry *entry);
+    void (*close_dir)(void *context, uint32_t level);
     void *context;
 } FingerprintFiles;
 
@@ -32,7 +32,6 @@ typedef struct MusicFingerprint {
 
 typedef struct FingerprintLevel {
     uint32_t path_length;
-    uint32_t next_index;
 } FingerprintLevel;
 
 typedef struct FingerprintWork {

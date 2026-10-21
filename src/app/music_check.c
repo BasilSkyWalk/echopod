@@ -16,24 +16,25 @@ enum {
 };
 
 typedef struct MusicWalk {
-    HalDir dir;
+    HalDir dirs[FINGERPRINT_MAX_DEPTH];
     HalDirEntry entry;
 } MusicWalk;
 
 static MusicWalk walk;
 static FingerprintWork work;
 
-static bool open_dir(void *context, const char *path)
+static bool open_dir(void *context, uint32_t level, const char *path)
 {
     MusicWalk *state = context;
     hal_system_keep_alive();
-    return hal_dir_open(&state->dir, path);
+    return hal_dir_open(&state->dirs[level], path);
 }
 
-static bool next_entry(void *context, FingerprintEntry *entry)
+static bool next_entry(void *context, uint32_t level, FingerprintEntry *entry)
 {
     MusicWalk *state = context;
-    if (!hal_dir_next(&state->dir, &state->entry)) {
+    hal_system_keep_alive();
+    if (!hal_dir_next(&state->dirs[level], &state->entry)) {
         return false;
     }
     entry->directory = state->entry.directory;
@@ -45,10 +46,10 @@ static bool next_entry(void *context, FingerprintEntry *entry)
     return true;
 }
 
-static void close_dir(void *context)
+static void close_dir(void *context, uint32_t level)
 {
     MusicWalk *state = context;
-    hal_dir_close(&state->dir);
+    hal_dir_close(&state->dirs[level]);
 }
 
 MusicFingerprint music_check_fingerprint(void)

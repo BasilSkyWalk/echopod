@@ -91,6 +91,7 @@ typedef struct FakeHal {
     int scratch_borrows;
     bool empty_card;
     int dir_opens;
+    int presents_at_dir_open;
     int library_writes;
     int covers_writes;
     const char *store_used[STORE_SLOTS];
@@ -782,6 +783,7 @@ bool hal_dir_open(HalDir *dir, const char *path)
 {
     (void)path;
     fake.dir_opens++;
+    fake.presents_at_dir_open = fake.present_count;
     dir->handle = fake.empty_card ? 0 : -1;
     return fake.empty_card;
 }
@@ -794,6 +796,11 @@ void fake_hal_set_empty_card(bool empty)
 int fake_hal_dir_open_count(void)
 {
     return fake.dir_opens;
+}
+
+int fake_hal_presents_at_last_dir_open(void)
+{
+    return fake.presents_at_dir_open;
 }
 
 int fake_hal_covers_writes(void)

@@ -694,7 +694,11 @@ void app_step(void)
     }
     if (app.music_check_requested) {
         app.music_check_requested = false;
-        bool changed = hal_system_restart_pending() || !music_check_unchanged();
+        bool changed = hal_system_restart_pending();
+        if (!changed) {
+            app_show_notice("Music", "Checking for changes...");
+            changed = !music_check_unchanged();
+        }
         if (!changed) {
             music_check_note_firmware();
         }

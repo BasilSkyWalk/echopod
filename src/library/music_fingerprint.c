@@ -35,23 +35,6 @@ static void mix_word(Walk *walk, uint32_t value)
     mix(walk, bytes, sizeof bytes);
 }
 
-static bool read_entry(Walk *walk, uint32_t index)
-{
-    const FingerprintFiles *files = walk->files;
-    if (!files->open_dir(files->context, walk->work->path)) {
-        return false;
-    }
-    bool found = false;
-    for (uint32_t skipped = 0; skipped <= index; skipped++) {
-        found = files->next_entry(files->context, &walk->work->entry);
-        if (!found) {
-            break;
-        }
-    }
-    files->close_dir(files->context);
-    return found;
-}
-
 static void mix_entry(Walk *walk, const FingerprintEntry *entry)
 {
     mix(walk, walk->work->path, text_length(walk->work->path));
@@ -81,7 +64,7 @@ static bool enter(Walk *walk, const char *name)
     }
     work->path[length] = '\0';
     walk->depth++;
-    work->levels[walk->depth] = (FingerprintLevel){.path_length = length, .next_index = 0};
+    work->levels[walk->depth] = (FingerprintLevel){.path_length = length};
     return true;
 }
 
@@ -89,6 +72,13 @@ static void leave(Walk *walk)
 {
     walk->depth--;
     walk->work->path[walk->work->levels[walk->depth].path_length] = '\0';
+}
+
+static void close_open_levels(Walk *walk, uint32_t top)
+{
+    for (uint32_t level = top + 1; level-- > 0;) {
+        walk->files->close_dir(walk->files->context, level);
+    }
 }
 
 MusicFingerprint music_fingerprint(const FingerprintFiles *files, FingerprintWork *work)
@@ -99,28 +89,33 @@ MusicFingerprint music_fingerprint(const FingerprintFiles *files, FingerprintWor
                  .depth = 0};
     work->path[0] = '/';
     work->path[1] = '\0';
-    work->levels[0] = (FingerprintLevel){.path_length = 1, .next_index = 0};
-    if (!files->open_dir(files->context, work->path)) {
+    work->levels[0] = (FingerprintLevel){.path_length = 1};
+    if (!files->open_dir(files->context, 0, work->path)) {
         return walk.print;
     }
-    files->close_dir(files->context);
     for (;;) {
-        FingerprintLevel *level = &work->levels[walk.depth];
-        if (!read_entry(&walk, level->next_index)) {
+        if (!files->next_entry(files->context, walk.depth, &work->entry)) {
+            files->close_dir(files->context, walk.depth);
             if (walk.depth == 0) {
                 break;
             }
             leave(&walk);
             continue;
         }
-        level->next_index++;
         const FingerprintEntry *entry = &work->entry;
         if (entry->name[0] == '.') {
             continue;
         }
         mix_entry(&walk, entry);
-        if (entry->directory && !enter(&walk, entry->name)) {
+        if (!entry->directory) {
+            continue;
+        }
+        if (!enter(&walk, entry->name)) {
+            close_open_levels(&walk, walk.depth);
             return walk.print;
+        }
+        if (!files->open_dir(files->context, walk.depth, work->path)) {
+            leave(&walk);
         }
     }
     walk.print.complete = true;
