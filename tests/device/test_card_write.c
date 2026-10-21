@@ -134,6 +134,44 @@ static void no_blocks_send_nothing(void)
     CHECK_EQUAL(0, card.call_count);
 }
 
+static void starting_one_block_only_sends_it(void)
+{
+    start();
+    CHECK(card_write_start(&writer, 0x40, 1, words));
+    CHECK_EQUAL(1, card.call_count);
+    CHECK_EQUAL(CALL_DATA, card.calls[0].kind);
+    CHECK_EQUAL(CARD_WRITE_SINGLE_BLOCK, card.calls[0].command);
+}
+
+static void starting_several_blocks_sends_them_and_the_stop_without_waiting(void)
+{
+    start();
+    CHECK(card_write_start(&writer, 0x40, 4, words));
+    CHECK_EQUAL(2, card.call_count);
+    CHECK_EQUAL(CARD_WRITE_MULTIPLE_BLOCK, card.calls[0].command);
+    CHECK_EQUAL(CALL_STOP, card.calls[1].kind);
+}
+
+static void finishing_waits_for_the_card(void)
+{
+    start();
+    CHECK(card_write_finish(&writer));
+    CHECK_EQUAL(1, card.call_count);
+    CHECK_EQUAL(CALL_READY, card.calls[0].kind);
+    start();
+    card.ready_fails = true;
+    CHECK(!card_write_finish(&writer));
+}
+
+static void a_failed_start_brings_the_card_back_at_once(void)
+{
+    start();
+    card.data_fails = true;
+    CHECK(!card_write_start(&writer, 0x40, 4, words));
+    CHECK_EQUAL(3, card.call_count);
+    CHECK_EQUAL(CALL_READY, card.calls[2].kind);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -144,6 +182,10 @@ int main(void)
         TEST_CASE(a_card_that_never_becomes_ready_fails_the_write),
         TEST_CASE(a_failed_single_write_does_not_wait),
         TEST_CASE(no_blocks_send_nothing),
+        TEST_CASE(starting_one_block_only_sends_it),
+        TEST_CASE(starting_several_blocks_sends_them_and_the_stop_without_waiting),
+        TEST_CASE(finishing_waits_for_the_card),
+        TEST_CASE(a_failed_start_brings_the_card_back_at_once),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

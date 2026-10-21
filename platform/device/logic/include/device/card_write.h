@@ -17,3 +17,6 @@ typedef struct CardWriter {
 } CardWriter;
 
 bool card_write(const CardWriter *writer, uint32_t address, uint32_t count, const uint32_t *words);
+bool card_write_start(const CardWriter *writer, uint32_t address, uint32_t count,
+                      const uint32_t *words);
+bool card_write_finish(const CardWriter *writer);
