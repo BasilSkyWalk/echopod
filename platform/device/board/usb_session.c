@@ -19,7 +19,8 @@ enum {
     SERIAL_DIGITS = 8,
     INTERNAL_LUN = 0,
     CARD_LUN = 1,
-    LUN_COUNT = 2
+    LUN_COUNT = 2,
+    WRITE_BUFFER_SECTORS = 64
 };
 
 static EmmcInfo internal;
@@ -27,6 +28,8 @@ static bool card_present;
 static UsbReport report;
 static UsbPort port;
 static Msc msc;
+static uint32_t write_buffer[WRITE_BUFFER_SECTORS * MSC_SECTOR_SIZE / 4]
+    __attribute__((section(".high_ram")));
 
 static void serial_text(uint32_t serial, char *text)
 {
@@ -57,6 +60,7 @@ static void prepare_luns(void)
     };
     card_present = card_ready;
     msc_init(&msc, luns, LUN_COUNT);
+    msc_use_write_buffer(&msc, write_buffer, WRITE_BUFFER_SECTORS);
 }
 
 static void finish_last_reply(void)

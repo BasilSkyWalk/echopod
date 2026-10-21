@@ -35,20 +35,40 @@ static bool ram_read(void *context, uint32_t lba, uint32_t count, void *buffer)
 
 static uint32_t failing_write_lba = UINT32_MAX;
 
+typedef struct WriteCall {
+    uint32_t lba;
+    uint32_t count;
+} WriteCall;
+
+static WriteCall write_calls[32];
+static int write_call_count;
+
 static bool ram_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
 {
     RamDisk *disk = context;
-    if (lba == failing_write_lba) {
-        return false;
+    if (write_call_count < 32) {
+        write_calls[write_call_count] = (WriteCall){lba, count};
     }
-    memcpy(disk->bytes + lba * 512, buffer, count * 512);
-    return true;
+    write_call_count++;
+    bool fails = failing_write_lba >= lba && failing_write_lba - lba < count;
+    uint32_t written = fails ? failing_write_lba - lba : count;
+    memcpy(disk->bytes + lba * 512, buffer, written * 512);
+    return !fails;
 }
+
+static void check_write_call(int index, uint32_t lba, uint32_t count)
+{
+    CHECK_EQUAL(lba, write_calls[index].lba);
+    CHECK_EQUAL(count, write_calls[index].count);
+}
+
+static uint32_t write_buffer[4 * 128];
 
 static Msc *started(void)
 {
     static Msc msc;
     failing_write_lba = UINT32_MAX;
+    write_call_count = 0;
     disk_reads = 0;
     for (uint32_t index = 0; index < sizeof writable_disk.bytes; index++) {
         writable_disk.bytes[index] = (uint8_t)(index * 7 + 1);
@@ -82,6 +102,20 @@ static void send_data(Msc *msc, const uint8_t *bytes, uint32_t length)
     for (uint32_t offset = 0; offset < length; offset += 64) {
         uint32_t chunk = length - offset < 64 ? length - offset : 64;
         msc_receive(msc, bytes + offset, chunk);
+    }
+}
+
+static Msc *started_with_buffer(void)
+{
+    Msc *msc = started();
+    msc_use_write_buffer(msc, write_buffer, 4);
+    return msc;
+}
+
+static void fill_pattern(uint8_t *bytes, uint32_t length, uint8_t seed)
+{
+    for (uint32_t index = 0; index < length; index++) {
+        bytes[index] = (uint8_t)(index * 13 + seed);
     }
 }
 
@@ -605,6 +639,137 @@ static void writes_are_counted_per_lun(void)
     CHECK_EQUAL(3, stats.sectors_written);
 }
 
+static void without_a_buffer_each_sector_is_its_own_write(void)
+{
+    uint8_t block[10];
+    static uint8_t bytes[3 * 512];
+    fill_pattern(bytes, sizeof bytes, 1);
+    Msc *msc = started();
+    read_10_block(block, 0x2A, 1, 3);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 0, 0);
+    CHECK_EQUAL(3, write_call_count);
+    check_write_call(0, 1, 1);
+    check_write_call(2, 3, 1);
+    CHECK(memcmp(writable_disk.bytes + 512, bytes, sizeof bytes) == 0);
+}
+
+static void buffered_writes_reach_the_drive_in_buffer_sized_runs(void)
+{
+    uint8_t block[10];
+    static uint8_t bytes[10 * 512];
+    fill_pattern(bytes, sizeof bytes, 2);
+    Msc *msc = started_with_buffer();
+    read_10_block(block, 0x2A, 20, 10);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 0, 0);
+    CHECK_EQUAL(3, write_call_count);
+    check_write_call(0, 20, 4);
+    check_write_call(1, 24, 4);
+    check_write_call(2, 28, 2);
+    CHECK(memcmp(writable_disk.bytes + 20 * 512, bytes, sizeof bytes) == 0);
+    MscStats stats = msc_stats(msc);
+    CHECK_EQUAL(10, stats.sectors_written);
+    CHECK_EQUAL(10, stats.lun_sectors_written[0]);
+}
+
+static void a_buffered_write_in_odd_sized_packets_lands_intact(void)
+{
+    uint8_t block[10];
+    static uint8_t bytes[6 * 512];
+    fill_pattern(bytes, sizeof bytes, 3);
+    Msc *msc = started_with_buffer();
+    read_10_block(block, 0x2A, 30, 6);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    for (uint32_t offset = 0; offset < sizeof bytes; offset += 37) {
+        uint32_t chunk = sizeof bytes - offset < 37 ? sizeof bytes - offset : 37;
+        msc_receive(msc, bytes + offset, chunk);
+    }
+    check_csw(collect(msc), 0, 0);
+    CHECK_EQUAL(2, write_call_count);
+    check_write_call(0, 30, 4);
+    check_write_call(1, 34, 2);
+    CHECK(memcmp(writable_disk.bytes + 30 * 512, bytes, sizeof bytes) == 0);
+}
+
+static void a_failed_batch_fails_the_command_and_stops_writing(void)
+{
+    uint8_t block[10];
+    static uint8_t bytes[12 * 512];
+    memset(bytes, 0x6B, sizeof bytes);
+    Msc *msc = started_with_buffer();
+    failing_write_lba = 5;
+    uint8_t untouched = writable_disk.bytes[8 * 512];
+    read_10_block(block, 0x2A, 0, 12);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 1, sizeof bytes);
+    CHECK_EQUAL(2, write_call_count);
+    check_write_call(1, 4, 4);
+    CHECK_EQUAL(untouched, writable_disk.bytes[8 * 512]);
+    MscStats stats = msc_stats(msc);
+    CHECK_EQUAL(4, stats.sectors_written);
+    CHECK_EQUAL(1, stats.write_failures);
+    CHECK_EQUAL(4, stats.last_failed_lba);
+    Exchange *sensed = sense(msc, 0);
+    CHECK_EQUAL(0x03, sensed->data[2]);
+    CHECK_EQUAL(0x0C, sensed->data[12]);
+}
+
+static void a_short_data_phase_writes_only_the_whole_sectors_received(void)
+{
+    uint8_t block[10];
+    static uint8_t bytes[700];
+    fill_pattern(bytes, sizeof bytes, 4);
+    Msc *msc = started_with_buffer();
+    uint8_t untouched = writable_disk.bytes[7 * 512];
+    read_10_block(block, 0x2A, 6, 2);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 2, 0);
+    CHECK_EQUAL(1, write_call_count);
+    check_write_call(0, 6, 1);
+    CHECK(memcmp(writable_disk.bytes + 6 * 512, bytes, 512) == 0);
+    CHECK_EQUAL(untouched, writable_disk.bytes[7 * 512]);
+}
+
+static void a_reset_drops_a_partly_filled_batch(void)
+{
+    uint8_t block[10];
+    static uint8_t bytes[4 * 512];
+    fill_pattern(bytes, sizeof bytes, 5);
+    Msc *msc = started_with_buffer();
+    read_10_block(block, 0x2A, 0, 4);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, 2 * 512);
+    msc_reset(msc);
+    CHECK_EQUAL(0, write_call_count);
+    read_10_block(block, 0x2A, 8, 1);
+    send_command(msc, 512, false, 0, block, 10);
+    send_data(msc, bytes, 512);
+    check_csw(collect(msc), 0, 0);
+    CHECK_EQUAL(1, write_call_count);
+    check_write_call(0, 8, 1);
+    CHECK(memcmp(writable_disk.bytes + 8 * 512, bytes, 512) == 0);
+}
+
+static void a_missing_buffer_falls_back_to_single_sectors(void)
+{
+    uint8_t block[10];
+    static uint8_t bytes[2 * 512];
+    fill_pattern(bytes, sizeof bytes, 6);
+    Msc *msc = started();
+    msc_use_write_buffer(msc, NULL, 4);
+    read_10_block(block, 0x2A, 2, 2);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 0, 0);
+    CHECK_EQUAL(2, write_call_count);
+    check_write_call(1, 3, 1);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -640,6 +805,13 @@ int main(void)
         TEST_CASE(the_session_finishes_only_when_every_present_lun_is_ejected),
         TEST_CASE(an_absent_lun_does_not_need_ejecting),
         TEST_CASE(writes_are_counted_per_lun),
+        TEST_CASE(without_a_buffer_each_sector_is_its_own_write),
+        TEST_CASE(buffered_writes_reach_the_drive_in_buffer_sized_runs),
+        TEST_CASE(a_buffered_write_in_odd_sized_packets_lands_intact),
+        TEST_CASE(a_failed_batch_fails_the_command_and_stops_writing),
+        TEST_CASE(a_short_data_phase_writes_only_the_whole_sectors_received),
+        TEST_CASE(a_reset_drops_a_partly_filled_batch),
+        TEST_CASE(a_missing_buffer_falls_back_to_single_sectors),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

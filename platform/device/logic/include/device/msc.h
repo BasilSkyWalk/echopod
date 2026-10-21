@@ -83,9 +83,13 @@ typedef struct Msc {
     uint8_t response[MSC_RESPONSE_CAPACITY];
     uint32_t response_length;
     uint32_t sector[MSC_SECTOR_SIZE / 4];
+    uint32_t *write_buffer;
+    uint32_t write_sectors;
+    uint32_t batch_bytes;
 } Msc;
 
 void msc_init(Msc *msc, const MscLun *luns, uint8_t count);
+void msc_use_write_buffer(Msc *msc, uint32_t *words, uint32_t sectors);
 void msc_reset(Msc *msc);
 void msc_receive(Msc *msc, const uint8_t *packet, uint32_t length);
 bool msc_next_in(Msc *msc, uint8_t *buffer, uint32_t capacity, uint32_t *length);
