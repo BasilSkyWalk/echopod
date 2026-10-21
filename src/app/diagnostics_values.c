@@ -51,6 +51,19 @@ void diagnostics_boot_clocks_text(HalBootClocks clocks, char *text, size_t capac
     append_hex(&builder, clocks.pclk_select, 4);
 }
 
+void diagnostics_usb_registers_text(bool captured, uint32_t first, uint32_t second, char *text,
+                                    size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!captured) {
+        string_builder_append(&builder, "Plug in USB first");
+        return;
+    }
+    append_hex(&builder, first, 8);
+    string_builder_append_char(&builder, ' ');
+    append_hex(&builder, second, 8);
+}
+
 void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);

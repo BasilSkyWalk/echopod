@@ -6,12 +6,14 @@
 #include "cru.h"
 #include "gpio.h"
 #include "hal/clock.h"
+#include "hal/system.h"
 #include "registers.h"
 
 #define USB_BASE 0x60080000u
 #define GOTGCTL 0x000u
 #define GOTGINT 0x004u
 #define GAHBCFG 0x008u
+#define GUSBCFG 0x00Cu
 #define GRSTCTL 0x010u
 #define GINTSTS 0x014u
 #define GINTMSK 0x018u
@@ -20,6 +22,7 @@
 #define GNPTXFSIZ 0x028u
 #define GNPTXSTS 0x02Cu
 #define GSNPSID 0x040u
+#define GHWCFG2 0x048u
 #define GHWCFG3 0x04Cu
 #define GHWCFG4 0x050u
 #define DIEPTXF1 0x104u
@@ -118,6 +121,8 @@ static const GrfWrite PHY_ON_SECOND[] = {
 static const GrfWrite PHY_OFF[] = {
     {0xB4, 0x00010001}, {0xB4, 0x000E0004}, {0xB8, 0x00010001}, {0x98, 0x00040000}};
 
+static HalUsbCore core_registers;
+
 static const GpioPin AMP_ENABLE = {1, 4};
 static const GpioPin AUDIO_MUTE = {2, 0};
 static const GpioPin DAC_POWER = {2, 2};
@@ -211,6 +216,22 @@ void usb_power_down(void)
     cru_gate(GATE_USB_B, false);
 }
 
+HalUsbCore hal_system_usb_core(void)
+{
+    return core_registers;
+}
+
+static void capture_core_registers(void)
+{
+    core_registers = (HalUsbCore){.captured = true,
+                                  .hwcfg2 = read_register(GHWCFG2),
+                                  .hwcfg3 = read_register(GHWCFG3),
+                                  .hwcfg4 = read_register(GHWCFG4),
+                                  .usbcfg = read_register(GUSBCFG),
+                                  .rx_fifo = read_register(GRXFSIZ),
+                                  .nptx_fifo = read_register(GNPTXFSIZ)};
+}
+
 static UsbConnectStep reset_core(void)
 {
     set_bits(DCTL, DCTL_SOFT_DISCONNECT);
@@ -224,6 +245,7 @@ static UsbConnectStep reset_core(void)
     if (!wait_clear(GRSTCTL, GRSTCTL_SOFT_RESET, RESET_TIMEOUT_MS)) {
         return USB_CONNECT_SOFT_RESET;
     }
+    capture_core_registers();
     write_register(PCGCCTL, 0xF);
     board_delay_ms(CLOCK_GATE_MS);
     write_register(PCGCCTL, 0);

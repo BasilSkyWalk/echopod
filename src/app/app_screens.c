@@ -324,6 +324,37 @@ static const char *boot_pll_value(const void *context)
     return boot_pll_text;
 }
 
+static char usb_config_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char usb_phy_text[DIAGNOSTICS_VALUE_CAPACITY];
+static char usb_fifo_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *usb_config_value(const void *context)
+{
+    (void)context;
+    HalUsbCore core = hal_system_usb_core();
+    diagnostics_usb_registers_text(core.captured, core.hwcfg2, core.hwcfg3, usb_config_text,
+                                   sizeof usb_config_text);
+    return usb_config_text;
+}
+
+static const char *usb_phy_value(const void *context)
+{
+    (void)context;
+    HalUsbCore core = hal_system_usb_core();
+    diagnostics_usb_registers_text(core.captured, core.hwcfg4, core.usbcfg, usb_phy_text,
+                                   sizeof usb_phy_text);
+    return usb_phy_text;
+}
+
+static const char *usb_fifo_value(const void *context)
+{
+    (void)context;
+    HalUsbCore core = hal_system_usb_core();
+    diagnostics_usb_registers_text(core.captured, core.rx_fifo, core.nptx_fifo, usb_fifo_text,
+                                   sizeof usb_fifo_text);
+    return usb_fifo_text;
+}
+
 static ScreenAction toggle_dma_tone(void *context)
 {
     DmaToneOption *tone = context;
@@ -571,6 +602,12 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
                                                 .select = toggle_dma_tone,
                                                 .context = &screens->tone_176,
                                                 .value = dma_tone_value};
+    screens->diagnostics_items[29] = (MenuItem){
+        .label = "USB HW2 HW3", .select = NULL, .context = NULL, .value = usb_config_value};
+    screens->diagnostics_items[30] =
+        (MenuItem){.label = "USB HW4 CFG", .select = NULL, .context = NULL, .value = usb_phy_value};
+    screens->diagnostics_items[31] =
+        (MenuItem){.label = "USB RX TX", .select = NULL, .context = NULL, .value = usb_fifo_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

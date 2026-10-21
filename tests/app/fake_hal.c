@@ -517,6 +517,11 @@ HalBootClocks hal_system_boot_clocks(void)
     return (HalBootClocks){0};
 }
 
+HalUsbCore hal_system_usb_core(void)
+{
+    return (HalUsbCore){.captured = false};
+}
+
 uint32_t fake_hal_dma_tone_rate(void)
 {
     return fake.dma_tone_rate;

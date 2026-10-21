@@ -18,6 +18,18 @@ typedef struct HalBootClocks {
 
 HalBootClocks hal_system_boot_clocks(void);
 
+typedef struct HalUsbCore {
+    bool captured;
+    uint32_t hwcfg2;
+    uint32_t hwcfg3;
+    uint32_t hwcfg4;
+    uint32_t usbcfg;
+    uint32_t rx_fifo;
+    uint32_t nptx_fifo;
+} HalUsbCore;
+
+HalUsbCore hal_system_usb_core(void);
+
 typedef struct HalLoopCycles {
     uint32_t register_centi;
     uint32_t memory_centi;
