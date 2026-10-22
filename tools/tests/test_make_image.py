@@ -354,6 +354,70 @@ class ValidatorTest(unittest.TestCase):
         self.assertTrue(make_image.validate_image(build()[:0x400000]))
 
 
+class GeneratedHeaderTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.image = make_image.build_image(None, firmware(), brand="ECHOFW", build_tag="abc1234",
+                                           date=(2026, 10, 22), version=(0, 1, 2))
+
+    def test_the_header_holds_the_format_constants(self):
+        self.assertEqual(0x76543210, word(self.image, 0x00C))
+        self.assertEqual(4, word(self.image, 0x050))
+        for offset in (0x054, 0x05C, 0x064, 0x06C):
+            self.assertEqual(0x200, word(self.image, offset), hex(offset))
+        self.assertEqual(1, word(self.image, 0x19C))
+        self.assertEqual(FW_SIZE, word(self.image, 0x1F4))
+
+    def test_the_version_is_major_and_minor_in_0x004_and_the_patch_in_0x008(self):
+        self.assertEqual(0x00010000, word(self.image, 0x004))
+        self.assertEqual(2, word(self.image, 0x008))
+
+    def test_every_other_header_byte_is_zero(self):
+        written = set(range(0x000, 0x010)) | set(range(0x010, 0x018)) | set(range(0x030, 0x038))
+        written |= set(range(0x050, 0x070)) | set(range(0x080, 0x084))
+        written |= set(range(0x19C, 0x1A0)) | set(range(0x1F4, 0x1F8))
+        for offset in range(0x1F4):
+            if offset not in written:
+                self.assertEqual(0, self.image[offset], hex(offset))
+
+    def test_the_part_chain_is_empty(self):
+        for offset in (0x070, 0x074, 0x078, 0x07C, 0x084, 0x088, 0x08C):
+            self.assertEqual(0, word(self.image, offset), hex(offset))
+
+    def test_the_date_brand_tag_and_fw1_end_are_ours(self):
+        self.assertEqual(0x10222026, word(self.image, 0x000))
+        self.assertEqual(b"ECHOFW\0\0", self.image[0x10:0x18])
+        self.assertEqual(b"abc1234\0", self.image[0x30:0x38])
+        self.assertEqual(CODE_OFFSET + 320 + 8, word(self.image, 0x080))
+
+    def test_the_marker_bytes_are_zero(self):
+        self.assertFalse(any(self.image[FW_SIZE + 0x200:FW_SIZE + 0x208]))
+
+    def test_the_header_copy_matches_and_the_image_passes_the_updater_checks(self):
+        self.assertEqual(self.image[:0x200], self.image[FW_SIZE:FW_SIZE + 0x200])
+        self.assertEqual([], make_image.validate_image(self.image))
+
+    def test_a_version_part_out_of_range_is_refused(self):
+        for version in ((256, 0, 0), (0, 256, 0), (0, 0, 0x10000), (-1, 0, 0)):
+            with self.assertRaises(make_image.ImageError, msg=str(version)):
+                make_image.build_image(None, firmware(), brand="ECHOFW", build_tag="abc1234",
+                                       date=(2026, 10, 22), version=version)
+
+    def test_the_command_builds_without_a_reference(self):
+        with tempfile.TemporaryDirectory() as directory:
+            elf = Path(directory) / "firmware.elf"
+            elf.write_bytes(firmware_elf(firmware()))
+            output = Path(directory) / "HIFIEC90.IMG"
+            status = make_image.main(["--elf", str(elf), "--output", str(output),
+                                      "--build-tag", "abc1234", "--date", "2026-10-22",
+                                      "--version", "0.1.2"])
+            self.assertEqual(0, status)
+            image = output.read_bytes()
+            self.assertEqual([], make_image.validate_image(image))
+            self.assertEqual(0x00010000, word(image, 0x004))
+            self.assertEqual(0, word(image, 0x070))
+
+
 class ReferenceCheckTest(unittest.TestCase):
     def test_a_file_that_is_not_the_reference_is_refused(self):
         with tempfile.TemporaryDirectory() as directory:

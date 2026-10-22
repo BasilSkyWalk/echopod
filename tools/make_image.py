@@ -46,6 +46,14 @@ BRAND_OFFSET = 0x10
 BUILD_TAG_OFFSET = 0x30
 FW1_END_OFFSET = 0x80
 TEXT_FIELD_SIZE = 8
+VERSION_OFFSET = 0x004
+HEADER_MAGIC_OFFSET = 0x00C
+HEADER_MAGIC = 0x76543210
+SECTOR_FIELDS_OFFSET = 0x050
+SECTOR_FIELDS = (4, 0x200, 0, 0x200, 0, 0x200, 0, 0x200)
+FIELD_19C_OFFSET = 0x19C
+FIELD_19C = 1
+DEFAULT_VERSION = (0, 1, 0)
 REFERENCE_MD5 = "4c333e193739512bb4bb706495523955"
 ELF_IDENT = b"\x7fELF\x01\x01"
 ELF_HEADER = struct.Struct("<16sHHIIIIIHHHHHH")
@@ -245,13 +253,35 @@ def fw1_end(payload):
     return PAYLOAD_OFFSET + (used + 3) // 4 * 4
 
 
-def build_image(reference, firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"",
-                core1_flac=b""):
-    check_firmware(firmware)
+def check_version(version):
+    major, minor, patch = version
+    if not (0 <= major <= 0xFF and 0 <= minor <= 0xFF and 0 <= patch <= 0xFFFF):
+        raise ImageError("the version must be major.minor.patch with parts up to 255, 255, 65535")
+
+
+def generated_header(version):
+    check_version(version)
+    major, minor, patch = version
+    header = bytearray(OUTER_HEADER_SIZE)
+    struct.pack_into("<III", header, VERSION_OFFSET, major << 24 | minor << 16, patch,
+                     HEADER_MAGIC)
+    struct.pack_into("<8I", header, SECTOR_FIELDS_OFFSET, *SECTOR_FIELDS)
+    struct.pack_into("<I", header, FIELD_19C_OFFSET, FIELD_19C)
+    struct.pack_into("<I", header, FW_SIZE_OFFSET, FW_SIZE)
+    return header
+
+
+def reference_header(reference):
     if len(reference) != IMAGE_SIZE or word(reference, FW_SIZE_OFFSET) != FW_SIZE:
         raise ImageError("the reference does not have the 5 MiB shape")
+    return bytearray(reference[:OUTER_HEADER_SIZE])
+
+
+def build_image(reference, firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"",
+                core1_flac=b"", version=DEFAULT_VERSION):
+    check_firmware(firmware)
     code_size, data_size = len(firmware.code), len(firmware.data)
-    header = bytearray(reference[:OUTER_HEADER_SIZE])
+    header = reference_header(reference) if reference is not None else generated_header(version)
     struct.pack_into("<I", header, DATE_OFFSET, bcd_date(date))
     header[BRAND_OFFSET:BRAND_OFFSET + TEXT_FIELD_SIZE] = text_field(brand, "brand")
     header[BUILD_TAG_OFFSET:BUILD_TAG_OFFSET + TEXT_FIELD_SIZE] = text_field(build_tag, "build tag")
@@ -263,7 +293,8 @@ def build_image(reference, firmware, brand, build_tag, date, overlay=b"", core1_
         ROW2,
     ]
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
-    marker = reference[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE]
+    marker = (reference[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE] if reference is not None
+              else bytes(MARKER_SIZE))
     return assemble(ImageParts(bytes(header), tuple(rows), payload, marker, overlay, core1_mp3,
                                core1_flac))
 
@@ -382,10 +413,21 @@ def parse_date(text):
     return year, month, day
 
 
+def parse_version(text):
+    try:
+        major, minor, patch = (int(part) for part in text.split("."))
+    except ValueError:
+        raise argparse.ArgumentTypeError("use major.minor.patch") from None
+    return major, minor, patch
+
+
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(description="Pack a device build into a 5 MiB fw1 image")
-    parser.add_argument("--reference", type=Path, required=True,
-                        help="RECHO 0.9.2 HIFIEC90.IMG; only header bytes are copied")
+    parser.add_argument("--reference", type=Path,
+                        help="RECHO 0.9.2 HIFIEC90.IMG to copy the outer header from; "
+                             "without it the header is generated")
+    parser.add_argument("--version", type=parse_version, default=DEFAULT_VERSION,
+                        help="major.minor.patch for a generated header")
     parser.add_argument("--elf", type=Path, required=True,
                         help="device ELF with .code at 0x03050000 and .data at 0x03004000")
     parser.add_argument("--brand", default="ECHOFW")
@@ -403,13 +445,13 @@ def main(argv=None):
     build_tag = arguments.build_tag or default_build_tag(Path(__file__).resolve().parents[1])
     date = arguments.date or default_date()
     try:
-        reference = load_reference(arguments.reference)
+        reference = load_reference(arguments.reference) if arguments.reference else None
         firmware = firmware_from_elf(arguments.elf.read_bytes())
         overlay = overlay_from_elf(arguments.overlay.read_bytes()) if arguments.overlay else b""
         core1_mp3 = arguments.core1_mp3.read_bytes() if arguments.core1_mp3 else b""
         core1_flac = arguments.core1_flac.read_bytes() if arguments.core1_flac else b""
         image = build_image(reference, firmware, arguments.brand, build_tag, date, overlay,
-                            core1_mp3, core1_flac)
+                            core1_mp3, core1_flac, arguments.version)
     except ImageError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -419,7 +461,9 @@ def main(argv=None):
         return 1
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_bytes(image)
-    print(f"wrote {arguments.output} ({build_tag}): code {len(firmware.code):,} bytes, "
+    header_source = "RECHO header" if reference is not None else "generated header"
+    print(f"wrote {arguments.output} ({build_tag}, {header_source}): "
+          f"code {len(firmware.code):,} bytes, "
           f"overlay {len(overlay):,} bytes, core 1 MP3 {len(core1_mp3):,} bytes, "
           f"core 1 FLAC {len(core1_flac):,} bytes, "
           f".data {len(firmware.data)} bytes, .bss {firmware.bss_size:,} bytes, "
