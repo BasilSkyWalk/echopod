@@ -111,7 +111,7 @@ target_link_options(echo_rescan_overlay PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_rescan_overlay.map
 )
 
-set(ECHO_IMAGE_HEADER "reference" CACHE STRING
+set(ECHO_IMAGE_HEADER "generated" CACHE STRING
     "Image outer header: reference (copied from RECHO 0.9.2) or generated (no reference needed)")
 set_property(CACHE ECHO_IMAGE_HEADER PROPERTY STRINGS reference generated)
 set(ECHO_FIRMWARE_VERSION "0.1.0" CACHE STRING "major.minor.patch written to a generated header")
