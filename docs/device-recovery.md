@@ -144,3 +144,46 @@ The player should restart into stock firmware. If it stays black after `rd`, unp
 
 - the output of `ld`, `td`, `wl` and `rd`
 - whether the player started stock 3.7.0 afterwards, and whether the drive appears over USB
+
+# Maskrom from Windows
+
+Verified on a Windows 11 laptop on 2026-10-22: `ld` reported Maskrom, `td` said `Test Device OK.`, and `rl` read the first sector of both firmware slots (rockusb 0 and 69632), each holding the running image's header.
+
+## 1. Build the patched `rkdeveloptool` (once)
+
+Needs MSYS2 with the CLANG64 packages from `NOTES.md` (Build facts) plus `mingw-w64-clang-x86_64-autotools`, `mingw-w64-clang-x86_64-libusb` and `git`. In an MSYS2 CLANG64 shell:
+
+```sh
+cd /d/Projects/echo-mini-fw/external
+git clone https://github.com/rockchip-linux/rkdeveloptool.git
+cd rkdeveloptool
+git checkout 304f073752fd25c854e1bcf05d8e7f925b1f4e14
+python ../../tools/patch_rkdeveloptool.py .
+autoreconf -fi
+mkdir -p build-clang64 && cd build-clang64
+../configure --prefix=/clang64
+make AM_CPPFLAGS='-Wall -Wextra -Wreturn-type -fno-strict-aliasing -D_FILE_OFFSET_BITS=64 -D_LARGE_FILE $(LIBUSB1_CFLAGS)'
+./rkdeveloptool -v
+```
+
+`tools/patch_rkdeveloptool.py` makes the three changes in `docs/device-facts.md` 2.3: a 5000 ms command timeout, 32 sectors per transfer, and `2207:262d` listed as an RKnano device and classified by bcdDevice (`0x0100` in maskrom). It prints `ok: Echo Mini changes applied`, and it refuses a source it doesn't recognise or one that is already patched. The `make` line drops upstream's `-Werror`, as MSYS2's own package does. The tool prints `rkdeveloptool ver 1.32` and needs `C:\msys64\clang64in` on the PATH at run time (libusb and libc++).
+
+## 2. Bind maskrom to WinUSB (once per PC)
+
+1. Enter maskrom (section 3 above). The screen stays black, and Windows lists `USB\VID_2207&PID_262D` with no driver.
+2. Run Zadig 2.9 (from https://github.com/pbatard/libwdi/releases, signed by Akeo Consulting) and allow the admin prompt.
+3. Options → List All Devices. Pick the entry whose USB ID reads `2207` `262D` (it shows as "Unknown Device #1"). Check both numbers: replacing another device's driver breaks that device.
+4. The target must be WinUSB. Click Install Driver.
+
+Only maskrom mode uses this ID, so the player's normal USB drives are unaffected.
+
+## 3. Check
+
+```sh
+./rkdeveloptool ld
+./rkdeveloptool td
+./rkdeveloptool rl 0 1 slot1.bin
+./rkdeveloptool rl 69632 1 slot2.bin
+```
+
+Expect `Maskrom`, `Test Device OK.` and two 512-byte files whose bytes `0x1F8`–`0x1FF` read `RKnanoFW`. The same rules as on the Mac apply: never `db`.
