@@ -166,7 +166,7 @@ make AM_CPPFLAGS='-Wall -Wextra -Wreturn-type -fno-strict-aliasing -D_FILE_OFFSE
 ./rkdeveloptool -v
 ```
 
-`tools/patch_rkdeveloptool.py` makes the three changes in `docs/device-facts.md` 2.3: a 5000 ms command timeout, 32 sectors per transfer, and `2207:262d` listed as an RKnano device and classified by bcdDevice (`0x0100` in maskrom). It prints `ok: Echo Mini changes applied`, and it refuses a source it doesn't recognise or one that is already patched. The `make` line drops upstream's `-Werror`, as MSYS2's own package does. The tool prints `rkdeveloptool ver 1.32` and needs `C:\msys64\clang64in` on the PATH at run time (libusb and libc++).
+`tools/patch_rkdeveloptool.py` makes the three changes in `docs/device-facts.md` 2.3: a 5000 ms command timeout, 32 sectors per transfer, and `2207:262d` listed as an RKnano device and classified by bcdDevice (`0x0100` in maskrom). It prints `ok: Echo Mini changes applied`, and it refuses a source it doesn't recognise or one that is already patched. The `make` line drops upstream's `-Werror`, as MSYS2's own package does. The tool prints `rkdeveloptool ver 1.32` and needs `C:\msys64\clang64\bin` on the PATH at run time (libusb and libc++).
 
 ## 2. Bind maskrom to WinUSB (once per PC)
 
