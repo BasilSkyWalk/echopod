@@ -122,6 +122,12 @@ class CrcTest(unittest.TestCase):
         self.assertEqual(0x04C10DB7, make_image.crc32(b"\x01"))
 
 
+class BrandTest(unittest.TestCase):
+    def test_the_default_brand_is_echopod(self):
+        arguments = make_image.parse_arguments(["--elf", "a.elf", "--output", "b.img"])
+        self.assertEqual("EchoPod", arguments.brand)
+
+
 class FwEndTest(unittest.TestCase):
     def test_the_reference_fw_size_ends_at_5_mib(self):
         self.assertEqual(0x500000, make_image.fw_end(0x44C000))

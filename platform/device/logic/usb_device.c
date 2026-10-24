@@ -77,10 +77,7 @@ static const uint8_t DEVICE_QUALIFIER[] = {10, 6, 0x00, 0x02, 0x00, 0x00, 0x00, 
                                            1,  0};
 
 static const uint8_t LANGUAGES[] = {4, 3, 0x09, 0x04};
-static const uint8_t MANUFACTURER[] = {26,  3, 'e', 0, 'c', 0, 'h', 0, 'o', 0, '-', 0, 'm', 0,
-                                       'i', 0, 'n', 0, 'i', 0, '-', 0, 'f', 0, 'w', 0};
-static const uint8_t PRODUCT[] = {20,  3, 'E', 0, 'c', 0, 'h', 0, 'o', 0,
-                                  ' ', 0, 'M', 0, 'i', 0, 'n', 0, 'i', 0};
+static const uint8_t PRODUCT[] = {16, 3, 'E', 0, 'c', 0, 'h', 0, 'o', 0, 'P', 0, 'o', 0, 'd', 0};
 
 UsbSetup usb_setup_parse(const uint8_t packet[8])
 {
@@ -119,7 +116,7 @@ static UsbReply data(const uint8_t *bytes, size_t length, UsbSetup setup)
 
 static UsbReply string_descriptor(const UsbDevice *device, uint8_t index, UsbSetup setup)
 {
-    static const uint8_t *const STRINGS[] = {LANGUAGES, MANUFACTURER, PRODUCT};
+    static const uint8_t *const STRINGS[] = {LANGUAGES, PRODUCT, PRODUCT};
     if (index == STRING_SERIAL) {
         return data(device->serial, device->serial[0], setup);
     }

@@ -32,7 +32,7 @@ bool sim_display_open(int scale)
 {
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
     display.window =
-        SDL_CreateWindow("Echo Mini", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SDL_CreateWindow("EchoPod", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                          HAL_DISPLAY_WIDTH * scale, HAL_DISPLAY_HEIGHT * scale, SDL_WINDOW_SHOWN);
     if (display.window == NULL) {
         return false;

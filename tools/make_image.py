@@ -430,7 +430,7 @@ def parse_arguments(argv):
                         help="major.minor.patch for a generated header")
     parser.add_argument("--elf", type=Path, required=True,
                         help="device ELF with .code at 0x03050000 and .data at 0x03004000")
-    parser.add_argument("--brand", default="ECHOFW")
+    parser.add_argument("--brand", default="EchoPod")
     parser.add_argument("--build-tag", help="defaults to the short git commit, + when dirty")
     parser.add_argument("--date", type=parse_date, help="YYYY-MM-DD; defaults to today")
     parser.add_argument("--overlay", type=Path, help="rescan overlay ELF linked at 0x0307A000")

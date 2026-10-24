@@ -184,7 +184,7 @@ static void inquiry_names_the_vendor_and_the_lun(void)
     Exchange *exchange = collect(msc);
     CHECK_EQUAL(36, exchange->length);
     CHECK_EQUAL(0x80, exchange->data[1]);
-    CHECK(memcmp(exchange->data + 8, "ECHOFW  ", 8) == 0);
+    CHECK(memcmp(exchange->data + 8, "ECHOPOD ", 8) == 0);
     CHECK(memcmp(exchange->data + 16, "SD card         ", 16) == 0);
     check_csw(exchange, 0, 0);
 }

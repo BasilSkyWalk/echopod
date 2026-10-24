@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "check.h"
 #include "device/usb_device.h"
 
@@ -66,6 +68,20 @@ static void the_configuration_has_one_bulk_only_scsi_interface(void)
     CHECK_EQUAL(USB_ENDPOINT_BULK_OUT, reply.data[25 + 2]);
 }
 
+static bool utf16_is(const char *text, UsbReply reply)
+{
+    uint32_t length = (uint32_t)strlen(text);
+    if (reply.length != 2 + 2 * length || reply.data[0] != reply.length || reply.data[1] != 3) {
+        return false;
+    }
+    for (uint32_t index = 0; index < length; index++) {
+        if (reply.data[2 + 2 * index] != (uint8_t)text[index] || reply.data[3 + 2 * index] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static void string_descriptors_are_utf16(void)
 {
     UsbDevice device = ready_device();
@@ -81,7 +97,9 @@ static void string_descriptors_are_utf16(void)
     CHECK_EQUAL('D', serial.data[16]);
     UsbReply product = usb_device_setup(&device, setup(0x80, 6, 0x0302, 0x0409, 255));
     CHECK_EQUAL(USB_REPLY_DATA, product.kind);
-    CHECK_EQUAL('E', product.data[2]);
+    CHECK(utf16_is("EchoPod", product));
+    UsbReply maker = usb_device_setup(&device, setup(0x80, 6, 0x0301, 0x0409, 255));
+    CHECK(utf16_is("EchoPod", maker));
 }
 
 static void unknown_descriptors_stall(void)

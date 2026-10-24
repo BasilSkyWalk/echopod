@@ -45,7 +45,7 @@ enum {
 };
 
 static const uint8_t INQUIRY_HEADER[8] = {0x00, 0x80, 0x02, 0x02, 31, 0, 0, 0};
-static const char INQUIRY_VENDOR[] = "ECHOFW  ";
+static const char INQUIRY_VENDOR[] = "ECHOPOD ";
 static const char INQUIRY_REVISION[] = "0.1 ";
 
 static uint32_t le32(const uint8_t *bytes)

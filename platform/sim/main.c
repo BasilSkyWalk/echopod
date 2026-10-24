@@ -116,7 +116,7 @@ static void refresh_title(void)
     char stats_text[TITLE_CAPACITY];
     char title[TITLE_CAPACITY * 2];
     format_frame_stats(stats_text, sizeof stats_text);
-    snprintf(title, sizeof title, "Echo Mini | %s | %s", app_screen_title(), stats_text);
+    snprintf(title, sizeof title, "EchoPod | %s | %s", app_screen_title(), stats_text);
     sim_display_set_title(title);
 }
 
