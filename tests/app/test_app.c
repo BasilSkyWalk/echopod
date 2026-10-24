@@ -10,6 +10,8 @@
 #include "gfx/text.h"
 #include "hal/display.h"
 #include "hal/system.h"
+#include "library/cover_build.h"
+#include "library/covers.h"
 #include "library_rescan.h"
 #include "settings/settings.h"
 #include "settings_store.h"
@@ -858,7 +860,10 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/resume.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/favorites.bin"));
     CHECK_EQUAL(4 * 1024 * 1024, fake_hal_reserved_size("/.echo/library.db"));
-    CHECK_EQUAL(32 * 1024 * 1024, fake_hal_reserved_size("/.echo/covers.bin"));
+    uint32_t covers_size = fake_hal_reserved_size("/.echo/covers.bin");
+    CHECK_EQUAL(80 * 1024 * 1024, covers_size);
+    CHECK((covers_size - COVERS_HEADER_SIZE) / (COVERS_ENTRY_SIZE + COVER_BUILD_RECORD_BYTES) >=
+          2500);
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/scan.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/upnext.bin"));
     step();

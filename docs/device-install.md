@@ -49,7 +49,7 @@ The updater checks the image's shape, rows, entry vector, header copy and CRC be
 - **Keys:** Diagnostics → Key test. The rocker's up end should register as up.
 - **Power:** a short press turns the screen off and on. A long press switches the player off, but only with the cable unplugged; with USB connected the player stays powered.
 - **USB:** the "USB" notice appears and the drive mounts within about 10 s.
-- **Card:** on the first start with a card, the player creates `/.echo` with `settings.bin`, `resume.bin`, `favorites.bin`, `library.db` (4 MB) and `covers.bin` (32 MB), then scans the card and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
+- **Card:** on the first start with a card, the player creates `/.echo` with `settings.bin`, `resume.bin`, `favorites.bin`, `library.db` (4 MB) and `covers.bin` (80 MB), then scans the card and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
 
 ## If something goes wrong
 
