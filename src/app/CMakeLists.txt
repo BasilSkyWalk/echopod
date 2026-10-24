@@ -7,6 +7,8 @@ add_library(echo_app STATIC
     default_theme.c
     favorites_store.c
     diagnostics_values.c
+    diagnostics_rows.c
+    $<IF:$<BOOL:${ECHO_RELEASE}>,diagnostics_menu_release.c,diagnostics_menu.c>
     draw_profile.c
     frame_overlay.c
     home_art.c

@@ -133,4 +133,8 @@ typedef struct AppScreensContext {
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);
+MenuItem app_screens_open_item(const char *label, Screen *target);
+Screen *app_screens_build_menu(MenuScreen *menu, const char *title, const MenuItem *items,
+                               int count, const Theme *theme);
+void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Theme *theme);
 int app_screens_start_path(AppScreens *screens, StartScreen start, Screen **path);
