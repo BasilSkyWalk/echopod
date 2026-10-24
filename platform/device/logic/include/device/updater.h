@@ -5,13 +5,15 @@
 
 enum {
     UPDATER_IMAGE_SIZE = 0x500004,
+    UPDATER_STOCK_IMAGE_SIZE = 0x2000004,
     UPDATER_CHUNK_BYTES = 8192
 };
 
 typedef enum UpdateCheck {
     UPDATE_VALID,
     UPDATE_ALREADY_INSTALLED,
-    UPDATE_INVALID
+    UPDATE_INVALID,
+    UPDATE_STOCK
 } UpdateCheck;
 
 typedef struct UpdateFile {

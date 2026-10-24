@@ -25,6 +25,9 @@ enum {
     FW_SIZE = 0x44C000,
     FW_END = 0x500000,
     CHUNK_COUNT = FW_END / UPDATER_CHUNK_BYTES,
+    BRAND_OFFSET = 0x10,
+    STOCK_FW_SIZE = 0x01FC4000,
+    STOCK_FW_END = 0x2000000,
     PASSES = 2
 };
 
@@ -34,6 +37,7 @@ enum {
 #define DATA_BASE 0x03004000u
 
 static const uint8_t MAGIC[8] = {'R', 'K', 'n', 'a', 'n', 'o', 'F', 'W'};
+static const uint8_t STOCK_BRAND[8] = {'R', 'o', 'c', 'k', 'c', 'h', 'i', 'p'};
 static const uint32_t ROW_2[4] = {0x03078CD0u, 0x03079DCCu, 4, 0};
 
 static uint32_t source_chunk[CHUNK_WORDS];
@@ -46,6 +50,7 @@ typedef struct SlotCopy {
     uint32_t target_slot;
     UpdateProgress progress;
     uint32_t pass;
+    uint32_t chunks;
 } SlotCopy;
 
 static uint32_t le32(const uint8_t *bytes)
@@ -75,14 +80,20 @@ static bool read_slot_chunk(const UpdateStorage *storage, uint32_t slot, uint32_
     return storage->read(storage->context, slot + chunk * CHUNK_SECTORS, CHUNK_SECTORS, words);
 }
 
+static bool has_text(const uint8_t *bytes, const uint8_t *text, size_t length)
+{
+    for (size_t index = 0; index < length; index++) {
+        if (bytes[index] != text[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool header_is_valid(const uint8_t *header, const UpdateStorage *storage)
 {
-    bool magic = true;
-    for (size_t index = 0; index < sizeof MAGIC; index++) {
-        magic = magic && header[MAGIC_OFFSET + index] == MAGIC[index];
-    }
-    return magic && le32(header + FW_SIZE_OFFSET) == FW_SIZE &&
-           le32(header + FW1_END_OFFSET) <= FW_SIZE &&
+    return has_text(header + MAGIC_OFFSET, MAGIC, sizeof MAGIC) &&
+           le32(header + FW_SIZE_OFFSET) == FW_SIZE && le32(header + FW1_END_OFFSET) <= FW_SIZE &&
            FW_END / SECTOR_BYTES <= storage->slot_sectors &&
            le32(header + CONTAINER_BASE_OFFSET) == CODE_BASE &&
            le32(header + CONTAINER_CAPACITY_OFFSET) == TABLE_ROWS;
@@ -148,10 +159,11 @@ static bool layout_is_bootable(const UpdateFile *file, const uint8_t *header)
            other_rows_are_valid(header) && vectors_are_valid(file, code_size);
 }
 
-static bool header_copy_matches(const UpdateFile *file, const uint32_t *first_chunk)
+static bool header_copy_matches(const UpdateFile *file, const uint32_t *first_chunk,
+                                uint32_t fw_size)
 {
     uint32_t copy[HEADER_BYTES / 4];
-    return file->read(file->context, FW_SIZE, copy, HEADER_BYTES) &&
+    return file->read(file->context, fw_size, copy, HEADER_BYTES) &&
            same_bytes(copy, first_chunk, HEADER_BYTES / 4);
 }
 
@@ -176,35 +188,53 @@ static bool matches_installed(const UpdateFile *file, const UpdateStorage *stora
            chunk_matches_slot(file, storage, storage->slot_2, 0);
 }
 
-static bool crc_is_valid(const UpdateFile *file)
+static bool crc_is_valid(const UpdateFile *file, uint32_t fw_end)
 {
     uint32_t crc = 0;
-    for (uint32_t chunk = 0; chunk < CHUNK_COUNT; chunk++) {
+    for (uint32_t chunk = 0; chunk < fw_end / UPDATER_CHUNK_BYTES; chunk++) {
         if (!read_file_chunk(file, chunk, source_chunk)) {
             return false;
         }
         crc = image_crc_update(crc, (const uint8_t *)source_chunk, UPDATER_CHUNK_BYTES);
     }
     uint32_t stored = 0;
-    return file->read(file->context, FW_END, &stored, sizeof stored) &&
+    return file->read(file->context, fw_end, &stored, sizeof stored) &&
            crc == le32((const uint8_t *)&stored);
+}
+
+static UpdateCheck stock_check(const UpdateFile *file, const UpdateStorage *storage,
+                               const uint32_t *header)
+{
+    const uint8_t *bytes = (const uint8_t *)header;
+    bool fits = STOCK_FW_END / SECTOR_BYTES <= storage->slot_sectors;
+    bool valid = fits && has_text(bytes + MAGIC_OFFSET, MAGIC, sizeof MAGIC) &&
+                 has_text(bytes + BRAND_OFFSET, STOCK_BRAND, sizeof STOCK_BRAND) &&
+                 le32(bytes + FW_SIZE_OFFSET) == STOCK_FW_SIZE &&
+                 header_copy_matches(file, header, STOCK_FW_SIZE) &&
+                 crc_is_valid(file, STOCK_FW_END);
+    return valid ? UPDATE_STOCK : UPDATE_INVALID;
 }
 
 UpdateCheck updater_check(const UpdateFile *file, const UpdateStorage *storage)
 {
     static uint32_t header[PREFIX_BYTES / 4];
-    if (file->size != UPDATER_IMAGE_SIZE || !file->read(file->context, 0, header, PREFIX_BYTES)) {
+    bool stock = file->size == UPDATER_STOCK_IMAGE_SIZE;
+    if ((file->size != UPDATER_IMAGE_SIZE && !stock) ||
+        !file->read(file->context, 0, header, PREFIX_BYTES)) {
         return UPDATE_INVALID;
     }
+    if (stock) {
+        return stock_check(file, storage, header);
+    }
     const uint8_t *bytes = (const uint8_t *)header;
-    if (!header_is_valid(bytes, storage) || !header_copy_matches(file, header) ||
+    if (!header_is_valid(bytes, storage) || !header_copy_matches(file, header, FW_SIZE) ||
         !layout_is_bootable(file, bytes)) {
         return UPDATE_INVALID;
     }
     if (matches_installed(file, storage, le32(bytes + FW1_END_OFFSET))) {
         return UPDATE_ALREADY_INSTALLED;
     }
-    return crc_is_valid(file) ? UPDATE_VALID : UPDATE_INVALID;
+    return crc_is_valid(file, FW_END) ? UPDATE_VALID : UPDATE_INVALID;
 }
 
 static bool read_source(const SlotCopy *copy, uint32_t chunk)
@@ -246,8 +276,8 @@ static bool invalidate_slot(const SlotCopy *copy)
 static void report(const SlotCopy *copy, uint32_t chunk)
 {
     if (copy->progress.report != NULL) {
-        copy->progress.report(copy->progress.context, copy->pass * CHUNK_COUNT + chunk,
-                              PASSES * CHUNK_COUNT);
+        copy->progress.report(copy->progress.context, copy->pass * copy->chunks + chunk,
+                              PASSES * copy->chunks);
     }
 }
 
@@ -256,7 +286,7 @@ static bool copy_slot(const SlotCopy *copy)
     if (!invalidate_slot(copy)) {
         return false;
     }
-    for (uint32_t chunk = 1; chunk < CHUNK_COUNT; chunk++) {
+    for (uint32_t chunk = 1; chunk < copy->chunks; chunk++) {
         if (!copy_chunk(copy, chunk)) {
             return false;
         }
@@ -265,13 +295,14 @@ static bool copy_slot(const SlotCopy *copy)
     if (!copy_chunk(copy, 0)) {
         return false;
     }
-    report(copy, CHUNK_COUNT);
+    report(copy, copy->chunks);
     return true;
 }
 
 bool updater_install(const UpdateFile *file, const UpdateStorage *storage, UpdateProgress progress)
 {
-    SlotCopy second = {file, storage, 0, storage->slot_2, progress, 0};
-    SlotCopy first = {NULL, storage, storage->slot_2, storage->slot_1, progress, 1};
+    uint32_t chunks = (file->size - 4) / UPDATER_CHUNK_BYTES;
+    SlotCopy second = {file, storage, 0, storage->slot_2, progress, 0, chunks};
+    SlotCopy first = {NULL, storage, storage->slot_2, storage->slot_1, progress, 1, chunks};
     return copy_slot(&second) && copy_slot(&first);
 }
