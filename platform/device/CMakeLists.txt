@@ -111,41 +111,20 @@ target_link_options(echo_rescan_overlay PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_rescan_overlay.map
 )
 
-set(ECHO_IMAGE_HEADER "generated" CACHE STRING
-    "Image outer header: reference (copied from RECHO 0.9.2) or generated (no reference needed)")
-set_property(CACHE ECHO_IMAGE_HEADER PROPERTY STRINGS reference generated)
-set(ECHO_FIRMWARE_VERSION "0.1.0" CACHE STRING "major.minor.patch written to a generated header")
-set(ECHO_REFERENCE_IMG
-    "$ENV{HOME}/echo-mini-blobs/recho-0.9.2/HIFIEC90.IMG"
-    CACHE FILEPATH "RECHO 0.9.2 HIFIEC90.IMG; only its header bytes are copied"
-)
+set(ECHO_FIRMWARE_VERSION "0.1.0" CACHE STRING "major.minor.patch written to the image header")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
 
-if(ECHO_IMAGE_HEADER STREQUAL "generated")
-    set(ECHO_IMAGE_HEADER_ARGUMENTS --version ${ECHO_FIRMWARE_VERSION})
-elseif(ECHO_IMAGE_HEADER STREQUAL "reference")
-    if(EXISTS ${ECHO_REFERENCE_IMG})
-        set(ECHO_IMAGE_HEADER_ARGUMENTS --reference ${ECHO_REFERENCE_IMG})
-    else()
-        message(STATUS "reference image not found at ${ECHO_REFERENCE_IMG}: only the ELF is built")
-    endif()
-else()
-    message(FATAL_ERROR "ECHO_IMAGE_HEADER must be reference or generated, not ${ECHO_IMAGE_HEADER}")
-endif()
-
-if(DEFINED ECHO_IMAGE_HEADER_ARGUMENTS)
-    add_custom_target(echo_device_image ALL
-        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
-            ${ECHO_IMAGE_HEADER_ARGUMENTS}
-            --elf $<TARGET_FILE:echo_device>
-            --overlay $<TARGET_FILE:echo_rescan_overlay>
-            --core1-mp3 ${ECHO_CORE1_MP3_BINARY}
-            --core1-flac ${ECHO_CORE1_BINARY}
-            --output ${ECHO_DEVICE_IMAGE}
-        BYPRODUCTS ${ECHO_DEVICE_IMAGE}
-        DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
-            ${PROJECT_SOURCE_DIR}/tools/make_image.py
-        VERBATIM
-    )
-endif()
+add_custom_target(echo_device_image ALL
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
+        --version ${ECHO_FIRMWARE_VERSION}
+        --elf $<TARGET_FILE:echo_device>
+        --overlay $<TARGET_FILE:echo_rescan_overlay>
+        --core1-mp3 ${ECHO_CORE1_MP3_BINARY}
+        --core1-flac ${ECHO_CORE1_BINARY}
+        --output ${ECHO_DEVICE_IMAGE}
+    BYPRODUCTS ${ECHO_DEVICE_IMAGE}
+    DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
+        ${PROJECT_SOURCE_DIR}/tools/make_image.py
+    VERBATIM
+)

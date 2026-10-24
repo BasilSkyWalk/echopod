@@ -1,6 +1,4 @@
 import datetime
-import functools
-import os
 import re
 import subprocess
 import struct
@@ -14,10 +12,6 @@ sys.path.insert(0, str(TOOLS_DIRECTORY))
 
 import make_image
 
-REFERENCE_PATH = Path(os.environ.get(
-    "ECHO_REFERENCE_IMG",
-    Path.home() / "echo-mini-blobs/recho-0.9.2/HIFIEC90.IMG"))
-
 RESET = 0x03050101
 IMAGE_SIZE = 0x500004
 FW_SIZE = 0x44C000
@@ -30,18 +24,6 @@ def word(data, offset):
 
 def row(data, index):
     return struct.unpack_from("<4I", data, 0x208 + 16 * index)
-
-
-@functools.cache
-def fake_reference():
-    image = bytearray(IMAGE_SIZE)
-    image[:0x1F4] = bytes((index * 7 + 3) & 0xFF for index in range(0x1F4))
-    struct.pack_into("<I", image, 0x1F4, FW_SIZE)
-    image[0x1F8:0x200] = b"RKnanoFW"
-    image[FW_SIZE:FW_SIZE + 0x200] = image[:0x200]
-    image[FW_SIZE + 0x200:FW_SIZE + 0x208] = b"\x11" * 8
-    struct.pack_into("<I", image, 0x500000, make_image.crc32(bytes(image[:0x500000])))
-    return bytes(image)
 
 
 def vector_table(stack=0x03004000, reset=RESET, size=256):
@@ -59,7 +41,7 @@ def firmware(code_tail=b"\xAA" * 64, data_tail=b"", bss_size=0x100, stack=0x0300
 def build(firmware_parts=None, **options):
     settings = {"brand": "ECHOFW", "build_tag": "abc1234", "date": (2026, 10, 14)}
     settings.update(options)
-    return make_image.build_image(fake_reference(), firmware_parts or firmware(), **settings)
+    return make_image.build_image(firmware_parts or firmware(), **settings)
 
 
 SHF_ALLOC = 2
@@ -129,7 +111,7 @@ class BrandTest(unittest.TestCase):
 
 
 class FwEndTest(unittest.TestCase):
-    def test_the_reference_fw_size_ends_at_5_mib(self):
+    def test_our_fw_size_ends_at_5_mib(self):
         self.assertEqual(0x500000, make_image.fw_end(0x44C000))
 
     def test_the_stock_fw_size_ends_at_32_mib(self):
@@ -147,14 +129,6 @@ class LayoutTest(unittest.TestCase):
     def test_the_image_is_5_mib_plus_the_trailer(self):
         self.assertEqual(IMAGE_SIZE, len(self.image))
 
-    def test_the_outer_header_keeps_the_reference_bytes_outside_the_patched_fields(self):
-        reference = fake_reference()
-        patched = set(range(0x00, 0x04)) | set(range(0x10, 0x18)) | set(range(0x30, 0x38))
-        patched |= set(range(0x80, 0x84))
-        for offset in range(0x1F4):
-            if offset not in patched:
-                self.assertEqual(reference[offset], self.image[offset], hex(offset))
-
     def test_the_fw_size_word_is_the_header_copy_offset(self):
         self.assertEqual(FW_SIZE, word(self.image, 0x1F4))
 
@@ -171,7 +145,7 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual((0x03004000, self.data_size, 0x03004000 + self.data_size,
                           self.data_size + 0x100), row(self.image, 1))
 
-    def test_row_2_is_the_constant_from_the_reference(self):
+    def test_row_2_is_the_fixed_constant(self):
         self.assertEqual((0x03078CD0, 0x03079DCC, 4, 0), row(self.image, 2))
 
     def test_the_remaining_rows_and_the_prefix_are_zero(self):
@@ -189,9 +163,8 @@ class LayoutTest(unittest.TestCase):
     def test_the_header_copy_repeats_the_first_512_bytes(self):
         self.assertEqual(self.image[:0x200], self.image[FW_SIZE:FW_SIZE + 0x200])
 
-    def test_the_marker_bytes_come_from_the_reference(self):
-        self.assertEqual(b"\x11" * 8, self.image[FW_SIZE + 0x200:FW_SIZE + 0x208])
-        self.assertFalse(any(self.image[FW_SIZE + 0x208:0x500000]))
+    def test_everything_after_the_header_copy_is_zero(self):
+        self.assertFalse(any(self.image[FW_SIZE + 0x200:0x500000]))
 
     def test_the_trailer_is_the_crc_of_everything_before_it(self):
         self.assertEqual(make_image.crc32(self.image[:0x500000]), word(self.image, 0x500000))
@@ -260,11 +233,11 @@ class FirmwareRulesTest(unittest.TestCase):
     def test_data_of_exactly_180_bytes_is_accepted(self):
         self.assertEqual(IMAGE_SIZE, len(build(firmware(data_tail=b"\x00" * 172))))
 
-    def test_code_past_the_reference_row_0_end_is_refused(self):
+    def test_code_past_the_row_0_end_is_refused(self):
         limit = 0x030771D4 - 0x03050B68 - 256
         self.assert_refused(firmware(code_tail=b"\x00" * (limit + 4)))
 
-    def test_code_that_ends_at_the_reference_row_0_end_is_accepted(self):
+    def test_code_that_ends_at_the_row_0_end_is_accepted(self):
         limit = 0x030771D4 - 0x03050B68 - 256
         self.assertEqual(IMAGE_SIZE, len(build(firmware(code_tail=b"\x00" * limit))))
 
@@ -363,7 +336,7 @@ class ValidatorTest(unittest.TestCase):
 class GeneratedHeaderTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.image = make_image.build_image(None, firmware(), brand="ECHOFW", build_tag="abc1234",
+        cls.image = make_image.build_image(firmware(), brand="ECHOFW", build_tag="abc1234",
                                            date=(2026, 10, 22), version=(0, 1, 2))
 
     def test_the_header_holds_the_format_constants(self):
@@ -406,10 +379,13 @@ class GeneratedHeaderTest(unittest.TestCase):
     def test_a_version_part_out_of_range_is_refused(self):
         for version in ((256, 0, 0), (0, 256, 0), (0, 0, 0x10000), (-1, 0, 0)):
             with self.assertRaises(make_image.ImageError, msg=str(version)):
-                make_image.build_image(None, firmware(), brand="ECHOFW", build_tag="abc1234",
+                make_image.build_image(firmware(), brand="ECHOFW", build_tag="abc1234",
                                        date=(2026, 10, 22), version=version)
 
-    def test_the_command_builds_without_a_reference(self):
+    def test_the_command_builds_an_image(self):
+        self.assertNotIn("reference", vars(make_image.parse_arguments(["--elf", "a", "--output", "b"])))
+
+    def test_the_command_writes_a_valid_image(self):
         with tempfile.TemporaryDirectory() as directory:
             elf = Path(directory) / "firmware.elf"
             elf.write_bytes(firmware_elf(firmware()))
@@ -422,46 +398,6 @@ class GeneratedHeaderTest(unittest.TestCase):
             self.assertEqual([], make_image.validate_image(image))
             self.assertEqual(0x00010000, word(image, 0x004))
             self.assertEqual(0, word(image, 0x070))
-
-
-class ReferenceCheckTest(unittest.TestCase):
-    def test_a_file_that_is_not_the_reference_is_refused(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "HIFIEC90.IMG"
-            path.write_bytes(fake_reference())
-            with self.assertRaises(make_image.ImageError):
-                make_image.load_reference(path)
-
-
-@unittest.skipUnless(REFERENCE_PATH.exists(), f"reference image not found at {REFERENCE_PATH}")
-class RealReferenceTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.reference = make_image.load_reference(REFERENCE_PATH)
-
-    def test_the_reference_trailer_matches_the_facts_sheet_and_passes_the_updater_checks(self):
-        self.assertEqual(0xEFDC758B, word(self.reference, 0x500000))
-        self.assertEqual([], make_image.validate_image(self.reference))
-
-    def test_reassembling_the_reference_from_its_parts_is_byte_identical(self):
-        parts = make_image.split_image(self.reference)
-        self.assertEqual(self.reference, make_image.assemble(parts))
-
-    def test_an_image_built_on_the_reference_passes_the_updater_checks(self):
-        image = make_image.build_image(self.reference, firmware(), brand="ECHOFW",
-                                       build_tag="abc1234", date=(2026, 10, 14))
-        self.assertEqual([], make_image.validate_image(image))
-
-    def test_the_command_writes_a_valid_image(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "echo.elf").write_bytes(firmware_elf(firmware()))
-            output = root / "HIFIEC90.IMG"
-            status = make_image.main([
-                "--reference", str(REFERENCE_PATH), "--elf", str(root / "echo.elf"),
-                "--build-tag", "abc1234", "--date", "2026-10-14", "--output", str(output)])
-            self.assertEqual(0, status)
-            self.assertEqual([], make_image.validate_image(output.read_bytes()))
 
 
 class SectionCheckTest(unittest.TestCase):
