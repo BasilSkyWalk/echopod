@@ -2,9 +2,13 @@
 
 Recovery has been confirmed on the test unit (`docs/device-recovery.md`): maskrom can write the stock 3.7.0 image back. Every route below falls back to that.
 
-## First install: a direct maskrom write
+## First install
 
-On the test unit the stock 3.7.0 updater shows "Updating" for under a second, deletes the file and keeps stock. It did this for our image, for RECHO 0.9.2, and even for FiiO's own image. So the first install writes our image straight into both firmware slots. Each slot holds the image's first `0x500000` bytes (`docs/device-facts.md` 2.2). On this unit rockusb LBA = raw − `0x2000`, so slot 1 is rockusb 0 and slot 2 is rockusb `0x11000` = 69632 (2.3.1).
+Since 2026-10-24 the first install works the way a user does it: copy `HIFIEC90.IMG` to internal storage from Windows while FiiO's firmware (3.7.0 or 3.9.0) runs, eject, and restart (`docs/user-guide.md`, Install). The direct maskrom write below is the fallback.
+
+## Fallback first install: a direct maskrom write
+
+On 2026-10-14 the stock 3.7.0 updater on the test unit showed "Updating" for under a second, deleted the file and kept stock. It did this for our image, for RECHO 0.9.2, and even for FiiO's own image, all copied from a Mac. This route writes our image straight into both firmware slots instead. Each slot holds the image's first `0x500000` bytes (`docs/device-facts.md` 2.2). On this unit rockusb LBA = raw − `0x2000`, so slot 1 is rockusb 0 and slot 2 is rockusb `0x11000` = 69632 (2.3.1).
 
 1. Build: `cmake --preset device && cmake --build --preset device`. Then cut the slot contents:
 
@@ -37,7 +41,7 @@ On the test unit the stock 3.7.0 updater shows "Updating" for under a second, de
    shasum -a 256 build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/HIFIEC90.IMG"
    ```
 
-   5 MiB takes about 30 s, because writes run at about 180 KB/s.
+   5 MiB takes a few seconds at high speed (about 30 s on a full-speed connection).
 3. Eject the drive and leave the cable in. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
 4. Press a key, unplug, hold Power to switch off, then switch on. The new build starts.
 
@@ -45,7 +49,7 @@ The updater checks the image's shape, rows, entry vector, header copy and CRC be
 
 ## What to check after an install
 
-- **Home screen:** "Echo Mini" with Music, Now Playing, Settings and Diagnostics. Without a card, Music says "No library".
+- **Home screen:** "EchoPod" with Music, Now Playing, Settings and Diagnostics. Without a card, Music says "No library".
 - **Keys:** Diagnostics → Key test. The rocker's up end should register as up.
 - **Power:** a short press turns the screen off and on. A long press switches the player off, but only with the cable unplugged; with USB connected the player stays powered.
 - **USB:** the "USB" notice appears and the drive mounts within about 10 s.

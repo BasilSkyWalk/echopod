@@ -1,8 +1,11 @@
-# Echo Mini firmware
+# EchoPod
 
-A custom firmware app layer for the Snowsky Echo Mini digital audio player. It has an iPod-style Cover Flow browser, a library database, album favorites and M3U playlists. Development happens in a macOS simulator; the device port builds on [ReChord](https://github.com/brnomt/ReChord).
+Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has an iPod-style Cover Flow browser, a music library built on the player, album favorites, M3U playlists and an Up Next queue. It isn't made or supported by FiiO.
 
-Status: early development, testing on hardware.
+- **Installing and using it:** `docs/user-guide.md`.
+- **Read first:** `docs/known-issues.md`. EchoPod is early, and has been tested on one player.
+
+The hardware facts it relies on come largely from the [ReChord](https://github.com/brnomt/ReChord) project's research; the drivers are written from those facts (`docs/device-facts.md`).
 
 ## Build and run the simulator (macOS)
 
@@ -15,7 +18,26 @@ ctest --preset dev
 ./build/dev/platform/sim/echo_sim
 ```
 
-### Use your music library
+## Build on Windows
+
+Install [MSYS2](https://www.msys2.org) and, in its CLANG64 shell, the packages `mingw-w64-clang-x86_64-{clang,compiler-rt,cmake,ninja,SDL2}` and `mingw-w64-clang-x86_64-arm-none-eabi-{gcc,binutils,newlib}`, plus Python 3 with `pip install -r tools/requirements.txt`. With `C:\msys64\clang64\bin` first on the PATH (and not `C:\msys64\usr\bin`, whose git ignores this repo's line endings):
+
+```sh
+CMAKE_GENERATOR=Ninja CC=clang cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+```
+
+## Build the firmware
+
+```sh
+cmake --preset release
+cmake --build --preset release
+```
+
+This writes `build/release/HIFIEC90.IMG`. The `device` preset builds the same image with the developer Diagnostics rows. `docs/device-install.md` covers installing builds during development.
+
+## Use your music library in the simulator
 
 ```sh
 mkdir -p build/system
@@ -28,7 +50,7 @@ The PC tools still work and write the same formats (`tools/library_index.py`, `t
 
 ## Testing on a player
 
-1. Install the firmware (`docs/device-install.md`). The first install on a stock unit is a maskrom write from a Mac; later updates are a file copy.
+1. Install the firmware (`docs/user-guide.md`, or `docs/device-install.md` for development builds).
 2. Put music on a microSD card (FAT32 or exFAT), in any folder layout, and insert it.
 3. Switch on. The player creates `/.echo` on the card, scans it ("Scanning library", then "Finding covers") and shows "Library: N tracks, M covers".
 4. After copying music over USB, eject both drives: the player rescans by itself. Settings → Rescan library does it on demand.
@@ -84,4 +106,4 @@ See `docs/architecture.md`.
 
 ## License
 
-GPL-3.0-or-later. See `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`). The simulator's decoders (dr_flac, dr_mp3, dr_wav) are public domain or MIT-0 (`third_party/dr_libs/LICENSE`).
+GPL-3.0-or-later. See `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`). The simulator's decoders (dr_flac, dr_mp3, dr_wav) are public domain or MIT-0 (`third_party/dr_libs/LICENSE`). The player's MP3 decoder is libmad, GPL-2.0-or-later (`third_party/libmad/COPYING`).

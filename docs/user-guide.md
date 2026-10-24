@@ -38,7 +38,8 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 - EchoPod plays FLAC, MP3 and WAV, up to 192 kHz. It lists the other formats FiiO lists, and says when it can't play one.
 - Album covers come from art inside each album's first track, or from a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks.
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
-- EchoPod keeps its own files in a hidden `/.echo` folder on the card. Don't delete it unless you want the library rebuilt.
+- Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
+- EchoPod keeps its own files in a hidden `/.echo` folder on the card, about 110 MB of them. Don't delete it unless you want the library rebuilt.
 
 ## Copying music over USB
 
@@ -75,4 +76,4 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 
 - **The install doesn't take** (FiiO's firmware comes back after a short "Updating"): copy the file again, check its hash on the player's drive, and make sure it's the only `HIFIECnn.IMG` there. If it keeps failing, the only other way in is maskrom (below).
 - **The player doesn't start at all:** every case so far was recovered through the chip's maskrom mode, which writes FiiO's firmware back from a computer over USB. It needs a patched `rkdeveloptool` and some care; the steps are in `docs/device-recovery.md`.
-- **Reporting a problem:** include what you did, and the Diagnostics → Firmware, Last start, Last step and Last USB lines.
+- **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step and Last USB lines from Home → Diagnostics.
