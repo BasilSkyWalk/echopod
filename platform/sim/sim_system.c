@@ -22,6 +22,11 @@ HalUsbCore hal_system_usb_core(void)
     return (HalUsbCore){.captured = false};
 }
 
+HalUsbLast hal_system_usb_last(void)
+{
+    return (HalUsbLast){.end = HAL_USB_END_NONE};
+}
+
 uint32_t hal_system_clock_mhz(void)
 {
     return clock_mhz;

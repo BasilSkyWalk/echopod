@@ -639,6 +639,62 @@ static void writes_are_counted_per_lun(void)
     CHECK_EQUAL(3, stats.sectors_written);
 }
 
+static void each_lun_remembers_the_last_sector_written(void)
+{
+    uint8_t block[10];
+    uint8_t bytes[1024] = {0};
+    Msc *msc = started_with_buffer();
+    msc->luns[1].writable = true;
+    CHECK_EQUAL(UINT32_MAX, msc_stats(msc).last_written_lba[0]);
+    CHECK_EQUAL(UINT32_MAX, msc_stats(msc).last_written_lba[1]);
+    read_10_block(block, 0x2A, 6, 2);
+    send_command(msc, sizeof bytes, false, 1, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    collect(msc);
+    read_10_block(block, 0x2A, 5, 1);
+    send_command(msc, 512, false, 0, block, 10);
+    send_data(msc, bytes, 512);
+    collect(msc);
+    MscStats stats = msc_stats(msc);
+    CHECK_EQUAL(5, stats.last_written_lba[0]);
+    CHECK_EQUAL(7, stats.last_written_lba[1]);
+}
+
+static void a_write_after_an_eject_is_refused_and_counted(void)
+{
+    uint8_t block[10];
+    uint8_t bytes[512] = {0};
+    Msc *msc = started();
+    eject(msc, 0);
+    read_10_block(block, 0x2A, 1, 1);
+    send_command(msc, sizeof bytes, false, 0, block, 10);
+    send_data(msc, bytes, sizeof bytes);
+    check_csw(collect(msc), 1, sizeof bytes);
+    static const uint8_t ready[6] = {0x00, 0, 0, 0, 0, 0};
+    send_command(msc, 0, false, 0, ready, 6);
+    collect(msc);
+    CHECK_EQUAL(1, msc_stats(msc).writes_after_eject);
+    CHECK_EQUAL(0, write_call_count);
+}
+
+static void the_luns_left_mounted_are_the_present_ones_not_ejected(void)
+{
+    static Msc msc;
+    MscLun luns[2] = {
+        {ram_read, ram_write, &writable_disk, DISK_SECTORS, true, true, "Internal storage"},
+        {ram_read, ram_write, &read_only_disk, DISK_SECTORS, true, true, "SD card"},
+    };
+    msc_init(&msc, luns, 2);
+    CHECK_EQUAL(3, msc_left_mounted(&msc));
+    eject(&msc, 1);
+    CHECK_EQUAL(1, msc_left_mounted(&msc));
+    eject(&msc, 0);
+    CHECK_EQUAL(0, msc_left_mounted(&msc));
+    luns[1].present = false;
+    msc_init(&msc, luns, 2);
+    CHECK_EQUAL(1, msc_left_mounted(&msc));
+}
+
 static void without_a_buffer_each_sector_is_its_own_write(void)
 {
     uint8_t block[10];
@@ -805,6 +861,9 @@ int main(void)
         TEST_CASE(the_session_finishes_only_when_every_present_lun_is_ejected),
         TEST_CASE(an_absent_lun_does_not_need_ejecting),
         TEST_CASE(writes_are_counted_per_lun),
+        TEST_CASE(each_lun_remembers_the_last_sector_written),
+        TEST_CASE(a_write_after_an_eject_is_refused_and_counted),
+        TEST_CASE(the_luns_left_mounted_are_the_present_ones_not_ejected),
         TEST_CASE(without_a_buffer_each_sector_is_its_own_write),
         TEST_CASE(buffered_writes_reach_the_drive_in_buffer_sized_runs),
         TEST_CASE(a_buffered_write_in_odd_sized_packets_lands_intact),

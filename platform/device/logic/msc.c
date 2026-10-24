@@ -78,6 +78,9 @@ static void put_le32(uint8_t *bytes, uint32_t value)
 void msc_init(Msc *msc, const MscLun *luns, uint8_t count)
 {
     *msc = (Msc){.lun_count = count, .stats = {.last_failed_lba = UINT32_MAX}, .write_sectors = 1};
+    for (uint8_t index = 0; index < MSC_MAX_LUNS; index++) {
+        msc->stats.last_written_lba[index] = UINT32_MAX;
+    }
     for (uint8_t index = 0; index < count && index < MSC_MAX_LUNS; index++) {
         msc->luns[index] = luns[index];
         if (luns[index].present) {
@@ -137,6 +140,11 @@ bool msc_finished(const Msc *msc)
 {
     return msc->present_at_start != 0 &&
            (msc->ejected & msc->present_at_start) == msc->present_at_start;
+}
+
+uint8_t msc_left_mounted(const Msc *msc)
+{
+    return (uint8_t)(msc->present_at_start & ~msc->ejected);
 }
 
 bool msc_ejected(const Msc *msc, uint8_t lun)
@@ -327,6 +335,9 @@ static void execute(Msc *msc, const uint8_t *block)
     } else if (block[0] == SCSI_START_STOP_UNIT) {
         start_stop(msc, block);
     } else if (!lun->present) {
+        if (block[0] == SCSI_WRITE_10 && msc_ejected(msc, msc->lun)) {
+            msc->stats.writes_after_eject++;
+        }
         set_sense(msc, SENSE_NOT_READY, CODE_MEDIUM_NOT_PRESENT);
     } else {
         execute_ready(msc, lun, block);
@@ -451,6 +462,7 @@ static void flush_batch(Msc *msc)
     if (lun->write(lun->context, msc->lba, sectors, batch_area(msc))) {
         msc->stats.sectors_written += sectors;
         msc->stats.lun_sectors_written[msc->lun] += sectors;
+        msc->stats.last_written_lba[msc->lun] = msc->lba + sectors - 1;
         msc->lba += sectors;
         return;
     }

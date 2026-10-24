@@ -30,6 +30,23 @@ typedef struct HalUsbCore {
 
 HalUsbCore hal_system_usb_core(void);
 
+typedef enum HalUsbEnd {
+    HAL_USB_END_NONE,
+    HAL_USB_END_EJECTED,
+    HAL_USB_END_UNPLUGGED,
+    HAL_USB_END_NO_HOST
+} HalUsbEnd;
+
+typedef struct HalUsbLast {
+    HalUsbEnd end;
+    uint8_t left_mounted;
+    uint32_t internal_written;
+    uint32_t card_written;
+    uint32_t writes_after_eject;
+} HalUsbLast;
+
+HalUsbLast hal_system_usb_last(void);
+
 typedef struct HalLoopCycles {
     uint32_t register_centi;
     uint32_t memory_centi;

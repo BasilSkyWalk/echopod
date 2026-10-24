@@ -81,6 +81,44 @@ static void usb_registers_ask_for_a_session_until_captured(void)
     CHECK(text_is("Plug in USB first", text));
 }
 
+static void the_last_usb_row_waits_for_a_session(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_usb_last_text((HalUsbLast){.end = HAL_USB_END_NONE}, text, sizeof text);
+    CHECK(text_is("No session yet", text));
+}
+
+static void the_last_usb_row_shows_a_clean_eject_and_the_sectors_written(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalUsbLast last = {.end = HAL_USB_END_EJECTED, .internal_written = 12, .card_written = 3};
+    diagnostics_usb_last_text(last, text, sizeof text);
+    CHECK(text_is("Ejected W12/3", text));
+}
+
+static void the_last_usb_row_counts_drives_left_mounted_at_unplug(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalUsbLast last = {.end = HAL_USB_END_UNPLUGGED, .left_mounted = 3, .internal_written = 1};
+    diagnostics_usb_last_text(last, text, sizeof text);
+    CHECK(text_is("Unplugged 2 up W1/0", text));
+}
+
+static void the_last_usb_row_flags_writes_after_an_eject(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalUsbLast last = {.end = HAL_USB_END_EJECTED, .writes_after_eject = 2};
+    diagnostics_usb_last_text(last, text, sizeof text);
+    CHECK(text_is("Ejected W0/0 A2", text));
+}
+
+static void the_last_usb_row_says_when_no_computer_answered(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_usb_last_text((HalUsbLast){.end = HAL_USB_END_NO_HOST}, text, sizeof text);
+    CHECK(text_is("No computer", text));
+}
+
 static void the_boot_pll_shows_its_fields_and_core_speed(void)
 {
     char text[DIAGNOSTICS_VALUE_CAPACITY];
@@ -390,6 +428,11 @@ int main(void)
         TEST_CASE(the_boot_pll_shows_its_fields_and_core_speed),
         TEST_CASE(usb_registers_show_two_whole_words),
         TEST_CASE(usb_registers_ask_for_a_session_until_captured),
+        TEST_CASE(the_last_usb_row_waits_for_a_session),
+        TEST_CASE(the_last_usb_row_shows_a_clean_eject_and_the_sectors_written),
+        TEST_CASE(the_last_usb_row_counts_drives_left_mounted_at_unplug),
+        TEST_CASE(the_last_usb_row_flags_writes_after_an_eject),
+        TEST_CASE(the_last_usb_row_says_when_no_computer_answered),
         TEST_CASE(the_clock_row_steps_up_from_the_current_speed_then_wraps),
         TEST_CASE(the_clock_row_shows_the_actual_speed),
     };

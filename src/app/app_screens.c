@@ -355,6 +355,15 @@ static const char *usb_fifo_value(const void *context)
     return usb_fifo_text;
 }
 
+static char usb_last_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+static const char *usb_last_value(const void *context)
+{
+    (void)context;
+    diagnostics_usb_last_text(hal_system_usb_last(), usb_last_text, sizeof usb_last_text);
+    return usb_last_text;
+}
+
 static ScreenAction toggle_dma_tone(void *context)
 {
     DmaToneOption *tone = context;
@@ -608,6 +617,8 @@ static void build_diagnostics(AppScreens *screens, AppOptions *options, const Th
         (MenuItem){.label = "USB HW4 CFG", .select = NULL, .context = NULL, .value = usb_phy_value};
     screens->diagnostics_items[31] =
         (MenuItem){.label = "USB RX TX", .select = NULL, .context = NULL, .value = usb_fifo_value};
+    screens->diagnostics_items[32] =
+        (MenuItem){.label = "Last USB", .select = NULL, .context = NULL, .value = usb_last_value};
     build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                DIAGNOSTICS_ITEM_COUNT, theme);
 }

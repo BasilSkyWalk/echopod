@@ -517,6 +517,11 @@ HalBootClocks hal_system_boot_clocks(void)
     return (HalBootClocks){0};
 }
 
+HalUsbLast hal_system_usb_last(void)
+{
+    return (HalUsbLast){.end = HAL_USB_END_NONE};
+}
+
 HalUsbCore hal_system_usb_core(void)
 {
     return (HalUsbCore){.captured = false};

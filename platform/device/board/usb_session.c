@@ -8,6 +8,7 @@
 #include "device/usb_fallback.h"
 #include "emmc.h"
 #include "hal/clock.h"
+#include "hal/system.h"
 #include "sd.h"
 #include "usb.h"
 #include "usb_report.h"
@@ -32,6 +33,7 @@ static UsbPort port;
 static Msc msc;
 static UsbFallback fallback;
 static bool high_speed_failed;
+static HalUsbLast last_session;
 static uint32_t write_buffer[WRITE_BUFFER_SECTORS * MSC_SECTOR_SIZE / 4]
     __attribute__((section(".high_ram")));
 
@@ -152,6 +154,24 @@ static UsbSessionEnd serve(void)
     return USB_SESSION_UNPLUGGED;
 }
 
+static HalUsbEnd hal_end(UsbSessionEnd end)
+{
+    if (end == USB_SESSION_EJECTED) {
+        return HAL_USB_END_EJECTED;
+    }
+    return end == USB_SESSION_UNPLUGGED ? HAL_USB_END_UNPLUGGED : HAL_USB_END_NO_HOST;
+}
+
+static void remember_session(UsbSessionEnd end)
+{
+    MscStats stats = msc_stats(&msc);
+    last_session = (HalUsbLast){.end = hal_end(end),
+                                .left_mounted = msc_left_mounted(&msc),
+                                .internal_written = stats.lun_sectors_written[INTERNAL_LUN],
+                                .card_written = stats.lun_sectors_written[CARD_LUN],
+                                .writes_after_eject = stats.writes_after_eject};
+}
+
 bool usb_session_listen(void)
 {
     report = (UsbReport){.internal_ready = false};
@@ -190,7 +210,13 @@ UsbSessionEnd usb_session_run(void)
         end = serve();
     }
     usb_session_stop_listening();
+    remember_session(end);
     return end;
+}
+
+HalUsbLast hal_system_usb_last(void)
+{
+    return last_session;
 }
 
 const UsbReport *usb_session_report(void)

@@ -64,6 +64,38 @@ void diagnostics_usb_registers_text(bool captured, uint32_t first, uint32_t seco
     append_hex(&builder, second, 8);
 }
 
+static uint32_t drives_in(uint8_t mask)
+{
+    return (uint32_t)(mask & 1u) + (uint32_t)((mask >> 1) & 1u);
+}
+
+void diagnostics_usb_last_text(HalUsbLast last, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (last.end == HAL_USB_END_NONE) {
+        string_builder_append(&builder, "No session yet");
+        return;
+    }
+    if (last.end == HAL_USB_END_NO_HOST) {
+        string_builder_append(&builder, "No computer");
+        return;
+    }
+    if (last.end == HAL_USB_END_EJECTED) {
+        string_builder_append(&builder, "Ejected W");
+    } else {
+        string_builder_append(&builder, "Unplugged ");
+        string_builder_append_unsigned(&builder, drives_in(last.left_mounted));
+        string_builder_append(&builder, " up W");
+    }
+    string_builder_append_unsigned(&builder, last.internal_written);
+    string_builder_append_char(&builder, '/');
+    string_builder_append_unsigned(&builder, last.card_written);
+    if (last.writes_after_eject > 0) {
+        string_builder_append(&builder, " A");
+        string_builder_append_unsigned(&builder, last.writes_after_eject);
+    }
+}
+
 void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);

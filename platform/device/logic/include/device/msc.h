@@ -43,6 +43,8 @@ typedef struct MscStats {
     uint32_t read_failures;
     uint32_t write_failures;
     uint32_t last_failed_lba;
+    uint32_t last_written_lba[MSC_MAX_LUNS];
+    uint32_t writes_after_eject;
 } MscStats;
 
 typedef struct MscHistoryEntry {
@@ -96,5 +98,6 @@ bool msc_next_in(Msc *msc, uint8_t *buffer, uint32_t capacity, uint32_t *length)
 void msc_prefetch(Msc *msc);
 bool msc_ejected(const Msc *msc, uint8_t lun);
 bool msc_finished(const Msc *msc);
+uint8_t msc_left_mounted(const Msc *msc);
 MscStats msc_stats(const Msc *msc);
 MscHistory msc_history(const Msc *msc);
