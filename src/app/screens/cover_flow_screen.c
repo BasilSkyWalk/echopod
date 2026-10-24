@@ -50,28 +50,72 @@ static int max_of(int first, int second)
     return first > second ? first : second;
 }
 
-static int add_group_albums(const Library *library, LibraryGroup group, uint16_t *albums, int found,
-                            int capacity)
+CoverFlowOrder cover_flow_order_make(const Library *library)
 {
-    for (uint32_t link = 0; link < group.link_count && found < capacity; link++) {
-        if (library_read_index(library, LIBRARY_LINKS, group.first_link + link, &albums[found])) {
-            found++;
+    uint32_t groups = library_count(library, LIBRARY_ALBUM_ARTISTS);
+    CoverFlowOrder order = {.first_link = 0, .count = 0, .linked = groups > 0};
+    uint32_t next = 0;
+    for (uint32_t index = 0; index < groups && order.linked; index++) {
+        LibraryGroup group;
+        if (!library_read_group(library, LIBRARY_ALBUM_ARTISTS, index, &group) ||
+            (index > 0 && group.first_link != next)) {
+            order.linked = false;
+            break;
         }
+        order.first_link = index == 0 ? group.first_link : order.first_link;
+        next = group.first_link + group.link_count;
     }
-    return found;
+    order.count = order.linked ? next - order.first_link : library_count(library, LIBRARY_ALBUMS);
+    return order;
 }
 
-int cover_flow_screen_build_order(const Library *library, uint16_t *albums, int capacity)
+bool cover_flow_order_album(const Library *library, CoverFlowOrder order, uint32_t position,
+                            uint16_t *album)
 {
-    int found = 0;
-    uint32_t groups = library_count(library, LIBRARY_ALBUM_ARTISTS);
-    for (uint32_t index = 0; index < groups && found < capacity; index++) {
-        LibraryGroup group;
-        if (library_read_group(library, LIBRARY_ALBUM_ARTISTS, index, &group)) {
-            found = add_group_albums(library, group, albums, found, capacity);
+    if (position >= order.count) {
+        return false;
+    }
+    if (!order.linked) {
+        *album = (uint16_t)position;
+        return true;
+    }
+    return library_read_index(library, LIBRARY_LINKS, order.first_link + position, album);
+}
+
+bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint16_t album,
+                           uint32_t *position)
+{
+    LibraryAlbum record;
+    LibraryGroup group;
+    if (!library_read_album(library, album, &record) || album >= order.count) {
+        return false;
+    }
+    if (!order.linked) {
+        *position = album;
+        return true;
+    }
+    if (!library_read_group(library, LIBRARY_ALBUM_ARTISTS, record.album_artist, &group)) {
+        return false;
+    }
+    for (uint32_t link = 0; link < group.link_count; link++) {
+        uint16_t value = 0;
+        if (library_read_index(library, LIBRARY_LINKS, group.first_link + link, &value) &&
+            value == album) {
+            *position = group.first_link + link - order.first_link;
+            return true;
         }
     }
-    return found;
+    return false;
+}
+
+static uint16_t album_of(const CoverFlowScreen *flow, int position)
+{
+    uint16_t album = LIBRARY_NONE;
+    if (position < 0 ||
+        !cover_flow_order_album(flow->config.library, flow->order, (uint32_t)position, &album)) {
+        return LIBRARY_NONE;
+    }
+    return album;
 }
 
 static int center_of(const CoverFlowScreen *flow)
@@ -107,7 +151,7 @@ static void refresh_text(CoverFlowScreen *flow, bool force)
     if (flow->count == 0 || (!force && center == flow->text_position)) {
         return;
     }
-    load_text(flow, flow->albums[center]);
+    load_text(flow, album_of(flow, center));
     flow->text_position = center;
     flow->text_changed_ms = flow->now_ms;
 }
@@ -119,7 +163,7 @@ static bool load_nearest_half(CoverFlowScreen *flow)
         for (int side = -1; side <= 1; side += 2) {
             int position = center + side * distance;
             if (position >= 0 && position < flow->count &&
-                cover_cache_load_half(flow->config.covers, position, flow->albums[position])) {
+                cover_cache_load_half(flow->config.covers, position, album_of(flow, position))) {
                 return true;
             }
         }
@@ -133,7 +177,7 @@ static void load_covers(CoverFlowScreen *flow)
         return;
     }
     if (flow->position == (int32_t)flow->target * COVER_FLOW_ONE) {
-        cover_cache_load_full(flow->config.covers, flow->albums[flow->target]);
+        cover_cache_load_full(flow->config.covers, album_of(flow, flow->target));
     }
 }
 
@@ -144,12 +188,11 @@ static int playing_position(const CoverFlowScreen *flow)
     if (!status.has_track || !library_read_track(flow->config.library, status.track, &track)) {
         return NO_POSITION;
     }
-    for (int position = 0; position < flow->count; position++) {
-        if (flow->albums[position] == track.album) {
-            return position;
-        }
+    uint32_t position = 0;
+    if (!cover_flow_order_find(flow->config.library, flow->order, track.album, &position)) {
+        return NO_POSITION;
     }
-    return NO_POSITION;
+    return (int)position;
 }
 
 static void move_target(CoverFlowScreen *flow, int delta)
@@ -161,7 +204,7 @@ static ScreenAction open_album(CoverFlowScreen *flow)
 {
     BrowseQuery child;
     BrowseItem item = {
-        .kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = flow->albums[flow->target]};
+        .kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = album_of(flow, flow->target)};
     if (flow->count == 0 || !browse_child(browse_root_query(BROWSE_ALBUMS), item, &child)) {
         return screen_action_none();
     }
@@ -171,11 +214,11 @@ static ScreenAction open_album(CoverFlowScreen *flow)
 
 static ScreenAction toggle_favorite(CoverFlowScreen *flow)
 {
-    if (flow->count == 0) {
+    uint16_t album = album_of(flow, flow->target);
+    if (flow->count == 0 || album == LIBRARY_NONE) {
         return screen_action_none();
     }
-    FavoriteResult result =
-        favorites_store_toggle_album(flow->config.favorites, flow->albums[flow->target]);
+    FavoriteResult result = favorites_store_toggle_album(flow->config.favorites, album);
     toast_show(flow->config.toast, favorites_store_message(result), flow->now_ms);
     refresh_text(flow, true);
     return screen_action_none();
@@ -233,7 +276,7 @@ static void update(void *context, uint32_t now_ms)
 
 static bool cover_image(const CoverFlowScreen *flow, int position, Image *image)
 {
-    uint16_t album = flow->albums[position];
+    uint16_t album = album_of(flow, position);
     return cover_cache_full(flow->config.covers, album, image) == COVER_LOADED ||
            cover_cache_half(flow->config.covers, position, album, image) == COVER_LOADED;
 }
@@ -330,7 +373,8 @@ static void draw(void *context, Canvas *canvas)
 Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config)
 {
     flow->config = config;
-    flow->count = cover_flow_screen_build_order(config.library, flow->albums, COVER_FLOW_CAPACITY);
+    flow->order = cover_flow_order_make(config.library);
+    flow->count = (int)flow->order.count;
     flow->target = 0;
     flow->position = 0;
     flow->positioned = false;

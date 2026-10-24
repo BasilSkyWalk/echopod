@@ -13,9 +13,14 @@
 #include "ui/toast.h"
 
 enum {
-    COVER_FLOW_CAPACITY = 1024,
     COVER_FLOW_TEXT_CAPACITY = 128
 };
+
+typedef struct CoverFlowOrder {
+    uint32_t first_link;
+    uint32_t count;
+    bool linked;
+} CoverFlowOrder;
 
 typedef struct CoverFlowConfig {
     const Library *library;
@@ -30,7 +35,7 @@ typedef struct CoverFlowConfig {
 typedef struct CoverFlowScreen {
     Screen screen;
     CoverFlowConfig config;
-    uint16_t albums[COVER_FLOW_CAPACITY];
+    CoverFlowOrder order;
     int count;
     int target;
     int32_t position;
@@ -44,4 +49,8 @@ typedef struct CoverFlowScreen {
 } CoverFlowScreen;
 
 Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config);
-int cover_flow_screen_build_order(const Library *library, uint16_t *albums, int capacity);
+CoverFlowOrder cover_flow_order_make(const Library *library);
+bool cover_flow_order_album(const Library *library, CoverFlowOrder order, uint32_t position,
+                            uint16_t *album);
+bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint16_t album,
+                           uint32_t *position);
