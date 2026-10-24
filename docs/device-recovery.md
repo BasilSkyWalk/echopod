@@ -189,3 +189,5 @@ Only maskrom mode uses this ID, so the player's normal USB drives are unaffected
 Expect `Maskrom`, `Test Device OK.` and two 512-byte files whose bytes `0x1F8`–`0x1FF` read `RKnanoFW`. The same rules as on the Mac apply: never `db`.
 
 Before booting an image written by maskrom, remove or replace `/HIFIEC90.IMG` on internal storage: if an older image is still there, the updater reinstalls it at the end of the next USB session (seen 2026-10-22).
+
+The same applies to a stock restore: stock 3.7.0 installs any `HIFIECnn.IMG` it finds on internal storage at its first boot after the restore. On 2026-10-24 a leftover `HIFIEC90.IMG` was installed into both slots that way. Check the root on a fresh mount (eject, replug, list) before entering maskrom.
