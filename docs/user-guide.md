@@ -4,6 +4,8 @@ EchoPod is a replacement firmware for the Snowsky (FiiO) Echo Mini music player.
 
 Read `docs/known-issues.md` before you install. EchoPod has been tested on one player so far.
 
+**Use it at your own risk.** EchoPod comes with no warranty (see `LICENSE`). Replacing a player's firmware can leave it unable to start; during development that happened, and the player was brought back through maskrom (`docs/device-recovery.md`). Only install it if you're prepared to do that.
+
 ## Which players
 
 - **Echo Mini 8 GB: supported.** Its FiiO update file is called `HIFIECnn.IMG`.
@@ -15,7 +17,7 @@ Tested starting points: FiiO firmware 3.7.0 and 3.9.0 (Settings → About on the
 
 1. Copy anything you want to keep off the player's internal storage.
 2. Charge the battery.
-3. Download `HIFIEC90.IMG` and `SHA256SUMS.txt` from the EchoPod release, and check the file:
+3. Download `HIFIEC90.IMG` and `SHA256SUMS.txt` from the [EchoPod releases](https://github.com/BasilSkyWalk/echopod/releases), and check the file:
    - Windows (PowerShell): `Get-FileHash HIFIEC90.IMG`
    - macOS or Linux: `shasum -a 256 HIFIEC90.IMG`
 
@@ -56,7 +58,9 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 | Play | Select; a song plays the list from that song. Hold on an album for Favorites, hold on a song for Play Next / Add to Up Next | Play / pause; hold to seek |
 | Menu | | Opens Up Next |
 | Back | Back; hold to go home | Back; hold to go home |
-| Power | Lock or unlock; hold to turn off | Same |
+| Power | Screen off or on; hold 2 s to turn off | Same |
+
+With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks.
 
 ## Updating EchoPod
 

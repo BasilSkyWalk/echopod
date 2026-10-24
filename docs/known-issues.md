@@ -1,6 +1,12 @@
 # EchoPod known issues
 
-EchoPod is early firmware made by one person and tested on one player. Read this before you install, and keep a way back (see "If something goes wrong" in `docs/user-guide.md`).
+EchoPod is early firmware made by one person and tested on one player. It comes with no warranty: use it at your own risk. Read this before you install, and keep a way back (see "If something goes wrong" in `docs/user-guide.md`).
+
+## Safety
+
+- **Volume:** EchoPod's top volume is close to FiiO's maximum, and sensitive earphones can be very loud. Turn the volume down before you put them in.
+- **Battery:** EchoPod switches off when the battery runs low, but doesn't yet refuse to start on an almost empty battery. If it switches off by itself, charge it before using it again.
+- **Bricking:** custom firmware has left Echo Mini players unable to start during development (all were recovered through maskrom). EchoPod's updater writes one firmware slot at a time and reads every chunk back, but a power cut during an install is still a risk: install with the battery charged.
 
 ## Installing
 
@@ -19,9 +25,9 @@ EchoPod is early firmware made by one person and tested on one player. Read this
 
 ## Music and library
 
-- **Formats:** FLAC, MP3 and WAV play, up to 192 kHz. ALAC, APE and the other formats FiiO lists appear in the library but don't play; EchoPod says so. 176.4 kHz files haven't been checked.
+- **Formats:** FLAC, MP3 and WAV play, at 44.1, 48, 88.2, 96, 176.4 and 192 kHz. ALAC, APE and the other formats FiiO lists appear in the library but don't play; EchoPod says so.
 - **Building the library takes time.** About 2 minutes per 1,400 tracks on the first start, and again after music changes over USB. The player is busy until it finishes.
-- **Library size:** tested on the player with 6,558 tracks and with 1,643 albums, and on a computer with 20,000 tracks. Larger libraries may stop with an error when the library file (4 MB) is full.
+- **Library size:** tested on the player with 6,558 tracks, and with over 1,600 albums; on a computer with 20,000 tracks. Larger libraries may stop with an error when the library file (4 MB) is full.
 - **Album art:** the covers file has room for 2,674 albums. Past that, the remaining albums show without art.
 - **Cover Flow** orders albums by album artist, then year, not by album title like the Albums list.
 
@@ -29,4 +35,3 @@ EchoPod is early firmware made by one person and tested on one player. Read this
 
 - No Bluetooth audio, EQ, ReplayGain, lyrics or USB DAC mode.
 - The 4.4 mm balanced output hasn't been checked on hardware.
-- A short hold of Power (0.6 s) turns the player off.

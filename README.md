@@ -5,7 +5,7 @@ Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has 
 - **Installing and using it:** `docs/user-guide.md`.
 - **Read first:** `docs/known-issues.md`. EchoPod is early, and has been tested on one player.
 
-The hardware facts it relies on come largely from the [ReChord](https://github.com/brnomt/ReChord) project's research; the drivers are written from those facts (`docs/device-facts.md`).
+The hardware knowledge it relies on comes largely from the [ReChord](https://github.com/brnomt/ReChord) project's research (`docs/hardware.md`, `CREDITS.md`).
 
 ## Build and run the simulator (macOS)
 
@@ -92,9 +92,9 @@ Headless runs use a virtual clock, so scripted screenshots are deterministic.
 | Play | Select (a song plays the list from that song); hold on an album to add or remove it from Favorites | Play / pause; hold to seek | Jump to the chosen time |
 | Menu | | | |
 | Back | Back; hold to go home | Back; hold to go home | Cancel |
-| Power | Lock or unlock; hold to turn off | Same | Same |
+| Power | Screen off or on; hold 2 s to turn off | Same | Same |
 
-The screen turns off after the screen timeout. Any key wakes it and does nothing else. While locked, only Power works.
+The screen turns off after the screen timeout or a tap of Power. With the screen off, ▶‖ pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks, all without waking the screen; Power turns it back on.
 
 Settings: Shuffle (Off / Songs / Albums), Repeat (Off / One / All), Sleep timer, Screen timeout, Brightness, Gain, Output and Start screen. They're saved in `/.echo/settings.bin`, and favorites in `/.echo/favorites.bin`. Without `--system-dir` the simulator can't save, and says so. Playback resumes, paused, where it left off.
 

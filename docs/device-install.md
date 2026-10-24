@@ -1,22 +1,23 @@
-# Installing our firmware
+# Installing development builds
 
-Recovery has been confirmed on the test unit (`docs/device-recovery.md`): maskrom can write the stock 3.7.0 image back. Every route below falls back to that.
+This covers installing builds you made yourself. Release users should follow `docs/user-guide.md`. Before trying a build of your own, make sure you can recover the player (`docs/device-recovery.md`).
 
 ## First install
 
-Since 2026-10-24 the first install works the way a user does it: copy `HIFIEC90.IMG` to internal storage from Windows while FiiO's firmware (3.7.0 or 3.9.0) runs, eject, and restart (`docs/user-guide.md`, Install). The direct maskrom write below is the fallback.
+The first install goes through FiiO's own updater, as in the user guide: copy `HIFIEC90.IMG` (from `build/device/` or `build/release/`) to the top level of internal storage while FiiO's firmware runs, eject, unplug, take the microSD card out and restart. It has worked from FiiO 3.7.0 and 3.9.0 with the file copied from Windows.
 
-## Fallback first install: a direct maskrom write
+### Fallback: a direct maskrom write
 
-On 2026-10-14 the stock 3.7.0 updater on the test unit showed "Updating" for under a second, deleted the file and kept stock. It did this for our image, for RECHO 0.9.2, and even for FiiO's own image, all copied from a Mac. This route writes our image straight into both firmware slots instead. Each slot holds the image's first `0x500000` bytes (`docs/device-facts.md` 2.2). On this unit rockusb LBA = raw − `0x2000`, so slot 1 is rockusb 0 and slot 2 is rockusb `0x11000` = 69632 (2.3.1).
+If FiiO's updater won't take the file, maskrom can write the image straight into both firmware slots. Each slot holds the image's first `0x500000` bytes. On the unit tested, slot 1 is rockusb sector 0 and slot 2 is rockusb sector 69632 (`0x11000`); check yours by reading both headers first (`rl 0 1` and `rl 69632 1` must both show `RKnanoFW` at `0x1F8`).
 
-1. Build: `cmake --preset device && cmake --build --preset device`. Then cut the slot contents:
+1. Build and cut the slot contents:
 
    ```sh
+   cmake --preset device && cmake --build --preset device
    head -c 5242880 build/device/HIFIEC90.IMG > build/device/slot.bin
    ```
 
-2. Enter maskrom: unplug, press RST, hold every button except Power, plug in, then let go after 2–3 s.
+2. Enter maskrom (`docs/device-recovery.md`, step 2).
 3. Write slot 2, then slot 1, and read both back:
 
    ```sh
@@ -24,43 +25,38 @@ On 2026-10-14 the stock 3.7.0 updater on the test unit showed "Updating" for und
    ./rkdeveloptool ld && ./rkdeveloptool td
    ./rkdeveloptool wl 69632 ../../build/device/slot.bin
    ./rkdeveloptool wl 0 ../../build/device/slot.bin
-   ./rkdeveloptool rl 0 1 /tmp/s1.bin && ./rkdeveloptool rl 69632 1 /tmp/s2.bin
+   ./rkdeveloptool rl 0 1 s1.bin && ./rkdeveloptool rl 69632 1 s2.bin
    ```
 
    Both read-backs must equal the first 512 bytes of `slot.bin`.
-4. `./rkdeveloptool rd`. The player starts our firmware.
+4. `./rkdeveloptool rd`. The player starts EchoPod.
 
-## Later updates: our own updater
+## Later updates: EchoPod's own updater
 
-1. Plug the player into the Mac. It shows "USB", and the internal-storage drive ("ECHO MINI") mounts.
-2. Copy the new image to the root without macOS's side file, and check it:
+1. Connect the player. It shows "Computer found", and two drives appear: internal storage ("ECHO MINI") and the SD card.
+2. Copy the new image to the top level of internal storage and check it:
+   - Windows (PowerShell): `Copy-Item build\device\HIFIEC90.IMG E:\` then `Get-FileHash E:\HIFIEC90.IMG`, with E: the internal drive.
+   - macOS: `cp -X build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/"`, then `rm -f "/Volumes/ECHO MINI/._HIFIEC90.IMG"` and `shasum -a 256` on both copies.
+3. Eject both drives. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
+4. Unplug, hold Power to switch off, then switch on. The new build starts.
 
-   ```sh
-   cp -X build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/"
-   rm -f "/Volumes/ECHO MINI/._HIFIEC90.IMG"
-   shasum -a 256 build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/HIFIEC90.IMG"
-   ```
-
-   5 MiB takes a few seconds at high speed (about 30 s on a full-speed connection).
-3. Eject the drive and leave the cable in. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
-4. Press a key, unplug, hold Power to switch off, then switch on. The new build starts.
-
-The updater checks the image's shape, rows, entry vector, header copy and CRC before writing. It skips an image that is already installed and refuses stock images. It writes slot 2 first, then slot 1, and reads back every chunk.
+The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's shape, rows, entry vector, header copy and CRC before writing, skips an image that is already installed, and writes slot 2 first, then slot 1, reading back every chunk. It also accepts FiiO's own 8 GB image (see "Going back to FiiO's firmware" in the user guide) and refuses the 512 MB model's.
 
 ## What to check after an install
 
 - **Home screen:** "EchoPod" with Music, Now Playing, Settings and Diagnostics. Without a card, Music says "No library".
-- **Keys:** Diagnostics → Key test. The rocker's up end should register as up.
-- **Power:** a short press turns the screen off and on. A long press switches the player off, but only with the cable unplugged; with USB connected the player stays powered.
-- **USB:** the "USB" notice appears and the drive mounts within about 10 s.
-- **Card:** on the first start with a card, the player creates `/.echo` with `settings.bin`, `resume.bin`, `favorites.bin`, `library.db` (4 MB) and `covers.bin` (80 MB), then scans the card and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
+- **Diagnostics → Firmware:** the commit you built.
+- **Keys:** Diagnostics → Key test.
+- **Power:** a tap turns the screen off and on. Holding it for 2 s switches the player off, but only with the cable unplugged.
+- **USB:** "Computer found" appears and the drives mount within about 10 s.
+- **Card:** on the first start with a card, the player creates `/.echo` with `settings.bin`, `resume.bin`, `favorites.bin`, `scan.bin`, `upnext.bin`, `library.db` (4 MB), `covers.bin` (80 MB) and `build.tmp` (24 MB), then scans the card and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
 
 ## If something goes wrong
 
 | Symptom | Next step |
 |---|---|
-| Black screen, but the drive appears over USB | Copy a fixed image with the updater |
-| Black screen and nothing over USB | Maskrom recovery, then a direct maskrom write of a fixed image |
+| Black screen, but the drives appear over USB | Copy a fixed image with the updater |
+| Black screen and nothing over USB | Maskrom recovery (`docs/device-recovery.md`), then a direct maskrom write of a fixed image |
 | "Update not installed" | The file isn't a valid image for this player; rebuild it and copy it again |
-| "Update failed" | Copy the file again and retry before turning the player off; one slot is always complete |
-| USB shows the "USB 1/4"–"4/4" screens | The USB controller failed to start; note the values for diagnosis |
+| "Update failed" | Copy the file again and retry before turning the player off |
+| A STALL or FAULT screen | Note the values shown, then hold Power for 2 s |
