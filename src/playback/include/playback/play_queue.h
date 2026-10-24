@@ -3,12 +3,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "core/permutation.h"
 #include "library/library.h"
 #include "library/library_browse.h"
-
-enum {
-    PLAY_QUEUE_CAPACITY = 2048
-};
 
 typedef enum ShuffleMode {
     SHUFFLE_OFF,
@@ -47,7 +44,11 @@ typedef struct PlayQueuePlace {
 typedef struct PlayQueue {
     const Library *library;
     PlayQueuePlan plan;
-    uint16_t entries[PLAY_QUEUE_CAPACITY];
+    uint32_t first_track;
+    uint16_t base_count;
+    uint16_t anchor_base;
+    uint16_t anchor_value;
+    Permutation order;
     uint16_t count;
     PlayQueueCursor cursor;
 } PlayQueue;

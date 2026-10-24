@@ -20,6 +20,7 @@ echo_add_unit_test(NAME test_utf8 SOURCES core/test_utf8.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_string_builder SOURCES core/test_string_builder.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_format SOURCES core/test_format.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_random SOURCES core/test_random.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_permutation SOURCES core/test_permutation.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_hash SOURCES core/test_hash.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_power_policy SOURCES core/test_power_policy.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_low_battery SOURCES core/test_low_battery.c LIBRARIES echo_core)
@@ -33,7 +34,11 @@ echo_add_unit_test(NAME test_font SOURCES gfx/test_font.c gfx/tiny_font.c LIBRAR
 echo_add_unit_test(NAME test_text SOURCES gfx/test_text.c gfx/tiny_font.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_fonts SOURCES fonts/test_fonts.c LIBRARIES echo_fonts)
 
-add_library(echo_library_fixtures STATIC library/memory_source.c library/fixture_library.c)
+add_library(echo_library_fixtures STATIC
+    library/memory_source.c
+    library/fixture_library.c
+    library/big_library.c
+)
 target_include_directories(echo_library_fixtures PUBLIC library)
 target_compile_definitions(echo_library_fixtures PRIVATE
     ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"

@@ -5,6 +5,7 @@ add_library(echo_core STATIC
     hash.c
     key_tracker.c
     low_battery.c
+    permutation.c
     power_policy.c
     random.c
     string_builder.c

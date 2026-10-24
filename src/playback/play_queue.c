@@ -1,94 +1,84 @@
 #include "playback/play_queue.h"
 
-#include "core/random.h"
+enum {
+    MOST_ENTRIES = UINT16_MAX
+};
 
 static bool shuffles_albums(const PlayQueue *queue)
 {
     return queue->plan.shuffle == SHUFFLE_ALBUMS;
 }
 
-static void swap_entries(PlayQueue *queue, uint16_t first, uint16_t second)
+static bool anchor_in_list(const PlayQueue *queue)
 {
-    uint16_t value = queue->entries[first];
-    queue->entries[first] = queue->entries[second];
-    queue->entries[second] = value;
+    return queue->anchor_base < queue->base_count;
 }
 
-enum {
-    FEWEST_TO_SHUFFLE = 3
-};
-
-static void shuffle_after_first(PlayQueue *queue)
+static bool source_track(const PlayQueue *queue, uint32_t position, uint16_t *track)
 {
-    if (queue->count < FEWEST_TO_SHUFFLE) {
-        return;
+    BrowseItem item;
+    if (!browse_item(queue->library, queue->plan.source, position, &item) ||
+        item.kind != BROWSE_ITEM_TRACK) {
+        return false;
     }
-    Random random = random_seeded(queue->plan.seed);
-    for (uint16_t index = (uint16_t)(queue->count - 1); index > 1; index--) {
-        uint16_t other = (uint16_t)(1 + random_below(&random, index));
-        swap_entries(queue, index, other);
+    *track = item.index;
+    return true;
+}
+
+static bool base_value(const PlayQueue *queue, uint32_t base, uint16_t *value)
+{
+    if (base >= queue->base_count) {
+        return false;
     }
+    if (shuffles_albums(queue)) {
+        *value = (uint16_t)base;
+        return true;
+    }
+    return source_track(queue, queue->first_track + base, value);
 }
 
-static void move_to_front(PlayQueue *queue, uint16_t position)
+static uint32_t first_track_position(const PlayQueue *queue, uint32_t available)
 {
-    swap_entries(queue, 0, position);
-    queue->cursor.position = 0;
+    uint16_t track = 0;
+    uint32_t position = 0;
+    while (position < available && !source_track(queue, position, &track)) {
+        position++;
+    }
+    return position;
 }
 
-static void collect_source_tracks(PlayQueue *queue)
+static uint16_t find_anchor(const PlayQueue *queue)
 {
-    uint32_t available = browse_count(queue->library, queue->plan.source);
-    for (uint32_t position = 0; position < available && queue->count < PLAY_QUEUE_CAPACITY;
-         position++) {
-        BrowseItem item;
-        if (browse_item(queue->library, queue->plan.source, position, &item) &&
-            item.kind == BROWSE_ITEM_TRACK) {
-            queue->entries[queue->count++] = item.index;
+    uint16_t track = 0;
+    for (uint16_t base = 0; base < queue->base_count; base++) {
+        if (base_value(queue, base, &track) && track == queue->anchor_value) {
+            return base;
         }
     }
+    return queue->base_count;
 }
 
-static bool find_entry(const PlayQueue *queue, uint16_t value, uint16_t *position)
+static void finish_layout(PlayQueue *queue)
 {
-    for (uint16_t index = 0; index < queue->count; index++) {
-        if (queue->entries[index] == value) {
-            *position = index;
-            return true;
-        }
+    bool shuffled = queue->plan.shuffle != SHUFFLE_OFF;
+    if (!anchor_in_list(queue) && queue->base_count == MOST_ENTRIES) {
+        queue->base_count--;
+        queue->anchor_base = queue->base_count;
     }
-    return false;
-}
-
-static void insert_at_front(PlayQueue *queue, uint16_t value)
-{
-    uint16_t kept = queue->count < PLAY_QUEUE_CAPACITY ? queue->count : PLAY_QUEUE_CAPACITY - 1;
-    for (uint16_t index = kept; index > 0; index--) {
-        queue->entries[index] = queue->entries[index - 1];
-    }
-    queue->entries[0] = value;
-    queue->count = (uint16_t)(kept + 1);
-}
-
-static void place_anchor(PlayQueue *queue)
-{
-    uint16_t position = 0;
-    if (find_entry(queue, queue->plan.anchor_track, &position)) {
-        queue->cursor.position = position;
-        return;
-    }
-    insert_at_front(queue, queue->plan.anchor_track);
-    queue->cursor.position = 0;
+    queue->count = anchor_in_list(queue) ? queue->base_count : (uint16_t)(queue->base_count + 1);
+    queue->cursor.position = !shuffled && anchor_in_list(queue) ? queue->anchor_base : 0;
+    queue->order = permutation_make(shuffled ? (uint32_t)queue->count - 1 : 0, queue->plan.seed);
 }
 
 static bool build_track_queue(PlayQueue *queue)
 {
-    collect_source_tracks(queue);
-    place_anchor(queue);
-    if (queue->plan.shuffle == SHUFFLE_SONGS) {
-        move_to_front(queue, queue->cursor.position);
-        shuffle_after_first(queue);
-    }
+    uint32_t available = browse_count(queue->library, queue->plan.source);
+    queue->first_track = first_track_position(queue, available);
+    uint32_t tracks = available - queue->first_track;
+    queue->base_count = (uint16_t)(tracks < MOST_ENTRIES ? tracks : MOST_ENTRIES);
+    queue->anchor_value = queue->plan.anchor_track;
+    queue->anchor_base = find_anchor(queue);
+    finish_layout(queue);
     return true;
 }
 
@@ -98,41 +88,56 @@ static bool build_album_queue(PlayQueue *queue)
     LibraryAlbum album;
     uint32_t albums = library_count(queue->library, LIBRARY_ALBUMS);
     if (!library_read_track(queue->library, queue->plan.anchor_track, &anchor) ||
-        !library_read_album(queue->library, anchor.album, &album)) {
+        !library_read_album(queue->library, anchor.album, &album) || anchor.album >= albums) {
         return false;
     }
-    for (uint32_t index = 0; index < albums && index < PLAY_QUEUE_CAPACITY; index++) {
-        queue->entries[queue->count++] = (uint16_t)index;
-    }
-    move_to_front(queue, anchor.album);
-    shuffle_after_first(queue);
+    queue->base_count = (uint16_t)(albums < MOST_ENTRIES ? albums : MOST_ENTRIES);
+    queue->anchor_value = anchor.album;
+    queue->anchor_base = anchor.album;
+    finish_layout(queue);
     queue->cursor.album_track = (uint16_t)(queue->plan.anchor_track - album.first_track);
     return true;
 }
 
 bool play_queue_build(PlayQueue *queue, const Library *library, PlayQueuePlan plan)
 {
-    queue->library = library;
-    queue->plan = plan;
-    queue->count = 0;
-    queue->cursor = (PlayQueueCursor){0, 0};
+    *queue = (PlayQueue){.library = library, .plan = plan};
     return shuffles_albums(queue) ? build_album_queue(queue) : build_track_queue(queue);
+}
+
+static bool entry_at(const PlayQueue *queue, uint16_t position, uint16_t *value)
+{
+    if (position >= queue->count) {
+        return false;
+    }
+    bool shuffled = queue->plan.shuffle != SHUFFLE_OFF;
+    if (!shuffled && anchor_in_list(queue)) {
+        return base_value(queue, position, value);
+    }
+    if (position == 0) {
+        *value = queue->anchor_value;
+        return true;
+    }
+    uint32_t base = (uint32_t)position - 1;
+    if (shuffled) {
+        base = permutation_at(&queue->order, base);
+    }
+    if (anchor_in_list(queue) && base >= queue->anchor_base) {
+        base++;
+    }
+    return base_value(queue, base, value);
 }
 
 static bool album_at(const PlayQueue *queue, uint16_t position, LibraryAlbum *album)
 {
-    return position < queue->count &&
-           library_read_album(queue->library, queue->entries[position], album);
+    uint16_t index = 0;
+    return entry_at(queue, position, &index) && library_read_album(queue->library, index, album);
 }
 
 bool play_queue_track_at(const PlayQueue *queue, PlayQueueCursor cursor, uint16_t *track)
 {
     if (!shuffles_albums(queue)) {
-        if (cursor.position >= queue->count) {
-            return false;
-        }
-        *track = queue->entries[cursor.position];
-        return true;
+        return entry_at(queue, cursor.position, track);
     }
     LibraryAlbum album;
     if (!album_at(queue, cursor.position, &album) || cursor.album_track >= album.track_count) {
