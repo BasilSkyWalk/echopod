@@ -3,6 +3,7 @@
 
 #include "check.h"
 #include "library/music_fingerprint.h"
+#include "library/track_tags.h"
 
 enum {
     MAX_NODES = 64
@@ -151,6 +152,52 @@ static void hidden_entries_do_not_count(void)
     CHECK(music_fingerprints_match(before, fingerprint()));
 }
 
+static void files_the_library_ignores_do_not_count(void)
+{
+    music_card();
+    MusicFingerprint before = fingerprint();
+    add("/", "probe1.bin", false, 65536, 9);
+    add("/AC DC/Back In Black", "notes.txt", false, 120, 9);
+    add("/AC DC/Back In Black", "scan 01.jpg", false, 900000, 9);
+    add("/", "System Volume Information", true, 0, 9);
+    add("/System Volume Information", "WPSettings.dat", false, 12, 9);
+    CHECK(music_fingerprints_match(before, fingerprint()));
+}
+
+static void every_format_the_library_reads_counts(void)
+{
+    static const char *const NAMES[] = {"a.flac", "a.ogg", "a.mp3", "a.m4a",  "a.wav", "a.wma",
+                                        "a.ape",  "a.dsf", "a.dff", "A.FLAC", "b.m3u", "b.M3U8"};
+    for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
+        music_card();
+        MusicFingerprint before = fingerprint();
+        add("/AC DC", NAMES[index], false, 1000, 9);
+        CHECK(!music_fingerprints_match(before, fingerprint()));
+    }
+}
+
+static void album_art_files_count(void)
+{
+    static const char *const NAMES[] = {"Folder.JPG", "front.png", "albumart.jpeg", "cover.png"};
+    for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
+        music_card();
+        MusicFingerprint before = fingerprint();
+        add("/AC DC", NAMES[index], false, 1000, 9);
+        CHECK(!music_fingerprints_match(before, fingerprint()));
+    }
+}
+
+static void the_counted_formats_are_the_ones_the_scanner_reads(void)
+{
+    static const char *const NAMES[] = {"x.flac", "x.ogg",  "x.mp3",  "x.m4a", "x.wav",
+                                        "x.wma",  "x.ape",  "x.dsf",  "x.dff", "x.aac",
+                                        "x.txt",  "x.opus", "x.aiff", "x.mp4", "x.flac.txt"};
+    for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
+        bool scanned = track_tags_format_for_name(NAMES[index]) != TAG_FORMAT_UNKNOWN;
+        CHECK_EQUAL(scanned, music_fingerprint_counts(NAMES[index], false));
+    }
+}
+
 static void a_retagged_file_changes_it(void)
 {
     music_card();
@@ -234,6 +281,10 @@ int main(void)
         TEST_CASE(the_test_card_keeps_its_stored_fingerprint),
         TEST_CASE(a_folder_that_cannot_be_opened_counts_as_empty),
         TEST_CASE(hidden_entries_do_not_count),
+        TEST_CASE(files_the_library_ignores_do_not_count),
+        TEST_CASE(every_format_the_library_reads_counts),
+        TEST_CASE(album_art_files_count),
+        TEST_CASE(the_counted_formats_are_the_ones_the_scanner_reads),
         TEST_CASE(a_retagged_file_changes_it),
         TEST_CASE(a_resized_file_changes_it),
         TEST_CASE(a_new_or_renamed_file_changes_it),

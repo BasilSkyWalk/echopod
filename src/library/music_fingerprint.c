@@ -6,6 +6,12 @@
 
 #define SECOND_SEED (HASH_START ^ UINT32_C(0x5BD1E995))
 
+static const char *const LIBRARY_SUFFIXES[] = {".flac", ".ogg", ".mp3", ".m4a", ".wav", ".wma",
+                                               ".ape",  ".dsf", ".dff", ".m3u", ".m3u8"};
+static const char *const ART_STEMS[] = {"cover", "folder", "front", "albumart"};
+static const char *const ART_SUFFIXES[] = {".jpg", ".jpeg", ".png"};
+static const char SYSTEM_FOLDER[] = "System Volume Information";
+
 typedef struct Walk {
     const FingerprintFiles *files;
     FingerprintWork *work;
@@ -20,6 +26,62 @@ static uint32_t text_length(const char *text)
         length++;
     }
     return length;
+}
+
+static char folded(char letter)
+{
+    return letter >= 'A' && letter <= 'Z' ? (char)(letter - 'A' + 'a') : letter;
+}
+
+static bool same_folded(const char *text, const char *lower, uint32_t length)
+{
+    for (uint32_t index = 0; index < length; index++) {
+        if (folded(text[index]) != lower[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool has_suffix(const char *name, uint32_t length, const char *suffix)
+{
+    uint32_t suffix_length = text_length(suffix);
+    return length > suffix_length &&
+           same_folded(name + length - suffix_length, suffix, suffix_length);
+}
+
+static bool is_album_art(const char *name, uint32_t length)
+{
+    for (size_t stem = 0; stem < sizeof ART_STEMS / sizeof ART_STEMS[0]; stem++) {
+        uint32_t stem_length = text_length(ART_STEMS[stem]);
+        for (size_t suffix = 0; suffix < sizeof ART_SUFFIXES / sizeof ART_SUFFIXES[0]; suffix++) {
+            if (stem_length + text_length(ART_SUFFIXES[suffix]) == length &&
+                same_folded(name, ART_STEMS[stem], stem_length) &&
+                has_suffix(name, length, ART_SUFFIXES[suffix])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool music_fingerprint_counts(const char *name, bool directory)
+{
+    uint32_t length = text_length(name);
+    if (directory) {
+        uint32_t system_length = text_length(SYSTEM_FOLDER);
+        bool system = length == system_length;
+        for (uint32_t index = 0; system && index < length; index++) {
+            system = folded(name[index]) == folded(SYSTEM_FOLDER[index]);
+        }
+        return !system;
+    }
+    for (size_t index = 0; index < sizeof LIBRARY_SUFFIXES / sizeof LIBRARY_SUFFIXES[0]; index++) {
+        if (has_suffix(name, length, LIBRARY_SUFFIXES[index])) {
+            return true;
+        }
+    }
+    return is_album_art(name, length);
 }
 
 static void mix(Walk *walk, const void *bytes, size_t length)
@@ -103,7 +165,7 @@ MusicFingerprint music_fingerprint(const FingerprintFiles *files, FingerprintWor
             continue;
         }
         const FingerprintEntry *entry = &work->entry;
-        if (entry->name[0] == '.') {
+        if (entry->name[0] == '.' || !music_fingerprint_counts(entry->name, entry->directory)) {
             continue;
         }
         mix_entry(&walk, entry);

@@ -42,3 +42,4 @@ typedef struct FingerprintWork {
 
 MusicFingerprint music_fingerprint(const FingerprintFiles *files, FingerprintWork *work);
 bool music_fingerprints_match(MusicFingerprint left, MusicFingerprint right);
+bool music_fingerprint_counts(const char *name, bool directory);
