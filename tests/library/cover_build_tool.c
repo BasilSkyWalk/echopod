@@ -10,7 +10,8 @@
 enum {
     MEMORY_SIZE = 384 * 1024,
     LIBRARY_CAPACITY = 4 * 1024 * 1024,
-    COVERS_CAPACITY = 8 * 1024 * 1024
+    COVERS_CAPACITY = 8 * 1024 * 1024,
+    SCRATCH_CAPACITY = 32 * 1024 * 1024
 };
 
 typedef struct HostFiles {
@@ -114,12 +115,14 @@ int main(int argc, char **argv)
     }
     Output library = {calloc(LIBRARY_CAPACITY, 1), LIBRARY_CAPACITY, 0};
     Output covers = {calloc(COVERS_CAPACITY, 1), COVERS_CAPACITY, 0};
+    Output scratch = {calloc(SCRATCH_CAPACITY, 1), SCRATCH_CAPACITY, 0};
     sim_storage_configure(argv[1], NULL);
     ScanFileSystem system = {open_dir, next_entry, close_dir, open_file, close_file, &files};
     ScanStats scan_stats;
     ScanJob scan = {.files = system,
                     .memory = memory,
                     .size = sizeof memory,
+                    .scratch = {read_output, write_output, &scratch, SCRATCH_CAPACITY},
                     .sink = {write_output, &library},
                     .capacity = LIBRARY_CAPACITY};
     ScanResult result = library_scan(&scan, &scan_stats);

@@ -7,7 +7,6 @@
 enum {
     PATH_CAPACITY = 1024,
     MAX_PARTS = 64,
-    MAX_DEPTH = 64,
     EMPTY_SLOT = 0
 };
 
@@ -28,30 +27,22 @@ typedef struct ResolveScratch {
     char normal[PATH_CAPACITY];
     char folded[PATH_CAPACITY];
     char track[PATH_CAPACITY];
+    char name[BUILDER_TEXT_CAPACITY];
     Parts raw;
     Parts wanted;
     Parts candidate;
     Span kept[MAX_PARTS];
 } ResolveScratch;
 
-static ResolveScratch *scratch_of(const LibraryModel *model)
+static ResolveScratch *scratch_of(const Prepared *prepared)
 {
-    return model->paths.scratch;
+    return prepared->resolve;
 }
 
-static uint32_t text_length(const char *text)
-{
-    uint32_t length = 0;
-    while (text[length] != '\0') {
-        length++;
-    }
-    return length;
-}
-
-static uint32_t power_of_two_above(uint32_t value)
+static uint32_t slots_for(uint32_t count)
 {
     uint32_t result = 16;
-    while (result < value * 2) {
+    while (result < count + count / 4) {
         result *= 2;
     }
     return result;
@@ -65,47 +56,60 @@ static uint32_t append_folded(char *out, uint32_t used, const char *text, uint32
     return used + (uint32_t)case_fold_make(text, length, out + used, PATH_CAPACITY - used);
 }
 
-static uint32_t folded_track_path(const LibraryBuilder *builder, const TrackRecord *track,
-                                  char *out)
+uint32_t builder_folded_path(BuilderState *state, Prepared *prepared, uint32_t position, char *out)
 {
-    uint16_t chain[MAX_DEPTH];
+    char *name = scratch_of(prepared)->name;
+    TrackRow row;
+    out[0] = '\0';
+    if (!builder_read_row(&prepared->rows, state, prepared->positions[position], &row)) {
+        return 0;
+    }
+    FolderRow chain[BUILDER_MAX_DEPTH];
     uint32_t depth = 0;
-    for (uint16_t node = track->folder; node != 0 && depth < MAX_DEPTH;
-         node = builder_folder(builder, node)->parent) {
-        chain[depth++] = node;
+    for (uint32_t node = row.folder; node != 0 && depth < BUILDER_MAX_DEPTH;) {
+        if (!builder_read_folder(&prepared->folders, state, node, &chain[depth])) {
+            return 0;
+        }
+        node = chain[depth++].parent;
     }
     uint32_t used = 0;
-    out[0] = '\0';
     while (depth > 0) {
-        const char *name = builder_text(builder, builder_folder(builder, chain[--depth])->name);
-        used = append_folded(out, used, name, text_length(name));
+        const FolderRow *folder = &chain[--depth];
+        if (!builder_read_text(&prepared->heap, folder->name, folder->length, name)) {
+            return 0;
+        }
+        used = append_folded(out, used, name, folder->length);
         used = used < PATH_CAPACITY - 1 ? used + 1 : used;
         out[used - 1] = '/';
         out[used] = '\0';
     }
-    const char *file = builder_text(builder, track->file_name);
-    return append_folded(out, used, file, text_length(file));
+    uint32_t length = row.length[BUILDER_FILE];
+    if (!builder_read_text(&prepared->heap, row.text[BUILDER_FILE], length, name)) {
+        return 0;
+    }
+    return append_folded(out, used, name, length);
 }
 
-static const TrackRecord *track_at(const LibraryBuilder *builder, const LibraryModel *model,
-                                   uint32_t position)
-{
-    return builder_track(builder, model->final_tracks[position]);
-}
-
-static uint32_t folded_name_hash(const LibraryBuilder *builder, const TrackRecord *track,
+static uint32_t folded_name_hash(BuilderState *state, Prepared *prepared, uint32_t position,
                                  char *folded)
 {
-    const char *file = builder_text(builder, track->file_name);
-    uint32_t length = (uint32_t)case_fold_make(file, text_length(file), folded, PATH_CAPACITY);
+    char *name = scratch_of(prepared)->name;
+    TrackRow row;
+    if (!builder_read_row(&prepared->rows, state, prepared->positions[position], &row) ||
+        !builder_read_text(&prepared->heap, row.text[BUILDER_FILE], row.length[BUILDER_FILE],
+                           name)) {
+        return 0;
+    }
+    uint32_t length =
+        (uint32_t)case_fold_make(name, row.length[BUILDER_FILE], folded, PATH_CAPACITY);
     return hash_update(HASH_START, folded, length);
 }
 
-static bool same_folded_path(const LibraryBuilder *builder, const LibraryModel *model,
-                             uint32_t position, const char *wanted, uint32_t length)
+static bool same_folded_path(BuilderState *state, Prepared *prepared, uint32_t position,
+                             const char *wanted, uint32_t length)
 {
-    char *folded = scratch_of(model)->track;
-    uint32_t found = folded_track_path(builder, track_at(builder, model, position), folded);
+    char *folded = scratch_of(prepared)->track;
+    uint32_t found = builder_folded_path(state, prepared, position, folded);
     if (found != length) {
         return false;
     }
@@ -117,51 +121,52 @@ static bool same_folded_path(const LibraryBuilder *builder, const LibraryModel *
     return true;
 }
 
-static void index_exact(const LibraryBuilder *builder, LibraryModel *model, uint32_t position)
+static void index_exact(BuilderState *state, Prepared *prepared, uint32_t position)
 {
-    char *folded = scratch_of(model)->folded;
-    uint32_t length = folded_track_path(builder, track_at(builder, model, position), folded);
+    char *folded = scratch_of(prepared)->folded;
+    uint32_t length = builder_folded_path(state, prepared, position, folded);
     uint32_t hash = hash_update(HASH_START, folded, length);
     for (uint32_t probe = 0;; probe++) {
-        uint16_t *slot = &model->paths.exact[(hash + probe) & model->paths.exact_mask];
-        if (*slot == EMPTY_SLOT || same_folded_path(builder, model, *slot - 1u, folded, length)) {
+        uint16_t *slot = &prepared->exact[(hash + probe) & prepared->exact_mask];
+        if (*slot == EMPTY_SLOT || same_folded_path(state, prepared, *slot - 1u, folded, length)) {
             *slot = (uint16_t)(position + 1);
             return;
         }
     }
 }
 
-static void index_name(const LibraryBuilder *builder, LibraryModel *model, uint32_t position)
+static void index_name(BuilderState *state, Prepared *prepared, uint32_t position)
 {
-    uint32_t hash =
-        folded_name_hash(builder, track_at(builder, model, position), scratch_of(model)->folded);
-    uint16_t *head = &model->paths.by_name[hash & model->paths.by_name_mask];
-    model->paths.next_same_name[position] = *head;
+    uint32_t hash = folded_name_hash(state, prepared, position, scratch_of(prepared)->folded);
+    uint16_t *head = &prepared->by_name[hash & prepared->by_name_mask];
+    prepared->next_same_name[position] = *head;
     *head = (uint16_t)(position + 1);
 }
 
-bool builder_index_paths(const LibraryBuilder *builder, Work *work, LibraryModel *model)
+bool builder_index_paths(BuilderState *state, Prepared *prepared)
 {
-    uint32_t count = model->track_count;
-    uint32_t slots = power_of_two_above(count);
-    model->paths.exact = work_alloc(work, slots * 2);
-    model->paths.by_name = work_alloc(work, slots * 2);
-    model->paths.next_same_name = work_alloc(work, count * 2 + 2);
-    model->paths.scratch = work_alloc(work, (uint32_t)sizeof(ResolveScratch));
-    if (work->failed) {
+    uint32_t count = state->track_count;
+    uint32_t slots = slots_for(count);
+    prepared->index_mark = state->arena.used;
+    prepared->positions = builder_load_column(state, prepared->final_tracks, count);
+    prepared->exact = arena_take(&state->arena, slots * 2);
+    prepared->by_name = arena_take(&state->arena, slots * 2);
+    prepared->next_same_name = arena_take(&state->arena, count * 2 + 2);
+    prepared->resolve = arena_take(&state->arena, (uint32_t)sizeof(ResolveScratch));
+    if (state->arena.failed || prepared->positions == NULL) {
         return false;
     }
-    model->paths.exact_mask = slots - 1;
-    model->paths.by_name_mask = slots - 1;
+    prepared->exact_mask = slots - 1;
+    prepared->by_name_mask = slots - 1;
     for (uint32_t slot = 0; slot < slots; slot++) {
-        model->paths.exact[slot] = EMPTY_SLOT;
-        model->paths.by_name[slot] = EMPTY_SLOT;
+        prepared->exact[slot] = EMPTY_SLOT;
+        prepared->by_name[slot] = EMPTY_SLOT;
     }
     for (uint32_t position = 0; position < count; position++) {
-        index_exact(builder, model, position);
-        index_name(builder, model, position);
+        index_exact(state, prepared, position);
+        index_name(state, prepared, position);
     }
-    return true;
+    return !state->store.io_failed;
 }
 
 static bool contains_url(const char *entry)
@@ -260,21 +265,21 @@ static uint32_t normalize(ResolveScratch *scratch, const char *path, uint32_t le
     return used;
 }
 
-static uint32_t find_exact(const LibraryBuilder *builder, const LibraryModel *model,
-                           const char *candidate, uint32_t length)
+static uint32_t find_exact(BuilderState *state, Prepared *prepared, const char *candidate,
+                           uint32_t length)
 {
-    ResolveScratch *scratch = scratch_of(model);
+    ResolveScratch *scratch = scratch_of(prepared);
     char *folded = scratch->folded;
     uint32_t normal_length = normalize(scratch, candidate, length);
     uint32_t folded_length =
         (uint32_t)case_fold_make(scratch->normal, normal_length, folded, PATH_CAPACITY);
     uint32_t hash = hash_update(HASH_START, folded, folded_length);
-    for (uint32_t probe = 0; probe <= model->paths.exact_mask; probe++) {
-        uint16_t slot = model->paths.exact[(hash + probe) & model->paths.exact_mask];
+    for (uint32_t probe = 0; probe <= prepared->exact_mask; probe++) {
+        uint16_t slot = prepared->exact[(hash + probe) & prepared->exact_mask];
         if (slot == EMPTY_SLOT) {
             return BUILDER_UNSET;
         }
-        if (same_folded_path(builder, model, slot - 1u, folded, folded_length)) {
+        if (same_folded_path(state, prepared, slot - 1u, folded, folded_length)) {
             return slot - 1u;
         }
     }
@@ -357,18 +362,17 @@ static void consider(Best *best, uint32_t score, uint32_t position)
     }
 }
 
-static uint32_t find_by_suffix(const LibraryBuilder *builder, const LibraryModel *model)
+static uint32_t find_by_suffix(BuilderState *state, Prepared *prepared)
 {
-    ResolveScratch *scratch = scratch_of(model);
+    ResolveScratch *scratch = scratch_of(prepared);
     const Parts *wanted = &scratch->wanted;
     Span last = wanted->spans[wanted->count - 1];
     uint32_t hash = hash_update(HASH_START, wanted->text + last.start, last.length);
     Best best = {.at_score = 0};
-    for (uint16_t link = model->paths.by_name[hash & model->paths.by_name_mask]; link != EMPTY_SLOT;
-         link = model->paths.next_same_name[link - 1]) {
+    for (uint16_t link = prepared->by_name[hash & prepared->by_name_mask]; link != EMPTY_SLOT;
+         link = prepared->next_same_name[link - 1]) {
         uint32_t position = link - 1u;
-        uint32_t length =
-            folded_track_path(builder, track_at(builder, model, position), scratch->track);
+        uint32_t length = builder_folded_path(state, prepared, position, scratch->track);
         fold_parts(&scratch->raw, scratch->track, length, &scratch->candidate);
         Parts *candidate = &scratch->candidate;
         if (candidate->count > 0 &&
@@ -379,10 +383,10 @@ static uint32_t find_by_suffix(const LibraryBuilder *builder, const LibraryModel
     return best.at_score == 1 ? best.position : BUILDER_UNSET;
 }
 
-uint32_t builder_resolve_entry(const LibraryBuilder *builder, const LibraryModel *model,
-                               const char *folder, const char *entry)
+uint32_t builder_resolve_entry(BuilderState *state, Prepared *prepared, const char *folder,
+                               const char *entry)
 {
-    ResolveScratch *scratch = scratch_of(model);
+    ResolveScratch *scratch = scratch_of(prepared);
     if (contains_url(entry)) {
         return BUILDER_UNSET;
     }
@@ -392,13 +396,13 @@ uint32_t builder_resolve_entry(const LibraryBuilder *builder, const LibraryModel
     }
     scratch->entry[length] = '\0';
     uint32_t joined = join(folder, scratch->entry, length, scratch->joined);
-    uint32_t found = find_exact(builder, model, scratch->joined, joined);
+    uint32_t found = find_exact(state, prepared, scratch->joined, joined);
     if (found == BUILDER_UNSET) {
-        found = find_exact(builder, model, scratch->entry, length);
+        found = find_exact(state, prepared, scratch->entry, length);
     }
     if (found != BUILDER_UNSET) {
         return found;
     }
     uint32_t parts = fold_parts(&scratch->raw, scratch->entry, length, &scratch->wanted);
-    return parts > 0 ? find_by_suffix(builder, model) : BUILDER_UNSET;
+    return parts > 0 ? find_by_suffix(state, prepared) : BUILDER_UNSET;
 }

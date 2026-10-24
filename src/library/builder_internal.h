@@ -9,137 +9,243 @@
 
 enum {
     BUILDER_NONE = 0xFFFF,
-    BUILDER_STRING_HEADER = 8,
-    BUILDER_TRACK_SIZE = 36,
-    BUILDER_FOLDER_SIZE = 8
+    BUILDER_MAX_INDEX = 0xFFFF,
+    BUILDER_FIELDS = 6,
+    BUILDER_TITLE = 0,
+    BUILDER_ARTIST = 1,
+    BUILDER_ALBUM_ARTIST = 2,
+    BUILDER_ALBUM = 3,
+    BUILDER_GENRE = 4,
+    BUILDER_FILE = 5,
+    BUILDER_ROW_SIZE = 48,
+    BUILDER_FOLDER_SIZE = 8,
+    BUILDER_MAX_DEPTH = 64,
+    BUILDER_TEXT_CAPACITY = 1024,
+    BUILDER_MAX_RECORD = 2 * BUILDER_TEXT_CAPACITY + 64,
+    BUILDER_MAX_PLAYLISTS = 1024,
+    BUILDER_ALIGNMENT = 8
 };
 
-typedef struct TrackRecord {
-    uint32_t title;
-    uint32_t file_name;
-    uint32_t artist;
-    uint32_t album_artist;
-    uint32_t album;
-    uint32_t genre;
+typedef struct Arena {
+    uint8_t *base;
+    uint32_t size;
+    uint32_t used;
+    bool failed;
+} Arena;
+
+typedef struct Store {
+    BuilderScratch io;
+    uint32_t end;
+    bool failed;
+    bool io_failed;
+} Store;
+
+typedef struct Out {
+    Store *store;
+    uint32_t start;
+    uint32_t limit;
+    uint32_t written;
+    uint8_t *buffer;
+    uint32_t capacity;
+    uint32_t used;
+} Out;
+
+typedef struct In {
+    Store *store;
+    uint32_t position;
+    uint32_t end;
+    uint8_t *buffer;
+    uint32_t capacity;
+    uint32_t filled;
+    uint32_t taken;
+} In;
+
+typedef struct Cache {
+    Store *store;
+    uint8_t *blocks;
+    uint32_t *tags;
+    uint32_t *ages;
+    uint32_t block_size;
+    uint32_t count;
+    uint32_t clock;
+} Cache;
+
+typedef struct Region {
+    uint32_t offset;
+    uint32_t size;
+} Region;
+
+typedef struct TrackRow {
+    uint32_t text[BUILDER_FIELDS];
+    uint16_t length[BUILDER_FIELDS];
     uint16_t folder;
     uint16_t year;
     uint8_t disc;
     uint8_t number;
-    uint16_t reserved;
     uint32_t duration_ms;
-} TrackRecord;
+} TrackRow;
 
-typedef struct FolderNode {
+typedef struct FolderRow {
     uint32_t name;
+    uint16_t length;
     uint16_t parent;
-    uint16_t reserved;
-} FolderNode;
+} FolderRow;
 
-typedef struct Work {
-    uint8_t *memory;
-    uint32_t used;
-    uint32_t top;
-    bool failed;
-} Work;
+typedef struct ChainLevel {
+    uint16_t node;
+    uint16_t start;
+    uint16_t length;
+} ChainLevel;
 
-typedef struct PlaylistModel {
+typedef struct ScanTime {
+    Out rows;
+    Out folders;
+    Out heap;
+    char chain_text[BUILDER_TEXT_CAPACITY];
+    ChainLevel chain[BUILDER_MAX_DEPTH];
+    uint32_t chain_depth;
+    uint32_t chain_path_length;
+    char previous[BUILDER_FIELDS][BUILDER_TEXT_CAPACITY];
+    uint32_t previous_text[BUILDER_FIELDS];
+    uint16_t previous_length[BUILDER_FIELDS];
+    uint32_t *folder_first;
+    uint32_t *folder_second;
+    uint16_t *folder_parent;
+    uint16_t *folder_slots;
+    uint32_t folder_capacity;
+    uint32_t folder_mask;
+} ScanTime;
+
+typedef struct GroupTable {
+    uint32_t count;
+    Region display;
+    Region groups;
+    Region links;
+    uint32_t link_count;
+} GroupTable;
+
+typedef struct PlaylistRow {
     uint32_t name;
-    uint32_t name_output;
+    uint16_t length;
+    uint16_t reserved;
     uint32_t first_link;
     uint32_t count;
-} PlaylistModel;
+} PlaylistRow;
 
-typedef struct PathIndex {
+typedef struct Prepared {
+    uint32_t album_count;
+    uint32_t folder_rank_count;
+    Region columns[BUILDER_FIELDS];
+    uint32_t rank_count[BUILDER_FIELDS];
+    Region genre_spelling;
+    Region folder_order;
+    Region final_tracks;
+    Region track_album;
+    Region albums;
+    GroupTable artists;
+    GroupTable album_artists;
+    GroupTable genres;
+    Region folder_new_index;
+    Region folder_path_length;
+    Region folders_final;
+    Region folder_links;
+    uint32_t folder_link_count;
+    Region title_order;
+    uint32_t index_mark;
+    uint16_t *positions;
     uint16_t *exact;
     uint32_t exact_mask;
     uint16_t *by_name;
     uint32_t by_name_mask;
     uint16_t *next_same_name;
-    void *scratch;
-} PathIndex;
-
-typedef int (*IndexCompare)(const void *context, uint16_t left, uint16_t right);
-
-typedef struct NameIndex {
-    uint16_t *group_of_track;
-    uint32_t *display;
-    uint16_t count;
-} NameIndex;
-
-typedef struct GroupLinks {
-    uint32_t *first;
-    uint16_t *count;
-    uint16_t *albums;
-    uint32_t total;
-} GroupLinks;
-
-typedef struct AlbumModel {
-    uint32_t title;
-    uint16_t album_artist;
-    uint16_t genre;
-    uint16_t year;
-    uint16_t first_track;
-    uint16_t track_count;
-    uint16_t member_start;
-    uint16_t first_seen;
-} AlbumModel;
-
-typedef struct FolderModel {
-    uint32_t name;
-    uint16_t parent;
-    uint16_t subfolder_count;
-    uint16_t track_count;
-    uint16_t node;
-    uint32_t first_link;
-} FolderModel;
-
-typedef struct LibraryModel {
-    uint32_t track_count;
-    uint16_t *final_tracks;
-    uint16_t *track_album;
-    uint16_t *track_folder;
-    NameIndex artists;
-    NameIndex album_artists;
-    NameIndex genres;
-    uint16_t album_count;
-    AlbumModel *albums;
-    uint16_t *album_members;
-    GroupLinks artist_links;
-    GroupLinks album_artist_links;
-    GroupLinks genre_links;
-    uint16_t folder_count;
-    FolderModel *folders;
-    uint16_t *folder_links;
-    uint32_t folder_link_count;
-    uint16_t *title_order;
-    PathIndex paths;
-    PlaylistModel *playlists;
+    void *resolve;
+    Cache rows;
+    Cache folders;
+    Cache heap;
+    PlaylistRow *playlists;
     uint32_t playlist_count;
-    uint32_t playlist_capacity;
-    uint16_t *playlist_links;
+    Region playlist_names;
+    Out playlist_name_out;
+    Region playlist_links;
+    Out playlist_link_out;
     uint32_t playlist_link_count;
-    uint32_t playlist_folder;
-} LibraryModel;
+    char playlist_folder[BUILDER_TEXT_CAPACITY];
+} Prepared;
 
-const char *builder_text(const LibraryBuilder *builder, uint32_t string);
-TrackRecord *builder_track(const LibraryBuilder *builder, uint32_t index);
-FolderNode *builder_folder(const LibraryBuilder *builder, uint32_t index);
-uint32_t *builder_output_offset(const LibraryBuilder *builder, uint32_t string);
-int builder_compare_keys(const LibraryBuilder *builder, uint32_t left, uint32_t right);
-int builder_compare_raw(const LibraryBuilder *builder, uint32_t left, uint32_t right);
-void *work_alloc(Work *work, uint32_t bytes);
-void *work_alloc_top(Work *work, uint32_t bytes);
-uint32_t builder_find(const LibraryBuilder *builder, const char *text, uint32_t length);
-bool builder_index_paths(const LibraryBuilder *builder, Work *work, LibraryModel *model);
-uint32_t builder_resolve_entry(const LibraryBuilder *builder, const LibraryModel *model,
-                               const char *folder, const char *entry);
-void stable_sort(uint16_t *items, uint16_t *scratch, uint32_t count, IndexCompare compare,
-                 const void *context);
-bool builder_build_model(LibraryBuilder *builder, Work *work, LibraryModel *model);
-typedef struct EncodeTarget {
-    ByteSink sink;
-    uint32_t capacity;
-} EncodeTarget;
+typedef struct BuilderState {
+    Arena arena;
+    Store store;
+    BuilderResult error;
+    uint32_t track_count;
+    uint32_t folder_count;
+    uint32_t heap_start;
+    uint32_t text_bytes;
+    Region rows;
+    Region folders;
+    ScanTime *scan;
+    Prepared *prepared;
+    bool prepare_done;
+    BuilderResult prepare_result;
+} BuilderState;
 
-BuilderResult builder_encode(LibraryBuilder *builder, const LibraryModel *model, Work *work,
-                             EncodeTarget target, uint32_t *length);
+typedef int (*SortCompare)(const uint8_t *left, const uint8_t *right, const void *context);
+
+typedef struct SortJob {
+    Store *store;
+    Arena *arena;
+    Region input;
+    SortCompare compare;
+    const void *context;
+} SortJob;
+
+uint16_t builder_get16(const uint8_t *bytes);
+uint32_t builder_get32(const uint8_t *bytes);
+void builder_put16(uint8_t *bytes, uint32_t value);
+void builder_put32(uint8_t *bytes, uint32_t value);
+uint32_t builder_text_length(const char *text);
+
+void arena_init(Arena *arena, void *memory, uint32_t size);
+void *arena_take(Arena *arena, uint32_t bytes);
+uint32_t arena_left(const Arena *arena);
+
+void store_init(Store *store, BuilderScratch io, uint32_t start);
+Region store_take(Store *store, uint32_t bytes);
+bool store_read(Store *store, uint32_t offset, void *bytes, uint32_t length);
+bool store_write(Store *store, uint32_t offset, const void *bytes, uint32_t length);
+
+void out_open(Out *out, Store *store, Region region, uint8_t *buffer, uint32_t capacity);
+bool out_put(Out *out, const void *bytes, uint32_t length);
+bool out_close(Out *out);
+uint32_t out_position(const Out *out);
+
+void in_open(In *in, Store *store, uint32_t start, uint32_t end, uint8_t *buffer,
+             uint32_t capacity);
+bool in_get(In *in, void *bytes, uint32_t length);
+bool in_record(In *in, uint8_t *record);
+bool in_done(const In *in);
+
+bool cache_init(Cache *cache, Store *store, Arena *arena, uint32_t block_size, uint32_t count);
+bool cache_read(Cache *cache, uint32_t offset, void *bytes, uint32_t length);
+
+bool sort_records(const SortJob *job, Region *output);
+
+void builder_row_decode(const uint8_t *bytes, TrackRow *row);
+void builder_row_encode(const TrackRow *row, uint8_t *bytes);
+void builder_folder_decode(const uint8_t *bytes, FolderRow *row);
+void builder_folder_encode(const FolderRow *row, uint8_t *bytes);
+
+bool builder_rank(BuilderState *state, Prepared *prepared);
+bool builder_model(BuilderState *state, Prepared *prepared);
+bool builder_index_paths(BuilderState *state, Prepared *prepared);
+uint32_t builder_resolve_entry(BuilderState *state, Prepared *prepared, const char *folder,
+                               const char *entry);
+uint32_t builder_folded_path(BuilderState *state, Prepared *prepared, uint32_t position, char *out);
+BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink sink,
+                             uint32_t capacity, uint32_t *length);
+bool builder_read_column(BuilderState *state, Region column, uint16_t *values, uint32_t count);
+bool builder_write_column(BuilderState *state, Region column, const uint16_t *values,
+                          uint32_t count);
+bool builder_read_text(Cache *heap, uint32_t offset, uint32_t length, char *text);
+bool builder_read_row(Cache *rows, const BuilderState *state, uint32_t track, TrackRow *row);
+bool builder_read_folder(Cache *folders, const BuilderState *state, uint32_t node, FolderRow *row);
+uint16_t *builder_load_column(BuilderState *state, Region column, uint32_t count);

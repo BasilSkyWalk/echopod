@@ -55,10 +55,24 @@ foreach(library_test block_cache library library_browse favorites covers sort_ke
         LIBRARIES echo_library_fixtures
     )
 endforeach()
+add_library(echo_reference_builder STATIC
+    library/reference/reference_builder.c
+    library/reference/reference_builder_encode.c
+    library/reference/reference_builder_model.c
+    library/reference/reference_builder_paths.c
+)
+target_include_directories(echo_reference_builder PUBLIC library/reference)
+target_link_libraries(echo_reference_builder PUBLIC echo_library_scan PRIVATE echo_options)
+
+add_library(echo_library_checks STATIC library/library_compare.c library/random_library.c)
+target_include_directories(echo_library_checks PUBLIC library)
+target_link_libraries(echo_library_checks PUBLIC echo_library_scan PRIVATE echo_options)
+
 echo_add_unit_test(NAME test_library_builder
     SOURCES library/test_library_builder.c
-    LIBRARIES echo_library_fixtures
+    LIBRARIES echo_library_fixtures echo_library_checks echo_reference_builder
 )
+set_tests_properties(test_library_builder PROPERTIES TIMEOUT 600)
 target_compile_definitions(test_library_builder PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_track_tags
     SOURCES library/test_track_tags.c
@@ -247,7 +261,7 @@ if(ECHO_BUILD_SIM)
     )
     echo_add_unit_test(NAME test_library_scan
         SOURCES library/test_library_scan.c
-        LIBRARIES echo_library_scan echo_sim_storage
+        LIBRARIES echo_library_scan echo_sim_storage echo_library_checks
     )
     target_compile_definitions(test_library_scan PRIVATE
         ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"

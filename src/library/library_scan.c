@@ -341,7 +341,8 @@ static bool split_memory(ScanState **state, const ScanJob *job)
     (*state)->listing_used = 0;
     (*state)->playlist_floor = listing;
     (*state)->playlist_count = 0;
-    library_builder_init(&(*state)->builder, memory + header + taken, size - header - taken);
+    library_builder_init(&(*state)->builder, memory + header + taken, size - header - taken,
+                         job->scratch);
     return true;
 }
 

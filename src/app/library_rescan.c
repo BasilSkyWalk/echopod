@@ -9,11 +9,13 @@
 #include "library_store.h"
 
 static const char MUSIC_ROOT[] = "/";
+const char LIBRARY_SCRATCH_PATH[] = "/.echo/build.tmp";
 
 typedef struct RescanFiles {
     HalDir dir;
     HalFile file;
     HalFile library;
+    HalFile scratch;
     HalDirEntry entry;
     RescanProgress progress;
 } RescanFiles;
@@ -73,6 +75,20 @@ static bool write_library(void *context, uint32_t offset, const void *bytes, uin
     (void)context;
     hal_system_keep_alive();
     return hal_file_write_at(LIBRARY_STORE_PATH, offset, bytes, length);
+}
+
+static bool read_scratch(void *context, uint32_t offset, void *bytes, uint32_t length)
+{
+    RescanFiles *files = context;
+    hal_system_keep_alive();
+    return hal_file_read(files->scratch, offset, bytes, length);
+}
+
+static bool write_scratch(void *context, uint32_t offset, const void *bytes, uint32_t length)
+{
+    (void)context;
+    hal_system_keep_alive();
+    return hal_file_write_at(LIBRARY_SCRATCH_PATH, offset, bytes, length);
 }
 
 static void report(void *context, uint32_t files, uint32_t tracks)
@@ -167,12 +183,13 @@ RescanOutcome library_rescan_run(RescanProgress progress)
     if (!music_root_exists()) {
         return outcome;
     }
-    if (capacity == 0) {
+    if (capacity == 0 || !hal_file_open(&files.scratch, LIBRARY_SCRATCH_PATH)) {
         outcome.result = SCAN_NO_ROOM;
         return outcome;
     }
     const LibraryScanEntry *entry = hal_system_load_rescan_code();
     if (entry == NULL || entry->magic != LIBRARY_SCAN_MAGIC) {
+        hal_file_close(&files.scratch);
         outcome.result = SCAN_NO_CODE;
         return outcome;
     }
@@ -187,6 +204,7 @@ RescanOutcome library_rescan_run(RescanProgress progress)
         .size = size,
         .listing = listing,
         .listing_size = listing_size,
+        .scratch = {read_scratch, write_scratch, &files, files.scratch.size},
         .sink = {write_library, NULL},
         .capacity = capacity,
         .progress = {report, &files},
@@ -195,6 +213,7 @@ RescanOutcome library_rescan_run(RescanProgress progress)
     if (outcome.result == SCAN_OK) {
         outcome.cover_result = build_covers(entry, &job, &outcome.covers);
     }
+    hal_file_close(&files.scratch);
     hal_system_return_scratch();
     return outcome;
 }

@@ -21,6 +21,13 @@ typedef struct ByteSink {
     void *context;
 } ByteSink;
 
+typedef struct BuilderScratch {
+    bool (*read)(void *context, uint32_t offset, void *bytes, uint32_t length);
+    bool (*write)(void *context, uint32_t offset, const void *bytes, uint32_t length);
+    void *context;
+    uint32_t size;
+} BuilderScratch;
+
 typedef enum BuilderResult {
     BUILDER_OK,
     BUILDER_OUT_OF_MEMORY,
@@ -30,25 +37,11 @@ typedef enum BuilderResult {
 } BuilderResult;
 
 typedef struct LibraryBuilder {
-    uint8_t *memory;
-    uint32_t size;
-    uint32_t slot_count;
-    uint32_t string_count;
-    uint32_t folder_capacity;
-    uint32_t folder_count;
-    uint32_t track_count;
-    uint32_t tracks_offset;
-    uint32_t strings_floor;
-    uint32_t empty_string;
-    bool prepared;
-    BuilderResult prepare_result;
-    uint32_t work_start;
-    uint32_t work_used;
-    uint32_t work_top;
-    void *model;
+    void *state;
 } LibraryBuilder;
 
-void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size);
+void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size,
+                          BuilderScratch scratch);
 BuilderResult library_builder_add_track(LibraryBuilder *builder, const BuilderTrack *track);
 BuilderResult library_builder_prepare(LibraryBuilder *builder);
 BuilderResult library_builder_begin_playlist(LibraryBuilder *builder, const char *name,

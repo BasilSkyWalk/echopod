@@ -5,11 +5,13 @@
 #include "check.h"
 #include "hal/storage.h"
 #include "library/library_scan.h"
+#include "library_compare.h"
 #include "sim_storage.h"
 
 enum {
     MEMORY_SIZE = 384 * 1024,
-    OUTPUT_CAPACITY = 64 * 1024
+    OUTPUT_CAPACITY = 64 * 1024,
+    SCRATCH_SIZE = 16 * 1024 * 1024
 };
 
 typedef struct HostFiles {
@@ -80,6 +82,37 @@ static bool write_output(void *context, uint32_t offset, const void *bytes, uint
     return true;
 }
 
+static uint8_t *scratch_bytes(void)
+{
+    static uint8_t *bytes;
+    if (bytes == NULL) {
+        bytes = calloc(SCRATCH_SIZE, 1);
+    }
+    return bytes;
+}
+
+static bool scratch_read(void *context, uint32_t offset, void *buffer, uint32_t length)
+{
+    (void)context;
+    if (offset > SCRATCH_SIZE || length > SCRATCH_SIZE - offset) {
+        return false;
+    }
+    memcpy(buffer, scratch_bytes() + offset, length);
+    return true;
+}
+
+static bool scratch_write(void *context, uint32_t offset, const void *bytes, uint32_t length)
+{
+    (void)context;
+    if (offset > SCRATCH_SIZE || length > SCRATCH_SIZE - offset) {
+        return false;
+    }
+    memcpy(scratch_bytes() + offset, bytes, length);
+    return true;
+}
+
+static const BuilderScratch SCRATCH = {scratch_read, scratch_write, NULL, SCRATCH_SIZE};
+
 typedef struct Progress {
     uint32_t calls;
     uint32_t last_tracks;
@@ -119,6 +152,7 @@ static ScanResult scan_folder(const char *folder, Output *output, Progress *prog
         .files = {open_dir, next_entry, close_dir, open_file, close_file, &files},
         .memory = memory,
         .size = sizeof memory,
+        .scratch = SCRATCH,
         .sink = {write_output, output},
         .progress = {report, progress},
     };
@@ -136,9 +170,8 @@ static void scanning_the_tag_fixtures_matches_the_pc_indexer(void)
     CHECK(progress.calls >= 13);
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("tags_library.db", &expected_size);
-    CHECK_EQUAL(expected_size, stats.length);
-    CHECK_EQUAL(expected_size, output.length);
-    CHECK_EQUAL(0, memcmp(expected, output.bytes, expected_size));
+    CHECK_EQUAL(stats.length, output.length);
+    CHECK(library_compare(expected, expected_size, output.bytes, output.length));
     free(expected);
 }
 
@@ -151,14 +184,13 @@ static void scanning_folders_and_playlists_matches_the_pc_indexer(void)
     CHECK_EQUAL(4u, stats.tracks);
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("scan_music.db", &expected_size);
-    CHECK_EQUAL(expected_size, stats.length);
-    CHECK_EQUAL(0, memcmp(expected, output.bytes, expected_size));
+    CHECK(library_compare(expected, expected_size, output.bytes, stats.length));
     free(expected);
 }
 
 static void a_separate_listing_leaves_the_memory_to_the_builder(void)
 {
-    static uint8_t memory[30 * 1024];
+    static uint8_t memory[128 * 1024];
     static uint8_t listing[16 * 1024];
     static HostFiles files;
     static Output output;
@@ -170,14 +202,14 @@ static void a_separate_listing_leaves_the_memory_to_the_builder(void)
         .size = sizeof memory,
         .listing = listing,
         .listing_size = sizeof listing,
+        .scratch = SCRATCH,
         .sink = {write_output, &output},
     };
     ScanStats stats;
     CHECK_EQUAL(SCAN_OK, library_scan(&job, &stats));
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("scan_music.db", &expected_size);
-    CHECK_EQUAL(expected_size, stats.length);
-    CHECK_EQUAL(0, memcmp(expected, output.bytes, expected_size));
+    CHECK(library_compare(expected, expected_size, output.bytes, stats.length));
     free(expected);
 }
 

@@ -13,7 +13,13 @@ enum {
     GROUP_RECORD = 12,
     FOLDER_RECORD = 16,
     INDEX_RECORD = 2,
-    BUFFER_SIZE = 512
+    BUFFER_SIZE = 512,
+    STREAM_BUFFER = 4096,
+    ALBUM_FINAL = 20,
+    GROUP_ENTRY = 8,
+    DISPLAY_SIZE = 8,
+    FOLDER_FINAL = 16,
+    NAME_HEADER = 6
 };
 
 typedef enum Section {
@@ -44,21 +50,24 @@ typedef struct Layout {
     uint32_t end;
 } Layout;
 
-typedef struct StringPass {
-    LibraryBuilder *builder;
-    const LibraryModel *model;
-    uint32_t *path_offsets;
-    uint32_t length;
+typedef struct Encode {
+    BuilderState *state;
+    Prepared *prepared;
     Writer *writer;
-    const uint8_t *work_memory;
-    const uint16_t *playlist_order;
-    uint32_t *playlist_names;
-} StringPass;
-
-typedef struct PlaylistSort {
-    const LibraryModel *model;
-    const uint8_t *work_memory;
-} PlaylistSort;
+    uint16_t *final_tracks;
+    uint16_t *track_album;
+    uint16_t *artists;
+    uint16_t *genres;
+    uint16_t *folder_index;
+    uint16_t *folder_path;
+    uint16_t *playlist_order;
+    uint8_t *stream;
+    char *text;
+    char *folder_text;
+    uint32_t folder_text_node;
+    uint32_t folder_text_length;
+    uint32_t strings;
+} Encode;
 
 static void flush(Writer *writer)
 {
@@ -90,6 +99,13 @@ static void put_u32(Writer *writer, uint32_t value)
     put_u16(writer, value >> 16);
 }
 
+static void put_bytes(Writer *writer, const char *bytes, uint32_t length)
+{
+    for (uint32_t index = 0; index < length; index++) {
+        put_byte(writer, (uint8_t)bytes[index]);
+    }
+}
+
 static void pad_to(Writer *writer, uint32_t offset)
 {
     while (writer->offset < offset) {
@@ -97,164 +113,179 @@ static void pad_to(Writer *writer, uint32_t offset)
     }
 }
 
-static void put_text(Writer *writer, const char *text)
+static uint32_t take_string(Encode *encode, uint32_t length)
 {
-    for (; *text != '\0'; text++) {
-        put_byte(writer, (uint8_t)*text);
+    if (length == 0) {
+        return 0;
     }
+    uint32_t offset = encode->strings;
+    encode->strings += length + 1;
+    return offset;
 }
 
-static uint32_t text_length(const char *text)
+static bool read_region(Encode *encode, Region region, uint32_t offset, void *bytes,
+                        uint32_t length)
 {
-    uint32_t length = 0;
-    while (text[length] != '\0') {
-        length++;
-    }
-    return length;
+    return store_read(&encode->state->store, region.offset + offset, bytes, length);
 }
 
-static void add_string(StringPass *pass, uint32_t string)
+static int compare_names(const uint8_t *left, const uint8_t *right, const void *context)
 {
-    uint32_t *output = builder_output_offset(pass->builder, string);
-    if (*output == BUILDER_UNSET) {
-        *output = pass->length;
-        pass->length += text_length(builder_text(pass->builder, string)) + 1;
-        if (pass->writer != NULL) {
-            put_text(pass->writer, builder_text(pass->builder, string));
-            put_byte(pass->writer, 0);
-        }
-    } else if (pass->writer != NULL && *output == pass->length) {
-        pass->length += text_length(builder_text(pass->builder, string)) + 1;
-        put_text(pass->writer, builder_text(pass->builder, string));
-        put_byte(pass->writer, 0);
-    }
-}
-
-static uint32_t path_length(const LibraryBuilder *builder, const TrackRecord *track)
-{
-    uint32_t length = text_length(builder_text(builder, track->file_name));
-    for (uint16_t node = track->folder; node != 0; node = builder_folder(builder, node)->parent) {
-        length += text_length(builder_text(builder, builder_folder(builder, node)->name)) + 1;
-    }
-    return length;
-}
-
-static void put_folder_path(Writer *writer, const LibraryBuilder *builder, uint16_t node)
-{
-    uint16_t chain[64];
-    uint32_t depth = 0;
-    for (; node != 0 && depth < 64; node = builder_folder(builder, node)->parent) {
-        chain[depth++] = node;
-    }
-    while (depth > 0) {
-        put_text(writer, builder_text(builder, builder_folder(builder, chain[--depth])->name));
-        put_byte(writer, '/');
-    }
-}
-
-static void add_path(StringPass *pass, uint32_t position)
-{
-    const TrackRecord *track = builder_track(pass->builder, pass->model->final_tracks[position]);
-    if (pass->writer == NULL) {
-        pass->path_offsets[position] = pass->length;
-    } else {
-        put_folder_path(pass->writer, pass->builder, track->folder);
-        put_text(pass->writer, builder_text(pass->builder, track->file_name));
-        put_byte(pass->writer, 0);
-    }
-    pass->length += path_length(pass->builder, track) + 1;
-}
-
-static void add_names(StringPass *pass, const NameIndex *index)
-{
-    for (uint32_t group = 0; group < index->count; group++) {
-        add_string(pass, index->display[group]);
-    }
-}
-
-static const char *playlist_name(const uint8_t *work_memory, const PlaylistModel *playlist)
-{
-    return (const char *)work_memory + playlist->name;
-}
-
-static bool same_bytes(const char *left, const char *right)
-{
-    while (*left != '\0' && *left == *right) {
-        left++;
-        right++;
-    }
-    return *left == *right;
-}
-
-static uint32_t earlier_playlist_name(const StringPass *pass, uint32_t sorted, const char *name)
-{
-    for (uint32_t earlier = 0; earlier < sorted; earlier++) {
-        const PlaylistModel *other = &pass->model->playlists[pass->playlist_order[earlier]];
-        if (same_bytes(playlist_name(pass->work_memory, other), name)) {
-            return pass->playlist_names[earlier];
+    (void)context;
+    uint32_t left_key = builder_get16(left + 4);
+    uint32_t right_key = builder_get16(right + 4);
+    const uint8_t *a = left + NAME_HEADER;
+    const uint8_t *b = right + NAME_HEADER;
+    uint32_t left_total = builder_get16(left) - (uint32_t)NAME_HEADER;
+    uint32_t right_total = builder_get16(right) - (uint32_t)NAME_HEADER;
+    uint32_t shorter = left_key < right_key ? left_key : right_key;
+    for (uint32_t index = 0; index < shorter; index++) {
+        if (a[index] != b[index]) {
+            return (int)a[index] - (int)b[index];
         }
     }
-    return BUILDER_UNSET;
+    if (left_key != right_key) {
+        return left_key < right_key ? -1 : 1;
+    }
+    uint32_t left_raw = left_total - left_key;
+    uint32_t right_raw = right_total - right_key;
+    uint32_t raw = left_raw < right_raw ? left_raw : right_raw;
+    for (uint32_t index = 0; index < raw; index++) {
+        if (a[left_key + index] != b[right_key + index]) {
+            return (int)a[left_key + index] - (int)b[right_key + index];
+        }
+    }
+    return left_raw < right_raw ? -1 : left_raw > right_raw ? 1 : 0;
 }
 
-static void add_playlist_name(StringPass *pass, uint32_t sorted)
+static bool read_playlist_name(Encode *encode, const PlaylistRow *playlist, char *text)
 {
-    const PlaylistModel *playlist = &pass->model->playlists[pass->playlist_order[sorted]];
-    const char *name = playlist_name(pass->work_memory, playlist);
-    uint32_t existing = builder_find(pass->builder, name, text_length(name));
-    if (existing != BUILDER_UNSET) {
-        add_string(pass, existing);
-        pass->playlist_names[sorted] = *builder_output_offset(pass->builder, existing);
-        return;
-    }
-    uint32_t earlier = earlier_playlist_name(pass, sorted, name);
-    if (earlier != BUILDER_UNSET) {
-        pass->playlist_names[sorted] = earlier;
-        return;
-    }
-    pass->playlist_names[sorted] = pass->length;
-    pass->length += text_length(name) + 1;
-    if (pass->writer != NULL) {
-        put_text(pass->writer, name);
-        put_byte(pass->writer, 0);
-    }
+    text[playlist->length] = '\0';
+    return read_region(encode, encode->prepared->playlist_names,
+                       playlist->name - encode->prepared->playlist_names.offset, text,
+                       playlist->length);
 }
 
-static void run_string_pass(StringPass *pass)
+static bool order_playlists(Encode *encode)
 {
-    const LibraryModel *model = pass->model;
-    pass->length = 1;
-    for (uint32_t position = 0; position < model->track_count; position++) {
-        add_string(pass, builder_track(pass->builder, model->final_tracks[position])->title);
-        add_path(pass, position);
+    BuilderState *state = encode->state;
+    Prepared *prepared = encode->prepared;
+    uint32_t count = prepared->playlist_count;
+    encode->playlist_order = arena_take(&state->arena, count * 2 + 2);
+    char *key = arena_take(&state->arena, SORT_KEY_CAPACITY);
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (state->arena.failed) {
+        return false;
     }
-    for (uint32_t album = 0; album < model->album_count; album++) {
-        add_string(pass, model->albums[album].title);
+    uint32_t mark = state->arena.used;
+    uint32_t start = state->store.end;
+    Region all = store_take(&state->store, count * (NAME_HEADER + 2 * BUILDER_TEXT_CAPACITY));
+    if (state->store.failed) {
+        return false;
     }
-    add_names(pass, &model->artists);
-    add_names(pass, &model->album_artists);
-    add_names(pass, &model->genres);
-    for (uint32_t folder = 0; folder < model->folder_count; folder++) {
-        add_string(pass, model->folders[folder].name);
+    Out out;
+    out_open(&out, &state->store, all, buffer, STREAM_BUFFER);
+    for (uint32_t index = 0; index < count; index++) {
+        const PlaylistRow *playlist = &prepared->playlists[index];
+        if (!read_playlist_name(encode, playlist, encode->text)) {
+            return false;
+        }
+        uint32_t key_length = (uint32_t)sort_key_make(encode->text, key, SORT_KEY_CAPACITY);
+        uint8_t header[NAME_HEADER];
+        builder_put16(header, NAME_HEADER + key_length + playlist->length);
+        builder_put16(header + 2, index);
+        builder_put16(header + 4, key_length);
+        if (!out_put(&out, header, sizeof header) || !out_put(&out, key, key_length) ||
+            !out_put(&out, encode->text, playlist->length)) {
+            return false;
+        }
     }
-    for (uint32_t sorted = 0; sorted < model->playlist_count; sorted++) {
-        add_playlist_name(pass, sorted);
+    if (!out_close(&out)) {
+        return false;
     }
+    Region input = {.offset = all.offset, .size = out.written};
+    Region sorted;
+    SortJob job = {.store = &state->store,
+                   .arena = &state->arena,
+                   .input = input,
+                   .compare = compare_names,
+                   .context = NULL};
+    if (!sort_records(&job, &sorted)) {
+        return false;
+    }
+    uint8_t *record = arena_take(&state->arena, BUILDER_MAX_RECORD);
+    if (record == NULL) {
+        return false;
+    }
+    In in;
+    in_open(&in, &state->store, sorted.offset, sorted.offset + sorted.size, buffer, STREAM_BUFFER);
+    for (uint32_t index = 0; index < count; index++) {
+        if (!in_record(&in, record)) {
+            return false;
+        }
+        encode->playlist_order[index] = builder_get16(record + 2);
+    }
+    state->arena.used = mark;
+    state->store.end = start;
+    return true;
 }
 
-static void plan(Layout *layout, const LibraryModel *model, uint32_t strings)
+static uint32_t string_total(Encode *encode)
 {
-    uint32_t links = model->artist_links.total + model->album_artist_links.total +
-                     model->genre_links.total + model->folder_link_count +
-                     model->playlist_link_count;
-    const uint32_t counts[SECTION_COUNT] = {model->track_count,
-                                            model->album_count,
-                                            model->artists.count,
-                                            model->album_artists.count,
-                                            model->genres.count,
-                                            model->folder_count,
-                                            model->track_count,
-                                            model->playlist_count,
+    BuilderState *state = encode->state;
+    Prepared *prepared = encode->prepared;
+    uint32_t total = 1 + state->text_bytes;
+    for (uint32_t album = 0; album < prepared->album_count; album++) {
+        uint8_t record[ALBUM_FINAL];
+        if (!read_region(encode, prepared->albums, album * ALBUM_FINAL, record, sizeof record)) {
+            return 0;
+        }
+        uint32_t length = builder_get16(record + 4);
+        total += length > 0 ? length + 1 : 0;
+    }
+    const GroupTable *tables[3] = {&prepared->artists, &prepared->album_artists, &prepared->genres};
+    for (int table = 0; table < 3; table++) {
+        for (uint32_t group = 0; group < tables[table]->count; group++) {
+            uint8_t entry[DISPLAY_SIZE];
+            if (!read_region(encode, tables[table]->display, group * DISPLAY_SIZE, entry,
+                             sizeof entry)) {
+                return 0;
+            }
+            uint32_t length = builder_get16(entry + 4);
+            total += length > 0 ? length + 1 : 0;
+        }
+    }
+    for (uint32_t folder = 0; folder < state->folder_count; folder++) {
+        uint8_t record[FOLDER_FINAL];
+        if (!read_region(encode, prepared->folders_final, folder * FOLDER_FINAL, record,
+                         sizeof record)) {
+            return 0;
+        }
+        uint32_t length = builder_get16(record + 4);
+        total += length > 0 ? length + 1 : 0;
+    }
+    for (uint32_t playlist = 0; playlist < prepared->playlist_count; playlist++) {
+        uint32_t length = prepared->playlists[playlist].length;
+        total += length > 0 ? length + 1 : 0;
+    }
+    return total;
+}
+
+static void plan(Encode *encode, Layout *layout, uint32_t strings)
+{
+    const Prepared *prepared = encode->prepared;
+    const BuilderState *state = encode->state;
+    uint32_t links = prepared->artists.link_count + prepared->album_artists.link_count +
+                     prepared->genres.link_count + prepared->folder_link_count +
+                     prepared->playlist_link_count;
+    const uint32_t counts[SECTION_COUNT] = {state->track_count,
+                                            prepared->album_count,
+                                            prepared->artists.count,
+                                            prepared->album_artists.count,
+                                            prepared->genres.count,
+                                            state->folder_count,
+                                            state->track_count,
+                                            prepared->playlist_count,
                                             links,
                                             strings};
     const uint16_t sizes[SECTION_COUNT] = {
@@ -285,76 +316,115 @@ static void write_header(Writer *writer, const Layout *layout)
     pad_to(writer, HEADER_SIZE);
 }
 
-static void write_tracks(Writer *writer, const LibraryBuilder *builder, const LibraryModel *model,
-                         const uint32_t *path_offsets)
+static bool write_tracks(Encode *encode)
 {
-    for (uint32_t position = 0; position < model->track_count; position++) {
-        const TrackRecord *track = builder_track(builder, model->final_tracks[position]);
-        put_u32(writer, *builder_output_offset(builder, track->title));
-        put_u32(writer, path_offsets[position]);
-        put_u16(writer, model->track_album[position]);
-        put_u16(writer, model->artists.group_of_track[model->final_tracks[position]]);
-        put_u16(writer, model->genres.group_of_track[model->final_tracks[position]]);
-        put_u16(writer, model->track_folder[position]);
-        put_u32(writer, track->duration_ms);
-        put_byte(writer, track->disc);
-        put_byte(writer, track->number);
+    BuilderState *state = encode->state;
+    for (uint32_t position = 0; position < state->track_count; position++) {
+        uint32_t track = encode->final_tracks[position];
+        TrackRow row;
+        if (!builder_read_row(&encode->prepared->rows, state, track, &row)) {
+            return false;
+        }
+        uint32_t title = take_string(encode, row.length[BUILDER_TITLE]);
+        uint32_t path_length = encode->folder_path[row.folder] + row.length[BUILDER_FILE];
+        uint32_t path = encode->strings;
+        encode->strings += path_length + 1;
+        Writer *writer = encode->writer;
+        put_u32(writer, title);
+        put_u32(writer, path);
+        put_u16(writer, encode->track_album[position]);
+        put_u16(writer, encode->artists[track]);
+        put_u16(writer, encode->genres[track]);
+        put_u16(writer, encode->folder_index[row.folder]);
+        put_u32(writer, row.duration_ms);
+        put_byte(writer, row.disc);
+        put_byte(writer, row.number);
         put_u16(writer, 0);
     }
+    return true;
 }
 
-static void write_albums(Writer *writer, const LibraryBuilder *builder, const LibraryModel *model)
+static bool write_albums(Encode *encode)
 {
-    for (uint32_t album = 0; album < model->album_count; album++) {
-        const AlbumModel *record = &model->albums[album];
-        put_u32(writer, *builder_output_offset(builder, record->title));
-        put_u16(writer, record->album_artist);
-        put_u16(writer, record->genre);
-        put_u16(writer, record->year);
-        put_u16(writer, record->first_track);
-        put_u16(writer, record->track_count);
+    Prepared *prepared = encode->prepared;
+    for (uint32_t album = 0; album < prepared->album_count; album++) {
+        uint8_t record[ALBUM_FINAL];
+        if (!read_region(encode, prepared->albums, album * ALBUM_FINAL, record, sizeof record)) {
+            return false;
+        }
+        Writer *writer = encode->writer;
+        put_u32(writer, take_string(encode, builder_get16(record + 4)));
+        put_u16(writer, builder_get16(record + 6));
+        put_u16(writer, builder_get16(record + 8));
+        put_u16(writer, builder_get16(record + 10));
+        put_u16(writer, builder_get16(record + 12));
+        put_u16(writer, builder_get16(record + 14));
         put_u16(writer, BUILDER_NONE);
     }
+    return true;
 }
 
-static uint32_t write_groups(Writer *writer, const LibraryBuilder *builder, const NameIndex *index,
-                             const GroupLinks *links, uint32_t first_link)
+static bool write_groups(Encode *encode, const GroupTable *table, uint32_t first_link)
 {
-    for (uint32_t group = 0; group < index->count; group++) {
-        put_u32(writer, *builder_output_offset(builder, index->display[group]));
-        put_u32(writer, first_link + links->first[group]);
-        put_u16(writer, links->count[group]);
+    for (uint32_t group = 0; group < table->count; group++) {
+        uint8_t display[DISPLAY_SIZE];
+        uint8_t entry[GROUP_ENTRY];
+        if (!read_region(encode, table->display, group * DISPLAY_SIZE, display, sizeof display) ||
+            !read_region(encode, table->groups, group * GROUP_ENTRY, entry, sizeof entry)) {
+            return false;
+        }
+        Writer *writer = encode->writer;
+        put_u32(writer, take_string(encode, builder_get16(display + 4)));
+        put_u32(writer, first_link + builder_get32(entry));
+        put_u16(writer, builder_get16(entry + 4));
         put_u16(writer, 0);
     }
-    return first_link + links->total;
+    return true;
 }
 
-static void write_folders(Writer *writer, const LibraryBuilder *builder, const LibraryModel *model,
-                          uint32_t first_link)
+static bool write_folders(Encode *encode, uint32_t first_link)
 {
-    for (uint32_t folder = 0; folder < model->folder_count; folder++) {
-        const FolderModel *record = &model->folders[folder];
-        put_u32(writer, *builder_output_offset(builder, record->name));
-        put_u16(writer, record->parent);
-        put_u16(writer, record->subfolder_count);
-        put_u32(writer, first_link + record->first_link);
-        put_u16(writer, record->track_count);
+    for (uint32_t folder = 0; folder < encode->state->folder_count; folder++) {
+        uint8_t record[FOLDER_FINAL];
+        if (!read_region(encode, encode->prepared->folders_final, folder * FOLDER_FINAL, record,
+                         sizeof record)) {
+            return false;
+        }
+        Writer *writer = encode->writer;
+        put_u32(writer, take_string(encode, builder_get16(record + 4)));
+        put_u16(writer, builder_get16(record + 6));
+        put_u16(writer, builder_get16(record + 8));
+        put_u32(writer, first_link + builder_get32(record + 12));
+        put_u16(writer, builder_get16(record + 10));
         put_u16(writer, 0);
     }
+    return true;
 }
 
-static void write_indices(Writer *writer, const uint16_t *values, uint32_t count)
+static bool copy_indices(Encode *encode, Region region, uint32_t first, uint32_t count)
 {
-    for (uint32_t index = 0; index < count; index++) {
-        put_u16(writer, values[index]);
+    uint8_t *chunk = encode->stream;
+    uint32_t done = 0;
+    while (done < count) {
+        uint32_t step = count - done < STREAM_BUFFER / 2 ? count - done : STREAM_BUFFER / 2;
+        if (!read_region(encode, region, (first + done) * 2, chunk, step * 2)) {
+            return false;
+        }
+        for (uint32_t index = 0; index < step; index++) {
+            put_u16(encode->writer, builder_get16(chunk + 2 * index));
+        }
+        done += step;
     }
+    return true;
 }
 
-static void write_playlists(Writer *writer, const StringPass *pass, uint32_t first_link)
+static void write_playlists(Encode *encode, uint32_t first_link)
 {
-    for (uint32_t sorted = 0; sorted < pass->model->playlist_count; sorted++) {
-        const PlaylistModel *playlist = &pass->model->playlists[pass->playlist_order[sorted]];
-        put_u32(writer, pass->playlist_names[sorted]);
+    const Prepared *prepared = encode->prepared;
+    for (uint32_t sorted = 0; sorted < prepared->playlist_count; sorted++) {
+        const PlaylistRow *playlist = &prepared->playlists[encode->playlist_order[sorted]];
+        Writer *writer = encode->writer;
+        put_u32(writer, take_string(encode, playlist->length));
         put_u32(writer, first_link);
         put_u16(writer, playlist->count);
         put_u16(writer, 0);
@@ -362,111 +432,232 @@ static void write_playlists(Writer *writer, const StringPass *pass, uint32_t fir
     }
 }
 
-static void write_links(Writer *writer, const StringPass *pass)
+static bool write_links(Encode *encode)
 {
-    const LibraryModel *model = pass->model;
-    write_indices(writer, model->artist_links.albums, model->artist_links.total);
-    write_indices(writer, model->album_artist_links.albums, model->album_artist_links.total);
-    write_indices(writer, model->genre_links.albums, model->genre_links.total);
-    write_indices(writer, model->folder_links, model->folder_link_count);
-    for (uint32_t sorted = 0; sorted < model->playlist_count; sorted++) {
-        const PlaylistModel *playlist = &model->playlists[pass->playlist_order[sorted]];
-        write_indices(writer, model->playlist_links + playlist->first_link, playlist->count);
+    const Prepared *prepared = encode->prepared;
+    const GroupTable *tables[3] = {&prepared->artists, &prepared->album_artists, &prepared->genres};
+    for (int table = 0; table < 3; table++) {
+        if (!copy_indices(encode, tables[table]->links, 0, tables[table]->link_count)) {
+            return false;
+        }
     }
+    if (!copy_indices(encode, prepared->folder_links, 0, prepared->folder_link_count)) {
+        return false;
+    }
+    for (uint32_t sorted = 0; sorted < prepared->playlist_count; sorted++) {
+        const PlaylistRow *playlist = &prepared->playlists[encode->playlist_order[sorted]];
+        if (!copy_indices(encode, prepared->playlist_links, playlist->first_link,
+                          playlist->count)) {
+            return false;
+        }
+    }
+    return true;
 }
 
-static void write_records(Writer *writer, const StringPass *pass, const Layout *layout)
+static bool write_records(Encode *encode, const Layout *layout)
 {
-    LibraryBuilder *builder = pass->builder;
-    const LibraryModel *model = pass->model;
-    const uint32_t *path_offsets = pass->path_offsets;
+    const Prepared *prepared = encode->prepared;
+    Writer *writer = encode->writer;
+    encode->strings = 1;
     write_header(writer, layout);
-    write_tracks(writer, builder, model, path_offsets);
+    if (!write_tracks(encode)) {
+        return false;
+    }
     pad_to(writer, layout->offset[SECTION_ALBUMS]);
-    write_albums(writer, builder, model);
-    pad_to(writer, layout->offset[SECTION_ARTISTS]);
-    uint32_t links = write_groups(writer, builder, &model->artists, &model->artist_links, 0);
-    pad_to(writer, layout->offset[SECTION_ALBUM_ARTISTS]);
-    links = write_groups(writer, builder, &model->album_artists, &model->album_artist_links, links);
-    pad_to(writer, layout->offset[SECTION_GENRES]);
-    links = write_groups(writer, builder, &model->genres, &model->genre_links, links);
+    if (!write_albums(encode)) {
+        return false;
+    }
+    uint32_t links = 0;
+    const GroupTable *tables[3] = {&prepared->artists, &prepared->album_artists, &prepared->genres};
+    for (int table = 0; table < 3; table++) {
+        pad_to(writer, layout->offset[SECTION_ARTISTS + table]);
+        if (!write_groups(encode, tables[table], links)) {
+            return false;
+        }
+        links += tables[table]->link_count;
+    }
     pad_to(writer, layout->offset[SECTION_FOLDERS]);
-    write_folders(writer, builder, model, links);
+    if (!write_folders(encode, links)) {
+        return false;
+    }
+    links += prepared->folder_link_count;
     pad_to(writer, layout->offset[SECTION_TITLE_ORDER]);
-    write_indices(writer, model->title_order, model->track_count);
+    if (!copy_indices(encode, prepared->title_order, 0, encode->state->track_count)) {
+        return false;
+    }
     pad_to(writer, layout->offset[SECTION_PLAYLISTS]);
-    write_playlists(writer, pass, links + model->folder_link_count);
+    write_playlists(encode, links);
     pad_to(writer, layout->offset[SECTION_LINKS]);
-    write_links(writer, pass);
+    if (!write_links(encode)) {
+        return false;
+    }
     pad_to(writer, layout->offset[SECTION_STRINGS]);
+    return true;
 }
 
-static int by_playlist_name(const void *context, uint16_t left, uint16_t right)
+static bool emit_text(Encode *encode, Cache *cache, uint32_t offset, uint32_t length)
 {
-    const PlaylistSort *sort = context;
-    const char *a = playlist_name(sort->work_memory, &sort->model->playlists[left]);
-    const char *b = playlist_name(sort->work_memory, &sort->model->playlists[right]);
-    int key = sort_key_compare(a, b);
-    if (key != 0) {
-        return key;
+    if (length == 0) {
+        return true;
     }
-    const unsigned char *x = (const unsigned char *)a;
-    const unsigned char *y = (const unsigned char *)b;
-    while (*x != '\0' && *x == *y) {
-        x++;
-        y++;
+    if (!builder_read_text(cache, offset, length, encode->text)) {
+        return false;
     }
-    return (int)*x - (int)*y;
+    put_bytes(encode->writer, encode->text, length);
+    put_byte(encode->writer, 0);
+    return true;
 }
 
-static uint16_t *order_playlists(const LibraryModel *model, Work *work)
+static bool folder_text_for(Encode *encode, uint32_t node)
 {
-    uint32_t count = model->playlist_count;
-    uint16_t *order = work_alloc(work, count * 2 + 2);
-    uint16_t *scratch = work_alloc(work, count * 2 + 2);
-    if (work->failed) {
-        return NULL;
+    if (node == encode->folder_text_node) {
+        return true;
     }
-    for (uint32_t index = 0; index < count; index++) {
-        order[index] = (uint16_t)index;
+    BuilderState *state = encode->state;
+    Prepared *prepared = encode->prepared;
+    FolderRow chain[BUILDER_MAX_DEPTH];
+    uint32_t depth = 0;
+    for (uint32_t walk = node; walk != 0 && depth < BUILDER_MAX_DEPTH;) {
+        if (!builder_read_folder(&prepared->folders, state, walk, &chain[depth])) {
+            return false;
+        }
+        walk = chain[depth++].parent;
     }
-    PlaylistSort sort = {.model = model, .work_memory = work->memory};
-    stable_sort(order, scratch, count, by_playlist_name, &sort);
-    return order;
+    uint32_t used = 0;
+    while (depth > 0) {
+        const FolderRow *folder = &chain[--depth];
+        if (used + folder->length + 1 >= BUILDER_TEXT_CAPACITY ||
+            !cache_read(&prepared->heap, folder->name, encode->folder_text + used,
+                        folder->length)) {
+            return false;
+        }
+        used += folder->length;
+        encode->folder_text[used++] = '/';
+    }
+    encode->folder_text_node = node;
+    encode->folder_text_length = used;
+    return true;
 }
 
-BuilderResult builder_encode(LibraryBuilder *builder, const LibraryModel *model, Work *work,
-                             EncodeTarget target, uint32_t *length)
+static bool emit_track_strings(Encode *encode)
 {
-    uint32_t *path_offsets = work_alloc(work, model->track_count * 4 + 4);
-    uint16_t *playlist_order = order_playlists(model, work);
-    uint32_t *playlist_names = work_alloc(work, model->playlist_count * 4 + 4);
-    if (work->failed) {
+    BuilderState *state = encode->state;
+    Prepared *prepared = encode->prepared;
+    for (uint32_t position = 0; position < state->track_count; position++) {
+        TrackRow row;
+        if (!builder_read_row(&prepared->rows, state, encode->final_tracks[position], &row) ||
+            !emit_text(encode, &prepared->heap, row.text[BUILDER_TITLE],
+                       row.length[BUILDER_TITLE]) ||
+            !folder_text_for(encode, row.folder) ||
+            !builder_read_text(&prepared->heap, row.text[BUILDER_FILE], row.length[BUILDER_FILE],
+                               encode->text)) {
+            return false;
+        }
+        put_bytes(encode->writer, encode->folder_text, encode->folder_text_length);
+        put_bytes(encode->writer, encode->text, row.length[BUILDER_FILE]);
+        put_byte(encode->writer, 0);
+    }
+    return true;
+}
+
+static bool emit_names(Encode *encode)
+{
+    Prepared *prepared = encode->prepared;
+    for (uint32_t album = 0; album < prepared->album_count; album++) {
+        uint8_t record[ALBUM_FINAL];
+        if (!read_region(encode, prepared->albums, album * ALBUM_FINAL, record, sizeof record) ||
+            !emit_text(encode, &prepared->heap, builder_get32(record), builder_get16(record + 4))) {
+            return false;
+        }
+    }
+    const GroupTable *tables[3] = {&prepared->artists, &prepared->album_artists, &prepared->genres};
+    for (int table = 0; table < 3; table++) {
+        for (uint32_t group = 0; group < tables[table]->count; group++) {
+            uint8_t entry[DISPLAY_SIZE];
+            if (!read_region(encode, tables[table]->display, group * DISPLAY_SIZE, entry,
+                             sizeof entry) ||
+                !emit_text(encode, &prepared->heap, builder_get32(entry),
+                           builder_get16(entry + 4))) {
+                return false;
+            }
+        }
+    }
+    for (uint32_t folder = 0; folder < encode->state->folder_count; folder++) {
+        uint8_t record[FOLDER_FINAL];
+        if (!read_region(encode, prepared->folders_final, folder * FOLDER_FINAL, record,
+                         sizeof record) ||
+            !emit_text(encode, &prepared->heap, builder_get32(record), builder_get16(record + 4))) {
+            return false;
+        }
+    }
+    for (uint32_t sorted = 0; sorted < prepared->playlist_count; sorted++) {
+        const PlaylistRow *playlist = &prepared->playlists[encode->playlist_order[sorted]];
+        if (playlist->length == 0) {
+            continue;
+        }
+        if (!read_playlist_name(encode, playlist, encode->text)) {
+            return false;
+        }
+        put_bytes(encode->writer, encode->text, playlist->length);
+        put_byte(encode->writer, 0);
+    }
+    return true;
+}
+
+static bool load_columns(Encode *encode)
+{
+    BuilderState *state = encode->state;
+    Prepared *prepared = encode->prepared;
+    uint32_t count = state->track_count;
+    encode->final_tracks = builder_load_column(state, prepared->final_tracks, count);
+    encode->track_album = builder_load_column(state, prepared->track_album, count);
+    encode->artists = builder_load_column(state, prepared->columns[BUILDER_ARTIST], count);
+    encode->genres = builder_load_column(state, prepared->columns[BUILDER_GENRE], count);
+    encode->folder_index =
+        builder_load_column(state, prepared->folder_new_index, state->folder_count);
+    encode->folder_path =
+        builder_load_column(state, prepared->folder_path_length, state->folder_count);
+    encode->stream = arena_take(&state->arena, STREAM_BUFFER);
+    encode->text = arena_take(&state->arena, BUILDER_TEXT_CAPACITY);
+    encode->folder_text = arena_take(&state->arena, BUILDER_TEXT_CAPACITY);
+    encode->folder_text_node = BUILDER_UNSET;
+    encode->folder_text_length = 0;
+    return !state->arena.failed && encode->final_tracks != NULL && encode->track_album != NULL &&
+           encode->artists != NULL && encode->genres != NULL && encode->folder_index != NULL &&
+           encode->folder_path != NULL;
+}
+
+BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink sink,
+                             uint32_t capacity, uint32_t *length)
+{
+    state->arena.used = prepared->index_mark;
+    Writer *writer = arena_take(&state->arena, (uint32_t)sizeof(Writer));
+    Encode encode = {.state = state, .prepared = prepared, .writer = writer};
+    encode.text = arena_take(&state->arena, BUILDER_TEXT_CAPACITY);
+    if (writer == NULL || encode.text == NULL || !order_playlists(&encode) ||
+        !load_columns(&encode)) {
         return BUILDER_OUT_OF_MEMORY;
     }
-    *builder_output_offset(builder, builder->empty_string) = 0;
-    StringPass pass = {.builder = builder,
-                       .model = model,
-                       .path_offsets = path_offsets,
-                       .work_memory = work->memory,
-                       .playlist_order = playlist_order,
-                       .playlist_names = playlist_names};
-    run_string_pass(&pass);
+    uint32_t strings = string_total(&encode);
+    if (strings == 0) {
+        return BUILDER_WRITE_FAILED;
+    }
     Layout layout;
-    plan(&layout, model, pass.length);
-    if (target.capacity != 0 && layout.end > target.capacity) {
+    plan(&encode, &layout, strings);
+    if (capacity != 0 && layout.end > capacity) {
         return BUILDER_NO_ROOM;
     }
-    ByteSink sink = target.sink;
-    Writer writer = {.sink = sink, .offset = 0, .used = 0, .failed = false};
-    write_records(&writer, &pass, &layout);
-    put_byte(&writer, 0);
-    StringPass emit = pass;
-    emit.writer = &writer;
-    run_string_pass(&emit);
-    flush(&writer);
+    *writer = (Writer){.sink = sink, .offset = 0, .used = 0, .failed = false};
+    if (!write_records(&encode, &layout)) {
+        return BUILDER_WRITE_FAILED;
+    }
+    put_byte(writer, 0);
+    if (!emit_track_strings(&encode) || !emit_names(&encode)) {
+        return BUILDER_WRITE_FAILED;
+    }
+    flush(writer);
     static const uint8_t MAGIC[4] = {'E', 'M', 'D', 'B'};
-    if (writer.failed || !sink.write(sink.context, 0, MAGIC, sizeof MAGIC)) {
+    if (writer->failed || !sink.write(sink.context, 0, MAGIC, sizeof MAGIC)) {
         return BUILDER_WRITE_FAILED;
     }
     *length = layout.end;

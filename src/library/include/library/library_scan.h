@@ -58,6 +58,7 @@ typedef struct ScanJob {
     uint32_t size;
     void *listing;
     uint32_t listing_size;
+    BuilderScratch scratch;
     ByteSink sink;
     uint32_t capacity;
     ScanProgress progress;

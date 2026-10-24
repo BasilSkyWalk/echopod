@@ -14,11 +14,14 @@ target_link_libraries(echo_library
 )
 
 add_library(echo_library_scan STATIC
+    builder_sort.c
+    builder_store.c
     cover_build.c
     library_builder.c
     library_builder_encode.c
     library_builder_model.c
     library_builder_paths.c
+    library_builder_rank.c
     library_scan.c
     library_scan_entry.c
     playlist_reader.c

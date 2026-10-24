@@ -92,6 +92,7 @@ static void start_app_with_library(void)
     fake_hal_reset();
     fake_hal_add_file("/.echo/library.db", bytes, size);
     fake_hal_add_file("/.echo/covers.bin", covers, covers_size);
+    fake_hal_add_file("/.echo/build.tmp", NULL, 16 * 1024 * 1024);
     now_ms = START_MS;
     fake_hal_set_milliseconds(now_ms);
     app_start();
@@ -868,7 +869,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(7, fake_hal_reserve_count());
+    CHECK_EQUAL(8, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }

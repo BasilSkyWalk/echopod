@@ -1,459 +1,452 @@
 #include "library/library_builder.h"
 
-#include <stdint.h>
+#include <stddef.h>
 
 #include "builder_internal.h"
 #include "core/hash.h"
-#include "library/sort_key.h"
 
 enum {
-    BYTES_PER_SLOT_SHARE = 32,
-    BYTES_PER_FOLDER_SHARE = 192,
-    MINIMUM_SLOTS = 16,
-    MINIMUM_FOLDERS = 8,
-    MAX_INDEX = 0xFFFF,
-    ALIGNMENT = 8
+    ROW_BUFFER = 64 * BUILDER_ROW_SIZE,
+    FOLDER_BUFFER = 64 * BUILDER_FOLDER_SIZE,
+    HEAP_BUFFER = 4096,
+    ROW_CACHE_BLOCK = 4096,
+    ROW_CACHE_BLOCKS = 4,
+    FOLDER_CACHE_BLOCK = 1024,
+    FOLDER_CACHE_BLOCKS = 4,
+    HEAP_CACHE_BLOCK = 4096,
+    HEAP_CACHE_BLOCKS = 4,
+    PLAYLIST_NAME_BYTES = BUILDER_MAX_PLAYLISTS * BUILDER_TEXT_CAPACITY,
+    PLAYLIST_LINK_BYTES = 2 * 1024 * 1024,
+    LINK_BUFFER = 1024,
+    NAME_BUFFER = 1024,
+    FOLDER_ENTRY_BYTES = 14,
+    MINIMUM_FOLDERS = 64
 };
 
-const char *builder_text(const LibraryBuilder *builder, uint32_t string)
-{
-    return (const char *)builder->memory + string + BUILDER_STRING_HEADER;
-}
+#define SECOND_SEED (HASH_START ^ UINT32_C(0x5BD1E995))
 
-uint32_t *builder_output_offset(const LibraryBuilder *builder, uint32_t string)
+static BuilderResult outcome(const BuilderState *state)
 {
-    return (uint32_t *)(void *)(builder->memory + string);
-}
-
-static uint32_t *slots(const LibraryBuilder *builder)
-{
-    return (uint32_t *)(void *)builder->memory;
-}
-
-TrackRecord *builder_track(const LibraryBuilder *builder, uint32_t index)
-{
-    return (TrackRecord *)(void *)(builder->memory + builder->tracks_offset +
-                                   index * BUILDER_TRACK_SIZE);
-}
-
-FolderNode *builder_folder(const LibraryBuilder *builder, uint32_t index)
-{
-    return (FolderNode *)(void *)(builder->memory + builder->slot_count * 4u +
-                                  index * BUILDER_FOLDER_SIZE);
-}
-
-static uint32_t tracks_end(const LibraryBuilder *builder)
-{
-    return builder->tracks_offset + builder->track_count * BUILDER_TRACK_SIZE;
-}
-
-static uint32_t power_of_two_at_most(uint32_t value)
-{
-    uint32_t result = 1;
-    while (result * 2 <= value) {
-        result *= 2;
+    if (state->store.io_failed) {
+        return BUILDER_WRITE_FAILED;
     }
-    return result;
+    if (state->store.failed) {
+        return BUILDER_NO_ROOM;
+    }
+    if (state->arena.failed) {
+        return BUILDER_OUT_OF_MEMORY;
+    }
+    return state->error;
 }
 
-static uint32_t intern(LibraryBuilder *builder, const char *text, uint32_t length);
-
-void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size)
+static BuilderState *state_of(const LibraryBuilder *builder)
 {
-    uint32_t skip = (uint32_t)((ALIGNMENT - (uintptr_t)memory % ALIGNMENT) % ALIGNMENT);
-    size = size > skip ? size - skip : 0;
-    uint32_t slot_share = size / BYTES_PER_SLOT_SHARE;
-    uint32_t folders = size / BYTES_PER_FOLDER_SHARE;
-    *builder = (LibraryBuilder){.memory = (uint8_t *)memory + skip, .size = size & ~3u};
-    builder->slot_count =
-        power_of_two_at_most(slot_share > MINIMUM_SLOTS ? slot_share : MINIMUM_SLOTS);
-    builder->folder_capacity = folders > MINIMUM_FOLDERS ? folders : MINIMUM_FOLDERS;
-    builder->folder_capacity =
-        builder->folder_capacity < MAX_INDEX ? builder->folder_capacity : MAX_INDEX;
-    builder->tracks_offset =
-        builder->slot_count * 4u + builder->folder_capacity * BUILDER_FOLDER_SIZE;
-    builder->strings_floor = builder->size;
-    for (uint32_t slot = 0; slot < builder->slot_count && slot * 4u < builder->size; slot++) {
-        slots(builder)[slot] = 0;
-    }
-    builder->empty_string = intern(builder, "", 0);
-    if (builder->empty_string != BUILDER_UNSET) {
-        *builder_folder(builder, 0) =
-            (FolderNode){.name = builder->empty_string, .parent = BUILDER_NONE};
-        builder->folder_count = 1;
-    }
+    return builder->state;
 }
 
-static bool same_text(const char *stored, const char *text, uint32_t length)
+static bool write_folder_row(BuilderState *state, uint32_t name, uint32_t length, uint32_t parent)
 {
-    for (uint32_t index = 0; index < length; index++) {
-        if (stored[index] != text[index]) {
-            return false;
+    uint8_t bytes[BUILDER_FOLDER_SIZE];
+    FolderRow row = {.name = name, .length = (uint16_t)length, .parent = (uint16_t)parent};
+    builder_folder_encode(&row, bytes);
+    return out_put(&state->scan->folders, bytes, sizeof bytes);
+}
+
+static bool open_folder_table(BuilderState *state)
+{
+    ScanTime *scan = state->scan;
+    uint32_t budget = arena_left(&state->arena) / 4 * 3;
+    uint32_t slots = 16;
+    uint32_t capacity = 0;
+    for (uint32_t candidate = 16; candidate <= BUILDER_MAX_INDEX + 1u; candidate *= 2) {
+        uint32_t loaded = candidate / 4 * 3;
+        uint32_t affordable = budget > candidate * 2 ? (budget - candidate * 2) / 10 : 0;
+        uint32_t usable = loaded < affordable ? loaded : affordable;
+        if (usable > capacity) {
+            capacity = usable;
+            slots = candidate;
         }
     }
-    return stored[length] == '\0';
+    capacity = capacity < BUILDER_MAX_INDEX ? capacity : BUILDER_MAX_INDEX;
+    if (capacity < MINIMUM_FOLDERS) {
+        state->arena.failed = true;
+        return false;
+    }
+    scan->folder_first = arena_take(&state->arena, capacity * 4);
+    scan->folder_second = arena_take(&state->arena, capacity * 4);
+    scan->folder_parent = arena_take(&state->arena, capacity * 2);
+    scan->folder_slots = arena_take(&state->arena, slots * 2);
+    scan->folder_capacity = capacity;
+    scan->folder_mask = slots - 1;
+    if (state->arena.failed) {
+        return false;
+    }
+    for (uint32_t slot = 0; slot < slots; slot++) {
+        scan->folder_slots[slot] = 0;
+    }
+    return true;
 }
 
-static uint32_t store_string(LibraryBuilder *builder, const char *text, uint32_t length,
-                             uint32_t hash)
+static uint32_t folder_hash(uint32_t seed, uint32_t parent, const char *name, uint32_t length)
 {
-    uint32_t need = (BUILDER_STRING_HEADER + length + 1 + 3) & ~3u;
-    if (builder->tracks_offset > builder->size || builder->strings_floor < need ||
-        builder->strings_floor - need < tracks_end(builder)) {
-        return BUILDER_UNSET;
-    }
-    builder->strings_floor -= need;
-    uint32_t string = builder->strings_floor;
-    *builder_output_offset(builder, string) = BUILDER_UNSET;
-    *(uint32_t *)(void *)(builder->memory + string + 4) = hash;
-    char *stored = (char *)builder->memory + string + BUILDER_STRING_HEADER;
-    for (uint32_t index = 0; index < length; index++) {
-        stored[index] = text[index];
-    }
-    stored[length] = '\0';
-    builder->string_count++;
-    return string;
+    uint8_t prefix[2] = {(uint8_t)parent, (uint8_t)(parent >> 8)};
+    return hash_update(hash_update(seed, prefix, sizeof prefix), name, length);
 }
 
-static uint32_t intern(LibraryBuilder *builder, const char *text, uint32_t length)
+static uint32_t find_folder(const ScanTime *scan, uint32_t parent, uint32_t first, uint32_t second)
 {
-    if (builder->tracks_offset > builder->size) {
-        return BUILDER_UNSET;
-    }
-    uint32_t hash = hash_update(HASH_START, text, length);
-    uint32_t mask = builder->slot_count - 1;
-    for (uint32_t probe = 0; probe < builder->slot_count; probe++) {
-        uint32_t *slot = &slots(builder)[(hash + probe) & mask];
-        if (*slot == 0) {
-            if (builder->string_count * 4 >= builder->slot_count * 3) {
-                return BUILDER_UNSET;
-            }
-            uint32_t string = store_string(builder, text, length, hash);
-            *slot = string == BUILDER_UNSET ? 0 : string + 1;
-            return string;
+    for (uint32_t probe = 0; probe <= scan->folder_mask; probe++) {
+        uint32_t slot = scan->folder_slots[(first + probe) & scan->folder_mask];
+        if (slot == 0) {
+            return BUILDER_UNSET;
         }
-        uint32_t string = *slot - 1;
-        if (*(uint32_t *)(void *)(builder->memory + string + 4) == hash &&
-            same_text(builder_text(builder, string), text, length)) {
-            return string;
+        uint32_t node = slot - 1u;
+        if (scan->folder_parent[node] == parent && scan->folder_first[node] == first &&
+            scan->folder_second[node] == second) {
+            return node;
         }
     }
     return BUILDER_UNSET;
 }
 
-static uint32_t text_length(const char *text)
+static void remember_folder(ScanTime *scan, uint32_t node, uint32_t parent, uint32_t first,
+                            uint32_t second)
 {
-    uint32_t length = 0;
-    while (text[length] != '\0') {
-        length++;
-    }
-    return length;
-}
-
-static uint32_t intern_text(LibraryBuilder *builder, const char *text)
-{
-    return intern(builder, text, text_length(text));
-}
-
-static uint32_t child_folder(LibraryBuilder *builder, uint16_t parent, uint32_t name)
-{
-    for (uint32_t index = 1; index < builder->folder_count; index++) {
-        FolderNode *node = builder_folder(builder, index);
-        if (node->parent == parent && node->name == name) {
-            return index;
+    scan->folder_first[node] = first;
+    scan->folder_second[node] = second;
+    scan->folder_parent[node] = (uint16_t)parent;
+    for (uint32_t probe = 0;; probe++) {
+        uint16_t *slot = &scan->folder_slots[(first + probe) & scan->folder_mask];
+        if (*slot == 0) {
+            *slot = (uint16_t)(node + 1);
+            return;
         }
     }
-    if (builder->folder_count >= builder->folder_capacity) {
-        return BUILDER_UNSET;
-    }
-    *builder_folder(builder, builder->folder_count) =
-        (FolderNode){.name = name, .parent = parent, .reserved = 0};
-    return builder->folder_count++;
 }
 
-static BuilderResult place_path(LibraryBuilder *builder, const char *path, TrackRecord *record)
+void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size,
+                          BuilderScratch scratch)
 {
-    uint16_t folder = 0;
+    Arena arena;
+    arena_init(&arena, memory, size);
+    BuilderState *state = arena_take(&arena, (uint32_t)sizeof(BuilderState));
+    builder->state = state;
+    if (state == NULL) {
+        return;
+    }
+    *state = (BuilderState){.arena = arena, .error = BUILDER_OK, .prepare_done = false};
+    store_init(&state->store, scratch, 0);
+    state->rows = store_take(&state->store, BUILDER_MAX_INDEX * BUILDER_ROW_SIZE);
+    state->folders = store_take(&state->store, BUILDER_MAX_INDEX * BUILDER_FOLDER_SIZE);
+    state->heap_start = state->store.end;
+    ScanTime *scan = arena_take(&state->arena, (uint32_t)sizeof(ScanTime));
+    uint8_t *row_buffer = arena_take(&state->arena, ROW_BUFFER);
+    uint8_t *folder_buffer = arena_take(&state->arena, FOLDER_BUFFER);
+    uint8_t *heap_buffer = arena_take(&state->arena, HEAP_BUFFER);
+    state->scan = scan;
+    if (state->arena.failed || state->store.failed) {
+        return;
+    }
+    out_open(&scan->rows, &state->store, state->rows, row_buffer, ROW_BUFFER);
+    out_open(&scan->folders, &state->store, state->folders, folder_buffer, FOLDER_BUFFER);
+    uint32_t heap_size = scratch.size > state->heap_start ? scratch.size - state->heap_start : 0;
+    out_open(&scan->heap, &state->store, (Region){.offset = state->heap_start, .size = heap_size},
+             heap_buffer, HEAP_BUFFER);
+    if (!open_folder_table(state)) {
+        return;
+    }
+    scan->chain_depth = 0;
+    scan->chain_path_length = 0;
+    for (int field = 0; field < BUILDER_FIELDS; field++) {
+        scan->previous_text[field] = BUILDER_UNSET;
+        scan->previous_length[field] = 0;
+    }
+    state->folder_count = 1;
+    write_folder_row(state, 0, 0, BUILDER_NONE);
+}
+
+static bool same_text(const char *left, const char *right, uint32_t length)
+{
+    for (uint32_t index = 0; index < length; index++) {
+        if (left[index] != right[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static uint32_t heap_put(BuilderState *state, const char *text, uint32_t length)
+{
+    uint32_t offset = out_position(&state->scan->heap);
+    return out_put(&state->scan->heap, text, length) ? offset : BUILDER_UNSET;
+}
+
+static bool store_field(BuilderState *state, int field, const char *text, uint32_t length,
+                        TrackRow *row)
+{
+    ScanTime *scan = state->scan;
+    if (length >= BUILDER_TEXT_CAPACITY) {
+        state->arena.failed = true;
+        return false;
+    }
+    row->length[field] = (uint16_t)length;
+    if (length == 0) {
+        row->text[field] = 0;
+        return true;
+    }
+    if (scan->previous_text[field] != BUILDER_UNSET && scan->previous_length[field] == length &&
+        same_text(scan->previous[field], text, length)) {
+        row->text[field] = scan->previous_text[field];
+        return true;
+    }
+    uint32_t offset = heap_put(state, text, length);
+    if (offset == BUILDER_UNSET) {
+        return false;
+    }
+    for (uint32_t index = 0; index < length; index++) {
+        scan->previous[field][index] = text[index];
+    }
+    scan->previous_text[field] = offset;
+    scan->previous_length[field] = (uint16_t)length;
+    row->text[field] = offset;
+    return true;
+}
+
+static bool chain_matches(const ScanTime *scan, uint32_t level, const char *name, uint32_t length)
+{
+    const ChainLevel *chain = &scan->chain[level];
+    return chain->length == length && same_text(scan->chain_text + chain->start, name, length);
+}
+
+static bool push_folder(BuilderState *state, const char *name, uint32_t length)
+{
+    ScanTime *scan = state->scan;
+    uint32_t start = scan->chain_depth == 0 ? 0
+                                            : scan->chain[scan->chain_depth - 1].start +
+                                                  scan->chain[scan->chain_depth - 1].length;
+    if (scan->chain_depth >= BUILDER_MAX_DEPTH || start + length > BUILDER_TEXT_CAPACITY) {
+        state->arena.failed = true;
+        return false;
+    }
+    uint32_t parent = scan->chain_depth == 0 ? 0 : scan->chain[scan->chain_depth - 1].node;
+    uint32_t first = folder_hash(HASH_START, parent, name, length);
+    uint32_t second = folder_hash(SECOND_SEED, parent, name, length);
+    uint32_t node = find_folder(scan, parent, first, second);
+    if (node == BUILDER_UNSET) {
+        if (state->folder_count >= scan->folder_capacity) {
+            state->arena.failed = true;
+            return false;
+        }
+        uint32_t offset = length > 0 ? heap_put(state, name, length) : 0;
+        if (offset == BUILDER_UNSET || !write_folder_row(state, offset, length, parent)) {
+            return false;
+        }
+        node = state->folder_count++;
+        remember_folder(scan, node, parent, first, second);
+    }
+    for (uint32_t index = 0; index < length; index++) {
+        scan->chain_text[start + index] = name[index];
+    }
+    scan->chain[scan->chain_depth++] =
+        (ChainLevel){.node = (uint16_t)node, .start = (uint16_t)start, .length = (uint16_t)length};
+    scan->chain_path_length += length + 1;
+    return true;
+}
+
+static void pop_to(ScanTime *scan, uint32_t depth)
+{
+    while (scan->chain_depth > depth) {
+        scan->chain_depth--;
+        scan->chain_path_length -= scan->chain[scan->chain_depth].length + 1u;
+    }
+}
+
+static bool place_path(BuilderState *state, const char *path, TrackRow *row)
+{
+    ScanTime *scan = state->scan;
+    uint32_t level = 0;
     const char *start = path;
     for (const char *cursor = path;; cursor++) {
         if (*cursor != '/' && *cursor != '\0') {
             continue;
         }
-        uint32_t name = intern(builder, start, (uint32_t)(cursor - start));
-        if (name == BUILDER_UNSET) {
-            return BUILDER_OUT_OF_MEMORY;
-        }
+        uint32_t length = (uint32_t)(cursor - start);
         if (*cursor == '\0') {
-            record->file_name = name;
-            record->folder = folder;
-            return BUILDER_OK;
+            pop_to(scan, level);
+            row->folder = level == 0 ? 0 : scan->chain[level - 1].node;
+            return store_field(state, BUILDER_FILE, start, length, row);
         }
-        uint32_t child = child_folder(builder, folder, name);
-        if (child == BUILDER_UNSET) {
-            return BUILDER_OUT_OF_MEMORY;
+        if (level < scan->chain_depth && !chain_matches(scan, level, start, length)) {
+            pop_to(scan, level);
         }
-        folder = (uint16_t)child;
+        if (level >= scan->chain_depth && !push_folder(state, start, length)) {
+            return false;
+        }
+        level++;
         start = cursor + 1;
     }
 }
 
-static BuilderResult intern_fields(LibraryBuilder *builder, const BuilderTrack *track,
-                                   TrackRecord *record)
-{
-    record->title = intern_text(builder, track->title);
-    record->artist = intern_text(builder, track->artist);
-    record->album_artist = intern_text(builder, track->album_artist);
-    record->album = intern_text(builder, track->album);
-    record->genre = intern_text(builder, track->genre);
-    bool missing = record->title == BUILDER_UNSET || record->artist == BUILDER_UNSET ||
-                   record->album_artist == BUILDER_UNSET || record->album == BUILDER_UNSET ||
-                   record->genre == BUILDER_UNSET;
-    return missing ? BUILDER_OUT_OF_MEMORY : BUILDER_OK;
-}
-
 BuilderResult library_builder_add_track(LibraryBuilder *builder, const BuilderTrack *track)
 {
-    if (builder->empty_string == BUILDER_UNSET) {
+    BuilderState *state = state_of(builder);
+    if (state == NULL) {
         return BUILDER_OUT_OF_MEMORY;
     }
-    if (builder->track_count >= MAX_INDEX) {
+    if (outcome(state) != BUILDER_OK) {
+        return outcome(state);
+    }
+    if (state->prepare_done) {
+        return BUILDER_OUT_OF_MEMORY;
+    }
+    if (state->track_count >= BUILDER_MAX_INDEX) {
         return BUILDER_TOO_MANY;
     }
-    TrackRecord record = {.year = track->year,
-                          .disc = track->disc,
-                          .number = track->number,
-                          .duration_ms = track->duration_ms};
-    BuilderResult result = place_path(builder, track->path, &record);
-    if (result == BUILDER_OK) {
-        result = intern_fields(builder, track, &record);
+    TrackRow row = {.year = track->year,
+                    .disc = track->disc,
+                    .number = track->number,
+                    .duration_ms = track->duration_ms};
+    const char *texts[BUILDER_FIELDS - 1] = {track->title, track->artist, track->album_artist,
+                                             track->album, track->genre};
+    bool stored = place_path(state, track->path, &row);
+    for (int field = 0; stored && field < BUILDER_FIELDS - 1; field++) {
+        stored = store_field(state, field, texts[field], builder_text_length(texts[field]), &row);
     }
-    if (result != BUILDER_OK || builder->strings_floor - tracks_end(builder) < BUILDER_TRACK_SIZE) {
-        return BUILDER_OUT_OF_MEMORY;
+    uint8_t bytes[BUILDER_ROW_SIZE];
+    builder_row_encode(&row, bytes);
+    if (!stored || !out_put(&state->scan->rows, bytes, sizeof bytes)) {
+        return outcome(state) != BUILDER_OK ? outcome(state) : BUILDER_OUT_OF_MEMORY;
     }
-    *builder_track(builder, builder->track_count++) = record;
+    uint32_t title = row.length[BUILDER_TITLE];
+    state->text_bytes +=
+        (title > 0 ? title + 1 : 0) + state->scan->chain_path_length + row.length[BUILDER_FILE] + 1;
+    state->track_count++;
     return BUILDER_OK;
 }
 
-int builder_compare_keys(const LibraryBuilder *builder, uint32_t left, uint32_t right)
+static bool finish_scan(BuilderState *state, uint32_t scan_mark)
 {
-    return left == right
-               ? 0
-               : sort_key_compare(builder_text(builder, left), builder_text(builder, right));
+    ScanTime *scan = state->scan;
+    bool closed = out_close(&scan->rows) && out_close(&scan->folders) && out_close(&scan->heap);
+    state->store.end = (out_position(&scan->heap) + 3) & ~3u;
+    state->scan = NULL;
+    state->arena.used = scan_mark;
+    return closed;
 }
 
-int builder_compare_raw(const LibraryBuilder *builder, uint32_t left, uint32_t right)
+static bool open_caches(BuilderState *state, Prepared *prepared)
 {
-    const unsigned char *a = (const unsigned char *)builder_text(builder, left);
-    const unsigned char *b = (const unsigned char *)builder_text(builder, right);
-    while (*a != '\0' && *a == *b) {
-        a++;
-        b++;
+    return cache_init(&prepared->rows, &state->store, &state->arena, ROW_CACHE_BLOCK,
+                      ROW_CACHE_BLOCKS) &&
+           cache_init(&prepared->folders, &state->store, &state->arena, FOLDER_CACHE_BLOCK,
+                      FOLDER_CACHE_BLOCKS) &&
+           cache_init(&prepared->heap, &state->store, &state->arena, HEAP_CACHE_BLOCK,
+                      HEAP_CACHE_BLOCKS);
+}
+
+static bool open_playlists(BuilderState *state, Prepared *prepared)
+{
+    prepared->playlists =
+        arena_take(&state->arena, BUILDER_MAX_PLAYLISTS * (uint32_t)sizeof(PlaylistRow));
+    uint8_t *name_buffer = arena_take(&state->arena, NAME_BUFFER);
+    uint8_t *link_buffer = arena_take(&state->arena, LINK_BUFFER);
+    prepared->playlist_names = store_take(&state->store, PLAYLIST_NAME_BYTES);
+    prepared->playlist_links = store_take(&state->store, PLAYLIST_LINK_BYTES);
+    if (state->arena.failed || state->store.failed) {
+        return false;
     }
-    return (int)*a - (int)*b;
-}
-
-void *work_alloc(Work *work, uint32_t bytes)
-{
-    uint32_t need = (bytes + 3) & ~3u;
-    if (work->failed || need > work->top - work->used) {
-        work->failed = true;
-        return NULL;
-    }
-    void *block = work->memory + work->used;
-    work->used += need;
-    return block;
-}
-
-void *work_alloc_top(Work *work, uint32_t bytes)
-{
-    uint32_t need = (bytes + 3) & ~3u;
-    if (work->failed || need > work->top - work->used) {
-        work->failed = true;
-        return NULL;
-    }
-    work->top -= need;
-    return work->memory + work->top;
-}
-
-uint32_t builder_find(const LibraryBuilder *builder, const char *text, uint32_t length)
-{
-    uint32_t hash = hash_update(HASH_START, text, length);
-    uint32_t mask = builder->slot_count - 1;
-    for (uint32_t probe = 0; probe < builder->slot_count; probe++) {
-        uint32_t slot = slots(builder)[(hash + probe) & mask];
-        if (slot == 0) {
-            return BUILDER_UNSET;
-        }
-        uint32_t string = slot - 1;
-        if (*(uint32_t *)(void *)(builder->memory + string + 4) == hash &&
-            same_text(builder_text(builder, string), text, length)) {
-            return string;
-        }
-    }
-    return BUILDER_UNSET;
-}
-
-static void merge(uint16_t *from, uint16_t *to, uint32_t start, uint32_t middle, uint32_t end,
-                  IndexCompare compare, const void *context)
-{
-    uint32_t left = start;
-    uint32_t right = middle;
-    for (uint32_t out = start; out < end; out++) {
-        bool take_left =
-            left < middle && (right >= end || compare(context, from[left], from[right]) <= 0);
-        to[out] = take_left ? from[left++] : from[right++];
-    }
-}
-
-void stable_sort(uint16_t *items, uint16_t *scratch, uint32_t count, IndexCompare compare,
-                 const void *context)
-{
-    uint16_t *from = items;
-    uint16_t *to = scratch;
-    for (uint32_t width = 1; width < count; width *= 2) {
-        for (uint32_t start = 0; start < count; start += 2 * width) {
-            uint32_t middle = start + width < count ? start + width : count;
-            uint32_t end = start + 2 * width < count ? start + 2 * width : count;
-            merge(from, to, start, middle, end, compare, context);
-        }
-        uint16_t *swap = from;
-        from = to;
-        to = swap;
-    }
-    if (from != items) {
-        for (uint32_t index = 0; index < count; index++) {
-            items[index] = from[index];
-        }
-    }
-}
-
-enum {
-    PLAYLIST_SHARE = 64,
-    MAX_PLAYLISTS = 1024
-};
-
-static Work open_work(const LibraryBuilder *builder)
-{
-    return (Work){.memory = builder->memory + builder->work_start,
-                  .used = builder->work_used,
-                  .top = builder->work_top,
-                  .failed = false};
-}
-
-static void close_work(LibraryBuilder *builder, const Work *work)
-{
-    builder->work_used = work->used;
-    builder->work_top = work->top;
-}
-
-static bool reserve_playlists(const LibraryBuilder *builder, Work *work, LibraryModel *model)
-{
-    uint32_t capacity = (work->top - work->used) / PLAYLIST_SHARE / (uint32_t)sizeof(PlaylistModel);
-    capacity = capacity < MAX_PLAYLISTS ? capacity : MAX_PLAYLISTS;
-    model->playlist_capacity = capacity;
-    model->playlists =
-        work_alloc(work, (capacity > 0 ? capacity : 1u) * (uint32_t)sizeof(PlaylistModel));
-    model->playlist_links = (uint16_t *)(void *)(work->memory + work->used);
-    (void)builder;
-    return !work->failed;
+    out_open(&prepared->playlist_name_out, &state->store, prepared->playlist_names, name_buffer,
+             NAME_BUFFER);
+    out_open(&prepared->playlist_link_out, &state->store, prepared->playlist_links, link_buffer,
+             LINK_BUFFER);
+    prepared->playlist_count = 0;
+    prepared->playlist_link_count = 0;
+    return true;
 }
 
 BuilderResult library_builder_prepare(LibraryBuilder *builder)
 {
-    if (builder->prepared) {
-        return builder->prepare_result;
+    BuilderState *state = state_of(builder);
+    if (state == NULL) {
+        return BUILDER_OUT_OF_MEMORY;
     }
-    builder->prepared = true;
-    builder->prepare_result = BUILDER_OUT_OF_MEMORY;
-    if (builder->empty_string == BUILDER_UNSET) {
-        return builder->prepare_result;
+    if (state->prepare_done) {
+        return state->prepare_result;
     }
-    builder->work_start = (tracks_end(builder) + 7) & ~7u;
-    builder->work_used = 0;
-    builder->work_top = builder->strings_floor > builder->work_start
-                            ? (builder->strings_floor - builder->work_start) & ~3u
-                            : 0;
-    Work work = open_work(builder);
-    LibraryModel *model = work_alloc(&work, (uint32_t)sizeof(LibraryModel));
-    if (model == NULL || !builder_build_model(builder, &work, model) ||
-        !builder_index_paths(builder, &work, model) || !reserve_playlists(builder, &work, model)) {
-        return builder->prepare_result;
+    state->prepare_done = true;
+    state->prepare_result = outcome(state);
+    if (state->prepare_result != BUILDER_OK || state->scan == NULL) {
+        return state->prepare_result;
     }
-    close_work(builder, &work);
-    builder->model = model;
-    builder->prepare_result = BUILDER_OK;
-    return BUILDER_OK;
-}
-
-static uint32_t text_bytes(const char *text)
-{
-    uint32_t length = 0;
-    while (text[length] != '\0') {
-        length++;
+    uint32_t scan_mark = (uint32_t)((uint8_t *)state->scan - state->arena.base);
+    bool ready = finish_scan(state, scan_mark);
+    Prepared *prepared = arena_take(&state->arena, (uint32_t)sizeof(Prepared));
+    state->prepared = prepared;
+    ready = ready && prepared != NULL && open_caches(state, prepared) &&
+            builder_rank(state, prepared) && builder_model(state, prepared) &&
+            open_playlists(state, prepared) && builder_index_paths(state, prepared);
+    state->prepare_result = outcome(state);
+    if (!ready && state->prepare_result == BUILDER_OK) {
+        state->prepare_result = BUILDER_OUT_OF_MEMORY;
     }
-    return length;
-}
-
-static uint32_t keep_text(Work *work, const char *text)
-{
-    uint32_t length = text_bytes(text);
-    char *copy = work_alloc_top(work, length + 1);
-    if (copy == NULL) {
-        return BUILDER_UNSET;
-    }
-    for (uint32_t index = 0; index <= length; index++) {
-        copy[index] = text[index];
-    }
-    return (uint32_t)((uint8_t *)copy - work->memory);
+    return state->prepare_result;
 }
 
 BuilderResult library_builder_begin_playlist(LibraryBuilder *builder, const char *name,
                                              const char *folder)
 {
     BuilderResult result = library_builder_prepare(builder);
-    LibraryModel *model = builder->model;
     if (result != BUILDER_OK) {
         return result;
     }
-    if (model->playlist_count >= model->playlist_capacity) {
+    BuilderState *state = state_of(builder);
+    Prepared *prepared = state->prepared;
+    if (prepared->playlist_count >= BUILDER_MAX_PLAYLISTS) {
         return BUILDER_TOO_MANY;
     }
-    Work work = open_work(builder);
-    uint32_t kept_name = keep_text(&work, name);
-    uint32_t kept_folder = keep_text(&work, folder);
-    if (kept_name == BUILDER_UNSET || kept_folder == BUILDER_UNSET) {
+    uint32_t length = builder_text_length(name);
+    uint32_t folder_length = builder_text_length(folder);
+    if (length >= BUILDER_TEXT_CAPACITY || folder_length >= BUILDER_TEXT_CAPACITY) {
         return BUILDER_OUT_OF_MEMORY;
     }
-    close_work(builder, &work);
-    model->playlist_folder = kept_folder;
-    model->playlists[model->playlist_count++] =
-        (PlaylistModel){.name = kept_name,
-                        .name_output = BUILDER_UNSET,
-                        .first_link = model->playlist_link_count,
-                        .count = 0};
+    uint32_t offset = out_position(&prepared->playlist_name_out);
+    if (!out_put(&prepared->playlist_name_out, name, length)) {
+        return outcome(state);
+    }
+    for (uint32_t index = 0; index <= folder_length; index++) {
+        prepared->playlist_folder[index] = folder[index];
+    }
+    prepared->playlists[prepared->playlist_count++] =
+        (PlaylistRow){.name = offset,
+                      .length = (uint16_t)length,
+                      .reserved = 0,
+                      .first_link = prepared->playlist_link_count,
+                      .count = 0};
     return BUILDER_OK;
 }
 
 BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char *entry)
 {
-    LibraryModel *model = builder->model;
-    if (!builder->prepared || builder->prepare_result != BUILDER_OK || model->playlist_count == 0) {
+    BuilderState *state = state_of(builder);
+    if (state == NULL || !state->prepare_done || state->prepare_result != BUILDER_OK ||
+        state->prepared->playlist_count == 0) {
         return BUILDER_OUT_OF_MEMORY;
     }
-    Work work = open_work(builder);
-    const char *folder = (const char *)work.memory + model->playlist_folder;
-    uint32_t position = builder_resolve_entry(builder, model, folder, entry);
+    Prepared *prepared = state->prepared;
+    uint32_t position = builder_resolve_entry(state, prepared, prepared->playlist_folder, entry);
+    if (outcome(state) != BUILDER_OK) {
+        return outcome(state);
+    }
     if (position == BUILDER_UNSET) {
         return BUILDER_OK;
     }
-    if (work.top - work.used < 2) {
-        return BUILDER_OUT_OF_MEMORY;
+    uint8_t bytes[2];
+    builder_put16(bytes, position);
+    if (!out_put(&prepared->playlist_link_out, bytes, sizeof bytes)) {
+        return outcome(state);
     }
-    model->playlist_links[model->playlist_link_count] = (uint16_t)position;
-    work.used += 2;
-    close_work(builder, &work);
-    model->playlist_link_count++;
-    model->playlists[model->playlist_count - 1].count++;
+    prepared->playlist_link_count++;
+    prepared->playlists[prepared->playlist_count - 1].count++;
     return BUILDER_OK;
 }
 
@@ -464,10 +457,11 @@ BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uin
     if (result != BUILDER_OK) {
         return result;
     }
-    Work work = open_work(builder);
-    work.used = (work.used + 3) & ~3u;
-    if (work.used > work.top) {
-        return BUILDER_OUT_OF_MEMORY;
+    BuilderState *state = state_of(builder);
+    Prepared *prepared = state->prepared;
+    if (!out_close(&prepared->playlist_name_out) || !out_close(&prepared->playlist_link_out)) {
+        return outcome(state);
     }
-    return builder_encode(builder, builder->model, &work, (EncodeTarget){sink, capacity}, length);
+    result = builder_encode(state, prepared, sink, capacity, length);
+    return result != BUILDER_OK ? result : outcome(state);
 }
