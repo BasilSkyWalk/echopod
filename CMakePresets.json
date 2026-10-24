@@ -1,0 +1,59 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development (Debug, sanitizers)",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ECHO_SANITIZE": "ON"
+      }
+    },
+    {
+      "name": "device",
+      "displayName": "Device firmware (Cortex-M3, Release -O2)",
+      "binaryDir": "${sourceDir}/build/device",
+      "toolchainFile": "${sourceDir}/cmake/arm-none-eabi.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "-O2",
+        "ECHO_BUILD_SIM": "OFF",
+        "ECHO_BUILD_TESTS": "OFF",
+        "ECHO_BUILD_DEVICE": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release firmware (device build without developer Diagnostics)",
+      "inherits": "device",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "ECHO_RELEASE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "device",
+      "configurePreset": "device"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

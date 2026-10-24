@@ -1,0 +1,1015 @@
+#include "fake_hal.h"
+
+#include "hal/system.h"
+
+#include "hal/audio.h"
+#include "hal/bluetooth.h"
+#include "hal/clock.h"
+#include "hal/display.h"
+#include "hal/input.h"
+#include "hal/power.h"
+#include "hal/storage.h"
+#include "library/library_scan.h"
+#include <stdlib.h>
+#include <string.h>
+
+enum {
+    TRANSITION_CAPACITY = 16,
+    FILE_CAPACITY = 12,
+    WRITTEN_CAPACITY = 1100,
+    PATH_CAPACITY = 260
+};
+
+typedef struct FakeAudio {
+    HalAudioStatus status;
+    char playing_path[PATH_CAPACITY];
+    uint32_t play_start_ms;
+    int play_count;
+    char queued_path[PATH_CAPACITY];
+    bool has_queued;
+    uint32_t queued_token;
+    int seek_count;
+    uint32_t last_seek_ms;
+    uint8_t volume;
+    HalAudioGain gain;
+    HalAudioOutput output;
+    int refused_plays;
+    HalAudioJack jack;
+    HalAudioRefusal refusal;
+} FakeAudio;
+
+typedef struct WrittenFile {
+    char path[PATH_CAPACITY];
+    uint8_t bytes[WRITTEN_CAPACITY];
+} WrittenFile;
+
+typedef struct FakeFile {
+    const char *path;
+    const uint8_t *bytes;
+    uint32_t size;
+    uint32_t stored;
+} FakeFile;
+
+enum {
+    STORE_SLOTS = 4,
+    STORE_CAPACITY = 512 * 1024
+};
+
+static uint8_t stores[STORE_SLOTS][STORE_CAPACITY];
+static uint8_t *large_store;
+static uint32_t large_size;
+
+typedef struct FakeHal {
+    const char *version;
+    uint16_t panel[HAL_DISPLAY_HEIGHT][HAL_DISPLAY_WIDTH];
+    long pixels_written;
+    int present_count;
+    bool display_on;
+    uint8_t brightness;
+    HalBattery battery;
+    int power_off_count;
+    uint32_t now_ms;
+    uint32_t now_us;
+    uint32_t microseconds_per_read;
+    HalKeyTransition transitions[TRANSITION_CAPACITY];
+    int transition_count;
+    int next_transition;
+    FakeFile files[FILE_CAPACITY];
+    int file_count;
+    FakeAudio audio;
+    WrittenFile written[FILE_CAPACITY];
+    int write_count;
+    uint32_t clock_mhz;
+    int stall_test_count;
+    int watchdog_test_count;
+    bool scratch_refused;
+    int listing_borrows;
+    int keep_alive_count;
+    bool restart_pending;
+    HalReserveResult reserve_result;
+    const char *reserved_paths[FILE_CAPACITY];
+    uint32_t reserved_sizes[FILE_CAPACITY];
+    int reserve_count;
+    int scratch_borrows;
+    bool empty_card;
+    int dir_opens;
+    int presents_at_dir_open;
+    int library_writes;
+    int covers_writes;
+    const char *store_used[STORE_SLOTS];
+    int scratch_outstanding;
+    int presents_at_power_on;
+    bool refuse_clock_switch;
+    int test_tone_count;
+    int loop_bench_count;
+    int core1_test_count;
+    int core1_decode_count;
+    int core1_accel_count;
+    bool dma_tone_running;
+    uint32_t dma_tone_rate;
+    int audio_service_count;
+    HalBluetoothStatus bluetooth;
+    bool bluetooth_powered;
+    int bluetooth_scan_count;
+    int bluetooth_service_count;
+    int bluetooth_connect_count;
+    int bluetooth_connect_index;
+    int bluetooth_disconnect_count;
+} FakeHal;
+
+static FakeHal fake;
+
+void fake_hal_reset(void)
+{
+    fake = (FakeHal){0};
+    fake.audio.jack = HAL_AUDIO_JACK_SINGLE_ENDED;
+    fake.audio.status.idle = true;
+}
+
+void fake_hal_set_version(const char *version)
+{
+    fake.version = version;
+}
+
+const char *hal_system_version(void)
+{
+    return fake.version != NULL ? fake.version : "test";
+}
+
+void fake_hal_refuse_clock_switch(void)
+{
+    fake.refuse_clock_switch = true;
+}
+
+uint32_t hal_system_clock_mhz(void)
+{
+    return fake.clock_mhz != 0 ? fake.clock_mhz : 24;
+}
+
+bool hal_system_set_clock_mhz(uint32_t mhz)
+{
+    if (fake.refuse_clock_switch) {
+        return false;
+    }
+    fake.clock_mhz = mhz;
+    return true;
+}
+
+void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size)
+{
+    fake.files[fake.file_count++] =
+        (FakeFile){.path = path, .bytes = bytes, .size = size, .stored = size};
+}
+
+void fake_hal_set_milliseconds(uint32_t now_ms)
+{
+    fake.now_ms = now_ms;
+}
+
+void fake_hal_set_microseconds_per_read(uint32_t step_us)
+{
+    fake.microseconds_per_read = step_us;
+}
+
+void fake_hal_queue_transition(Key key, bool pressed, uint32_t time_ms)
+{
+    if (fake.transition_count == TRANSITION_CAPACITY) {
+        return;
+    }
+    fake.transitions[fake.transition_count++] =
+        (HalKeyTransition){.key = key, .pressed = pressed, .time_ms = time_ms};
+}
+
+uint16_t fake_hal_pixel(int x, int y)
+{
+    return fake.panel[y][x];
+}
+
+long fake_hal_pixels_written(void)
+{
+    return fake.pixels_written;
+}
+
+int fake_hal_present_count(void)
+{
+    return fake.present_count;
+}
+
+void hal_display_write(int x, int y, int width, int height, const uint16_t *pixels)
+{
+    for (int row = 0; row < height; row++) {
+        for (int column = 0; column < width; column++) {
+            fake.panel[y + row][x + column] = pixels[row * width + column];
+        }
+    }
+    fake.pixels_written += (long)width * height;
+}
+
+void hal_display_present(void)
+{
+    fake.present_count++;
+}
+
+void hal_display_set_power(bool on)
+{
+    if (on && !fake.display_on) {
+        fake.presents_at_power_on = fake.present_count;
+    }
+    fake.display_on = on;
+}
+
+int fake_hal_presents_at_power_on(void)
+{
+    return fake.presents_at_power_on;
+}
+
+void hal_display_set_brightness(uint8_t level)
+{
+    fake.brightness = level;
+}
+
+bool fake_hal_display_on(void)
+{
+    return fake.display_on;
+}
+
+uint8_t fake_hal_display_brightness(void)
+{
+    return fake.brightness;
+}
+
+void fake_hal_set_battery(HalBattery battery)
+{
+    fake.battery = battery;
+}
+
+HalBattery hal_power_battery(void)
+{
+    return fake.battery;
+}
+
+void hal_power_off(void)
+{
+    fake.power_off_count++;
+}
+
+int fake_hal_power_off_count(void)
+{
+    return fake.power_off_count;
+}
+
+bool hal_input_next_transition(HalKeyTransition *transition)
+{
+    if (fake.next_transition == fake.transition_count) {
+        fake.next_transition = 0;
+        fake.transition_count = 0;
+        return false;
+    }
+    *transition = fake.transitions[fake.next_transition++];
+    return true;
+}
+
+uint32_t hal_clock_milliseconds(void)
+{
+    return fake.now_ms;
+}
+
+uint32_t fake_hal_microseconds(void)
+{
+    return fake.now_us;
+}
+
+uint32_t hal_clock_microseconds(void)
+{
+    fake.now_us += fake.microseconds_per_read;
+    return fake.now_us;
+}
+
+bool hal_file_open(HalFile *file, const char *path)
+{
+    for (int index = 0; index < fake.file_count; index++) {
+        if (strcmp(fake.files[index].path, path) == 0) {
+            *file = (HalFile){.handle = index, .size = fake.files[index].size};
+            return true;
+        }
+    }
+    *file = (HalFile){.handle = -1, .size = 0};
+    return false;
+}
+
+bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
+{
+    if (file.handle < 0 || file.handle >= fake.file_count) {
+        return false;
+    }
+    const FakeFile *source = &fake.files[file.handle];
+    if (offset > source->size || length > source->size - offset) {
+        return false;
+    }
+    uint32_t stored = source->bytes == NULL ? 0 : source->stored;
+    for (uint32_t index = 0; index < length; index++) {
+        uint32_t position = offset + index;
+        ((uint8_t *)buffer)[index] = position < stored ? source->bytes[position] : 0;
+    }
+    return true;
+}
+
+void hal_file_close(HalFile *file)
+{
+    file->handle = -1;
+}
+
+static void copy_path(char *target, const char *source)
+{
+    strncpy(target, source, PATH_CAPACITY - 1);
+    target[PATH_CAPACITY - 1] = '\0';
+}
+
+const char *fake_hal_audio_playing_path(void)
+{
+    return fake.audio.playing_path;
+}
+
+uint32_t fake_hal_audio_play_start(void)
+{
+    return fake.audio.play_start_ms;
+}
+
+int fake_hal_audio_play_count(void)
+{
+    return fake.audio.play_count;
+}
+
+const char *fake_hal_audio_queued_path(void)
+{
+    return fake.audio.has_queued ? fake.audio.queued_path : NULL;
+}
+
+void fake_hal_audio_finish_track(void)
+{
+    if (!fake.audio.has_queued) {
+        fake.audio.status.state = HAL_AUDIO_STOPPED;
+        return;
+    }
+    fake.audio.status.token = fake.audio.queued_token;
+    fake.audio.status.position_ms = 0;
+    copy_path(fake.audio.playing_path, fake.audio.queued_path);
+    fake.audio.has_queued = false;
+}
+
+void fake_hal_audio_refuse_plays(int count)
+{
+    fake.audio.refused_plays = count;
+}
+
+void fake_hal_audio_fail_track(void)
+{
+    fake.audio.status.state = HAL_AUDIO_STOPPED;
+    fake.audio.status.failed = true;
+}
+
+void fake_hal_audio_set_position(uint32_t position_ms)
+{
+    fake.audio.status.position_ms = position_ms;
+}
+
+void fake_hal_audio_set_format(HalAudioFormat format)
+{
+    fake.audio.status.format = format;
+}
+
+void fake_hal_audio_set_idle(bool idle)
+{
+    fake.audio.status.idle = idle;
+}
+
+void fake_hal_audio_set_token(uint32_t token)
+{
+    fake.audio.status.token = token;
+}
+
+int fake_hal_audio_seek_count(void)
+{
+    return fake.audio.seek_count;
+}
+
+uint32_t fake_hal_audio_last_seek(void)
+{
+    return fake.audio.last_seek_ms;
+}
+
+uint8_t fake_hal_audio_volume(void)
+{
+    return fake.audio.volume;
+}
+
+int fake_hal_audio_state(void)
+{
+    return (int)fake.audio.status.state;
+}
+
+int fake_hal_write_count(void)
+{
+    return fake.write_count;
+}
+
+bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
+{
+    fake.audio.play_count++;
+    if (fake.audio.refused_plays > 0) {
+        fake.audio.refused_plays--;
+        fake.audio.status = (HalAudioStatus){
+            .state = HAL_AUDIO_STOPPED, .token = token, .failed = true, .idle = false};
+        return false;
+    }
+    copy_path(fake.audio.playing_path, path);
+    fake.audio.play_start_ms = start_ms;
+    fake.audio.status = (HalAudioStatus){.state = HAL_AUDIO_PLAYING,
+                                         .token = token,
+                                         .position_ms = start_ms,
+                                         .failed = false,
+                                         .idle = false};
+    return true;
+}
+
+void hal_audio_queue_next(const char *path, uint32_t token)
+{
+    fake.audio.has_queued = path != NULL;
+    if (path != NULL) {
+        copy_path(fake.audio.queued_path, path);
+        fake.audio.queued_token = token;
+    }
+}
+
+void hal_audio_pause(void)
+{
+    fake.audio.status.state = HAL_AUDIO_PAUSED;
+}
+
+void hal_audio_resume(void)
+{
+    fake.audio.status.state = HAL_AUDIO_PLAYING;
+}
+
+void hal_audio_seek(uint32_t position_ms)
+{
+    fake.audio.seek_count++;
+    fake.audio.last_seek_ms = position_ms;
+    fake.audio.status.position_ms = position_ms;
+}
+
+void hal_audio_set_volume(uint8_t level)
+{
+    fake.audio.volume = level;
+}
+
+void hal_audio_set_gain(HalAudioGain gain)
+{
+    fake.audio.gain = gain;
+}
+
+void hal_audio_set_output(HalAudioOutput output)
+{
+    fake.audio.output = output;
+}
+
+int fake_hal_audio_gain(void)
+{
+    return (int)fake.audio.gain;
+}
+
+int fake_hal_audio_output(void)
+{
+    return (int)fake.audio.output;
+}
+
+int fake_hal_test_tone_count(void)
+{
+    return fake.test_tone_count;
+}
+
+HalToneResult hal_audio_test_tone(void)
+{
+    fake.test_tone_count++;
+    return HAL_TONE_PLAYED;
+}
+
+int fake_hal_audio_service_count(void)
+{
+    return fake.audio_service_count;
+}
+
+void hal_audio_service(void)
+{
+    fake.audio_service_count++;
+}
+
+HalAudioStats hal_audio_stats(void)
+{
+    return (HalAudioStats){0};
+}
+
+HalToneDetail hal_audio_tone_detail(void)
+{
+    return (HalToneDetail){.stage = 0, .pending = 0};
+}
+
+HalBootClocks hal_system_boot_clocks(void)
+{
+    return (HalBootClocks){0};
+}
+
+HalUsbLast hal_system_usb_last(void)
+{
+    return (HalUsbLast){.end = HAL_USB_END_NONE};
+}
+
+HalUsbCore hal_system_usb_core(void)
+{
+    return (HalUsbCore){.captured = false};
+}
+
+uint32_t fake_hal_dma_tone_rate(void)
+{
+    return fake.dma_tone_rate;
+}
+
+HalToneResult hal_audio_dma_tone_start(uint32_t sample_rate)
+{
+    fake.dma_tone_rate = sample_rate;
+    fake.dma_tone_running = true;
+    return HAL_TONE_PLAYED;
+}
+
+void hal_audio_dma_tone_stop(void)
+{
+    fake.dma_tone_running = false;
+}
+
+HalDmaToneStatus hal_audio_dma_tone_status(void)
+{
+    return (HalDmaToneStatus){.running = fake.dma_tone_running, .position = 0};
+}
+
+HalAudioRefusal hal_audio_refusal(void)
+{
+    return fake.audio.refusal;
+}
+
+void fake_hal_audio_set_refusal(HalAudioRefusal refusal)
+{
+    fake.audio.refusal = refusal;
+}
+
+HalAudioJack hal_audio_jack(void)
+{
+    return fake.audio.jack;
+}
+
+void fake_hal_audio_set_jack(HalAudioJack jack)
+{
+    fake.audio.jack = jack;
+}
+
+HalJackPins hal_audio_jack_pins(void)
+{
+    return (HalJackPins){.single_ended = {.high = false}, .balanced = {.high = true}};
+}
+
+HalAudioStatus hal_audio_status(void)
+{
+    return fake.audio.status;
+}
+
+static WrittenFile *written_slot(const char *path)
+{
+    for (int index = 0; index < FILE_CAPACITY; index++) {
+        if (strcmp(fake.written[index].path, path) == 0 || fake.written[index].path[0] == '\0') {
+            return &fake.written[index];
+        }
+    }
+    return NULL;
+}
+
+static void register_written(const char *path, uint32_t length)
+{
+    WrittenFile *slot = written_slot(path);
+    for (int index = 0; index < fake.file_count; index++) {
+        if (strcmp(fake.files[index].path, path) == 0) {
+            fake.files[index].size = length;
+            fake.files[index].bytes =
+                fake.files[index].bytes == NULL ? slot->bytes : fake.files[index].bytes;
+            fake.files[index].stored =
+                fake.files[index].bytes == slot->bytes ? length : fake.files[index].stored;
+            return;
+        }
+    }
+    fake_hal_add_file(slot->path, slot->bytes, length);
+}
+
+bool hal_file_write(const char *path, const void *bytes, uint32_t length)
+{
+    WrittenFile *slot = written_slot(path);
+    if (slot == NULL || length > WRITTEN_CAPACITY) {
+        return false;
+    }
+    copy_path(slot->path, path);
+    memcpy(slot->bytes, bytes, length);
+    register_written(path, length);
+    fake.write_count++;
+    return true;
+}
+
+const uint8_t *fake_hal_file_bytes(const char *path, uint32_t *size)
+{
+    for (int index = 0; index < fake.file_count; index++) {
+        if (strcmp(fake.files[index].path, path) == 0) {
+            *size = fake.files[index].size;
+            return fake.files[index].bytes;
+        }
+    }
+    *size = 0;
+    return NULL;
+}
+
+int fake_hal_loop_bench_count(void)
+{
+    return fake.loop_bench_count;
+}
+
+void hal_system_stall_test(void)
+{
+    fake.stall_test_count++;
+}
+
+int fake_hal_stall_test_count(void)
+{
+    return fake.stall_test_count;
+}
+
+void hal_system_watchdog_test(void)
+{
+    fake.watchdog_test_count++;
+}
+
+int fake_hal_watchdog_test_count(void)
+{
+    return fake.watchdog_test_count;
+}
+
+void hal_system_keep_alive(void)
+{
+    fake.keep_alive_count++;
+}
+
+int fake_hal_keep_alive_count(void)
+{
+    return fake.keep_alive_count;
+}
+
+HalLoopCycles hal_system_loop_cycles(void)
+{
+    fake.loop_bench_count++;
+    return (HalLoopCycles){.register_centi = 300, .memory_centi = 700};
+}
+
+int fake_hal_core1_test_count(void)
+{
+    return fake.core1_test_count;
+}
+
+HalCore1Test hal_system_core1_test(void)
+{
+    fake.core1_test_count++;
+    return (HalCore1Test){.status = HAL_CORE1_RAN, .mhz = 100};
+}
+
+int fake_hal_core1_decode_count(void)
+{
+    return fake.core1_decode_count;
+}
+
+int fake_hal_core1_accel_count(void)
+{
+    return fake.core1_accel_count;
+}
+
+HalCore1Accel hal_system_core1_accel_test(void)
+{
+    fake.core1_accel_count++;
+    return (HalCore1Accel){.status = HAL_CORE1_UNAVAILABLE};
+}
+
+HalCore1Decode hal_system_core1_decode_test(void)
+{
+    fake.core1_decode_count++;
+    return (HalCore1Decode){.status = HAL_CORE1_NO_TRACK};
+}
+
+HalPowerHold hal_power_boot_hold(void)
+{
+    return (HalPowerHold){.function = 0, .output = true, .high = true};
+}
+
+HalStartInfo hal_system_start_info(void)
+{
+    return (HalStartInfo){.warm = false, .starts = 1};
+}
+
+HalBluetoothStatus *fake_hal_bluetooth(void)
+{
+    return &fake.bluetooth;
+}
+
+bool fake_hal_bluetooth_powered(void)
+{
+    return fake.bluetooth_powered;
+}
+
+int fake_hal_bluetooth_scan_count(void)
+{
+    return fake.bluetooth_scan_count;
+}
+
+int fake_hal_bluetooth_service_count(void)
+{
+    return fake.bluetooth_service_count;
+}
+
+void hal_bluetooth_set_power(bool on)
+{
+    fake.bluetooth_powered = on;
+    fake.bluetooth = (HalBluetoothStatus){.state = on ? HAL_BLUETOOTH_STARTING : HAL_BLUETOOTH_OFF};
+}
+
+void hal_bluetooth_scan(void)
+{
+    fake.bluetooth_scan_count++;
+    if (fake.bluetooth.state == HAL_BLUETOOTH_READY) {
+        fake.bluetooth.state = HAL_BLUETOOTH_SCANNING;
+    }
+}
+
+int fake_hal_bluetooth_connect_count(void)
+{
+    return fake.bluetooth_connect_count;
+}
+
+int fake_hal_bluetooth_connect_index(void)
+{
+    return fake.bluetooth_connect_index;
+}
+
+int fake_hal_bluetooth_disconnect_count(void)
+{
+    return fake.bluetooth_disconnect_count;
+}
+
+void hal_bluetooth_connect(uint8_t index)
+{
+    fake.bluetooth_connect_count++;
+    fake.bluetooth_connect_index = index;
+}
+
+void hal_bluetooth_disconnect(void)
+{
+    fake.bluetooth_disconnect_count++;
+}
+
+void hal_bluetooth_set_stream(bool on)
+{
+    fake.bluetooth.streaming = on;
+}
+
+void hal_bluetooth_service(void)
+{
+    fake.bluetooth_service_count++;
+}
+
+const HalBluetoothStatus *hal_bluetooth_status(void)
+{
+    return &fake.bluetooth;
+}
+
+bool hal_dir_open(HalDir *dir, const char *path)
+{
+    (void)path;
+    fake.dir_opens++;
+    fake.presents_at_dir_open = fake.present_count;
+    dir->handle = fake.empty_card ? 0 : -1;
+    return fake.empty_card;
+}
+
+void fake_hal_set_empty_card(bool empty)
+{
+    fake.empty_card = empty;
+}
+
+int fake_hal_dir_open_count(void)
+{
+    return fake.dir_opens;
+}
+
+int fake_hal_presents_at_last_dir_open(void)
+{
+    return fake.presents_at_dir_open;
+}
+
+int fake_hal_covers_writes(void)
+{
+    return fake.covers_writes;
+}
+
+int fake_hal_library_writes(void)
+{
+    return fake.library_writes;
+}
+
+bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
+{
+    (void)dir;
+    (void)entry;
+    return false;
+}
+
+void hal_dir_close(HalDir *dir)
+{
+    dir->handle = -1;
+}
+
+void *hal_system_borrow_scratch(uint32_t *size)
+{
+    static uint8_t scratch[384 * 1024];
+    fake.scratch_borrows++;
+    if (fake.scratch_refused) {
+        *size = 0;
+        return NULL;
+    }
+    fake.scratch_outstanding++;
+    *size = sizeof scratch;
+    return scratch;
+}
+
+void hal_system_return_scratch(void)
+{
+    if (!fake.scratch_refused) {
+        fake.scratch_outstanding--;
+    }
+}
+
+void *hal_system_borrow_listing(uint32_t *size)
+{
+    static uint8_t listing[96 * 1024];
+    fake.listing_borrows++;
+    *size = sizeof listing;
+    return listing;
+}
+
+int fake_hal_listing_borrow_count(void)
+{
+    return fake.listing_borrows;
+}
+
+void fake_hal_refuse_scratch(bool refused)
+{
+    fake.scratch_refused = refused;
+}
+
+int fake_hal_scratch_borrow_count(void)
+{
+    return fake.scratch_borrows;
+}
+
+int fake_hal_scratch_outstanding(void)
+{
+    return fake.scratch_outstanding;
+}
+
+static FakeFile *fake_file(const char *path)
+{
+    for (int index = 0; index < fake.file_count; index++) {
+        if (strcmp(fake.files[index].path, path) == 0) {
+            return &fake.files[index];
+        }
+    }
+    return NULL;
+}
+
+static uint8_t *large_store_for(FakeFile *file)
+{
+    if (file->bytes != NULL && file->bytes == large_store) {
+        return large_store;
+    }
+    if (file->size > large_size) {
+        free(large_store);
+        large_store = malloc(file->size);
+        large_size = file->size;
+    }
+    if (large_store == NULL) {
+        large_size = 0;
+        return NULL;
+    }
+    memset(large_store, 0, file->size);
+    file->bytes = large_store;
+    file->stored = file->size;
+    return large_store;
+}
+
+static uint8_t *store_for(FakeFile *file)
+{
+    for (int slot = 0; slot < STORE_SLOTS; slot++) {
+        if (file->bytes == stores[slot]) {
+            return stores[slot];
+        }
+    }
+    if (file->size > STORE_CAPACITY && strcmp(file->path, "/.echo/build.tmp") == 0) {
+        return large_store_for(file);
+    }
+    for (int slot = 0; slot < STORE_SLOTS; slot++) {
+        if (fake.store_used[slot] == NULL) {
+            fake.store_used[slot] = file->path;
+            uint32_t kept = file->bytes == NULL ? 0 : file->stored;
+            kept = kept < STORE_CAPACITY ? kept : STORE_CAPACITY;
+            memset(stores[slot], 0, STORE_CAPACITY);
+            if (kept > 0) {
+                memcpy(stores[slot], file->bytes, kept);
+            }
+            file->bytes = stores[slot];
+            file->stored = STORE_CAPACITY < file->size ? STORE_CAPACITY : file->size;
+            return stores[slot];
+        }
+    }
+    return NULL;
+}
+
+bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)
+{
+    FakeFile *file = fake_file(path);
+    if (file == NULL || offset > file->size || length > file->size - offset) {
+        return false;
+    }
+    uint8_t *store = store_for(file);
+    if (store != NULL && offset + length <= file->stored) {
+        memcpy(store + offset, bytes, length);
+    }
+    fake.library_writes += strcmp(path, "/.echo/library.db") == 0;
+    fake.covers_writes += strcmp(path, "/.echo/covers.bin") == 0;
+    return true;
+}
+
+HalHighRamTest hal_system_high_ram_test(void)
+{
+    return (HalHighRamTest){.status = HAL_HIGH_RAM_UNAVAILABLE};
+}
+
+void fake_hal_set_reserve_result(HalReserveResult result)
+{
+    fake.reserve_result = result;
+}
+
+HalReserveResult hal_file_reserve(const char *path, uint32_t size)
+{
+    if (fake.reserve_count < FILE_CAPACITY) {
+        fake.reserved_paths[fake.reserve_count] = path;
+        fake.reserved_sizes[fake.reserve_count] = size;
+    }
+    fake.reserve_count++;
+    HalFile existing;
+    if (hal_file_open(&existing, path)) {
+        return HAL_RESERVE_EXISTS;
+    }
+    if (fake.reserve_result == HAL_RESERVE_CREATED) {
+        fake_hal_add_file(path, NULL, size);
+    }
+    return fake.reserve_result;
+}
+
+int fake_hal_reserve_count(void)
+{
+    return fake.reserve_count;
+}
+
+uint32_t fake_hal_reserved_size(const char *path)
+{
+    for (int index = 0; index < fake.reserve_count && index < FILE_CAPACITY; index++) {
+        if (strcmp(fake.reserved_paths[index], path) == 0) {
+            return fake.reserved_sizes[index];
+        }
+    }
+    return 0;
+}
+
+void fake_hal_set_restart_pending(bool pending)
+{
+    fake.restart_pending = pending;
+}
+
+bool hal_system_restart_pending(void)
+{
+    return fake.restart_pending;
+}
+
+const void *hal_system_load_rescan_code(void)
+{
+    return &LIBRARY_SCAN_ENTRY;
+}

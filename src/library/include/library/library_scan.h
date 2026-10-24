@@ -1,0 +1,80 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "library/byte_source.h"
+#include "library/library_builder.h"
+
+enum {
+    SCAN_NAME_CAPACITY = 768,
+    SCAN_PATH_CAPACITY = 1024,
+    SCAN_MAX_DEPTH = 32
+};
+
+typedef struct ScanEntry {
+    bool directory;
+    char name[SCAN_NAME_CAPACITY];
+} ScanEntry;
+
+typedef struct ScanFileSystem {
+    bool (*open_dir)(void *context, const char *path);
+    bool (*next_entry)(void *context, ScanEntry *entry);
+    void (*close_dir)(void *context);
+    bool (*open_file)(void *context, const char *path, ByteSource *source, uint32_t *size);
+    void (*close_file)(void *context);
+    void *context;
+} ScanFileSystem;
+
+typedef struct ScanProgress {
+    void (*report)(void *context, uint32_t files, uint32_t tracks);
+    void *context;
+} ScanProgress;
+
+typedef enum ScanResult {
+    SCAN_OK,
+    SCAN_NO_MUSIC_ROOT,
+    SCAN_OUT_OF_MEMORY,
+    SCAN_TOO_MANY,
+    SCAN_FOLDER_TOO_BIG,
+    SCAN_PATH_TOO_LONG,
+    SCAN_WRITE_FAILED,
+    SCAN_NO_ROOM,
+    SCAN_NO_CODE,
+    SCAN_RESTART_NEEDED,
+    SCAN_NO_SCRATCH
+} ScanResult;
+
+typedef struct ScanStats {
+    uint32_t files;
+    uint32_t tracks;
+    uint32_t skipped;
+    uint32_t length;
+} ScanStats;
+
+typedef struct ScanJob {
+    ScanFileSystem files;
+    void *memory;
+    uint32_t size;
+    void *listing;
+    uint32_t listing_size;
+    BuilderScratch scratch;
+    ByteSink sink;
+    uint32_t capacity;
+    ScanProgress progress;
+} ScanJob;
+
+#define LIBRARY_SCAN_MAGIC 0x4E414353u
+
+struct CoverJob;
+struct CoverStats;
+
+typedef struct LibraryScanEntry {
+    uint32_t magic;
+    ScanResult (*scan)(const ScanJob *job, ScanStats *stats);
+    ScanResult (*covers)(const struct CoverJob *job, struct CoverStats *stats);
+} LibraryScanEntry;
+
+extern const LibraryScanEntry LIBRARY_SCAN_ENTRY;
+
+ScanResult library_scan(const ScanJob *job, ScanStats *stats);
