@@ -11,14 +11,20 @@ enum {
     LISTING_SHARE = 8,
     MINIMUM_LISTING = 16 * 1024,
     MAXIMUM_LISTING = 96 * 1024,
-    ALIGNMENT = 8
+    ALIGNMENT = 8,
+    RESUME_BYTES = (2 + SCAN_NAME_CAPACITY + 3) & ~3,
+    NO_RESUME = 0xFFFF,
+    MINIMUM_BATCH = 2,
+    ENTRY_OVERHEAD = 8
 };
 
 typedef struct Level {
+    uint32_t start;
     uint32_t first;
     uint32_t count;
     uint32_t next;
     uint32_t path_length;
+    bool partial;
 } Level;
 
 typedef struct ScanState {
@@ -38,6 +44,7 @@ typedef struct ScanState {
     PlaylistReader playlist;
     char entry_text[PLAYLIST_ENTRY_CAPACITY];
     char playlist_name[SCAN_NAME_CAPACITY];
+    char cutoff[SCAN_NAME_CAPACITY];
 } ScanState;
 
 typedef struct Listing {
@@ -64,15 +71,20 @@ static bool entry_is_directory(const ScanState *state, uint32_t offset)
     return state->listing[offset] != 0;
 }
 
-static int compare_names(const ScanState *state, uint32_t left, uint32_t right)
+static int compare_texts(const char *left, const char *right)
 {
-    const unsigned char *a = (const unsigned char *)entry_name(state, left);
-    const unsigned char *b = (const unsigned char *)entry_name(state, right);
+    const unsigned char *a = (const unsigned char *)left;
+    const unsigned char *b = (const unsigned char *)right;
     while (*a != '\0' && *a == *b) {
         a++;
         b++;
     }
     return (int)*a - (int)*b;
+}
+
+static int compare_names(const ScanState *state, uint32_t left, uint32_t right)
+{
+    return compare_texts(entry_name(state, left), entry_name(state, right));
 }
 
 static void merge_names(const ScanState *state, const uint32_t *from, uint32_t *to, uint32_t start,
@@ -126,12 +138,9 @@ static uint32_t align4(uint32_t value)
     return (value + 3) & ~3u;
 }
 
-static ScanResult index_listing(ScanState *state, uint32_t start, uint32_t count, Level *level)
+static uint32_t *sorted_offsets(ScanState *state, uint32_t start, uint32_t count)
 {
     uint32_t table = align4(state->listing_used);
-    if (table > state->playlist_floor || (uint64_t)count * 8 > state->playlist_floor - table) {
-        return SCAN_FOLDER_TOO_BIG;
-    }
     uint32_t *offsets = (uint32_t *)(void *)(state->listing + table);
     uint32_t cursor = start;
     for (uint32_t index = 0; index < count; index++) {
@@ -139,28 +148,173 @@ static ScanResult index_listing(ScanState *state, uint32_t start, uint32_t count
         cursor += 2 + text_length(entry_name(state, cursor));
     }
     sort_names(state, offsets, offsets + count, count);
+    return offsets;
+}
+
+static ScanResult index_listing(ScanState *state, uint32_t start, uint32_t count, Level *level)
+{
+    uint32_t table = align4(state->listing_used);
+    if (table > state->playlist_floor || (uint64_t)count * 8 > state->playlist_floor - table) {
+        return SCAN_FOLDER_TOO_BIG;
+    }
+    sorted_offsets(state, start, count);
     state->listing_used = table + count * 4;
-    *level = (Level){.first = table, .count = count, .next = 0, .path_length = state->path_length};
+    level->first = table;
+    level->count = count;
+    level->next = 0;
+    level->path_length = state->path_length;
     return SCAN_OK;
 }
 
-static ScanResult read_listing(ScanState *state, const ScanFileSystem *files, Level *level)
+static ScanResult read_whole(ScanState *state, const ScanFileSystem *files, Level *level,
+                             bool *fits)
 {
     if (!files->open_dir(files->context, state->path)) {
         return SCAN_NO_MUSIC_ROOT;
     }
     uint32_t start = state->listing_used;
     uint32_t count = 0;
-    bool fits = true;
-    while (fits && files->next_entry(files->context, &state->entry)) {
+    *fits = true;
+    while (*fits && files->next_entry(files->context, &state->entry)) {
         if (state->entry.name[0] == '.') {
             continue;
         }
-        fits = store_entry(state, &state->entry);
+        *fits = store_entry(state, &state->entry) &&
+                align4(state->listing_used) + (count + 1) * ENTRY_OVERHEAD <= state->playlist_floor;
         count++;
     }
     files->close_dir(files->context);
-    return fits ? index_listing(state, start, count, level) : SCAN_FOLDER_TOO_BIG;
+    if (!*fits) {
+        state->listing_used = start;
+        return SCAN_OK;
+    }
+    level->start = start;
+    level->partial = false;
+    return index_listing(state, start, count, level);
+}
+
+typedef struct Batch {
+    uint32_t start;
+    uint32_t end;
+    uint32_t count;
+    bool cut;
+    const char *after;
+} Batch;
+
+static bool batch_fits(const ScanState *state, const Batch *batch, uint32_t length)
+{
+    uint64_t need = (uint64_t)align4(state->listing_used + length + 2) +
+                    (uint64_t)(batch->count + 1) * ENTRY_OVERHEAD;
+    return need <= batch->end;
+}
+
+static void keep_smaller_half(ScanState *state, Batch *batch)
+{
+    uint32_t *offsets = sorted_offsets(state, batch->start, batch->count);
+    uint32_t keep = batch->count / 2;
+    const char *first_dropped = entry_name(state, offsets[keep]);
+    uint32_t length = text_length(first_dropped);
+    for (uint32_t index = 0; index <= length; index++) {
+        state->cutoff[index] = first_dropped[index];
+    }
+    uint32_t write = batch->start;
+    for (uint32_t read = batch->start; read < state->listing_used;) {
+        uint32_t size = 2 + text_length(entry_name(state, read));
+        if (compare_texts(entry_name(state, read), state->cutoff) < 0) {
+            for (uint32_t index = 0; index < size; index++) {
+                state->listing[write + index] = state->listing[read + index];
+            }
+            write += size;
+        }
+        read += size;
+    }
+    state->listing_used = write;
+    batch->count = keep;
+    batch->cut = true;
+}
+
+static bool wanted(const ScanState *state, const Batch *batch, const char *name)
+{
+    return name[0] != '.' && (batch->after == NULL || compare_texts(name, batch->after) > 0) &&
+           (!batch->cut || compare_texts(name, state->cutoff) < 0);
+}
+
+static ScanResult add_to_batch(ScanState *state, Batch *batch)
+{
+    uint32_t length = text_length(state->entry.name);
+    while (!batch_fits(state, batch, length)) {
+        if (batch->count < MINIMUM_BATCH) {
+            return SCAN_FOLDER_TOO_BIG;
+        }
+        keep_smaller_half(state, batch);
+        if (compare_texts(state->entry.name, state->cutoff) >= 0) {
+            return SCAN_OK;
+        }
+    }
+    store_entry(state, &state->entry);
+    batch->count++;
+    return SCAN_OK;
+}
+
+static ScanResult read_batch(ScanState *state, const ScanFileSystem *files, Level *level,
+                             uint32_t start, bool resume)
+{
+    uint8_t *header = state->listing + start;
+    if (!resume) {
+        header[0] = (uint8_t)NO_RESUME;
+        header[1] = (uint8_t)(NO_RESUME >> 8);
+    }
+    bool has_after = (uint32_t)(header[0] | header[1] << 8) != NO_RESUME;
+    Batch batch = {.start = start + RESUME_BYTES,
+                   .end = start + (state->playlist_floor - start) / 2,
+                   .count = 0,
+                   .cut = false,
+                   .after = has_after ? (const char *)header + 2 : NULL};
+    if (batch.end < batch.start + 2 * (RESUME_BYTES + ENTRY_OVERHEAD)) {
+        return SCAN_FOLDER_TOO_BIG;
+    }
+    if (!files->open_dir(files->context, state->path)) {
+        return SCAN_NO_MUSIC_ROOT;
+    }
+    state->listing_used = batch.start;
+    ScanResult result = SCAN_OK;
+    while (result == SCAN_OK && files->next_entry(files->context, &state->entry)) {
+        if (wanted(state, &batch, state->entry.name)) {
+            result = add_to_batch(state, &batch);
+        }
+    }
+    files->close_dir(files->context);
+    if (result != SCAN_OK) {
+        return result;
+    }
+    level->start = start;
+    level->partial = batch.cut;
+    return index_listing(state, batch.start, batch.count, level);
+}
+
+static ScanResult read_listing(ScanState *state, const ScanFileSystem *files, Level *level)
+{
+    bool fits = true;
+    uint32_t start = state->listing_used;
+    ScanResult result = read_whole(state, files, level, &fits);
+    if (result != SCAN_OK || fits) {
+        return result;
+    }
+    return read_batch(state, files, level, start, false);
+}
+
+static ScanResult read_next_batch(ScanState *state, const ScanFileSystem *files, Level *level)
+{
+    const uint32_t *offsets = (const uint32_t *)(const void *)(state->listing + level->first);
+    const char *last = entry_name(state, offsets[level->count - 1]);
+    uint32_t length = text_length(last);
+    char *resume = (char *)state->listing + level->start + 2;
+    for (uint32_t index = 0; index <= length; index++) {
+        resume[index] = last[index];
+    }
+    state->listing[level->start] = (uint8_t)length;
+    state->listing[level->start + 1] = (uint8_t)(length >> 8);
+    return read_batch(state, files, level, level->start, true);
 }
 
 static bool append_path(ScanState *state, const char *name, bool directory)
@@ -307,8 +461,13 @@ static ScanResult walk(ScanState *state, const ScanJob *job, ScanStats *stats)
     state->depth = result == SCAN_OK ? 1 : 0;
     while (result == SCAN_OK && state->depth > 0) {
         Level *level = &state->levels[state->depth - 1];
+        if (level->next >= level->count && level->partial && level->count > 0) {
+            truncate_path(state, level->path_length);
+            result = read_next_batch(state, &job->files, level);
+            continue;
+        }
         if (level->next >= level->count) {
-            state->listing_used = level->first;
+            state->listing_used = level->start;
             state->depth--;
             truncate_path(state,
                           state->depth > 0 ? state->levels[state->depth - 1].path_length : 1);
