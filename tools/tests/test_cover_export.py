@@ -112,6 +112,32 @@ class ArtSearchTest(unittest.TestCase):
         self.assertIsNotNone(data)
 
 
+class FormatPictureTest(unittest.TestCase):
+    TAGS = TOOLS_DIRECTORY.parent / "tests" / "fixtures" / "tags"
+
+    def test_art_inside_mp4_ape_and_wma_files_is_found_as_a_front_cover(self):
+        from tag_fixture import cover_jpeg
+        for name in ("aac.m4a", "alac.m4a", "tagged.ape", "tagged.wma"):
+            with self.subTest(name=name):
+                pictures = cover_export.embedded_pictures(self.TAGS / name)
+                self.assertEqual([(cover_export.FRONT_COVER, cover_jpeg())], pictures)
+
+    def test_ogg_pictures_are_left_out_as_on_the_player(self):
+        self.assertEqual([], cover_export.embedded_pictures(self.TAGS / "tagged.ogg"))
+
+    def test_an_ape_back_cover_is_not_a_front_cover(self):
+        self.assertEqual((cover_export.OTHER_PICTURE, b"jpeg"),
+                         cover_export.ape_picture("Cover Art (Back)", b"back.jpg\x00jpeg"))
+        self.assertIsNone(cover_export.ape_picture("Cover Art (Front)", b"no terminator"))
+
+    def test_a_wma_picture_skips_its_mime_type_and_description(self):
+        mime = "image/png".encode("utf-16-le") + b"\x00\x00"
+        description = "x".encode("utf-16-le") + b"\x00\x00"
+        data = struct.pack("<BI", 4, 3) + mime + description + b"png"
+        self.assertEqual((4, b"png"), cover_export.asf_picture(data))
+        self.assertIsNone(cover_export.asf_picture(struct.pack("<BI", 3, 99) + mime + b"\x00\x00"))
+
+
 class EncodeCoversTest(unittest.TestCase):
     def test_the_header_and_index_describe_sorted_records(self):
         red = Image.new("RGB", (8, 8), (255, 0, 0))

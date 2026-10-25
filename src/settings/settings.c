@@ -3,8 +3,9 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 2,
+    VERSION = 3,
     FIRST_VERSION = 1,
+    AUTO_OFF_VERSION = 2,
     MAGIC_SIZE = 4,
     VERSION_FIELD = 4,
     BRIGHTNESS_FIELD = 6,
@@ -16,6 +17,7 @@ enum {
     REPEAT_FIELD = 12,
     VOLUME_FIELD = 13,
     AUTO_OFF_FIELD = 14,
+    USB_MODE_FIELD = 15,
     CHECKSUM_FIELD = 20,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
@@ -43,6 +45,7 @@ Settings settings_defaults(void)
         .repeat = REPEAT_OFF,
         .volume = DEFAULT_VOLUME,
         .auto_off = DEFAULT_AUTO_OFF_OPTION,
+        .usb_mode = USB_MODE_STORAGE,
     };
 }
 
@@ -107,6 +110,7 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     bytes[REPEAT_FIELD] = (uint8_t)settings->repeat;
     bytes[VOLUME_FIELD] = settings->volume;
     bytes[AUTO_OFF_FIELD] = settings->auto_off;
+    bytes[USB_MODE_FIELD] = (uint8_t)settings->usb_mode;
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
@@ -118,7 +122,7 @@ static bool header_valid(const uint8_t *bytes)
         }
     }
     uint8_t version = bytes[VERSION_FIELD];
-    return (version == VERSION || version == FIRST_VERSION) && bytes[VERSION_FIELD + 1] == 0 &&
+    return version >= FIRST_VERSION && version <= VERSION && bytes[VERSION_FIELD + 1] == 0 &&
            get_u32(bytes, CHECKSUM_FIELD) == checksum_of(bytes);
 }
 
@@ -130,7 +134,7 @@ static bool values_valid(const uint8_t *bytes)
            bytes[GAIN_FIELD] < GAIN_LEVEL_COUNT && bytes[OUTPUT_FIELD] < OUTPUT_JACK_COUNT &&
            bytes[START_FIELD] < START_SCREEN_COUNT && bytes[SHUFFLE_FIELD] < SHUFFLE_MODE_COUNT &&
            bytes[REPEAT_FIELD] < REPEAT_MODE_COUNT && bytes[VOLUME_FIELD] <= SETTINGS_VOLUME_MAX &&
-           bytes[AUTO_OFF_FIELD] < AUTO_OFF_OPTION_COUNT;
+           bytes[AUTO_OFF_FIELD] < AUTO_OFF_OPTION_COUNT && bytes[USB_MODE_FIELD] < USB_MODE_COUNT;
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
@@ -147,8 +151,10 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .shuffle = (ShuffleMode)bytes[SHUFFLE_FIELD],
         .repeat = (RepeatMode)bytes[REPEAT_FIELD],
         .volume = bytes[VOLUME_FIELD],
-        .auto_off = bytes[VERSION_FIELD] == FIRST_VERSION ? (uint8_t)DEFAULT_AUTO_OFF_OPTION
-                                                          : bytes[AUTO_OFF_FIELD],
+        .auto_off = bytes[VERSION_FIELD] < AUTO_OFF_VERSION ? (uint8_t)DEFAULT_AUTO_OFF_OPTION
+                                                            : bytes[AUTO_OFF_FIELD],
+        .usb_mode =
+            bytes[VERSION_FIELD] < VERSION ? USB_MODE_STORAGE : (UsbMode)bytes[USB_MODE_FIELD],
     };
     return true;
 }

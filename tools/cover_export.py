@@ -18,6 +18,10 @@ FNV_PRIME = 16777619
 KEY_SEPARATOR = b"\x1f"
 KEY_NAME_LIMIT = 255
 FRONT_COVER = 3
+OTHER_PICTURE = 0
+APE_COVER_PREFIX = "cover art ("
+APE_FRONT_KEY = "cover art (front)"
+ASF_PICTURE_HEAD = struct.Struct("<BI")
 FOLDER_IMAGE_STEMS = ("cover", "folder", "front", "albumart")
 FOLDER_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png")
 MAX_COVERS = 0xFFFF
@@ -61,6 +65,73 @@ def cover_pixels(image, size):
     return [rgb565(*pixel) for pixel in resized.getdata()]
 
 
+def mp4_pictures(tags):
+    return [(FRONT_COVER, bytes(cover)) for cover in tags.get("covr", [])]
+
+
+def ape_picture(key, data):
+    name_end = data.find(b"\x00")
+    if name_end < 0:
+        return None
+    kind = FRONT_COVER if key.lower() == APE_FRONT_KEY else OTHER_PICTURE
+    return kind, data[name_end + 1:]
+
+
+def ape_pictures(tags):
+    from mutagen.apev2 import BINARY
+    pictures = []
+    for key, value in tags.items():
+        if (len(key) > len(APE_COVER_PREFIX) and key.lower().startswith(APE_COVER_PREFIX)
+                and value.kind == BINARY):
+            picture = ape_picture(key, value.value)
+            if picture is not None:
+                pictures.append(picture)
+    return pictures
+
+
+def skip_utf16_string(data, cursor):
+    while cursor + 2 <= len(data):
+        unit = data[cursor:cursor + 2]
+        cursor += 2
+        if unit == b"\x00\x00":
+            break
+    return cursor
+
+
+def asf_picture(data):
+    if len(data) < ASF_PICTURE_HEAD.size:
+        return None
+    kind, length = ASF_PICTURE_HEAD.unpack_from(data)
+    cursor = skip_utf16_string(data, skip_utf16_string(data, ASF_PICTURE_HEAD.size))
+    if cursor > len(data) or length > len(data) - cursor:
+        return None
+    return kind, data[cursor:cursor + length]
+
+
+def asf_pictures(tags):
+    pictures = []
+    for attribute in tags.get("WM/Picture", []):
+        picture = asf_picture(bytes(attribute.value)) if isinstance(attribute.value, bytes) else None
+        if picture is not None:
+            pictures.append(picture)
+    return pictures
+
+
+def tag_pictures(tags):
+    from mutagen.apev2 import APEv2
+    from mutagen.asf import ASFTags
+    from mutagen.mp4 import MP4Tags
+    if isinstance(tags, MP4Tags):
+        return mp4_pictures(tags)
+    if isinstance(tags, APEv2):
+        return ape_pictures(tags)
+    if isinstance(tags, ASFTags):
+        return asf_pictures(tags)
+    if hasattr(tags, "getall"):
+        return [(frame.type, frame.data) for frame in tags.getall("APIC")]
+    return []
+
+
 def embedded_pictures(path):
     from mutagen import File, MutagenError
     try:
@@ -71,8 +142,8 @@ def embedded_pictures(path):
         return []
     pictures = [(picture.type, picture.data) for picture in getattr(audio, "pictures", [])]
     tags = getattr(audio, "tags", None)
-    if tags is not None and hasattr(tags, "getall"):
-        pictures += [(frame.type, frame.data) for frame in tags.getall("APIC")]
+    if tags is not None:
+        pictures += tag_pictures(tags)
     return pictures
 
 
@@ -151,18 +222,23 @@ def pack_pixels(pixels):
     return struct.pack(f"<{len(pixels)}H", *pixels)
 
 
-def encode_covers(images):
-    keys = sorted(images)[:MAX_COVERS]
+def cover_record(image):
+    return pack_pixels(cover_pixels(image, FULL_SIZE)) + pack_pixels(cover_pixels(image, HALF_SIZE))
+
+
+def encode_records(records):
+    keys = sorted(records)[:MAX_COVERS]
     offset = HEADER.size + ENTRY.size * len(keys)
     header = HEADER.pack(MAGIC, VERSION, len(keys), FULL_SIZE, HALF_SIZE, 0)
-    index, records = bytearray(), bytearray()
+    index, data = bytearray(), bytearray()
     for key in keys:
-        image = images[key]
-        record = pack_pixels(cover_pixels(image, FULL_SIZE)) + pack_pixels(
-            cover_pixels(image, HALF_SIZE))
-        index += ENTRY.pack(key, offset + len(records))
-        records += record
-    return header + bytes(index) + bytes(records)
+        index += ENTRY.pack(key, offset + len(data))
+        data += records[key]
+    return header + bytes(index) + bytes(data)
+
+
+def encode_covers(images):
+    return encode_records({key: cover_record(images[key]) for key in sorted(images)[:MAX_COVERS]})
 
 
 def load_image(data):
@@ -172,14 +248,18 @@ def load_image(data):
     return image
 
 
-def collect_images(root, sources):
+def unchanged(image):
+    return image
+
+
+def collect_images(root, sources, convert=unchanged):
     images, missing = {}, []
     for source in sources:
         if source.key in images:
             continue
         data = find_art(root, source.paths)
         try:
-            image = None if data is None else load_image(data)
+            image = None if data is None else convert(load_image(data))
         except Exception:
             image = None
         if image is None:

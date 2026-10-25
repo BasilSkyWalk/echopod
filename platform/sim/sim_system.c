@@ -27,6 +27,11 @@ HalUsbLast hal_system_usb_last(void)
     return (HalUsbLast){.end = HAL_USB_END_NONE};
 }
 
+void hal_system_set_usb_mode(HalUsbMode mode)
+{
+    (void)mode;
+}
+
 uint32_t hal_system_clock_mhz(void)
 {
     return clock_mhz;

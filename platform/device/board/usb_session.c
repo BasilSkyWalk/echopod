@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "app/app.h"
+#include "board.h"
 #include "core/string_builder.h"
 #include "device/block_device.h"
 #include "device/usb_fallback.h"
@@ -201,6 +202,8 @@ UsbSessionEnd usb_session_run(void)
 {
     app_show_notice("USB", "Computer found. Starting...");
     prepare_luns();
+    app_release_audio();
+    board_audio_shut_down();
     usb_silence_audio();
     UsbSessionEnd end = USB_SESSION_NO_HOST;
     if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {

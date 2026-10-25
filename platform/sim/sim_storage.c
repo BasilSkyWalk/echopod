@@ -86,6 +86,7 @@ bool hal_file_open(HalFile *file, const char *path)
     if (handle == NULL) {
         return false;
     }
+    setvbuf(handle, NULL, _IONBF, 0);
     long size = file_size(handle);
     if (size < 0 || (unsigned long)size > UINT32_MAX) {
         fclose(handle);
@@ -121,6 +122,14 @@ static bool is_system_path(const char *path)
            strncmp(path, SYSTEM_PREFIX, sizeof SYSTEM_PREFIX - 1) == 0;
 }
 
+static bool replace_file(const char *from, const char *to)
+{
+#if defined(_WIN32)
+    (void)remove(to);
+#endif
+    return rename(from, to) == 0;
+}
+
 bool hal_file_write(const char *path, const void *bytes, uint32_t length)
 {
     char resolved[PATH_CAPACITY];
@@ -138,7 +147,7 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length)
     }
     bool written = fwrite(bytes, 1, length, handle) == length;
     written = fclose(handle) == 0 && written;
-    return written && rename(temporary, resolved) == 0;
+    return written && replace_file(temporary, resolved);
 }
 
 bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)

@@ -50,12 +50,12 @@ HalBattery hal_power_battery(void)
     if (!battery_gauge_known(&gauge)) {
         return (HalBattery){.known = false, .usb_power = usb_power, .charging = charging};
     }
-    return (HalBattery){
-        .known = true,
-        .percent = battery_display_update(&display, battery_gauge_percent(&gauge, charging)),
-        .charging = charging,
-        .usb_power = usb_power,
-        .millivolts = (uint16_t)battery_gauge_millivolts(&gauge)};
+    return (HalBattery){.known = true,
+                        .percent = battery_display_update(
+                            &display, battery_gauge_percent(&gauge, charging), usb_power),
+                        .charging = charging,
+                        .usb_power = usb_power,
+                        .millivolts = (uint16_t)battery_gauge_millivolts(&gauge)};
 }
 
 void board_power_cut(void)

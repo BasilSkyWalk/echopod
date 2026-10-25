@@ -47,7 +47,20 @@ typedef struct PlayerStatus {
     RepeatMode repeat;
     PlayQueuePlace place;
     HalAudioFormat format;
+    bool spoken;
 } PlayerStatus;
+
+typedef struct PlayerResume {
+    uint32_t (*position_for)(void *context, uint16_t track);
+    void *context;
+} PlayerResume;
+
+typedef struct PlayerListStart {
+    BrowseQuery source;
+    uint32_t position;
+    uint32_t seed;
+    bool in_order;
+} PlayerListStart;
 
 typedef struct Player {
     const Library *library;
@@ -73,6 +86,8 @@ typedef struct Player {
     HalAudioJack jack;
     uint32_t refusal_count;
     HalAudioRefusal refusal;
+    bool spoken;
+    PlayerResume resume;
 } Player;
 
 extern const char PLAYER_RESUME_PATH[];
@@ -80,6 +95,9 @@ extern const char PLAYER_UP_NEXT_PATH[];
 
 void player_init(Player *player, const Library *library);
 bool player_play_list(Player *player, BrowseQuery source, uint32_t position, uint32_t seed);
+bool player_play_from(Player *player, PlayerListStart start);
+void player_set_resume(Player *player, PlayerResume resume);
+void player_jump(Player *player, int32_t delta_ms);
 void player_toggle_pause(Player *player);
 void player_skip(Player *player, int direction);
 void player_seek(Player *player, uint32_t position_ms);
@@ -93,5 +111,6 @@ bool player_jump_to_queue(Player *player, PlayQueueCursor cursor);
 void player_update(Player *player, uint32_t now_ms);
 void player_refusal_text(HalAudioRefusal refusal, char *text, size_t capacity);
 bool player_save(Player *player);
+void player_release_output(Player *player);
 bool player_restore(Player *player);
 PlayerStatus player_status(const Player *player);

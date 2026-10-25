@@ -26,10 +26,16 @@ typedef enum StartScreen {
     START_COVER_FLOW
 } StartScreen;
 
+typedef enum UsbMode {
+    USB_MODE_STORAGE,
+    USB_MODE_DAC
+} UsbMode;
+
 enum {
     GAIN_LEVEL_COUNT = GAIN_HIGH + 1,
     OUTPUT_JACK_COUNT = OUTPUT_BALANCED + 1,
     START_SCREEN_COUNT = START_COVER_FLOW + 1,
+    USB_MODE_COUNT = USB_MODE_DAC + 1,
     SETTINGS_BRIGHTNESS_MIN = 1,
     SETTINGS_BRIGHTNESS_MAX = 10,
     SETTINGS_VOLUME_MAX = 50,
@@ -49,6 +55,7 @@ typedef struct Settings {
     RepeatMode repeat;
     uint8_t volume;
     uint8_t auto_off;
+    UsbMode usb_mode;
 } Settings;
 
 Settings settings_defaults(void);

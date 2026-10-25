@@ -11,7 +11,8 @@
 #include "ui/toast.h"
 
 enum {
-    SETTINGS_CHOICE_COUNT = 9,
+    SETTINGS_CHOICE_COUNT = 10,
+    SETTINGS_RESCAN_ITEM = 9,
     SETTINGS_ITEM_COUNT = SETTINGS_CHOICE_COUNT + 1
 };
 
@@ -30,6 +31,7 @@ typedef struct SettingChoice {
     int option_count;
     int (*current)(const void *context);
     void (*choose)(void *context, int index);
+    const char *(*describe)(int current);
 } SettingChoice;
 
 typedef struct SettingsScreens SettingsScreens;

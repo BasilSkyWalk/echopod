@@ -28,6 +28,7 @@ add_executable(echo_device
     board/system.c
     board/update.c
     board/usb.c
+    board/usb_dac_session.c
     board/usb_report.c
     board/usb_session.c
 )
@@ -90,6 +91,20 @@ set_target_properties(echo_device PROPERTIES
 set_source_files_properties(board/libc.c board/startup.c PROPERTIES
     COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns"
 )
+if(CMAKE_CROSSCOMPILING)
+    set_source_files_properties(
+        board/high_ram.c
+        board/overlay.c
+        board/panic.c
+        board/start_info.c
+        board/system.c
+        board/update.c
+        board/usb_dac_session.c
+        board/usb_report.c
+        board/usb_session.c
+        PROPERTIES COMPILE_OPTIONS -Os
+    )
+endif()
 target_link_libraries(echo_device PRIVATE echo_app echo_device_logic echo_options)
 target_link_options(echo_device PRIVATE
     -T${ECHO_DEVICE_LINKER_SCRIPT}

@@ -6,6 +6,7 @@
 #include "library/favorites.h"
 #include "library/library_browse.h"
 #include "player.h"
+#include "spoken_store.h"
 #include "ui/list_view.h"
 #include "ui/menu_screen.h"
 #include "ui/screen.h"
@@ -41,6 +42,8 @@ typedef struct BrowseScreen {
     BrowseQuery query;
     uint32_t count;
     bool favorites_only;
+    SpokenKind shelf;
+    bool shelf_root;
     char title[BROWSE_TITLE_CAPACITY];
     ListModel model;
     ListView list;
@@ -54,6 +57,7 @@ typedef struct BrowsePoolConfig {
     Screen *now_playing;
     FavoritesStore *favorites;
     Toast *toast;
+    SpokenStore *spoken;
 } BrowsePoolConfig;
 
 typedef struct SongActions {
@@ -70,9 +74,13 @@ struct BrowsePool {
     uint32_t row_uses;
     BrowseScreen screens[BROWSE_DEPTH];
     uint16_t favorite_albums[FAVORITES_CAPACITY];
+    uint16_t favorite_count;
+    bool favorites_collected;
+    uint32_t favorites_revision;
     SongActions song_actions;
 };
 
 void browse_pool_init(BrowsePool *pool, BrowsePoolConfig config);
 Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query);
 Screen *browse_pool_open_favorites(BrowsePool *pool, int level);
+Screen *browse_pool_open_shelf(BrowsePool *pool, int level, SpokenKind shelf);

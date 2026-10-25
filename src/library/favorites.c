@@ -127,15 +127,30 @@ bool favorites_decode(const uint8_t *bytes, uint32_t length, Favorites *favorite
     return true;
 }
 
-uint16_t favorites_collect_albums(const Favorites *favorites, const Library *library,
-                                  uint16_t *albums, uint16_t capacity)
+static void pause_between_albums(FavoritesCollector collector, uint32_t album)
+{
+    if (collector.between_albums != NULL && album % FAVORITES_ALBUMS_PER_PAUSE == 0) {
+        collector.between_albums(collector.context);
+    }
+}
+
+uint16_t favorites_collect(const Favorites *favorites, const Library *library,
+                           FavoritesCollector collector)
 {
     uint16_t found = 0;
     uint32_t album_count = library_count(library, LIBRARY_ALBUMS);
-    for (uint32_t album = 0; album < album_count && found < capacity; album++) {
+    for (uint32_t album = 0; album < album_count && found < collector.capacity; album++) {
+        pause_between_albums(collector, album);
         if (favorites_contains(favorites, library_album_key(library, album))) {
-            albums[found++] = (uint16_t)album;
+            collector.albums[found++] = (uint16_t)album;
         }
     }
     return found;
+}
+
+uint16_t favorites_collect_albums(const Favorites *favorites, const Library *library,
+                                  uint16_t *albums, uint16_t capacity)
+{
+    FavoritesCollector collector = {.albums = albums, .capacity = capacity};
+    return favorites_collect(favorites, library, collector);
 }

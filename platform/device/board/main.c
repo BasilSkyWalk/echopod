@@ -9,6 +9,7 @@
 #include "storage_reset.h"
 #include "update.h"
 #include "usb.h"
+#include "usb_dac_session.h"
 #include "usb_report.h"
 #include "usb_session.h"
 
@@ -26,6 +27,13 @@ typedef enum UsbState {
 
 static UsbState usb_state;
 static uint32_t listen_started_ms;
+static HalUsbMode usb_mode;
+static bool dac_session;
+
+void hal_system_set_usb_mode(HalUsbMode mode)
+{
+    usb_mode = mode;
+}
 
 bool board_usb_listening(void)
 {
@@ -61,14 +69,49 @@ static void run_usb_session(void)
     board_stall_pause(false);
 }
 
-static void start_listening(void)
+static void run_dac_session(void)
 {
+    board_stall_pause(true);
     raise_clock_for_usb();
-    if (!usb_session_listen()) {
+    usb_dac_session_run();
+    app_wake();
+    board_stall_pause(false);
+}
+
+static void run_session(void)
+{
+    if (dac_session) {
+        run_dac_session();
+    } else {
+        run_usb_session();
+    }
+}
+
+static void stop_listening(void)
+{
+    if (dac_session) {
+        usb_power_down();
+    } else {
+        usb_session_stop_listening();
+    }
+}
+
+static void report_failed_start(void)
+{
+    if (!dac_session) {
         board_stall_pause(true);
         usb_report_show(usb_session_report());
         board_stall_pause(false);
         app_wake();
+    }
+}
+
+static void start_listening(void)
+{
+    raise_clock_for_usb();
+    dac_session = usb_mode == HAL_USB_MODE_DAC;
+    if (!(dac_session ? usb_dac_session_listen() : usb_session_listen())) {
+        report_failed_start();
         usb_state = USB_STATE_HANDLED;
         return;
     }
@@ -80,9 +123,9 @@ static void keep_listening(void)
 {
     if (usb_session_host_seen()) {
         usb_state = USB_STATE_HANDLED;
-        run_usb_session();
+        run_session();
     } else if (hal_clock_milliseconds() - listen_started_ms >= HOST_WAIT_MS) {
-        usb_session_stop_listening();
+        stop_listening();
         usb_state = USB_STATE_HANDLED;
     }
 }
@@ -92,7 +135,7 @@ static void check_usb(void)
     bool vbus = usb_vbus_present();
     if (!vbus) {
         if (usb_state == USB_STATE_LISTENING) {
-            usb_session_stop_listening();
+            stop_listening();
         }
         usb_state = USB_STATE_UNPLUGGED;
     } else if (usb_state == USB_STATE_UNPLUGGED) {

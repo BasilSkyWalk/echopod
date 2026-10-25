@@ -79,6 +79,7 @@ typedef struct AppState {
     Player player;
     SettingsStore settings;
     FavoritesStore favorites;
+    SpokenStore spoken;
     CoverCache covers;
     PowerPolicy power;
     LowBattery low_battery;
@@ -181,6 +182,7 @@ static void save_settings(void)
 
 static void save_session(void)
 {
+    spoken_store_flush(&app.spoken, player_status(&app.player), hal_clock_milliseconds());
     player_save(&app.player);
     save_settings();
 }
@@ -540,6 +542,8 @@ static void start_playback(void)
     settings_store_restore_playback(&app.settings, &app.player, hal_clock_microseconds());
     player_restore(&app.player);
     favorites_store_load(&app.favorites, &app.library.library);
+    spoken_store_load(&app.spoken, &app.library.library);
+    player_set_resume(&app.player, spoken_store_resume(&app.spoken));
     cover_cache_open(&app.covers, &app.library.library);
 }
 
@@ -567,6 +571,7 @@ static void start_screens(uint32_t now_ms)
         .theme = &DEFAULT_THEME,
         .store = &app.library,
         .player = &app.player,
+        .spoken = &app.spoken,
         .settings = &app.settings,
         .favorites = &app.favorites,
         .power = &app.power,
@@ -677,6 +682,12 @@ static void run_rescan(void)
     toast_show(&app.toast, text, hal_clock_milliseconds());
 }
 
+void app_release_audio(void)
+{
+    spoken_store_flush(&app.spoken, player_status(&app.player), hal_clock_milliseconds());
+    player_release_output(&app.player);
+}
+
 void app_request_rescan(void)
 {
     app.rescan_requested = true;
@@ -726,6 +737,7 @@ void app_step(void)
     }
     if (!app.powered_off) {
         player_update(&app.player, now_ms);
+        spoken_store_follow(&app.spoken, player_status(&app.player), now_ms);
         explain_refusals(now_ms);
         update_power(now_ms);
     }

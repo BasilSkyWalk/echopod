@@ -22,6 +22,7 @@ typedef struct FavoriteResult {
 typedef struct FavoritesStore {
     Favorites favorites;
     const Library *library;
+    uint32_t revision;
 } FavoritesStore;
 
 void favorites_store_load(FavoritesStore *store, const Library *library);

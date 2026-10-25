@@ -510,6 +510,29 @@ static void a_session_resumes_inside_an_added_song(void)
     CHECK(path_is(fake_hal_audio_queued_path(), SHOOT_TO_THRILL_PATH));
 }
 
+static void releasing_the_output_pauses_where_the_track_was(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_set_position(42000);
+    player_release_output(started);
+    PlayerStatus status = player_status(started);
+    CHECK_EQUAL(PLAYER_PAUSED, status.state);
+    CHECK_EQUAL(42000, status.position_ms);
+    CHECK_EQUAL(HELLS_BELLS, status.track);
+}
+
+static void play_after_a_release_starts_the_output_again(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_set_position(42000);
+    player_release_output(started);
+    player_toggle_pause(started);
+    CHECK_EQUAL(2, fake_hal_audio_play_count());
+    CHECK_EQUAL(42000, fake_hal_audio_play_start());
+    CHECK(path_is(fake_hal_audio_playing_path(), HELLS_BELLS_PATH));
+    CHECK_EQUAL(PLAYER_PLAYING, player_status(started).state);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -556,6 +579,8 @@ int main(void)
         TEST_CASE(jumping_into_the_list_clears_up_next),
         TEST_CASE(up_next_survives_a_restart),
         TEST_CASE(a_session_resumes_inside_an_added_song),
+        TEST_CASE(releasing_the_output_pauses_where_the_track_was),
+        TEST_CASE(play_after_a_release_starts_the_output_again),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

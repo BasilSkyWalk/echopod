@@ -23,7 +23,8 @@ typedef struct UsbSetup {
 typedef enum UsbReplyKind {
     USB_REPLY_STALL,
     USB_REPLY_DATA,
-    USB_REPLY_STATUS
+    USB_REPLY_STATUS,
+    USB_REPLY_RECEIVE
 } UsbReplyKind;
 
 typedef enum UsbAction {
@@ -31,7 +32,8 @@ typedef enum UsbAction {
     USB_ACTION_SET_ADDRESS,
     USB_ACTION_CONFIGURE,
     USB_ACTION_CLEAR_HALT,
-    USB_ACTION_MSC_RESET
+    USB_ACTION_MSC_RESET,
+    USB_ACTION_STREAM
 } UsbAction;
 
 typedef struct UsbReply {

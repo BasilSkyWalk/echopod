@@ -18,6 +18,7 @@ add_library(echo_app STATIC
     player.c
     settings_screens.c
     settings_store.c
+    spoken_store.c
     screens/bluetooth_screen.c
     screens/cover_flow_screen.c
     screens/font_sample_screen.c
@@ -29,5 +30,5 @@ add_library(echo_app STATIC
 target_include_directories(echo_app PUBLIC include PRIVATE .)
 target_link_libraries(echo_app
     PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_settings echo_hal
-    PRIVATE echo_options
+    PRIVATE echo_options echo_compact
 )
