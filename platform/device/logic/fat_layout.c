@@ -338,11 +338,18 @@ uint32_t fat_run_length(FatVolume *volume, FatFile *file, uint32_t sector_index,
 const uint8_t *fat_read_entry(FatVolume *volume, FatFile *directory, uint32_t index)
 {
     uint32_t offset = index * DIRECTORY_ENTRY_SIZE;
+    uint32_t sector = offset / FAT_SECTOR_SIZE;
     uint32_t lba = 0;
-    if (offset >= directory->size ||
-        !fat_file_sector(volume, directory, offset / FAT_SECTOR_SIZE, &lba) ||
-        !fat_read_sector(volume, lba)) {
+    if (offset >= directory->size || !fat_file_sector(volume, directory, sector, &lba)) {
         return NULL;
+    }
+    if (!fat_sector_cached(volume, lba)) {
+        uint32_t left = (directory->size - 1) / FAT_SECTOR_SIZE - sector + 1;
+        uint32_t run = fat_run_length(volume, directory, sector,
+                                      left < FAT_CACHE_SECTORS ? left : FAT_CACHE_SECTORS);
+        if (run == 0 || !fat_read_run(volume, lba, run)) {
+            return NULL;
+        }
     }
     return fat_cached_sector(volume) + offset % FAT_SECTOR_SIZE;
 }

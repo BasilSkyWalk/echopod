@@ -46,25 +46,6 @@ typedef struct UsbPort {
     void (*receive_stream)(const uint8_t *bytes, uint32_t length);
 } UsbPort;
 
-typedef struct UsbIsoStats {
-    uint32_t armed;
-    uint32_t received;
-    uint32_t incomplete;
-} UsbIsoStats;
-
-typedef struct UsbIsoRegisters {
-    uint32_t control;
-    uint32_t size;
-    uint32_t events;
-    uint32_t status;
-    uint32_t rx_fifo;
-    uint32_t tx0_fifo;
-    uint32_t interrupts;
-    uint32_t hardware;
-} UsbIsoRegisters;
-
-UsbIsoStats usb_iso_stats(void);
-UsbIsoRegisters usb_iso_registers(void);
 bool usb_vbus_present(void);
 void usb_power_up(void);
 void usb_power_down(void);

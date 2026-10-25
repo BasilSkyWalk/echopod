@@ -4,6 +4,7 @@ Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has 
 
 - **Installing and using it:** `docs/user-guide.md`.
 - **Read first:** `docs/known-issues.md`. EchoPod is early, and has been tested on one player.
+- **What's new:** `docs/release-notes.md`.
 
 The hardware knowledge it relies on comes largely from the [ReChord](https://github.com/brnomt/ReChord) project's research (`docs/hardware.md`, `CREDITS.md`).
 
@@ -96,7 +97,7 @@ Headless runs use a virtual clock, so scripted screenshots are deterministic.
 
 The screen turns off after the screen timeout or a tap of Power. With the screen off, ▶‖ pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks, all without waking the screen; Power turns it back on.
 
-Home also lists Audiobooks and Podcasts when the card has an `Audiobooks` or `Podcasts` folder: every book and episode remembers where you stopped, plays in order, and hold vol± jumps 30 s forward or 15 s back (`docs/user-guide.md`).
+Home also lists Audiobooks and Podcasts when the card has an `Audiobooks` or `Podcasts` folder: every book and episode remembers where you stopped, plays in order, and hold vol± jumps 30 s forward or 15 s back. Books and episodes stay out of the Music lists (`docs/user-guide.md`).
 
 Settings: Shuffle (Off / Songs / Albums), Repeat (Off / One / All), Sleep timer, Screen timeout, Brightness, Gain, Output and Start screen. They're saved in `/.echo/settings.bin`, and favorites in `/.echo/favorites.bin`. Without `--system-dir` the simulator can't save, and says so. Playback resumes, paused, where it left off.
 
