@@ -438,6 +438,8 @@ static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPha
     Out out;
     out_open(&out, &state->store, prepared->albums, buffer, STREAM_BUFFER);
     uint32_t position = 0;
+    prepared->music_albums = 0;
+    prepared->music_tracks = 0;
     for (uint32_t final = 0; final < albums->count; final++) {
         uint8_t pre[ALBUM_PRE];
         if (!read_album_pre(state, albums, album_at[final], pre)) {
@@ -459,6 +461,10 @@ static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPha
                 track_album[position++] = (uint16_t) final;
             }
             done += step;
+        }
+        if (builder_get16(pre + 4) < prepared->music_ranks[BUILDER_ALBUM]) {
+            prepared->music_albums = final + 1;
+            prepared->music_tracks = position;
         }
         TrackRow row;
         if (!builder_read_row(&prepared->rows, state, first_seen, &row)) {

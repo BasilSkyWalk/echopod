@@ -15,6 +15,7 @@ bool fat_read_run(FatVolume *volume, uint32_t lba, uint32_t count);
 uint32_t fat_run_length(FatVolume *volume, FatFile *file, uint32_t sector_index, uint32_t limit);
 uint8_t *fat_sector_for_update(FatVolume *volume, uint32_t lba);
 bool fat_commit_sector(FatVolume *volume, uint32_t lba);
+bool fat_write_run(FatVolume *volume, uint32_t lba, const uint8_t *bytes, uint32_t count);
 bool fat_clear_sectors(FatVolume *volume, uint32_t lba, uint32_t count);
 bool fat_update_bytes(FatVolume *volume, uint32_t lba, uint32_t within, const uint8_t *bytes,
                       uint32_t length);

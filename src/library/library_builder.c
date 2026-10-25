@@ -4,6 +4,7 @@
 
 #include "builder_internal.h"
 #include "core/hash.h"
+#include "library/spoken_path.h"
 
 enum {
     ROW_BUFFER = 64 * BUILDER_ROW_SIZE,
@@ -305,6 +306,7 @@ BuilderResult library_builder_add_track(LibraryBuilder *builder, const BuilderTr
     TrackRow row = {.year = track->year,
                     .disc = track->disc,
                     .number = track->number,
+                    .spoken = spoken_kind_of(track->path) != SPOKEN_NONE,
                     .duration_ms = track->duration_ms};
     const char *texts[BUILDER_FIELDS - 1] = {track->title, track->artist, track->album_artist,
                                              track->album, track->genre};

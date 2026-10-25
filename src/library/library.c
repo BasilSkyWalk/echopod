@@ -60,6 +60,7 @@ static LibrarySectionInfo decode_section(const uint8_t *header, int section)
         .offset = u32_at(header, entry),
         .count = u32_at(header, entry + 4),
         .record_size = u16_at(header, entry + 8),
+        .music = u16_at(header, entry + 10),
     };
 }
 
@@ -129,6 +130,13 @@ LibraryStatus library_open(Library *library, ByteSource source, uint32_t size)
 uint32_t library_count(const Library *library, LibrarySection section)
 {
     return library->sections[section].count;
+}
+
+uint32_t library_music_count(const Library *library, LibrarySection section)
+{
+    LibrarySectionInfo info = library->sections[section];
+    bool counted = section <= LIBRARY_GENRES || section == LIBRARY_TITLE_ORDER;
+    return counted && info.music < info.count ? info.music : info.count;
 }
 
 bool library_read_track(const Library *library, uint32_t index, LibraryTrack *track)

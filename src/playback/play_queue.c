@@ -86,7 +86,7 @@ static bool build_album_queue(PlayQueue *queue)
 {
     LibraryTrack anchor;
     LibraryAlbum album;
-    uint32_t albums = library_count(queue->library, LIBRARY_ALBUMS);
+    uint32_t albums = library_music_count(queue->library, LIBRARY_ALBUMS);
     if (!library_read_track(queue->library, queue->plan.anchor_track, &anchor) ||
         !library_read_album(queue->library, anchor.album, &album) || anchor.album >= albums) {
         return false;

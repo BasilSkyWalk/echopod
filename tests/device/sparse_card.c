@@ -89,6 +89,7 @@ static bool write_sectors(void *context, uint32_t lba, uint32_t count, const voi
         return false;
     }
     card->writes += count;
+    card->write_calls++;
     memcpy(card->bytes + (size_t)lba * SECTOR_SIZE, buffer, (size_t)count * SECTOR_SIZE);
     return true;
 }

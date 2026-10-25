@@ -177,6 +177,9 @@ static void compare_counts(Pair *pair)
         same_number(pair, "section", (uint32_t)section, NAMES[section],
                     library_count(&pair->expected, (LibrarySection)section),
                     library_count(&pair->actual, (LibrarySection)section));
+        same_number(pair, "music", (uint32_t)section, NAMES[section],
+                    library_music_count(&pair->expected, (LibrarySection)section),
+                    library_music_count(&pair->actual, (LibrarySection)section));
     }
 }
 

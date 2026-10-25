@@ -4,12 +4,7 @@
 #include <stdint.h>
 
 #include "library/library.h"
-
-typedef enum SpokenKind {
-    SPOKEN_NONE,
-    SPOKEN_AUDIOBOOK,
-    SPOKEN_PODCAST
-} SpokenKind;
+#include "library/spoken_path.h"
 
 enum {
     SPOKEN_JUMP_FORWARD_MS = 30000,
@@ -18,7 +13,6 @@ enum {
     SPOKEN_FINISH_DIVISOR = 10
 };
 
-SpokenKind spoken_kind_of(const char *path);
 uint32_t spoken_track_key(const char *path);
 uint32_t spoken_bookmark_key(const char *path);
 bool spoken_near_end(uint32_t position_ms, uint32_t duration_ms);

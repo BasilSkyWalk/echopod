@@ -52,7 +52,7 @@ static int max_of(int first, int second)
 
 CoverFlowOrder cover_flow_order_make(const Library *library)
 {
-    uint32_t groups = library_count(library, LIBRARY_ALBUM_ARTISTS);
+    uint32_t groups = library_music_count(library, LIBRARY_ALBUM_ARTISTS);
     CoverFlowOrder order = {.first_link = 0, .count = 0, .linked = groups > 0};
     uint32_t next = 0;
     for (uint32_t index = 0; index < groups && order.linked; index++) {
@@ -65,7 +65,8 @@ CoverFlowOrder cover_flow_order_make(const Library *library)
         order.first_link = index == 0 ? group.first_link : order.first_link;
         next = group.first_link + group.link_count;
     }
-    order.count = order.linked ? next - order.first_link : library_count(library, LIBRARY_ALBUMS);
+    order.count =
+        order.linked ? next - order.first_link : library_music_count(library, LIBRARY_ALBUMS);
     return order;
 }
 

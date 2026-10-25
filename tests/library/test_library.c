@@ -61,7 +61,8 @@ static void a_wrong_magic_is_rejected(void)
 
 static void a_newer_version_is_rejected(void)
 {
-    CHECK_EQUAL(LIBRARY_BAD_VERSION, open_modified(VERSION_OFFSET, 3, fixture_size()));
+    CHECK_EQUAL(LIBRARY_BAD_VERSION, open_modified(VERSION_OFFSET, 4, fixture_size()));
+    CHECK_EQUAL(LIBRARY_BAD_VERSION, open_modified(VERSION_OFFSET, 2, fixture_size()));
 }
 
 static void a_truncated_file_is_rejected(void)

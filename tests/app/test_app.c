@@ -874,7 +874,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(9, fake_hal_reserve_count());
+    CHECK_EQUAL(10, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -922,6 +922,18 @@ static void a_new_firmware_rescans_music_that_changed(void)
     step();
     static const uint8_t BLANK[16] = {0};
     CHECK(hal_file_write_at("/.echo/scan.bin", 0, BLANK, sizeof BLANK));
+    fake_hal_set_version("newer");
+    restart_app();
+    step();
+    CHECK_EQUAL(2, fake_hal_scratch_borrow_count());
+}
+
+static void a_new_firmware_rebuilds_a_library_it_cannot_read(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    step();
+    static const uint8_t OLD_VERSION[2] = {2, 0};
+    CHECK(hal_file_write_at("/.echo/library.db", 4, OLD_VERSION, sizeof OLD_VERSION));
     fake_hal_set_version("newer");
     restart_app();
     step();
@@ -1816,6 +1828,7 @@ int main(void)
         TEST_CASE(a_new_firmware_checks_the_music_once_without_rescanning),
         TEST_CASE(the_music_check_after_usb_says_so_before_walking_the_card),
         TEST_CASE(a_new_firmware_rescans_music_that_changed),
+        TEST_CASE(a_new_firmware_rebuilds_a_library_it_cannot_read),
         TEST_CASE(a_card_that_cannot_be_walked_is_rescanned_after_usb),
         TEST_CASE(a_full_card_says_it_is_full),
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),

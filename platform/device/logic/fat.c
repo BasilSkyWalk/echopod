@@ -336,6 +336,37 @@ bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, u
     return true;
 }
 
+static uint32_t write_whole_sectors(FatVolume *volume, FatFile *file, uint32_t offset,
+                                    const uint8_t *bytes, uint32_t length)
+{
+    uint32_t sectors = length / FAT_SECTOR_SIZE;
+    uint32_t sector_index = offset / FAT_SECTOR_SIZE;
+    uint32_t lba = 0;
+    uint32_t count = fat_run_length(volume, file, sector_index,
+                                    sectors < FAT_CACHE_SECTORS ? sectors : FAT_CACHE_SECTORS);
+    if (count == 0 || !fat_file_sector(volume, file, sector_index, &lba) ||
+        !fat_write_run(volume, lba, bytes, count)) {
+        return 0;
+    }
+    return count * FAT_SECTOR_SIZE;
+}
+
+static uint32_t write_step(FatVolume *volume, FatFile *file, uint32_t offset, const uint8_t *bytes,
+                           uint32_t length)
+{
+    uint32_t within = offset % FAT_SECTOR_SIZE;
+    if (within == 0 && length >= FAT_SECTOR_SIZE) {
+        return write_whole_sectors(volume, file, offset, bytes, length);
+    }
+    uint32_t chunk = FAT_SECTOR_SIZE - within < length ? FAT_SECTOR_SIZE - within : length;
+    uint32_t lba = 0;
+    if (!fat_file_sector(volume, file, offset / FAT_SECTOR_SIZE, &lba) ||
+        !fat_update_bytes(volume, lba, within, bytes, chunk)) {
+        return 0;
+    }
+    return chunk;
+}
+
 bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *bytes,
                uint32_t length)
 {
@@ -344,11 +375,8 @@ bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *by
     }
     const uint8_t *in = bytes;
     while (length > 0) {
-        uint32_t within = offset % FAT_SECTOR_SIZE;
-        uint32_t chunk = FAT_SECTOR_SIZE - within < length ? FAT_SECTOR_SIZE - within : length;
-        uint32_t lba = 0;
-        if (!fat_file_sector(volume, file, offset / FAT_SECTOR_SIZE, &lba) ||
-            !fat_update_bytes(volume, lba, within, in, chunk)) {
+        uint32_t chunk = write_step(volume, file, offset, in, length);
+        if (chunk == 0) {
             return false;
         }
         in += chunk;

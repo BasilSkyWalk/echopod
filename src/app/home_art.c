@@ -17,7 +17,7 @@ void home_art_init(HomeArt *art, CoverCache *covers, const LibraryStore *store, 
 
 static uint32_t album_count(const HomeArt *art)
 {
-    return art->store->available ? library_count(&art->store->library, LIBRARY_ALBUMS) : 0;
+    return art->store->available ? library_music_count(&art->store->library, LIBRARY_ALBUMS) : 0;
 }
 
 static bool playing_album(const HomeArt *art, uint16_t *album)
