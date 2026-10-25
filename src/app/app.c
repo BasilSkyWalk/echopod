@@ -688,6 +688,12 @@ void app_release_audio(void)
     player_release_output(&app.player);
 }
 
+void app_remember_dac_volume(uint8_t level)
+{
+    app.settings.settings.dac_volume = level;
+    settings_store_save(&app.settings);
+}
+
 void app_request_rescan(void)
 {
     app.rescan_requested = true;

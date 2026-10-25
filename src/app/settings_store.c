@@ -88,4 +88,5 @@ void settings_store_apply_hardware(const Settings *settings)
     hal_audio_set_gain(HAL_GAINS[settings->gain]);
     hal_audio_set_output(HAL_OUTPUTS[settings->output]);
     hal_system_set_usb_mode(HAL_USB_MODES[settings->usb_mode]);
+    hal_system_set_dac_volume(settings->dac_volume);
 }

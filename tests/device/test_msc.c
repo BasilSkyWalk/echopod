@@ -24,10 +24,16 @@ static RamDisk writable_disk;
 static RamDisk read_only_disk;
 
 static uint32_t disk_reads;
+static uint32_t read_calls;
+static uint32_t failing_read_lba = UINT32_MAX;
 
 static bool ram_read(void *context, uint32_t lba, uint32_t count, void *buffer)
 {
     RamDisk *disk = context;
+    read_calls++;
+    if (failing_read_lba >= lba && failing_read_lba - lba < count) {
+        return false;
+    }
     disk_reads += count;
     memcpy(buffer, disk->bytes + lba * 512, count * 512);
     return true;
@@ -68,8 +74,10 @@ static Msc *started(void)
 {
     static Msc msc;
     failing_write_lba = UINT32_MAX;
+    failing_read_lba = UINT32_MAX;
     write_call_count = 0;
     disk_reads = 0;
+    read_calls = 0;
     for (uint32_t index = 0; index < sizeof writable_disk.bytes; index++) {
         writable_disk.bytes[index] = (uint8_t)(index * 7 + 1);
         read_only_disk.bytes[index] = (uint8_t)(index * 3 + 2);
@@ -811,6 +819,67 @@ static void a_reset_drops_a_partly_filled_batch(void)
     CHECK(memcmp(writable_disk.bytes + 8 * 512, bytes, 512) == 0);
 }
 
+static void buffered_reads_fetch_the_drive_in_buffer_sized_runs(void)
+{
+    uint8_t block[10];
+    Msc *msc = started_with_buffer();
+    read_10_block(block, 0x28, 3, 10);
+    send_command(msc, 10 * 512, true, 0, block, 10);
+    Exchange *exchange = collect(msc);
+    CHECK_EQUAL(10 * 512, exchange->length);
+    CHECK(memcmp(exchange->data, writable_disk.bytes + 3 * 512, 10 * 512) == 0);
+    check_csw(exchange, 0, 0);
+    CHECK_EQUAL(3, read_calls);
+    CHECK_EQUAL(10, disk_reads);
+    CHECK_EQUAL(10, msc_stats(msc).sectors_read);
+}
+
+static void a_short_host_buffer_reads_only_the_sectors_it_takes(void)
+{
+    uint8_t block[10];
+    Msc *msc = started_with_buffer();
+    read_10_block(block, 0x28, 0, 4);
+    send_command(msc, 1300, true, 0, block, 10);
+    Exchange *exchange = collect(msc);
+    CHECK_EQUAL(1300, exchange->length);
+    CHECK(memcmp(exchange->data, writable_disk.bytes, 1300) == 0);
+    CHECK_EQUAL(3, disk_reads);
+}
+
+static void a_failed_buffered_read_fails_the_command(void)
+{
+    uint8_t block[10];
+    Msc *msc = started_with_buffer();
+    failing_read_lba = 6;
+    read_10_block(block, 0x28, 0, 8);
+    send_command(msc, 8 * 512, true, 0, block, 10);
+    Exchange *exchange = collect(msc);
+    CHECK(memcmp(exchange->data, writable_disk.bytes, 4 * 512) == 0);
+    CHECK_EQUAL(1, exchange->csw[12]);
+    CHECK_EQUAL(1, msc_stats(msc).read_failures);
+    CHECK_EQUAL(4, msc_stats(msc).last_failed_lba);
+}
+
+static void a_read_after_a_write_comes_from_the_drive_again(void)
+{
+    uint8_t block[10];
+    static uint8_t fresh[4 * 512];
+    Msc *msc = started_with_buffer();
+    read_10_block(block, 0x28, 8, 4);
+    send_command(msc, sizeof fresh, true, 0, block, 10);
+    collect(msc);
+    fill_pattern(fresh, sizeof fresh, 9);
+    read_10_block(block, 0x2A, 8, 4);
+    send_command(msc, sizeof fresh, false, 0, block, 10);
+    send_data(msc, fresh, sizeof fresh);
+    collect(msc);
+    read_10_block(block, 0x28, 8, 4);
+    send_command(msc, sizeof fresh, true, 0, block, 10);
+    Exchange *exchange = collect(msc);
+    CHECK(memcmp(exchange->data, fresh, sizeof fresh) == 0);
+    CHECK_EQUAL(8, disk_reads);
+}
+
 static void a_missing_buffer_falls_back_to_single_sectors(void)
 {
     uint8_t block[10];
@@ -858,6 +927,10 @@ int main(void)
         TEST_CASE(a_reply_fits_in_one_chunk),
         TEST_CASE(prefetching_reads_the_next_sector_once),
         TEST_CASE(prefetching_outside_a_read_does_nothing),
+        TEST_CASE(buffered_reads_fetch_the_drive_in_buffer_sized_runs),
+        TEST_CASE(a_short_host_buffer_reads_only_the_sectors_it_takes),
+        TEST_CASE(a_failed_buffered_read_fails_the_command),
+        TEST_CASE(a_read_after_a_write_comes_from_the_drive_again),
         TEST_CASE(the_session_finishes_only_when_every_present_lun_is_ejected),
         TEST_CASE(an_absent_lun_does_not_need_ejecting),
         TEST_CASE(writes_are_counted_per_lun),

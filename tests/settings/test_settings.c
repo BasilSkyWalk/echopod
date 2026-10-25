@@ -7,6 +7,7 @@ enum {
     BRIGHTNESS_FIELD = 6,
     AUTO_OFF_FIELD = 14,
     USB_MODE_FIELD = 15,
+    DAC_VOLUME_FIELD = 16,
     CHECKSUM_FIELD = 20,
     NEVER_OPTION = 6
 };
@@ -24,6 +25,7 @@ static Settings custom_settings(void)
     settings.volume = 42;
     settings.auto_off = 3;
     settings.usb_mode = USB_MODE_DAC;
+    settings.dac_volume = 37;
     return settings;
 }
 
@@ -48,6 +50,7 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(12, settings.volume);
     CHECK_EQUAL(5u * 60000u, settings_auto_off_ms(&settings));
     CHECK_EQUAL(USB_MODE_STORAGE, settings.usb_mode);
+    CHECK_EQUAL(30, settings.dac_volume);
 }
 
 static void auto_off_options_are_stocks(void)
@@ -87,13 +90,38 @@ static void a_version_two_file_keeps_its_auto_off_and_uses_usb_storage(void)
     CHECK_EQUAL(USB_MODE_STORAGE, decoded.usb_mode);
 }
 
-static void the_usb_mode_is_saved_at_byte_fifteen(void)
+static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(void)
 {
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(3, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(4, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
+    CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
+}
+
+static void a_version_three_file_keeps_its_usb_mode_and_gets_the_default_dac_volume(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 3;
+    bytes[DAC_VOLUME_FIELD] = 0;
+    rewrite_checksum(bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(USB_MODE_DAC, decoded.usb_mode);
+    CHECK_EQUAL(SETTINGS_DEFAULT_DAC_VOLUME, decoded.dac_volume);
+}
+
+static void a_dac_volume_above_the_top_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[DAC_VOLUME_FIELD] = SETTINGS_VOLUME_MAX + 1;
+    rewrite_checksum(bytes);
+    CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
 
 static void an_unknown_usb_mode_is_rejected(void)
@@ -111,7 +139,7 @@ static void a_newer_version_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 4;
+    bytes[VERSION_FIELD] = 5;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -150,6 +178,7 @@ static void settings_survive_a_round_trip(void)
     CHECK_EQUAL(original.volume, decoded.volume);
     CHECK_EQUAL(original.auto_off, decoded.auto_off);
     CHECK_EQUAL(original.usb_mode, decoded.usb_mode);
+    CHECK_EQUAL(original.dac_volume, decoded.dac_volume);
 }
 
 static void a_corrupted_file_is_rejected(void)
@@ -184,7 +213,9 @@ int main(void)
         TEST_CASE(auto_off_options_are_stocks),
         TEST_CASE(a_version_one_file_keeps_its_values_and_gets_the_default_auto_off),
         TEST_CASE(a_version_two_file_keeps_its_auto_off_and_uses_usb_storage),
-        TEST_CASE(the_usb_mode_is_saved_at_byte_fifteen),
+        TEST_CASE(the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen),
+        TEST_CASE(a_version_three_file_keeps_its_usb_mode_and_gets_the_default_dac_volume),
+        TEST_CASE(a_dac_volume_above_the_top_is_rejected),
         TEST_CASE(an_unknown_usb_mode_is_rejected),
         TEST_CASE(a_newer_version_is_rejected),
     };

@@ -102,6 +102,7 @@ void msc_reset(Msc *msc)
     msc->phase = MSC_PHASE_COMMAND;
     msc->source = MSC_SOURCE_NONE;
     msc->batch_bytes = 0;
+    msc->read_count = 0;
 }
 
 MscStats msc_stats(const Msc *msc)
@@ -250,7 +251,7 @@ static bool start_transfer(Msc *msc, const MscLun *lun, const uint8_t *block)
     uint32_t count = (uint32_t)block[7] << 8 | block[8];
     msc->lba = be32(block + 2);
     msc->sector_offset = 0;
-    msc->sector_loaded = false;
+    msc->read_count = 0;
     msc->batch_bytes = 0;
     if (msc->lba > lun->sector_count || count > lun->sector_count - msc->lba) {
         set_sense(msc, SENSE_ILLEGAL_REQUEST, CODE_OUT_OF_RANGE);
@@ -376,21 +377,45 @@ static bool is_command_block(const uint8_t *packet, uint32_t length)
            packet[3] == 'C';
 }
 
+static uint8_t *batch_area(Msc *msc)
+{
+    return (uint8_t *)(msc->write_buffer != NULL ? msc->write_buffer : msc->sector);
+}
+
+static bool sector_buffered(const Msc *msc)
+{
+    return msc->lba - msc->read_first < msc->read_count;
+}
+
+static uint32_t sectors_to_read(const Msc *msc)
+{
+    uint32_t left = (msc->valid_bytes - msc->transferred + MSC_SECTOR_SIZE - 1) / MSC_SECTOR_SIZE;
+    return left < msc->write_sectors ? left : msc->write_sectors;
+}
+
+static void fail_read(Msc *msc)
+{
+    set_sense(msc, SENSE_MEDIUM_ERROR, CODE_UNRECOVERED_READ);
+    msc->source = MSC_SOURCE_NONE;
+    msc->stats.read_failures++;
+    msc->stats.last_failed_lba = msc->lba;
+}
+
 static bool ensure_sector(Msc *msc)
 {
-    if (msc->sector_loaded) {
+    if (sector_buffered(msc)) {
         return true;
     }
     const MscLun *lun = &msc->luns[msc->lun];
-    if (!lun->read(lun->context, msc->lba, 1, msc->sector)) {
-        set_sense(msc, SENSE_MEDIUM_ERROR, CODE_UNRECOVERED_READ);
-        msc->source = MSC_SOURCE_NONE;
-        msc->stats.read_failures++;
-        msc->stats.last_failed_lba = msc->lba;
+    uint32_t count = sectors_to_read(msc);
+    msc->read_count = 0;
+    if (!lun->read(lun->context, msc->lba, count, batch_area(msc))) {
+        fail_read(msc);
         return false;
     }
-    msc->stats.sectors_read++;
-    msc->sector_loaded = true;
+    msc->stats.sectors_read += count;
+    msc->read_first = msc->lba;
+    msc->read_count = count;
     return true;
 }
 
@@ -423,12 +448,12 @@ static uint32_t copy_sector_data(Msc *msc, uint8_t *buffer, uint32_t room)
     }
     uint32_t count =
         smallest(room, MSC_SECTOR_SIZE - msc->sector_offset, msc->valid_bytes - msc->transferred);
-    copy_bytes(buffer, (const uint8_t *)msc->sector + msc->sector_offset, count);
+    const uint8_t *sector = batch_area(msc) + (msc->lba - msc->read_first) * MSC_SECTOR_SIZE;
+    copy_bytes(buffer, sector + msc->sector_offset, count);
     msc->sector_offset += count;
     msc->transferred += count;
     if (msc->sector_offset == MSC_SECTOR_SIZE) {
         msc->sector_offset = 0;
-        msc->sector_loaded = false;
         msc->lba++;
     }
     return count;
@@ -444,11 +469,6 @@ static uint8_t next_plain_byte(Msc *msc)
 static bool sector_data_pending(const Msc *msc)
 {
     return msc->source == MSC_SOURCE_SECTORS && msc->transferred < msc->valid_bytes;
-}
-
-static uint8_t *batch_area(Msc *msc)
-{
-    return (uint8_t *)(msc->write_buffer != NULL ? msc->write_buffer : msc->sector);
 }
 
 static void flush_batch(Msc *msc)

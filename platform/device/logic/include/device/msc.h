@@ -71,7 +71,8 @@ typedef struct Msc {
     uint8_t lun;
     uint32_t lba;
     uint32_t sector_offset;
-    bool sector_loaded;
+    uint32_t read_first;
+    uint32_t read_count;
     uint8_t sense_key[MSC_MAX_LUNS];
     uint8_t sense_code[MSC_MAX_LUNS];
     uint8_t ejected;

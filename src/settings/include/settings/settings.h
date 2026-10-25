@@ -39,6 +39,7 @@ enum {
     SETTINGS_BRIGHTNESS_MIN = 1,
     SETTINGS_BRIGHTNESS_MAX = 10,
     SETTINGS_VOLUME_MAX = 50,
+    SETTINGS_DEFAULT_DAC_VOLUME = 30,
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
     AUTO_OFF_OPTION_COUNT = 4,
@@ -56,6 +57,7 @@ typedef struct Settings {
     uint8_t volume;
     uint8_t auto_off;
     UsbMode usb_mode;
+    uint8_t dac_volume;
 } Settings;
 
 Settings settings_defaults(void);
