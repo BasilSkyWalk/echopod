@@ -10,48 +10,12 @@ enum {
     ROOT_FOLDER = 0
 };
 
-static char lower(char letter)
-{
-    return letter >= 'A' && letter <= 'Z' ? (char)(letter - 'A' + 'a') : letter;
-}
-
-static bool name_matches(const char *name, size_t length, const char *expected)
-{
-    size_t index = 0;
-    for (; index < length && expected[index] != '\0'; index++) {
-        if (lower(name[index]) != expected[index]) {
-            return false;
-        }
-    }
-    return index == length && expected[index] == '\0';
-}
-
-static SpokenKind kind_of_name(const char *name, size_t length)
-{
-    if (name_matches(name, length, "audiobooks") || name_matches(name, length, "audiobook")) {
-        return SPOKEN_AUDIOBOOK;
-    }
-    if (name_matches(name, length, "podcasts") || name_matches(name, length, "podcast")) {
-        return SPOKEN_PODCAST;
-    }
-    return SPOKEN_NONE;
-}
-
 static const char *relative(const char *path)
 {
     while (*path == '/') {
         path++;
     }
     return path;
-}
-
-static size_t component_length(const char *text)
-{
-    size_t length = 0;
-    while (text[length] != '\0' && text[length] != '/') {
-        length++;
-    }
-    return length;
 }
 
 static size_t text_length(const char *text)
@@ -81,16 +45,6 @@ static uint32_t slash_count(const char *text)
         count += text[index] == '/' ? 1u : 0u;
     }
     return count;
-}
-
-SpokenKind spoken_kind_of(const char *path)
-{
-    const char *start = relative(path);
-    size_t length = component_length(start);
-    if (start[length] != '/') {
-        return SPOKEN_NONE;
-    }
-    return kind_of_name(start, length);
 }
 
 uint32_t spoken_track_key(const char *path)
@@ -126,7 +80,7 @@ static SpokenKind folder_kind(const Library *library, uint16_t folder)
         !library_read_string(library, record.name, name, sizeof name)) {
         return SPOKEN_NONE;
     }
-    return kind_of_name(name, text_length(name));
+    return spoken_kind_of_name(name, text_length(name));
 }
 
 bool spoken_shelf_folder(const Library *library, SpokenKind kind, uint16_t *folder)

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 MAGIC = b"EMDB"
-VERSION = 2
+VERSION = 3
 HEADER_SIZE = 128
 SECTION_ALIGNMENT = 4
 NONE = 0xFFFF
@@ -22,6 +22,7 @@ UNKNOWN_GENRE = "Unknown Genre"
 AUDIO_SUFFIXES = {".flac", ".ogg", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf", ".dff"}
 PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
 URL_MARKER = "://"
+SPOKEN_FOLDERS = {b"audiobooks", b"audiobook", b"podcasts", b"podcast"}
 
 HEADER_PREFIX = struct.Struct("<4sHH")
 SECTION_ENTRY = struct.Struct("<IIHH")
@@ -60,6 +61,7 @@ class Album:
     year: int
     first_track: int = 0
     track_count: int = 0
+    spoken: int = 0
 
 
 @dataclass
@@ -104,6 +106,11 @@ class LibraryModel:
     folders: list
     title_order: list
     playlists: list = field(default_factory=list)
+    music_tracks: int = 0
+    music_albums: int = 0
+    music_artists: int = 0
+    music_album_artists: int = 0
+    music_genres: int = 0
 
 
 def sort_key(text):
@@ -319,21 +326,27 @@ def resolve_playlists(raw_playlists, tracks):
     return sorted(playlists, key=lambda playlist: (sort_key(playlist.name), playlist.name))
 
 
+def spoken_of(track):
+    parts = track.path.lstrip("/").split("/")
+    return int(len(parts) > 1 and parts[0].encode("utf-8").lower() in SPOKEN_FOLDERS)
+
+
 class NameIndex:
-    def __init__(self, names):
+    def __init__(self, entries):
         displays = {}
-        for name in names:
-            displays.setdefault(sort_key(name), name)
+        for spoken, name in entries:
+            displays.setdefault((spoken, sort_key(name)), name)
         ordered = sorted(displays.items(), key=lambda item: (item[0], item[1]))
         self.names = [display for _, display in ordered]
         self.positions = {key: position for position, (key, _) in enumerate(ordered)}
+        self.music = sum(1 for (spoken, _), _ in ordered if not spoken)
 
-    def index_of(self, name):
-        return self.positions[sort_key(name)]
+    def index_of(self, spoken, name):
+        return self.positions[(spoken, sort_key(name))]
 
 
 def album_key(track):
-    return sort_key(track.album_artist), sort_key(track.album)
+    return spoken_of(track), sort_key(track.album_artist), sort_key(track.album)
 
 
 def track_order_key(track):
@@ -348,10 +361,13 @@ def build_albums(tracks, album_artists, genres):
     for members in grouped.values():
         years = [track.year for track in members if track.year]
         genre = Counter(track.genre for track in members).most_common(1)[0][0]
-        albums.append((Album(members[0].album, album_artists.index_of(members[0].album_artist),
-                             genres.index_of(genre), min(years) if years else 0),
+        spoken = spoken_of(members[0])
+        albums.append((Album(members[0].album,
+                             album_artists.index_of(spoken, members[0].album_artist),
+                             genres.index_of(spoken, genre), min(years) if years else 0,
+                             spoken=spoken),
                        sorted(members, key=track_order_key)))
-    albums.sort(key=lambda pair: (sort_key(pair[0].title),
+    albums.sort(key=lambda pair: (pair[0].spoken, sort_key(pair[0].title),
                                   sort_key(album_artists.names[pair[0].album_artist])))
     return albums
 
@@ -363,7 +379,8 @@ def chronological(albums, indices):
 def build_groups(index, albums, album_tracks, membership, order):
     groups = [Group(name) for name in index.names]
     for album_position, tracks in enumerate(album_tracks):
-        for group_position in sorted({index.index_of(membership(track)) for track in tracks}):
+        for group_position in sorted({index.index_of(spoken_of(track), membership(track))
+                                      for track in tracks}):
             groups[group_position].albums.append(album_position)
     for group in groups:
         group.albums = order(albums, group.albums)
@@ -417,13 +434,18 @@ def order_tracks(album_pairs):
 
 def title_order(tracks):
     return sorted(range(len(tracks)), key=lambda index: (
-        sort_key(tracks[index].title), sort_key(tracks[index].artist), index))
+        spoken_of(tracks[index]), sort_key(tracks[index].title), sort_key(tracks[index].artist),
+        index))
+
+
+def name_index(track_infos, name_of):
+    return NameIndex((spoken_of(track), name_of(track)) for track in track_infos)
 
 
 def build_library(track_infos, raw_playlists=()):
-    album_artists = NameIndex(track.album_artist for track in track_infos)
-    artists = NameIndex(track.artist for track in track_infos)
-    genres = NameIndex(track.genre for track in track_infos)
+    album_artists = name_index(track_infos, lambda track: track.album_artist)
+    artists = name_index(track_infos, lambda track: track.artist)
+    genres = name_index(track_infos, lambda track: track.genre)
     album_pairs = build_albums(track_infos, album_artists, genres)
     albums = [album for album, _ in album_pairs]
     album_tracks = [members for _, members in album_pairs]
@@ -432,8 +454,8 @@ def build_library(track_infos, raw_playlists=()):
     return LibraryModel(
         tracks=tracks,
         track_albums=track_albums,
-        track_artists=[artists.index_of(track.artist) for track in tracks],
-        track_genres=[genres.index_of(track.genre) for track in tracks],
+        track_artists=[artists.index_of(spoken_of(track), track.artist) for track in tracks],
+        track_genres=[genres.index_of(spoken_of(track), track.genre) for track in tracks],
         track_folders=folder_of_tracks(folders, len(tracks)),
         albums=albums,
         artists=build_groups(artists, albums, album_tracks, lambda t: t.artist, chronological),
@@ -443,6 +465,11 @@ def build_library(track_infos, raw_playlists=()):
         folders=folders,
         title_order=title_order(tracks),
         playlists=resolve_playlists(raw_playlists, tracks),
+        music_tracks=sum(1 for track in tracks if not spoken_of(track)),
+        music_albums=sum(1 for album in albums if not album.spoken),
+        music_artists=artists.music,
+        music_album_artists=album_artists.music,
+        music_genres=genres.music,
     )
 
 
@@ -516,19 +543,25 @@ def encode_sections(model):
     strings = StringTable()
     links = []
     sections = [
-        (encode_tracks(model, strings), len(model.tracks), TRACK_RECORD.size),
-        (encode_albums(model, strings), len(model.albums), ALBUM_RECORD.size),
-        (encode_groups(model.artists, strings, links), len(model.artists), GROUP_RECORD.size),
+        (encode_tracks(model, strings), len(model.tracks), TRACK_RECORD.size,
+         model.music_tracks),
+        (encode_albums(model, strings), len(model.albums), ALBUM_RECORD.size,
+         model.music_albums),
+        (encode_groups(model.artists, strings, links), len(model.artists), GROUP_RECORD.size,
+         model.music_artists),
         (encode_groups(model.album_artists, strings, links), len(model.album_artists),
-         GROUP_RECORD.size),
-        (encode_groups(model.genres, strings, links), len(model.genres), GROUP_RECORD.size),
-        (encode_folders(model.folders, strings, links), len(model.folders), FOLDER_RECORD.size),
-        (encode_indices(model.title_order), len(model.title_order), INDEX_RECORD.size),
+         GROUP_RECORD.size, model.music_album_artists),
+        (encode_groups(model.genres, strings, links), len(model.genres), GROUP_RECORD.size,
+         model.music_genres),
+        (encode_folders(model.folders, strings, links), len(model.folders), FOLDER_RECORD.size,
+         0),
+        (encode_indices(model.title_order), len(model.title_order), INDEX_RECORD.size,
+         model.music_tracks),
         (encode_playlists(model.playlists, strings, links), len(model.playlists),
-         GROUP_RECORD.size),
+         GROUP_RECORD.size, 0),
     ]
-    sections.append((encode_indices(links), len(links), INDEX_RECORD.size))
-    sections.append((bytes(strings.blob), len(strings.blob), 1))
+    sections.append((encode_indices(links), len(links), INDEX_RECORD.size, 0))
+    sections.append((bytes(strings.blob), len(strings.blob), 1, 0))
     return sections
 
 
@@ -538,9 +571,9 @@ def encode_library(model):
     sections = encode_sections(model)
     header = bytearray(HEADER_PREFIX.pack(MAGIC, VERSION, len(sections)))
     body = bytearray()
-    for data, count, record_size in sections:
+    for data, count, record_size, music in sections:
         body += bytes(-len(body) % SECTION_ALIGNMENT)
-        header += SECTION_ENTRY.pack(HEADER_SIZE + len(body), count, record_size, 0)
+        header += SECTION_ENTRY.pack(HEADER_SIZE + len(body), count, record_size, music)
         body += data
     return bytes(header) + bytes(HEADER_SIZE - len(header)) + bytes(body)
 

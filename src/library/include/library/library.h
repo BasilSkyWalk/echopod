@@ -21,7 +21,7 @@ typedef enum LibrarySection {
 
 enum {
     LIBRARY_SECTION_COUNT = LIBRARY_STRINGS + 1,
-    LIBRARY_VERSION = 2,
+    LIBRARY_VERSION = 3,
     LIBRARY_HEADER_SIZE = 128,
     LIBRARY_NONE = 0xFFFF
 };
@@ -38,6 +38,7 @@ typedef struct LibrarySectionInfo {
     uint32_t offset;
     uint32_t count;
     uint16_t record_size;
+    uint16_t music;
 } LibrarySectionInfo;
 
 typedef struct Library {
@@ -83,6 +84,7 @@ typedef struct LibraryFolder {
 
 LibraryStatus library_open(Library *library, ByteSource source, uint32_t size);
 uint32_t library_count(const Library *library, LibrarySection section);
+uint32_t library_music_count(const Library *library, LibrarySection section);
 bool library_read_track(const Library *library, uint32_t index, LibraryTrack *track);
 bool library_read_album(const Library *library, uint32_t index, LibraryAlbum *album);
 bool library_read_group(const Library *library, LibrarySection section, uint32_t index,

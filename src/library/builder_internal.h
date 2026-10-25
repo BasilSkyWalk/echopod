@@ -82,6 +82,7 @@ typedef struct TrackRow {
     uint16_t year;
     uint8_t disc;
     uint8_t number;
+    uint8_t spoken;
     uint32_t duration_ms;
 } TrackRow;
 
@@ -137,6 +138,9 @@ typedef struct Prepared {
     uint32_t folder_rank_count;
     Region columns[BUILDER_FIELDS];
     uint32_t rank_count[BUILDER_FIELDS];
+    uint32_t music_ranks[BUILDER_FIELDS];
+    uint32_t music_albums;
+    uint32_t music_tracks;
     Region genre_spelling;
     Region folder_order;
     Region final_tracks;

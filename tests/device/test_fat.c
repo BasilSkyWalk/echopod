@@ -377,6 +377,29 @@ static void exfat_writes_land_in_place_across_sectors_and_clusters(void)
     check_write_in_place("exfat_mbr");
 }
 
+static void a_whole_sector_write_takes_one_block_write_and_no_reads(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    static uint8_t written[4096];
+    static uint8_t bytes[20000];
+    fill_written(written, sizeof written);
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    card->sparse.calls = 0;
+    card->sparse.writes = 0;
+    card->sparse.write_calls = 0;
+    CHECK(fat_write(&card->volume, &file, 0, written, sizeof written));
+    CHECK_EQUAL(0u, card->sparse.calls);
+    CHECK_EQUAL(1u, card->sparse.write_calls);
+    CHECK_EQUAL(8u, card->sparse.writes);
+    CHECK(fat_mount(&card->volume, sparse_card_device(&card->sparse)));
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    CHECK(fat_read(&card->volume, &file, 0, bytes, 20000));
+    check_written(bytes, sizeof written);
+    check_pattern(bytes + 4096, 5, 4096, 20000 - 4096);
+    sparse_card_free(&card->sparse);
+}
+
 static void a_write_past_the_end_fails_and_changes_nothing(void)
 {
     Card *card = mounted("exfat_mbr");
@@ -557,6 +580,7 @@ int main(void)
         TEST_CASE(fat32_writes_land_in_place_across_sectors_and_clusters),
         TEST_CASE(fat16_writes_land_in_place_across_sectors_and_clusters),
         TEST_CASE(exfat_writes_land_in_place_across_sectors_and_clusters),
+        TEST_CASE(a_whole_sector_write_takes_one_block_write_and_no_reads),
         TEST_CASE(a_write_past_the_end_fails_and_changes_nothing),
         TEST_CASE(a_device_without_writes_refuses_to_write),
         TEST_CASE(the_fat32_root_lists_its_files_and_folders),

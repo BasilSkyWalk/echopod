@@ -1,12 +1,13 @@
 #include <stddef.h>
 
+#include "library/library.h"
 #include "library/sort_key.h"
 #include "reference_internal.h"
 
 enum {
     HEADER_SIZE = 128,
     SECTION_COUNT = 10,
-    VERSION = 2,
+    VERSION = 3,
     ALIGNMENT = 4,
     TRACK_RECORD = 24,
     ALBUM_RECORD = 16,
@@ -280,7 +281,8 @@ static void write_header(Writer *writer, const Layout *layout)
         put_u32(writer, layout->offset[section]);
         put_u32(writer, layout->count[section]);
         put_u16(writer, layout->record_size[section]);
-        put_u16(writer, 0);
+        bool counted = section <= LIBRARY_GENRES || section == LIBRARY_TITLE_ORDER;
+        put_u16(writer, counted ? (uint16_t)layout->count[section] : 0);
     }
     pad_to(writer, HEADER_SIZE);
 }

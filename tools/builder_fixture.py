@@ -17,7 +17,7 @@ GENRES = ["Rock", "rock", "Pop", "Électro", "Electro", "Unknown Genre", "Metal"
 TITLES = ["Intro", "intro", "Outro", "The Song", "Song", "Help!", "Jóga", "Joga", "Hunter",
           "Army of Me", "Ünïcödé", "Track", "Ballad", "Ballad", "Zzz", "Aaa", "1999", "½ Life"]
 FOLDERS = ["Music", "Other", "Incoming", "Ac DC", "ac dc", "Ärzte", "Arzte", "Disc 1", "Disc 2",
-           "CD1", "cd1", "Z", "a"]
+           "CD1", "cd1", "Z", "a", "Audiobooks", "audiobook", "Podcasts", "PODCAST"]
 
 
 def random_path(rng, index):

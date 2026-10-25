@@ -286,7 +286,8 @@ void builder_row_encode(const TrackRow *row, uint8_t *bytes)
     builder_put16(bytes + 38, row->year);
     bytes[40] = row->disc;
     bytes[41] = row->number;
-    builder_put16(bytes + 42, 0);
+    bytes[42] = row->spoken;
+    bytes[43] = 0;
     builder_put32(bytes + 44, row->duration_ms);
 }
 
@@ -300,6 +301,7 @@ void builder_row_decode(const uint8_t *bytes, TrackRow *row)
     row->year = builder_get16(bytes + 38);
     row->disc = bytes[40];
     row->number = bytes[41];
+    row->spoken = bytes[42];
     row->duration_ms = builder_get32(bytes + 44);
 }
 

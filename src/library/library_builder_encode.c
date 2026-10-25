@@ -6,7 +6,7 @@
 enum {
     HEADER_SIZE = 128,
     SECTION_COUNT = 10,
-    VERSION = 2,
+    VERSION = 3,
     ALIGNMENT = 4,
     TRACK_RECORD = 24,
     ALBUM_RECORD = 16,
@@ -47,6 +47,7 @@ typedef struct Layout {
     uint32_t offset[SECTION_COUNT];
     uint32_t count[SECTION_COUNT];
     uint16_t record_size[SECTION_COUNT];
+    uint16_t music[SECTION_COUNT];
     uint32_t end;
 } Layout;
 
@@ -291,12 +292,23 @@ static void plan(Encode *encode, Layout *layout, uint32_t strings)
     const uint16_t sizes[SECTION_COUNT] = {
         TRACK_RECORD,  ALBUM_RECORD, GROUP_RECORD, GROUP_RECORD, GROUP_RECORD,
         FOLDER_RECORD, INDEX_RECORD, GROUP_RECORD, INDEX_RECORD, 1};
+    const uint32_t music[SECTION_COUNT] = {prepared->music_tracks,
+                                           prepared->music_albums,
+                                           prepared->music_ranks[BUILDER_ARTIST],
+                                           prepared->music_ranks[BUILDER_ALBUM_ARTIST],
+                                           prepared->music_ranks[BUILDER_GENRE],
+                                           0,
+                                           prepared->music_tracks,
+                                           0,
+                                           0,
+                                           0};
     uint32_t offset = HEADER_SIZE;
     for (int section = 0; section < SECTION_COUNT; section++) {
         offset = (offset + ALIGNMENT - 1) & ~(uint32_t)(ALIGNMENT - 1);
         layout->offset[section] = offset;
         layout->count[section] = counts[section];
         layout->record_size[section] = sizes[section];
+        layout->music[section] = (uint16_t)music[section];
         offset += counts[section] * sizes[section];
     }
     layout->end = offset;
@@ -311,7 +323,7 @@ static void write_header(Writer *writer, const Layout *layout)
         put_u32(writer, layout->offset[section]);
         put_u32(writer, layout->count[section]);
         put_u16(writer, layout->record_size[section]);
-        put_u16(writer, 0);
+        put_u16(writer, layout->music[section]);
     }
     pad_to(writer, HEADER_SIZE);
 }

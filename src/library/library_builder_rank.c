@@ -86,7 +86,8 @@ static bool emit_run(Prepared *prepared, Tail *tail, uint32_t run, const TrackRo
         return false;
     }
     text[length] = '\0';
-    uint32_t key_length = (uint32_t)sort_key_make(text, key, SORT_KEY_CAPACITY);
+    key[0] = (char)row->spoken;
+    uint32_t key_length = 1u + (uint32_t)sort_key_make(text, key + 1, SORT_KEY_CAPACITY - 1);
     uint8_t header[RECORD_HEADER];
     builder_put16(header, RECORD_HEADER + key_length + length);
     builder_put16(header + 2, run);
@@ -102,6 +103,7 @@ typedef struct RunReader {
     uint32_t text;
     uint32_t length;
     uint32_t run;
+    uint8_t spoken;
     bool started;
 } RunReader;
 
@@ -113,12 +115,13 @@ static bool next_row(RunReader *reader, int field, TrackRow *row, bool *new_run)
     }
     builder_row_decode(bytes, row);
     *new_run = !reader->started || row->text[field] != reader->text ||
-               row->length[field] != reader->length;
+               row->length[field] != reader->length || row->spoken != reader->spoken;
     if (*new_run) {
         reader->run += reader->started ? 1u : 0u;
         reader->started = true;
         reader->text = row->text[field];
         reader->length = row->length[field];
+        reader->spoken = row->spoken;
     }
     return true;
 }
@@ -161,6 +164,7 @@ typedef struct RankTarget {
     uint16_t *spelling_of_run;
     Region display;
     uint32_t ranks;
+    uint32_t music_ranks;
 } RankTarget;
 
 static bool put_display(Out *out, Region display, uint32_t text, uint32_t length)
@@ -204,6 +208,7 @@ static bool assign_ranks(BuilderState *state, Region sorted, RankTarget *target)
                 return false;
             }
             ranks++;
+            target->music_ranks += record[RECORD_HEADER] == 0 ? 1u : 0u;
             best_run = run;
             best_text = builder_get32(record + 4);
             best_length = builder_get16(record + 8);
@@ -276,7 +281,7 @@ static bool rank_field(BuilderState *state, Prepared *prepared, int field)
     uint32_t count = state->track_count;
     GroupTable *group = group_of_field(prepared, field);
     prepared->columns[field] = store_take(&state->store, count * 2 + 2);
-    RankTarget target = {.display = {.offset = 0, .size = 0}};
+    RankTarget target = {.display = {.offset = 0, .size = 0}, .music_ranks = 0};
     if (group != NULL) {
         target.display = store_take(&state->store, count * DISPLAY_SIZE + DISPLAY_SIZE);
         group->display = target.display;
@@ -314,6 +319,7 @@ static bool rank_field(BuilderState *state, Prepared *prepared, int field)
         return false;
     }
     prepared->rank_count[field] = target.ranks;
+    prepared->music_ranks[field] = target.music_ranks;
     if (group != NULL) {
         group->count = target.ranks;
     }

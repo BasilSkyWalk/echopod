@@ -77,7 +77,7 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 
 ## Audiobooks and podcasts
 
-- `playback/spoken` decides what is spoken word from the path alone: a track whose first folder is `Audiobooks`/`Audiobook` or `Podcasts`/`Podcast` (ASCII case-insensitive). The library format doesn't change, and both the player's and the PC's indexer work as before. `spoken_shelf_folder` finds those folders among the root folder's children.
+- `playback/spoken` decides what is spoken word from the path alone: a track whose first folder is `Audiobooks`/`Audiobook` or `Podcasts`/`Podcast` (ASCII case-insensitive). Both indexers sort spoken word after the music and record music counts in the library header (format version 3, see `docs/library-format.md`), so the Music lists leave it out while the shelves browse its folders. The rule itself lives in `library/spoken_path`. `spoken_shelf_folder` finds those folders among the root folder's children.
 - Bookmarks are keyed by FNV-1a hashes of paths, so they outlive a rescan, like favorites: a book's key is its folder's path (`Audiobooks/<Book>`), and a book that is a single file, or a podcast episode, is keyed by its own path. Each bookmark also keeps the track's path hash, its chapter (its place among its folder's tracks), the position and a finished flag. `playback/bookmarks` keeps the 128 most recent, newest first, in `/.echo/bookmarks.bin` (4 KB, reserved by `card_files`; see `docs/library-format.md`).
 - The player marks a track spoken when it starts it (`player->spoken`), after a gapless hand-over and after a restore. For a spoken track:
   - a start from 0 asks `PlayerResume.position_for`, which `app/spoken_store` answers from the bookmark when its track hash matches and it isn't finished;

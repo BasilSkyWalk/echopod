@@ -1,4 +1,4 @@
-# Library database format (version 2)
+# Library database format (version 3)
 
 The PC indexer (`tools/library_index.py`) writes the library database. The device reads it (`src/library`). Everything is sorted on the PC, so the device never sorts. It reads fixed-size records by index and strings by offset, a few hundred bytes at a time.
 
@@ -12,11 +12,11 @@ The PC indexer (`tools/library_index.py`) writes the library database. The devic
 | Offset | Type | Field |
 |---|---|---|
 | 0 | `char[4]` | magic `EMDB` |
-| 4 | `u16` | version = 2 |
+| 4 | `u16` | version = 3 (the player rebuilds a library of any other version) |
 | 6 | `u16` | section count = 10 |
 | 8 | 10 × 12 B | section directory, in the order below |
 
-Each section directory entry is `u32 offset`, `u32 count`, `u16 record size`, `u16 reserved`.
+Each section directory entry is `u32 offset`, `u32 count`, `u16 record size`, `u16 music count`. The music count is set for tracks, albums, artists, album artists, genres and title order (0 elsewhere); see Spoken word below.
 
 | # | Section | Record size | Content |
 |---|---|---|---|
@@ -47,6 +47,12 @@ Field notes:
 - A group's albums are `links[first_link .. first_link + link_count)`. Artists list every album containing at least one of their tracks. Artist and album-artist albums are ordered by year, then title; genre albums are ordered by title. Within each section the groups' links are consecutive and in group order (group `n + 1` starts where group `n` ends). Cover Flow relies on this for album artists to read its order straight from `links`; a file that breaks it gets Cover Flow in album order instead.
 - A playlist's links are track indices in playlist order. Its name is the file name without `.m3u` or `.m3u8`.
 - A folder's items are `links[first_link ..]`: first `subfolder_count` folder indices (sorted by name), then `track_count` track indices (sorted by disc, number, file name).
+
+## Spoken word
+
+A track is spoken word when its first folder is `Audiobooks`, `Audiobook`, `Podcasts` or `Podcast` (ASCII case-insensitive; `library/spoken_path`, `spoken_of` in the indexer). Spoken word is kept out of the Music lists and lives on the Audiobooks and Podcasts shelves, which browse its folders.
+
+Every sort and grouping key of a spoken track starts with a spoken flag that sorts after music, so spoken word never shares an album, artist, album artist or genre with music: an author with music too appears twice, once among the music groups and once among the spoken ones. Each of those sections and the title order therefore hold their music entries first, then the spoken ones, and the header's music count says where the music ends. Tracks follow album order, so spoken tracks come last too. The Music lists (Cover Flow, Albums, Artists, Album Artists, Genres, Songs, shuffle) only read the first `music count` entries; folders and playlists show everything. Covers are built for every album, spoken ones included.
 
 ## Sorting
 

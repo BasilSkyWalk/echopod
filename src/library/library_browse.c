@@ -83,15 +83,15 @@ uint32_t browse_count(const Library *library, BrowseQuery query)
 {
     switch (query.kind) {
     case BROWSE_ARTISTS:
-        return library_count(library, LIBRARY_ARTISTS);
+        return library_music_count(library, LIBRARY_ARTISTS);
     case BROWSE_ALBUM_ARTISTS:
-        return library_count(library, LIBRARY_ALBUM_ARTISTS);
+        return library_music_count(library, LIBRARY_ALBUM_ARTISTS);
     case BROWSE_GENRES:
-        return library_count(library, LIBRARY_GENRES);
+        return library_music_count(library, LIBRARY_GENRES);
     case BROWSE_ALBUMS:
-        return library_count(library, LIBRARY_ALBUMS);
+        return library_music_count(library, LIBRARY_ALBUMS);
     case BROWSE_ALL_SONGS:
-        return library_count(library, LIBRARY_TITLE_ORDER);
+        return library_music_count(library, LIBRARY_TITLE_ORDER);
     case BROWSE_GROUP_ALBUMS:
     case BROWSE_PLAYLIST_TRACKS:
         return group_link_count(library, query);
@@ -108,7 +108,7 @@ uint32_t browse_count(const Library *library, BrowseQuery query)
 static bool table_item(const Library *library, LibrarySection section, uint32_t position,
                        BrowseItem *item)
 {
-    if (position >= library_count(library, section)) {
+    if (position >= library_music_count(library, section)) {
         return false;
     }
     BrowseItemKind kind = section == LIBRARY_ALBUMS ? BROWSE_ITEM_ALBUM : BROWSE_ITEM_GROUP;

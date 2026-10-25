@@ -4,6 +4,7 @@
 #include "check.h"
 #include "default_theme.h"
 #include "fake_hal.h"
+#include "library/library_browse.h"
 #include "player.h"
 #include "spoken_library.h"
 #include "spoken_store.h"
@@ -189,6 +190,24 @@ static ScreenAction press(BrowseScreen *browse, KeyGesture gesture)
     return browse->screen.handle_key(browse, event, 0);
 }
 
+static uint32_t music_count(BrowseKind kind)
+{
+    return browse_count(library, (BrowseQuery){.kind = kind});
+}
+
+static void the_music_lists_leave_out_spoken_word(void)
+{
+    start();
+    CHECK_EQUAL(7, library_count(library, LIBRARY_TRACKS));
+    CHECK_EQUAL(1, library_music_count(library, LIBRARY_TRACKS));
+    CHECK_EQUAL(1, music_count(BROWSE_ALBUMS));
+    CHECK_EQUAL(1, music_count(BROWSE_ALL_SONGS));
+    CHECK_EQUAL(1, music_count(BROWSE_ARTISTS));
+    CHECK_EQUAL(1, music_count(BROWSE_ALBUM_ARTISTS));
+    CHECK_EQUAL(1, music_count(BROWSE_GENRES));
+    CHECK_EQUAL(spoken_library_track(library, SPOKEN_SONG_PATH), 0);
+}
+
 static void the_audiobook_shelf_lists_books(void)
 {
     start();
@@ -278,6 +297,7 @@ int main(void)
         TEST_CASE(the_bookmark_is_saved_to_the_card),
         TEST_CASE(a_finished_episode_is_marked_played),
         TEST_CASE(a_played_episode_starts_from_the_top),
+        TEST_CASE(the_music_lists_leave_out_spoken_word),
         TEST_CASE(the_audiobook_shelf_lists_books),
         TEST_CASE(a_started_book_shows_its_chapter),
         TEST_CASE(selecting_a_book_resumes_it),

@@ -144,6 +144,42 @@ class BuildLibraryTest(unittest.TestCase):
                          [self.library.tracks[index].title for index in homogenic.tracks])
 
 
+def spoken_test_track(path, title, artist, album):
+    return library_index.TrackInfo(path=path, title=title, artist=artist, album_artist=artist,
+                                   album=album, genre="Rock", year=0, disc=1, number=1,
+                                   duration_ms=1000)
+
+
+class SpokenWordTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.library = library_index.build_library([
+            spoken_test_track("Audiobooks/Book/01 Chapter.mp3", "Chapter", "Narrator", "Book"),
+            spoken_test_track("Music/Audiobooks/Song.mp3", "Song", "Narrator", "Book"),
+            spoken_test_track("podcast/Show/Episode.mp3", "Episode", "Host", "Show"),
+        ])
+        cls.data = library_index.encode_library(cls.library)
+
+    def test_only_the_first_folder_makes_a_track_spoken(self):
+        self.assertEqual([0, 1, 1], [library_index.spoken_of(track)
+                                     for track in self.library.tracks])
+        self.assertEqual(0, library_index.spoken_of(spoken_test_track("Podcasts.mp3", "", "",
+                                                                      "")))
+
+    def test_spoken_word_sorts_after_the_music(self):
+        self.assertEqual(["Song", "Chapter", "Episode"],
+                         [track.title for track in self.library.tracks])
+        self.assertEqual(["Book", "Book", "Show"], [album.title for album in self.library.albums])
+        self.assertEqual(["Narrator", "Host", "Narrator"],
+                         [artist.name for artist in self.library.artists])
+        self.assertEqual([0], self.library.artists[0].albums)
+
+    def test_the_header_counts_the_music(self):
+        music = [SECTION_ENTRY.unpack_from(self.data, 8 + number * SECTION_ENTRY.size)[3]
+                 for number in range(10)]
+        self.assertEqual([1, 1, 1, 1, 1, 0, 1, 0, 0, 0], music)
+
+
 class EncodeLibraryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -160,7 +196,7 @@ class EncodeLibraryTest(unittest.TestCase):
 
     def test_the_header_identifies_the_format(self):
         magic, version, sections = struct.unpack_from("<4sHH", self.data, 0)
-        self.assertEqual((b"EMDB", 2, 10), (magic, version, sections))
+        self.assertEqual((b"EMDB", 3, 10), (magic, version, sections))
         self.assertEqual(HEADER_SIZE, self.section(0)[0])
 
     def test_sections_declare_their_counts_and_record_sizes(self):

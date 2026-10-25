@@ -82,6 +82,23 @@ bool fat_commit_sector(FatVolume *volume, uint32_t lba)
     return true;
 }
 
+bool fat_write_run(FatVolume *volume, uint32_t lba, const uint8_t *bytes, uint32_t count)
+{
+    uint8_t *cache = (uint8_t *)volume->cache;
+    uint32_t total = count * FAT_SECTOR_SIZE;
+    for (uint32_t index = 0; index < total; index++) {
+        cache[index] = bytes[index];
+    }
+    volume->cache_lba = lba;
+    volume->cache_index = 0;
+    volume->cache_count = count;
+    if (!volume->device.write(volume->device.context, lba, count, volume->cache)) {
+        volume->cache_count = 0;
+        return false;
+    }
+    return true;
+}
+
 bool fat_update_bytes(FatVolume *volume, uint32_t lba, uint32_t within, const uint8_t *bytes,
                       uint32_t length)
 {
