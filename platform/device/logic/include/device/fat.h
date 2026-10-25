@@ -11,7 +11,8 @@ enum {
     FAT_LONG_NAME_CAPACITY = 260,
     FAT_NAME_CAPACITY = 768,
     FAT_RESERVE_CLEARED_BYTES = 4096,
-    FAT_RESERVE_NAME_LIMIT = 64
+    FAT_RESERVE_NAME_LIMIT = 64,
+    FAT_PARENT_CAPACITY = 256
 };
 
 typedef enum FatReserveResult {
@@ -58,6 +59,11 @@ typedef struct FatVolume {
     uint32_t cache[FAT_CACHE_SECTORS * FAT_SECTOR_SIZE / 4];
     uint32_t fat_sector[FAT_SECTOR_SIZE / 4];
     uint16_t long_name[FAT_LONG_NAME_CAPACITY];
+    FatFile parent;
+    uint32_t parent_length;
+    bool parent_valid;
+    bool parent_named;
+    char parent_path[FAT_PARENT_CAPACITY];
 } FatVolume;
 
 typedef struct FatDirCursor {

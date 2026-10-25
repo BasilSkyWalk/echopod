@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -400,6 +401,44 @@ static void a_whole_sector_write_takes_one_block_write_and_no_reads(void)
     sparse_card_free(&card->sparse);
 }
 
+static uint32_t calls_to_open(Card *card, const char *path)
+{
+    FatFile file;
+    uint8_t bytes[4096];
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    CHECK(fat_read(&card->volume, &file, 4096, bytes, sizeof bytes));
+    card->sparse.calls = 0;
+    CHECK(fat_open(&card->volume, path, &file));
+    return card->sparse.calls;
+}
+
+static void a_second_file_in_the_same_folder_skips_the_walk(void)
+{
+    Card *card = mounted("exfat_mbr");
+    uint32_t same_folder = calls_to_open(card, INTRO_PATH);
+    uint32_t from_the_top = calls_to_open(card, "/readme.txt");
+    uint32_t other_folder = calls_to_open(card, EMOJI_PATH);
+    CHECK_EQUAL(1u, same_folder);
+    CHECK_EQUAL(1u, from_the_top);
+    CHECK(other_folder > same_folder);
+    check_file(card, INTRO_PATH, 4, 9000);
+    sparse_card_free(&card->sparse);
+}
+
+static void files_reserved_in_a_remembered_folder_open(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    char path[32];
+    for (uint32_t index = 0; index < 40; index++) {
+        snprintf(path, sizeof path, "/.made/file %u.bin", index);
+        CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, path, 4096));
+        CHECK(fat_open(&card->volume, "/.made/file 0.bin", &file));
+        CHECK(fat_open(&card->volume, path, &file));
+    }
+    sparse_card_free(&card->sparse);
+}
+
 static void a_write_past_the_end_fails_and_changes_nothing(void)
 {
     Card *card = mounted("exfat_mbr");
@@ -581,6 +620,8 @@ int main(void)
         TEST_CASE(fat16_writes_land_in_place_across_sectors_and_clusters),
         TEST_CASE(exfat_writes_land_in_place_across_sectors_and_clusters),
         TEST_CASE(a_whole_sector_write_takes_one_block_write_and_no_reads),
+        TEST_CASE(a_second_file_in_the_same_folder_skips_the_walk),
+        TEST_CASE(files_reserved_in_a_remembered_folder_open),
         TEST_CASE(a_write_past_the_end_fails_and_changes_nothing),
         TEST_CASE(a_device_without_writes_refuses_to_write),
         TEST_CASE(the_fat32_root_lists_its_files_and_folders),

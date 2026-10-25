@@ -30,7 +30,7 @@ Tested starting points: FiiO firmware 3.7.0 and 3.9.0 (Settings → About on the
 3. Eject the drive (Windows: Safely Remove; macOS: Eject), then unplug.
 4. Take the microSD card out.
 5. Switch the player off and on again. It shows "Updating, Don't power off" for about a minute or two. Leave it alone until EchoPod starts.
-6. Put the microSD card back. On the first start with a card, EchoPod builds its library and album covers, which takes about 2 minutes per 1,400 tracks.
+6. Put the microSD card back. On the first start with a card, EchoPod builds its library and album covers, which takes a minute or two (about 1 minute 45 seconds for 1,563 tracks and 144 albums).
 
 If "Updating" flashes for under a second and FiiO's firmware comes back, the install didn't happen. See "If something goes wrong" below.
 
@@ -64,7 +64,7 @@ The player accepts 16 or 24-bit at 44.1, 48, 88.2 and 96 kHz; the computer picks
 
 ## Build the library on a computer
 
-Rebuilding on the player takes about 2 minutes per 1,400 tracks. A computer can build the same library and album covers instead, straight onto the card, and tell the player that the card has already been scanned.
+Rebuilding on the player takes a minute or two (1,563 tracks and 144 albums take about 1 minute 45 seconds). A computer can build the same library and album covers instead, straight onto the card, and tell the player that the card has already been scanned.
 
 The tool is called **echo-sync**. Download it from the release page, under Assets; it's one file, with nothing to install:
 
@@ -110,7 +110,7 @@ It reads the whole card, as the player does, and writes `library.db`, `covers.bi
 
 To see whether it works on your card, let the player scan it once, then run echo-sync with `--check` without changing anything (for example `echo-sync-windows-x64.exe E: --check`). "They match" means the player won't rescan after the next sync.
 
-**After a firmware update** the player checks the music once when it first starts ("Checking for changes"), and rescans only if the music changed. `scan.bin` remembers the firmware version; the computer keeps it. A `scan.bin` the computer had to create has no version yet, so the player checks once on its next start too.
+**After a firmware update** the player checks the music once when it first starts ("Checking for changes"), and rescans only if the music changed, or if it can't read the library on the card (as after updating to 0.2.0, which changed the library format). `scan.bin` remembers the firmware version; the computer keeps it. A `scan.bin` the computer had to create has no version yet, so the player checks once on its next start too.
 
 | Option | Effect |
 |---|---|

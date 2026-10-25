@@ -12,7 +12,6 @@
 #include "hal/input.h"
 #include "settings/settings.h"
 #include "usb.h"
-#include "usb_report.h"
 
 enum {
     HOST_TIMEOUT_MS = 3000,
@@ -22,8 +21,6 @@ enum {
     NOTICE_CAPACITY = 64,
     HZ_PER_KHZ = 1000,
     BITS_PER_BYTE = 8,
-    COUNTER_REFRESH_MS = 1000,
-    PAGE_COUNT = 4,
     VOLUME_REPEAT_DELAY_MS = 400,
     VOLUME_REPEAT_MS = 80
 };
@@ -38,8 +35,6 @@ static uint32_t last_packet_ms;
 static uint32_t back_pressed_ms;
 static bool receiving;
 static bool playing;
-static uint32_t counters_shown_ms;
-static uint32_t page;
 static uint8_t dac_volume;
 static bool dac_volume_known;
 static bool holding_volume;
@@ -113,88 +108,6 @@ static void show_state(void)
     app_show_notice(TITLE, text);
 }
 
-static void append_count(StringBuilder *line, char label, uint32_t value)
-{
-    string_builder_append_char(line, ' ');
-    string_builder_append_char(line, label);
-    string_builder_append_unsigned(line, value);
-}
-
-static void append_word(StringBuilder *line, char label, uint32_t value)
-{
-    string_builder_append_char(line, ' ');
-    string_builder_append_char(line, label);
-    usb_report_append_hex(line, value, 8);
-}
-
-static void counter_page(StringBuilder *top, StringBuilder *line)
-{
-    UsbIsoStats iso = usb_iso_stats();
-    string_builder_append(top, "1 USB");
-    append_count(top, 'a', iso.armed);
-    append_count(top, 'r', iso.received);
-    append_count(top, 'i', iso.incomplete);
-    string_builder_append_unsigned(line, audio.rate / HZ_PER_KHZ);
-    string_builder_append(line, playing ? "k on" : "k off");
-    append_count(line, 'w', sink.written);
-    append_count(line, 'c', board_audio_stream_consumed());
-    append_count(line, 'x', sink.stats.realigned);
-}
-
-static void endpoint_page(StringBuilder *top, StringBuilder *line)
-{
-    UsbIsoRegisters registers = usb_iso_registers();
-    string_builder_append(top, "2 EP");
-    append_word(top, 'C', registers.control);
-    append_word(top, 'T', registers.size);
-    append_word(line, 'E', registers.events);
-    append_word(line, 'S', registers.status);
-}
-
-static void fifo_page(StringBuilder *top, StringBuilder *line)
-{
-    UsbIsoRegisters registers = usb_iso_registers();
-    string_builder_append(top, "3 FIFO");
-    append_word(top, 'R', registers.rx_fifo);
-    append_word(top, 'N', registers.tx0_fifo);
-    append_word(line, 'M', registers.interrupts);
-    append_word(line, 'H', registers.hardware);
-}
-
-static void show_counters(void)
-{
-    char title[NOTICE_CAPACITY];
-    char text[NOTICE_CAPACITY];
-    StringBuilder top = string_builder_make(title, sizeof title);
-    StringBuilder line = string_builder_make(text, sizeof text);
-    if (page == 2) {
-        endpoint_page(&top, &line);
-    } else if (page == 3) {
-        fifo_page(&top, &line);
-    } else {
-        counter_page(&top, &line);
-    }
-    app_show_notice(title, text);
-}
-
-static void show_page(void)
-{
-    if (page == 0) {
-        show_state();
-    } else {
-        show_counters();
-    }
-}
-
-static void refresh_counters(void)
-{
-    uint32_t now_ms = hal_clock_milliseconds();
-    if (page != 0 && now_ms - counters_shown_ms >= COUNTER_REFRESH_MS) {
-        counters_shown_ms = now_ms;
-        show_counters();
-    }
-}
-
 static void stop_output(void)
 {
     if (playing) {
@@ -212,7 +125,7 @@ static void follow_format(void)
         open_rate = board_audio_stream_open(audio.rate, serve_usb) ? audio.rate : 0;
     }
     receiving = open_rate != 0 && usb_audio_sample_bytes(&audio) != 0;
-    show_page();
+    show_state();
 }
 
 static void follow_host(void)
@@ -244,9 +157,7 @@ static void step_volume(int step)
     }
     dac_volume = (uint8_t)level;
     hal_audio_set_volume(dac_volume);
-    if (page == 0) {
-        show_state();
-    }
+    show_state();
 }
 
 static void start_holding(int step, uint32_t now_ms)
@@ -292,11 +203,6 @@ static bool user_left(void)
         if (key.key == KEY_BACK && back_released_after_hold(key)) {
             return true;
         }
-        if (key.pressed && key.key == KEY_PLAY) {
-            page = (page + 1) % PAGE_COUNT;
-            counters_shown_ms = hal_clock_milliseconds();
-            show_page();
-        }
         if (key.key == KEY_VOLUME_UP || key.key == KEY_VOLUME_DOWN) {
             follow_volume_key(key);
         }
@@ -313,7 +219,6 @@ static void serve(void)
         follow_host();
         keep_output();
         repeat_volume();
-        refresh_counters();
     }
 }
 
@@ -325,7 +230,6 @@ static void start_session(void)
     open_rate = 0;
     receiving = false;
     playing = false;
-    page = 0;
     holding_volume = false;
     dac_volume = dac_volume_known ? dac_volume : (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME;
     hal_audio_set_volume(dac_volume);

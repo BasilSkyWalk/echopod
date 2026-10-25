@@ -183,21 +183,76 @@ static size_t component_length(const char *path)
     return length;
 }
 
-static bool walk_path(FatVolume *volume, const char *path, FatFile *found, bool *found_any)
+static bool walk_from(FatVolume *volume, FatFile *current, const char *path, const char *end,
+                      bool *found_any)
 {
-    FatFile current = fat_root_directory(volume);
-    *found_any = false;
-    while (*path != '\0') {
+    while (path < end) {
         if (*path == '/') {
             path++;
             continue;
         }
         size_t length = component_length(path);
-        if (!current.directory || !fat_find_entry(volume, &current, path, length, &current)) {
+        if (!current->directory || !fat_find_entry(volume, current, path, length, current)) {
             return false;
         }
         *found_any = true;
         path += length;
+    }
+    return true;
+}
+
+static uint32_t parent_length(const char *path, uint32_t *total)
+{
+    uint32_t parent = 0;
+    uint32_t length = 0;
+    for (; path[length] != '\0'; length++) {
+        parent = path[length] == '/' ? length : parent;
+    }
+    *total = length;
+    return parent;
+}
+
+static bool parent_cached(const FatVolume *volume, const char *path, uint32_t parent)
+{
+    if (!volume->parent_valid || volume->parent_length != parent) {
+        return false;
+    }
+    for (uint32_t index = 0; index < parent; index++) {
+        if (volume->parent_path[index] != path[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void remember_parent(FatVolume *volume, const char *path, uint32_t parent,
+                            const FatFile *directory, bool named)
+{
+    volume->parent_valid = parent < FAT_PARENT_CAPACITY;
+    for (uint32_t index = 0; volume->parent_valid && index < parent; index++) {
+        volume->parent_path[index] = path[index];
+    }
+    volume->parent_length = parent;
+    volume->parent = *directory;
+    volume->parent_named = named;
+}
+
+static bool walk_path(FatVolume *volume, const char *path, FatFile *found, bool *found_any)
+{
+    uint32_t total = 0;
+    uint32_t parent = parent_length(path, &total);
+    FatFile current = fat_root_directory(volume);
+    *found_any = false;
+    if (parent_cached(volume, path, parent)) {
+        current = volume->parent;
+        *found_any = volume->parent_named;
+    } else if (walk_from(volume, &current, path, path + parent, found_any)) {
+        remember_parent(volume, path, parent, &current, *found_any);
+    } else {
+        return false;
+    }
+    if (!walk_from(volume, &current, path + parent, path + total, found_any)) {
+        return false;
     }
     *found = current;
     return true;

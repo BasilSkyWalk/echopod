@@ -401,31 +401,10 @@ static uint32_t next_frame_parity(void)
     return (read_register(DSTS) & DSTS_ODD_FRAME) != 0 ? EP_SET_EVEN_FRAME : EP_SET_ODD_FRAME;
 }
 
-static UsbIsoStats iso_stats;
-static uint32_t iso_events_seen;
-
-UsbIsoStats usb_iso_stats(void)
-{
-    return iso_stats;
-}
-
-UsbIsoRegisters usb_iso_registers(void)
-{
-    return (UsbIsoRegisters){.control = read_register(out_control(BULK_ENDPOINT)),
-                             .size = read_register(out_control(BULK_ENDPOINT) + 0x10u),
-                             .events = iso_events_seen,
-                             .status = read_register(DSTS),
-                             .rx_fifo = read_register(GRXFSIZ),
-                             .tx0_fifo = read_register(GNPTXFSIZ),
-                             .interrupts = read_register(GINTMSK),
-                             .hardware = read_register(GHWCFG3)};
-}
-
 static void arm_iso_out(const UsbPort *port)
 {
     uint32_t packet = usb_audio_packet_bytes(port->audio);
     uint32_t control = read_register(out_control(BULK_ENDPOINT)) & ~EP_MAX_PACKET_MASK;
-    iso_stats.armed++;
     write_register(out_control(BULK_ENDPOINT) + 0x10u, ONE_PACKET | packet);
     write_register(out_control(BULK_ENDPOINT),
                    control | packet | EP_ENABLE | EP_CLEAR_NAK | next_frame_parity());
@@ -445,8 +424,6 @@ static void start_stream(const UsbPort *port)
 
 static void handle_incomplete_iso(void)
 {
-    iso_stats.incomplete++;
-    iso_events_seen |= read_register(out_control(BULK_ENDPOINT) + 0x08u);
     uint32_t control = read_register(out_control(BULK_ENDPOINT));
     bool odd_now = (read_register(DSTS) & DSTS_ODD_FRAME) != 0;
     bool armed_for_now = ((control & EP_ODD_FRAME) != 0) == odd_now;
@@ -587,7 +564,6 @@ static void deliver(UsbPort *port, uint32_t endpoint, uint32_t length)
     } else if (endpoint == BULK_ENDPOINT && port->audio == NULL) {
         msc_receive(port->msc, bytes, length);
     } else if (endpoint == BULK_ENDPOINT && port->receive_stream != NULL) {
-        iso_stats.received++;
         port->receive_stream(bytes, length);
     }
 }
@@ -631,7 +607,6 @@ static void handle_out_endpoints(UsbPort *port)
     }
     if ((pending & (1u << (16 + BULK_ENDPOINT))) != 0) {
         uint32_t events = read_register(out_control(BULK_ENDPOINT) + 0x08u);
-        iso_events_seen |= events;
         write_register(out_control(BULK_ENDPOINT) + 0x08u, events);
         if ((events & EP_INT_TRANSFER_DONE) != 0 && port->audio == NULL) {
             arm_bulk_out(port);
