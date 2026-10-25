@@ -33,8 +33,8 @@ enum {
     VOLUME_MAX = 0,
     VOLUME_RESOLUTION = 128,
     RATE_BYTES = 3,
-    FIFO_DEPTH_SHIFT = 16,
-    FIFO_FIELD_MASK = 0xFFFF
+    FRAMES_PER_SECOND = 1000,
+    CHANNELS = 2
 };
 
 typedef enum AudioControl {
@@ -292,19 +292,18 @@ uint8_t usb_audio_sample_bytes(const UsbAudio *audio)
     return audio->alt == 0 ? 0 : (uint8_t)(audio->alt + 1);
 }
 
+uint16_t usb_audio_packet_bytes(const UsbAudio *audio)
+{
+    uint32_t sample_bytes = usb_audio_sample_bytes(audio);
+    if (sample_bytes == 0) {
+        return USB_AUDIO_MAX_PACKET;
+    }
+    uint32_t frames = (audio->rate + FRAMES_PER_SECOND - 1) / FRAMES_PER_SECOND + 1;
+    uint32_t bytes = frames * CHANNELS * sample_bytes;
+    return (uint16_t)(bytes < USB_AUDIO_MAX_PACKET ? bytes : USB_AUDIO_MAX_PACKET);
+}
+
 uint8_t usb_audio_attenuation(const UsbAudio *audio)
 {
     return audio->muted ? USB_AUDIO_MUTED : (uint8_t)(-audio->volume / VOLUME_RESOLUTION);
-}
-
-UsbFifoSizes usb_audio_fifo_sizes(UsbFifoSizes reset)
-{
-    uint32_t rx = reset.rx & FIFO_FIELD_MASK;
-    uint32_t tx_start = reset.tx0 & FIFO_FIELD_MASK;
-    uint32_t end = tx_start + (reset.tx0 >> FIFO_DEPTH_SHIFT);
-    if (tx_start != rx || end < rx + 2 * USB_AUDIO_EP0_FIFO_WORDS) {
-        return reset;
-    }
-    uint32_t grown = end - USB_AUDIO_EP0_FIFO_WORDS;
-    return (UsbFifoSizes){grown, (uint32_t)USB_AUDIO_EP0_FIFO_WORDS << FIFO_DEPTH_SHIFT | grown};
 }

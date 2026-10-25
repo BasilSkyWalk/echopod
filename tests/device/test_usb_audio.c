@@ -174,6 +174,21 @@ static void the_host_sets_and_reads_the_sample_rate(void)
     CHECK_EQUAL(44100, rate_at(reply.data));
 }
 
+static void the_endpoint_is_armed_for_the_largest_packet_of_the_current_format(void)
+{
+    UsbAudio audio = ready_audio();
+    CHECK_EQUAL(USB_AUDIO_MAX_PACKET, usb_audio_packet_bytes(&audio));
+    audio.alt = 2;
+    CHECK_EQUAL(49 * 2 * 3, usb_audio_packet_bytes(&audio));
+    audio.alt = 1;
+    CHECK_EQUAL(49 * 2 * 2, usb_audio_packet_bytes(&audio));
+    audio.rate = 44100;
+    CHECK_EQUAL(46 * 2 * 2, usb_audio_packet_bytes(&audio));
+    audio.alt = 2;
+    audio.rate = 96000;
+    CHECK_EQUAL(USB_AUDIO_MAX_PACKET, usb_audio_packet_bytes(&audio));
+}
+
 static void an_unsupported_rate_stalls_and_keeps_the_old_one(void)
 {
     UsbAudio audio = ready_audio();
@@ -245,21 +260,6 @@ static void standard_requests_reach_the_usb_device(void)
     CHECK_EQUAL(USB_REPLY_DATA, usb_audio_setup(&audio, setup(0x80, 6, 0x0302, 0, 64)).kind);
 }
 
-static void the_fifo_split_gives_reception_all_but_one_control_packet(void)
-{
-    UsbFifoSizes sizes = usb_audio_fifo_sizes((UsbFifoSizes){.rx = 147, .tx0 = 128u << 16 | 147});
-    CHECK_EQUAL(259, sizes.rx);
-    CHECK_EQUAL(16u << 16 | 259, sizes.tx0);
-}
-
-static void an_unexpected_fifo_layout_is_left_alone(void)
-{
-    UsbFifoSizes odd = {.rx = 0x120, .tx0 = 0x20u << 16 | 0x140};
-    UsbFifoSizes sizes = usb_audio_fifo_sizes(odd);
-    CHECK_EQUAL(odd.rx, sizes.rx);
-    CHECK_EQUAL(odd.tx0, sizes.tx0);
-}
-
 int main(void)
 {
     static const TestCase cases[] = {
@@ -273,14 +273,14 @@ int main(void)
         TEST_CASE(a_bus_reset_or_new_configuration_stops_streaming),
         TEST_CASE(the_host_sets_and_reads_the_sample_rate),
         TEST_CASE(an_unsupported_rate_stalls_and_keeps_the_old_one),
+        TEST_CASE(the_endpoint_is_armed_for_the_largest_packet_of_the_current_format),
         TEST_CASE(the_volume_range_is_minus_sixty_four_to_zero_decibels),
         TEST_CASE(host_volume_becomes_half_decibel_attenuation),
         TEST_CASE(volume_below_the_range_is_clamped),
         TEST_CASE(mute_overrides_the_volume),
         TEST_CASE(requests_for_other_units_or_channels_stall),
         TEST_CASE(standard_requests_reach_the_usb_device),
-        TEST_CASE(the_fifo_split_gives_reception_all_but_one_control_packet),
-        TEST_CASE(an_unexpected_fifo_layout_is_left_alone),
+
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

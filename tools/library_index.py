@@ -246,7 +246,9 @@ def normalized_tags(audio):
 
 def read_track(root, path):
     from mutagen import File
-    audio = File(path)
+    from tag_skim import open_skimming
+    with open_skimming(path) as handle:
+        audio = File(handle)
     duration = audio.info.length if audio is not None else 0.0
     return track_from_tags(nfc(path.relative_to(root).as_posix()), normalized_tags(audio), duration)
 

@@ -116,6 +116,7 @@ typedef struct FakeHal {
     int bluetooth_connect_index;
     int bluetooth_disconnect_count;
     HalUsbMode usb_mode;
+    uint8_t dac_volume;
 } FakeHal;
 
 static FakeHal fake;
@@ -528,6 +529,16 @@ void hal_system_set_usb_mode(HalUsbMode mode)
 int fake_hal_usb_mode(void)
 {
     return (int)fake.usb_mode;
+}
+
+void hal_system_set_dac_volume(uint8_t level)
+{
+    fake.dac_volume = level;
+}
+
+int fake_hal_dac_volume(void)
+{
+    return fake.dac_volume;
 }
 
 HalUsbLast hal_system_usb_last(void)
