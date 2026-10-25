@@ -112,6 +112,21 @@ On the device, the scanner notes each `.m3u`/`.m3u8` path during the walk (the P
 
 Favorites outlive a re-index, so they don't store album indices. An album's key is the FNV-1a hash of its album artist, a `0x1F` separator and its title (`library_album_key`). `/.echo/favorites.bin` holds the magic `EMFV`, `u16` version 1, a `u16` count, the `u32` keys and an FNV-1a checksum. At most 256 albums can be favorites. An album that leaves the library just stops showing up.
 
+## Bookmarks file
+
+`/.echo/bookmarks.bin` (4 KB, reserved by the player) remembers where each audiobook and podcast episode stopped (`playback/bookmarks`). Like favorites, it is keyed by path hashes, so it outlives a re-index.
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | `char[4]` | magic `EMBK` |
+| 4 | `u16` | version = 1 |
+| 6 | `u16` | count (at most 128) |
+| 8 | `u32` | reserved (0) |
+| 12 | count × 16 B | bookmarks, most recent first |
+| 12 + 16 × count | `u32` | FNV-1a checksum of everything before it |
+
+Each bookmark is `u32 key`, `u32 track key`, `u32 position_ms`, `u16 chapter`, `u8 flags` (bit 0: finished), `u8 reserved`. The key is the FNV-1a hash of the book's folder path relative to the music root (`Audiobooks/The Long Road`), or of the track's own path for a single-file book or a podcast episode; the track key hashes the track's path. `chapter` is the track's place among its folder's tracks, checked against the track key before it's used. A zero-filled or damaged file reads as no bookmarks.
+
 ## Covers file
 
 The player builds `/.echo/covers.bin` after every rescan (see `docs/architecture.md`, Covers on the device); `tools/cover_export.py` writes the same format on a PC. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.

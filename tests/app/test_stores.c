@@ -4,6 +4,7 @@
 #include "fixture_library.h"
 #include "hal/audio.h"
 #include "hal/storage.h"
+#include "hal/system.h"
 #include "settings_store.h"
 
 enum {
@@ -63,10 +64,12 @@ static void hardware_settings_reach_the_hal(void)
     chosen.brightness = BRIGHT;
     chosen.gain = GAIN_HIGH;
     chosen.output = OUTPUT_BALANCED;
+    chosen.usb_mode = USB_MODE_DAC;
     settings_store_apply_hardware(&chosen);
     CHECK_EQUAL(BRIGHT, fake_hal_display_brightness());
     CHECK_EQUAL(HAL_AUDIO_GAIN_HIGH, fake_hal_audio_gain());
     CHECK_EQUAL(HAL_AUDIO_OUTPUT_BALANCED, fake_hal_audio_output());
+    CHECK_EQUAL(HAL_USB_MODE_DAC, fake_hal_usb_mode());
 }
 
 static void toggling_an_album_adds_it_and_saves(void)

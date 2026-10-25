@@ -19,13 +19,21 @@ uint32_t backlight_percent(uint8_t level)
     return PERCENT_FOR_LEVEL[level - HAL_DISPLAY_BRIGHTNESS_MIN];
 }
 
+uint32_t backlight_duty(uint32_t period, uint32_t percent)
+{
+    if (percent >= FULL_PERCENT) {
+        return 0;
+    }
+    return period - period * percent / FULL_PERCENT;
+}
+
 BacklightPwm backlight_pwm(uint32_t pclk_hz, uint32_t percent)
 {
     if (percent >= FULL_PERCENT) {
         return (BacklightPwm){.full = true};
     }
     uint32_t period = pclk_hz / PWM_HZ;
-    return (BacklightPwm){.full = false, .period = period, .duty = period * percent / FULL_PERCENT};
+    return (BacklightPwm){.full = false, .period = period, .duty = backlight_duty(period, percent)};
 }
 
 uint32_t backlight_ramp_percent(uint32_t target_percent, uint32_t elapsed_ms)

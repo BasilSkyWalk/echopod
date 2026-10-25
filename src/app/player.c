@@ -6,6 +6,7 @@
 #include "core/string_builder.h"
 #include "hal/storage.h"
 #include "playback/resume_state.h"
+#include "playback/spoken.h"
 
 const char PLAYER_RESUME_PATH[] = "/.echo/resume.bin";
 const char PLAYER_UP_NEXT_PATH[] = "/.echo/upnext.bin";
@@ -90,6 +91,21 @@ static void queue_upcoming(Player *player)
     hal_audio_queue_next(path, player->next_token);
 }
 
+static void note_spoken(Player *player, uint16_t track)
+{
+    char path[PLAYER_PATH_CAPACITY];
+    player->spoken =
+        track_path(player, track, path, sizeof path) && spoken_kind_of(path) != SPOKEN_NONE;
+}
+
+static uint32_t resume_point(const Player *player, uint16_t track, uint32_t start_ms)
+{
+    if (start_ms != 0 || !player->spoken || player->resume.position_for == NULL) {
+        return start_ms;
+    }
+    return player->resume.position_for(player->resume.context, track);
+}
+
 static bool start_current(Player *player, uint32_t start_ms)
 {
     char path[PLAYER_PATH_CAPACITY];
@@ -98,6 +114,8 @@ static bool start_current(Player *player, uint32_t start_ms)
         become_idle(player);
         return false;
     }
+    player->spoken = spoken_kind_of(path) != SPOKEN_NONE;
+    start_ms = resume_point(player, track, start_ms);
     player->track = track;
     player->has_track = true;
     player->current_token = new_token(player);
@@ -196,19 +214,36 @@ void player_init(Player *player, const Library *library)
     player->jack = hal_audio_jack();
     player->refusal_count = 0;
     player->refusal = (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_NONE};
+    player->spoken = false;
+    player->resume = (PlayerResume){.position_for = NULL, .context = NULL};
     become_idle(player);
     hal_audio_set_volume(player->volume);
 }
 
+void player_set_resume(Player *player, PlayerResume resume)
+{
+    player->resume = resume;
+}
+
 bool player_play_list(Player *player, BrowseQuery source, uint32_t position, uint32_t seed)
 {
+    PlayerListStart start = {
+        .source = source, .position = position, .seed = seed, .in_order = false};
+    return player_play_from(player, start);
+}
+
+bool player_play_from(Player *player, PlayerListStart start)
+{
     BrowseItem item;
-    if (!browse_item(player->library, source, position, &item) || item.kind != BROWSE_ITEM_TRACK) {
+    if (!browse_item(player->library, start.source, start.position, &item) ||
+        item.kind != BROWSE_ITEM_TRACK) {
         return false;
     }
     player->from_up_next = false;
-    PlayQueuePlan plan = {
-        .source = source, .anchor_track = item.index, .shuffle = player->shuffle, .seed = seed};
+    PlayQueuePlan plan = {.source = start.source,
+                          .anchor_track = item.index,
+                          .shuffle = start.in_order ? SHUFFLE_OFF : player->shuffle,
+                          .seed = start.seed};
     if (!play_queue_build(&player->queue, player->library, plan) ||
         !start_playable(player, 0, 1, player->repeat == REPEAT_ALL)) {
         return false;
@@ -241,9 +276,39 @@ void player_toggle_pause(Player *player)
     }
 }
 
+static uint32_t track_duration(const Player *player)
+{
+    LibraryTrack record;
+    return library_read_track(player->library, player->track, &record) ? record.duration_ms : 0;
+}
+
+void player_jump(Player *player, int32_t delta_ms)
+{
+    if (!player->has_track) {
+        return;
+    }
+    uint32_t position = current_position(player);
+    uint32_t duration = track_duration(player);
+    if (delta_ms < 0) {
+        uint32_t back = (uint32_t)-delta_ms;
+        player_seek(player, position > back ? position - back : 0);
+        return;
+    }
+    uint32_t target = position + (uint32_t)delta_ms;
+    if (duration > 0 && target >= duration) {
+        move_and_start(player, 1, player->repeat != REPEAT_OFF);
+        return;
+    }
+    player_seek(player, target);
+}
+
 void player_skip(Player *player, int direction)
 {
     if (!player->has_track) {
+        return;
+    }
+    if (player->spoken) {
+        player_jump(player, direction > 0 ? SPOKEN_JUMP_FORWARD_MS : -SPOKEN_JUMP_BACK_MS);
         return;
     }
     if (direction < 0 && current_position(player) > PLAYER_RESTART_THRESHOLD_MS) {
@@ -291,7 +356,7 @@ void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed)
     if (!play_queue_current(&player->queue, &plan.anchor_track)) {
         plan.anchor_track = player->track;
     }
-    plan.shuffle = shuffle;
+    plan.shuffle = player->spoken ? SHUFFLE_OFF : shuffle;
     plan.seed = seed;
     if (play_queue_build(&player->queue, player->library, plan) && player->loaded) {
         queue_upcoming(player);
@@ -326,9 +391,15 @@ static void take_next(Player *player)
     player->from_up_next = false;
 }
 
-static void advance_to_next(Player *player)
+static void take_next_and_note(Player *player)
 {
     take_next(player);
+    note_spoken(player, player->track);
+}
+
+static void advance_to_next(Player *player)
+{
+    take_next_and_note(player);
     player->current_token = player->next_token;
     player->has_next = false;
     queue_upcoming(player);
@@ -393,6 +464,20 @@ bool player_jump_to_queue(Player *player, PlayQueueCursor cursor)
     bool started = start_playable(player, 0, 1, player->repeat == REPEAT_ALL);
     player_save(player);
     return started;
+}
+
+void player_release_output(Player *player)
+{
+    if (!player->loaded) {
+        return;
+    }
+    player->paused_position_ms = hal_audio_status().position_ms;
+    player_save(player);
+    player->loaded = false;
+    player->has_next = false;
+    if (player->state == PLAYER_PLAYING) {
+        player->state = PLAYER_PAUSED;
+    }
 }
 
 static void save_periodically(Player *player, uint32_t now_ms)
@@ -501,6 +586,7 @@ bool player_restore(Player *player)
     player->shuffle = state.plan.shuffle;
     player->state = PLAYER_PAUSED;
     player->paused_position_ms = state.position_ms;
+    note_spoken(player, player->track);
     player_change_volume(player, (int)state.volume - (int)player->volume);
     return true;
 }
@@ -530,6 +616,7 @@ PlayerStatus player_status(const Player *player)
         .repeat = player->repeat,
         .place = player->has_track ? play_queue_place(&player->queue) : (PlayQueuePlace){0, 0},
         .format = current_format(player),
+        .spoken = player->has_track && player->spoken,
     };
 }
 

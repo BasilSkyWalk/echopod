@@ -21,6 +21,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **Eject both drives before you unplug.** Unplugging first can lose the last changes, and the player warns you ("Unplugged before ejecting"). Once, a file deleted from Windows and ejected properly was still on internal storage afterwards; it hasn't happened again.
 - **The SD card can be marked as needing repair.** Twice a computer reported the card's exFAT volume as not cleanly closed. Nothing was lost. If Windows offers to scan and fix the card, let it (or run `chkdsk /f` on its drive letter; on a Mac, Disk Utility's First Aid).
 - **Speed on a Mac hasn't been measured.** On Windows 11, copying runs at about 3.7 MB/s to the SD card and 5 MB/s to internal storage.
+- **USB DAC mode hasn't been tested on a player yet.** It was written and checked on a computer only. If it doesn't appear as a sound card, crackles, or plays at the wrong speed, set Settings → USB mode back to Storage and report what you saw. Known limits: full speed only (up to 96 kHz, 16 or 24-bit); about 20 ms of delay; the player stays in DAC mode until you unplug it or hold Back; the volume keys change the volume one step per press and the screen doesn't show it; Power doesn't turn the screen off during DAC mode. If the computer stops sending audio and starts again, the first 20 ms are silent.
 - **macOS leaves `._` files** beside everything it copies. EchoPod ignores them, but they take space. `dot_clean` on the drive removes them.
 
 ## Music and library
@@ -33,5 +34,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 
 ## Not there yet
 
-- No Bluetooth audio, EQ, ReplayGain, lyrics or USB DAC mode.
-- The 4.4 mm balanced output hasn't been checked on hardware.
+- No Bluetooth audio, EQ, ReplayGain or lyrics.
+- The 4.4 mm balanced output works (reported by a tester). Settings → Output can't switch sound between the jacks: both are driven by the same DACs, so it only picks the volume table (see `docs/user-guide.md`).
+- Audiobooks and podcasts (bookmarks, in-order play, 30 s / 15 s jumps) are new and have only been tested in the simulator. There's no playback speed control.
+- The brightness, Favorites stutter, sound-after-USB and battery-while-charging fixes since 0.1.0 are tested on a computer, not yet on a player.

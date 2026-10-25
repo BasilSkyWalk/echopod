@@ -47,6 +47,13 @@ typedef struct HalUsbLast {
 
 HalUsbLast hal_system_usb_last(void);
 
+typedef enum HalUsbMode {
+    HAL_USB_MODE_STORAGE,
+    HAL_USB_MODE_DAC
+} HalUsbMode;
+
+void hal_system_set_usb_mode(HalUsbMode mode);
+
 typedef struct HalLoopCycles {
     uint32_t register_centi;
     uint32_t memory_centi;

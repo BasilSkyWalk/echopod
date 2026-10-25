@@ -6,7 +6,7 @@ enum {
     FULL_SCALE_MILLIVOLTS = 5000,
     ADC_STEPS = 1024,
     PERCENT_PER_POINT = 10,
-    CHARGING_OFFSET_MILLIVOLTS = 100
+    CHARGING_OFFSET_MILLIVOLTS = 50
 };
 
 static const uint16_t CURVE_MILLIVOLTS[] = {3450, 3580, 3660, 3710, 3750, 3800,
@@ -85,13 +85,21 @@ void battery_display_init(BatteryDisplay *display)
     *display = (BatteryDisplay){.shown_known = false, .shown = 0};
 }
 
-uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent)
+static uint8_t step_needed(bool rising, bool usb_power)
 {
-    uint8_t difference =
-        percent > display->shown ? percent - display->shown : display->shown - percent;
-    if (!display->shown_known || difference >= BATTERY_DISPLAY_STEP) {
+    return rising == usb_power ? BATTERY_DISPLAY_STEP : BATTERY_DISPLAY_REVERSE_STEP;
+}
+
+uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent, bool usb_power)
+{
+    if (!display->shown_known) {
+        *display = (BatteryDisplay){.shown_known = true, .shown = percent};
+        return percent;
+    }
+    bool rising = percent > display->shown;
+    uint8_t difference = rising ? percent - display->shown : display->shown - percent;
+    if (difference >= step_needed(rising, usb_power)) {
         display->shown = percent;
-        display->shown_known = true;
     }
     return display->shown;
 }

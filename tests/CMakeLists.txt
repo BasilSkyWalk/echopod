@@ -38,6 +38,7 @@ add_library(echo_library_fixtures STATIC
     library/memory_source.c
     library/fixture_library.c
     library/big_library.c
+    library/spoken_library.c
 )
 target_include_directories(echo_library_fixtures PUBLIC library)
 target_compile_definitions(echo_library_fixtures PRIVATE
@@ -45,7 +46,7 @@ target_compile_definitions(echo_library_fixtures PRIVATE
 )
 target_link_libraries(echo_library_fixtures PUBLIC echo_library echo_library_scan PRIVATE echo_options)
 
-foreach(playback_test play_queue resume_state up_next)
+foreach(playback_test play_queue resume_state up_next bookmarks spoken)
     echo_add_unit_test(NAME test_${playback_test}
         SOURCES playback/test_${playback_test}.c
         LIBRARIES echo_playback echo_library_fixtures
@@ -130,6 +131,11 @@ echo_add_unit_test(NAME test_player
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+echo_add_unit_test(NAME test_spoken_word
+    SOURCES app/test_spoken_word.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 echo_add_unit_test(NAME test_cover_cache
     SOURCES app/test_cover_cache.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures
@@ -181,7 +187,7 @@ echo_add_unit_test(NAME test_test_pattern_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
-foreach(device_test audio_math backlight battery_gauge watchdog panic_text stall_watch bt_module card_write core1_control start_record dac_sequence dma_loop flac_accel jack_sense key_ladder key_scanner msc panel pll sd_card tick_clock updater usb_device usb_fallback wav_source)
+foreach(device_test audio_math backlight battery_gauge watchdog panic_text stall_watch bt_module card_write core1_control start_record dac_sequence dma_loop flac_accel jack_sense key_ladder key_scanner msc panel pll sd_card stream_drift tick_clock updater usb_audio usb_audio_sink usb_device usb_fallback wav_source)
     echo_add_unit_test(NAME test_${device_test}
         SOURCES device/test_${device_test}.c
         LIBRARIES echo_device_logic
@@ -268,6 +274,7 @@ if(ECHO_BUILD_SIM)
     )
     target_compile_definitions(test_sim_storage PRIVATE
         ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+        ECHO_TEST_OUTPUT_DIR="${CMAKE_CURRENT_BINARY_DIR}"
     )
     echo_add_unit_test(NAME test_library_scan
         SOURCES library/test_library_scan.c

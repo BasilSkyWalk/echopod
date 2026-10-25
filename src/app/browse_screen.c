@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "core/string_builder.h"
+#include "hal/audio.h"
 #include "hal/clock.h"
 #include "library/sort_key.h"
 #include "ui/header.h"
@@ -16,7 +17,11 @@ enum {
 
 static const char EMPTY_MESSAGE[] = "Nothing here";
 static const char NO_FAVORITES_MESSAGE[] = "Hold Play on an album to add it";
+static const char NO_BOOKS_MESSAGE[] = "Put books in an Audiobooks folder";
+static const char NO_SHOWS_MESSAGE[] = "Put shows in a Podcasts folder";
 static const char FAVORITES_TITLE[] = "Favorites";
+static const char AUDIOBOOKS_TITLE[] = "Audiobooks";
+static const char PODCASTS_TITLE[] = "Podcasts";
 static const char STAR[] = "\xE2\x98\x85";
 
 static int min_of(int first, int second)
@@ -106,6 +111,17 @@ static void mark_favorite(char *detail)
     }
 }
 
+static void describe_spoken(const BrowseScreen *browse, BrowseItem item, char *detail)
+{
+    const SpokenStore *spoken = browse->pool->config.spoken;
+    if (browse->shelf == SPOKEN_NONE || spoken == NULL) {
+        return;
+    }
+    SpokenRow row = {
+        .shelf = browse->shelf, .item = item, .detail = detail, .capacity = BROWSE_DETAIL_CAPACITY};
+    spoken_store_describe(spoken, row);
+}
+
 static void load_row(BrowseScreen *browse, BrowseRows *rows, int row, int index)
 {
     BrowseText text = {rows->labels[row], BROWSE_LABEL_CAPACITY, rows->details[row],
@@ -123,6 +139,7 @@ static void load_row(BrowseScreen *browse, BrowseRows *rows, int row, int index)
     if (is_favorite(browse, item)) {
         mark_favorite(rows->details[row]);
     }
+    describe_spoken(browse, item, rows->details[row]);
 }
 
 static void refresh_rows(BrowseScreen *browse)
@@ -218,43 +235,115 @@ static bool is_loaded_track(const BrowseScreen *browse, int index)
            item.kind == BROWSE_ITEM_TRACK && item.index == status.track;
 }
 
-static ScreenAction play_from(BrowseScreen *browse, int index)
+static ScreenAction start_list(BrowseScreen *browse, BrowseQuery source, uint32_t position)
 {
     BrowsePoolConfig *config = &browse->pool->config;
-    if (is_loaded_track(browse, index)) {
-        return screen_action_push(config->now_playing);
-    }
-    uint32_t seed = hal_clock_microseconds();
-    if (!player_play_list(config->player, browse->query, (uint32_t)index, seed)) {
+    PlayerListStart start = {.source = source,
+                             .position = position,
+                             .seed = hal_clock_microseconds(),
+                             .in_order = browse->shelf != SPOKEN_NONE};
+    if (!player_play_from(config->player, start)) {
         return screen_action_none();
     }
     return screen_action_push(config->now_playing);
+}
+
+static ScreenAction play_from(BrowseScreen *browse, int index)
+{
+    if (is_loaded_track(browse, index)) {
+        return screen_action_push(browse->pool->config.now_playing);
+    }
+    return start_list(browse, browse->query, (uint32_t)index);
+}
+
+static ScreenAction open_child(BrowseScreen *browse, BrowseItem item)
+{
+    BrowseQuery child;
+    if (!browse_child(browse->query, item, &child)) {
+        return screen_action_none();
+    }
+    Screen *next = browse_pool_open(browse->pool, browse->level + 1, child);
+    if (next == NULL) {
+        return screen_action_none();
+    }
+    browse->pool->screens[browse->level + 1].shelf = browse->shelf;
+    return screen_action_push(next);
+}
+
+static bool playing_folder(const BrowseScreen *browse, uint16_t folder)
+{
+    LibraryTrack record;
+    PlayerStatus status = player_status(browse->pool->config.player);
+    return status.has_track && status.state != PLAYER_IDLE &&
+           library_read_track(browse->pool->config.library, status.track, &record) &&
+           record.folder == folder;
+}
+
+static ScreenAction resume_book(BrowseScreen *browse, BrowseItem item)
+{
+    const BrowsePoolConfig *config = &browse->pool->config;
+    LibraryFolder folder;
+    BrowseQuery child;
+    if (config->spoken == NULL || !library_read_folder(config->library, item.index, &folder) ||
+        folder.track_count == 0 || !browse_child(browse->query, item, &child)) {
+        return open_child(browse, item);
+    }
+    if (playing_folder(browse, item.index)) {
+        if (player_status(config->player).state == PLAYER_PAUSED) {
+            player_toggle_pause(config->player);
+        }
+        return screen_action_push(config->now_playing);
+    }
+    uint16_t chapter = spoken_store_resume_chapter(config->spoken, item.index);
+    return start_list(browse, child, (uint32_t)folder.subfolder_count + chapter);
+}
+
+static bool resumes_books(const BrowseScreen *browse, BrowseItem item)
+{
+    return browse->shelf == SPOKEN_AUDIOBOOK && browse->shelf_root &&
+           item.kind == BROWSE_ITEM_FOLDER;
 }
 
 static ScreenAction select_row(void *context, int index)
 {
     BrowseScreen *browse = context;
     BrowseItem item;
-    BrowseQuery child;
     if (!item_at(browse, index, &item)) {
         return screen_action_none();
     }
     if (item.kind == BROWSE_ITEM_TRACK) {
         return play_from(browse, index);
     }
-    if (!browse_child(browse->query, item, &child)) {
-        return screen_action_none();
+    if (resumes_books(browse, item)) {
+        return resume_book(browse, item);
     }
-    Screen *next = browse_pool_open(browse->pool, browse->level + 1, child);
-    return next != NULL ? screen_action_push(next) : screen_action_none();
+    return open_child(browse, item);
+}
+
+static void keep_audio_fed(void *context)
+{
+    (void)context;
+    hal_audio_service();
+}
+
+static void refresh_favorites(BrowsePool *pool)
+{
+    const FavoritesStore *store = pool->config.favorites;
+    if (pool->favorites_collected && pool->favorites_revision == store->revision) {
+        return;
+    }
+    FavoritesCollector collector = {.albums = pool->favorite_albums,
+                                    .capacity = FAVORITES_CAPACITY,
+                                    .between_albums = keep_audio_fed};
+    pool->favorite_count = favorites_collect(&store->favorites, pool->config.library, collector);
+    pool->favorites_revision = store->revision;
+    pool->favorites_collected = true;
 }
 
 static void collect_favorites(BrowseScreen *browse)
 {
-    BrowsePool *pool = browse->pool;
-    browse->count =
-        favorites_collect_albums(&pool->config.favorites->favorites, pool->config.library,
-                                 pool->favorite_albums, FAVORITES_CAPACITY);
+    refresh_favorites(browse->pool);
+    browse->count = browse->pool->favorite_count;
     list_view_select(&browse->list, browse->list.selected, browse->now_ms);
 }
 
@@ -337,9 +426,14 @@ static ScreenAction hold_row(void *context, int index)
 {
     BrowseScreen *browse = context;
     BrowseItem item;
-    if (browse->pool->config.player != NULL && item_at(browse, index, &item) &&
-        item.kind == BROWSE_ITEM_TRACK) {
+    if (!item_at(browse, index, &item)) {
+        return screen_action_none();
+    }
+    if (browse->pool->config.player != NULL && item.kind == BROWSE_ITEM_TRACK) {
         return open_song_actions(browse, index, item.index);
+    }
+    if (browse->shelf != SPOKEN_NONE && item.kind == BROWSE_ITEM_FOLDER) {
+        return open_child(browse, item);
     }
     return toggle_favorite(context, index);
 }
@@ -379,6 +473,17 @@ static void draw_empty(Canvas *canvas, const Theme *theme, Rect content, const c
     label_draw(canvas, style, (Label){.area = area, .text = message});
 }
 
+static const char *empty_message(const BrowseScreen *browse)
+{
+    if (browse->favorites_only) {
+        return NO_FAVORITES_MESSAGE;
+    }
+    if (browse->shelf_root) {
+        return browse->shelf == SPOKEN_PODCAST ? NO_SHOWS_MESSAGE : NO_BOOKS_MESSAGE;
+    }
+    return EMPTY_MESSAGE;
+}
+
 static void draw(void *context, Canvas *canvas)
 {
     const BrowseScreen *browse = context;
@@ -386,8 +491,7 @@ static void draw(void *context, Canvas *canvas)
     Rect content = theme_content_area(theme);
     header_draw(canvas, theme, browse->title);
     if (browse->count == 0) {
-        draw_empty(canvas, theme, content,
-                   browse->favorites_only ? NO_FAVORITES_MESSAGE : EMPTY_MESSAGE);
+        draw_empty(canvas, theme, content, empty_message(browse));
         return;
     }
     list_view_draw(&browse->list, canvas, content, browse->now_ms);
@@ -397,6 +501,7 @@ void browse_pool_init(BrowsePool *pool, BrowsePoolConfig config)
 {
     pool->config = config;
     pool->row_uses = 0;
+    pool->favorites_collected = false;
     for (int slot = 0; slot < BROWSE_ROW_CACHES; slot++) {
         pool->rows[slot] = (BrowseRows){.level = NO_LEVEL};
     }
@@ -412,6 +517,8 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     browse->level = level;
     browse->query = query;
     browse->favorites_only = false;
+    browse->shelf = SPOKEN_NONE;
+    browse->shelf_root = false;
     browse->count = browse_count(pool->config.library, query);
     browse_title(pool->config.library, query, browse->title, sizeof browse->title);
     browse->model = (ListModel){.context = browse,
@@ -447,5 +554,33 @@ Screen *browse_pool_open_favorites(BrowsePool *pool, int level)
     browse->favorites_only = true;
     browse->model.section = NULL;
     collect_favorites(browse);
+    return screen;
+}
+
+static BrowseQuery shelf_query(const BrowsePool *pool, SpokenKind shelf, bool *found)
+{
+    uint16_t folder = 0;
+    BrowseQuery query = browse_root_query(BROWSE_FOLDER);
+    *found = spoken_shelf_folder(pool->config.library, shelf, &folder);
+    if (*found) {
+        BrowseItem item = {.kind = BROWSE_ITEM_FOLDER, .index = folder};
+        browse_child(query, item, &query);
+    }
+    return query;
+}
+
+Screen *browse_pool_open_shelf(BrowsePool *pool, int level, SpokenKind shelf)
+{
+    bool found = false;
+    Screen *screen = browse_pool_open(pool, level, shelf_query(pool, shelf, &found));
+    if (screen == NULL) {
+        return NULL;
+    }
+    BrowseScreen *browse = &pool->screens[level];
+    StringBuilder title = string_builder_make(browse->title, sizeof browse->title);
+    string_builder_append(&title, shelf == SPOKEN_PODCAST ? PODCASTS_TITLE : AUDIOBOOKS_TITLE);
+    browse->shelf = shelf;
+    browse->shelf_root = true;
+    browse->count = found ? browse->count : 0;
     return screen;
 }

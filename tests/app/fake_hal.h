@@ -75,4 +75,5 @@ void fake_hal_set_battery(HalBattery battery);
 int fake_hal_power_off_count(void);
 int fake_hal_audio_gain(void);
 int fake_hal_audio_output(void);
+int fake_hal_usb_mode(void);
 const uint8_t *fake_hal_file_bytes(const char *path, uint32_t *size);

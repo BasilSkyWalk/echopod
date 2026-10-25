@@ -1,5 +1,6 @@
 #include "settings_screens.h"
 
+#include "hal/audio.h"
 #include "hal/clock.h"
 
 enum {
@@ -23,8 +24,13 @@ static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2",
                                                                        "6", "7", "8", "9", "10"};
 static const char *const GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {"Low", "High"};
 static const char *const OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {"Auto", "3.5 mm", "4.4 mm"};
+static const char *const OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
+    "Volume follows the plugged jack", "Using 3.5 mm volume levels", "Using 4.4 mm volume levels"};
 static const char *const START_OPTIONS[START_SCREEN_COUNT] = {
     "Main menu", "Now Playing", "Albums", "Artists", "Favorites", "Playlists", "Cover Flow"};
+static const char *const USB_MODE_OPTIONS[USB_MODE_COUNT] = {"Storage", "DAC"};
+static const char *const USB_MODE_MESSAGES[USB_MODE_COUNT] = {"USB shows the player's drives",
+                                                              "USB plays the computer's sound"};
 
 static const Settings *settings_of(const void *context)
 {
@@ -154,8 +160,19 @@ static int current_output(const void *context)
 
 static void choose_output(void *context, int index)
 {
+    SettingsContext *settings = context;
     editable_settings(context)->output = (OutputJack)index;
     apply_and_save(context);
+    toast_show(settings->toast, OUTPUT_MESSAGES[index], hal_clock_milliseconds());
+}
+
+static const char *describe_output(int current)
+{
+    HalAudioJack jack = hal_audio_jack();
+    if (current != OUTPUT_AUTO || jack == HAL_AUDIO_JACK_NONE) {
+        return OUTPUT_OPTIONS[current];
+    }
+    return jack == HAL_AUDIO_JACK_BALANCED ? "Auto (4.4 mm)" : "Auto (3.5 mm)";
 }
 
 static int current_start(const void *context)
@@ -169,18 +186,32 @@ static void choose_start(void *context, int index)
     save(context);
 }
 
+static int current_usb_mode(const void *context)
+{
+    return (int)settings_of(context)->usb_mode;
+}
+
+static void choose_usb_mode(void *context, int index)
+{
+    SettingsContext *settings = context;
+    editable_settings(context)->usb_mode = (UsbMode)index;
+    apply_and_save(context);
+    toast_show(settings->toast, USB_MODE_MESSAGES[index], hal_clock_milliseconds());
+}
+
 static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
-    {"Shuffle", SHUFFLE_OPTIONS, SHUFFLE_MODE_COUNT, current_shuffle, choose_shuffle},
-    {"Repeat", REPEAT_OPTIONS, REPEAT_MODE_COUNT, current_repeat, choose_repeat},
-    {"Sleep timer", SLEEP_OPTIONS, SLEEP_TIMER_OPTION_COUNT, current_sleep, choose_sleep},
-    {"Auto off", AUTO_OFF_OPTIONS, AUTO_OFF_OPTION_COUNT, current_auto_off, choose_auto_off},
+    {"Shuffle", SHUFFLE_OPTIONS, SHUFFLE_MODE_COUNT, current_shuffle, choose_shuffle, NULL},
+    {"Repeat", REPEAT_OPTIONS, REPEAT_MODE_COUNT, current_repeat, choose_repeat, NULL},
+    {"Sleep timer", SLEEP_OPTIONS, SLEEP_TIMER_OPTION_COUNT, current_sleep, choose_sleep, NULL},
+    {"Auto off", AUTO_OFF_OPTIONS, AUTO_OFF_OPTION_COUNT, current_auto_off, choose_auto_off, NULL},
     {"Screen timeout", TIMEOUT_OPTIONS, SCREEN_TIMEOUT_OPTION_COUNT, current_timeout,
-     choose_timeout},
+     choose_timeout, NULL},
     {"Brightness", BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,
-     choose_brightness},
-    {"Gain", GAIN_OPTIONS, GAIN_LEVEL_COUNT, current_gain, choose_gain},
-    {"Output", OUTPUT_OPTIONS, OUTPUT_JACK_COUNT, current_output, choose_output},
-    {"Start screen", START_OPTIONS, START_SCREEN_COUNT, current_start, choose_start},
+     choose_brightness, NULL},
+    {"Gain", GAIN_OPTIONS, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
+    {"Output", OUTPUT_OPTIONS, OUTPUT_JACK_COUNT, current_output, choose_output, describe_output},
+    {"Start screen", START_OPTIONS, START_SCREEN_COUNT, current_start, choose_start, NULL},
+    {"USB mode", USB_MODE_OPTIONS, USB_MODE_COUNT, current_usb_mode, choose_usb_mode, NULL},
 };
 
 static ScreenAction open_choice(void *context)
@@ -204,8 +235,13 @@ static const char *choice_value(const void *context)
 {
     const SettingsEntry *entry = context;
     int current = entry->choice->current(&entry->owner->context);
-    return current >= 0 && current < entry->choice->option_count ? entry->choice->options[current]
-                                                                 : "";
+    if (current < 0 || current >= entry->choice->option_count) {
+        return "";
+    }
+    if (entry->choice->describe != NULL) {
+        return entry->choice->describe(current);
+    }
+    return entry->choice->options[current];
 }
 
 static ScreenAction request_rescan(void *context)
@@ -221,15 +257,16 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
 {
     screens->context = context;
     screens->theme = theme;
-    screens->items[SETTINGS_CHOICE_COUNT] = (MenuItem){
+    screens->items[SETTINGS_RESCAN_ITEM] = (MenuItem){
         .label = "Rescan library", .select = request_rescan, .context = &screens->context};
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
-        screens->items[index] = (MenuItem){.label = CHOICES[index].title,
-                                           .select = open_choice,
-                                           .context = &screens->entries[index],
-                                           .value = choice_value,
-                                           .opens = true};
+        int item = index < SETTINGS_RESCAN_ITEM ? index : index + 1;
+        screens->items[item] = (MenuItem){.label = CHOICES[index].title,
+                                          .select = open_choice,
+                                          .context = &screens->entries[index],
+                                          .value = choice_value,
+                                          .opens = true};
     }
     MenuConfig menu = {.title = "Settings",
                        .items = screens->items,

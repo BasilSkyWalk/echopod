@@ -6,6 +6,7 @@
 enum {
     BATTERY_GAUGE_READINGS = 64,
     BATTERY_DISPLAY_STEP = 2,
+    BATTERY_DISPLAY_REVERSE_STEP = 10,
     BATTERY_BOOT_CUTOFF_MILLIVOLTS = 3400
 };
 
@@ -30,4 +31,4 @@ typedef struct BatteryDisplay {
 } BatteryDisplay;
 
 void battery_display_init(BatteryDisplay *display);
-uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent);
+uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent, bool usb_power);

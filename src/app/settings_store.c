@@ -3,12 +3,14 @@
 #include "hal/audio.h"
 #include "hal/display.h"
 #include "hal/storage.h"
+#include "hal/system.h"
 
 const char SETTINGS_STORE_PATH[] = "/.echo/settings.bin";
 
 static const HalAudioGain HAL_GAINS[GAIN_LEVEL_COUNT] = {HAL_AUDIO_GAIN_LOW, HAL_AUDIO_GAIN_HIGH};
 static const HalAudioOutput HAL_OUTPUTS[OUTPUT_JACK_COUNT] = {
     HAL_AUDIO_OUTPUT_AUTO, HAL_AUDIO_OUTPUT_SINGLE_ENDED, HAL_AUDIO_OUTPUT_BALANCED};
+static const HalUsbMode HAL_USB_MODES[USB_MODE_COUNT] = {HAL_USB_MODE_STORAGE, HAL_USB_MODE_DAC};
 
 static bool read_settings(uint8_t *bytes)
 {
@@ -85,4 +87,5 @@ void settings_store_apply_hardware(const Settings *settings)
     hal_display_set_brightness(settings->brightness);
     hal_audio_set_gain(HAL_GAINS[settings->gain]);
     hal_audio_set_output(HAL_OUTPUTS[settings->output]);
+    hal_system_set_usb_mode(HAL_USB_MODES[settings->usb_mode]);
 }

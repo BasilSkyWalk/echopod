@@ -1,0 +1,77 @@
+name: echo-sync
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths:
+      - "tools/**"
+      - ".github/workflows/echo-sync.yml"
+  pull_request:
+    paths:
+      - "tools/**"
+      - ".github/workflows/echo-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: echo-sync-windows-x64.exe
+            built: dist/echo-sync.exe
+          - os: macos-latest
+            asset: echo-sync-macos-arm64
+            built: dist/echo-sync
+          - os: ubuntu-22.04
+            asset: echo-sync-linux-x64
+            built: dist/echo-sync
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the tools' packages
+        run: python -m pip install -r tools/requirements.txt -r tools/requirements-build.txt
+      - name: Test the tools
+        run: python -m unittest discover -s tools/tests
+      - name: Build one file
+        run: >
+          python -m PyInstaller --onefile --console --name echo-sync
+          --paths tools --distpath dist --workpath build/pyinstaller --specpath build/pyinstaller
+          tools/echo_sync.py
+      - name: Smoke test
+        run: |
+          ${{ matrix.built }} --help
+          mkdir -p smoke/.echo smoke/Artist/Album
+          python -c "import sys; sys.path[:0] = ['tools', 'tools/tests']; from pathlib import Path; from test_library_index import write_silent_flac; write_silent_flac(Path('smoke/Artist/Album/01 - Song.flac'), 1)"
+          ${{ matrix.built }} smoke --dry-run
+      - name: Name the file for its platform
+        run: mv "${{ matrix.built }}" "dist/${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*

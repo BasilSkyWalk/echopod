@@ -30,7 +30,7 @@ A short map of the hardware EchoPod drives, for reading the code in `platform/de
 
 ## USB
 
-- DesignWare USB 2.0 OTG controller, high speed. EchoPod presents both drives as a mass-storage device.
+- DesignWare USB 2.0 OTG controller, high speed. EchoPod presents both drives as a mass-storage device, or, in USB DAC mode, a full-speed USB Audio Class 1.0 sound card (untested on hardware). The core's FIFO RAM is small: at reset, RX 147 words and TX FIFO 0 128 words.
 - With the buttons held at power-up, the boot ROM's maskrom mode appears as `2207:262d` (`docs/device-recovery.md`).
 
 ## Other

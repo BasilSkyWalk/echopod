@@ -26,7 +26,8 @@
 #include "ui/toast.h"
 
 enum {
-    HOME_ITEM_COUNT = 4,
+    HOME_ITEM_COUNT = 6,
+    SHELF_COUNT = 2,
     MUSIC_ITEM_COUNT = 9,
     DIAGNOSTICS_ITEM_COUNT = 33,
     START_PATH_CAPACITY = 2
@@ -85,6 +86,8 @@ typedef struct BrowseEntry {
     BrowseQuery query;
     bool favorites;
     Screen *fixed;
+    SpokenKind shelf;
+    bool present;
 } BrowseEntry;
 
 typedef struct AppScreens {
@@ -99,6 +102,7 @@ typedef struct AppScreens {
     UpNextScreen up_next;
     CoverFlowScreen cover_flow;
     BrowseEntry browse_entries[MUSIC_ITEM_COUNT];
+    BrowseEntry shelf_entries[SHELF_COUNT];
     TestPatternScreen test_pattern;
     FontSampleScreen font_sample;
     StopwatchScreen stopwatch;
@@ -130,6 +134,7 @@ typedef struct AppScreensContext {
     Toast *toast;
     CoverCache *covers;
     bool *rescan_requested;
+    SpokenStore *spoken;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);

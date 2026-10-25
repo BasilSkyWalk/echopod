@@ -71,6 +71,9 @@ static Screen *browse_screen_for(BrowseEntry *entry)
     if (entry->favorites) {
         return browse_pool_open_favorites(entry->pool, 0);
     }
+    if (entry->shelf != SPOKEN_NONE) {
+        return browse_pool_open_shelf(entry->pool, 0, entry->shelf);
+    }
     return browse_pool_open(entry->pool, 0, entry->query);
 }
 
@@ -89,6 +92,8 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
         .query = browse_root_query(entry->kind),
         .favorites = entry->source == MUSIC_FAVORITES,
         .fixed = entry->source == MUSIC_COVER_FLOW ? &screens->cover_flow.screen : NULL,
+        .shelf = SPOKEN_NONE,
+        .present = true,
     };
     return (MenuItem){.label = entry->label,
                       .select = open_browse,
@@ -106,6 +111,7 @@ static void build_music(AppScreens *screens, AppScreensContext context)
         .now_playing = &screens->now_playing.screen,
         .favorites = context.favorites,
         .toast = context.toast,
+        .spoken = context.spoken,
     };
     browse_pool_init(&screens->browse, browse);
     CoverFlowConfig cover_flow = {
@@ -138,15 +144,43 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
     settings_screens_init(&screens->settings, settings, context.theme);
 }
 
+static bool shelf_present(const void *context)
+{
+    const BrowseEntry *entry = context;
+    return entry->present;
+}
+
+static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, SpokenKind shelf)
+{
+    uint16_t folder = 0;
+    BrowseEntry *entry = &screens->shelf_entries[shelf == SPOKEN_PODCAST ? 1 : 0];
+    *entry = (BrowseEntry){
+        .pool = &screens->browse,
+        .store = context.store,
+        .unavailable = &screens->no_library.screen,
+        .shelf = shelf,
+        .present = context.store->available &&
+                   spoken_shelf_folder(&context.store->library, shelf, &folder),
+    };
+    return (MenuItem){.label = shelf == SPOKEN_PODCAST ? "Podcasts" : "Audiobooks",
+                      .select = open_browse,
+                      .context = entry,
+                      .opens = true,
+                      .shown = shelf_present,
+                      .shown_context = entry};
+}
+
 static void build_home(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
     screens->home_items[0] = app_screens_open_item("Music", &screens->music.screen);
-    screens->home_items[1] = app_screens_open_item("Settings", &screens->settings.menu.screen);
-    screens->home_items[2] = app_screens_open_item("Diagnostics", &screens->diagnostics.screen);
-    screens->home_items[3] = app_screens_open_item("Now Playing", &screens->now_playing.screen);
-    screens->home_items[3].shown = player_has_track;
-    screens->home_items[3].shown_context = context.player;
+    screens->home_items[1] = shelf_item(screens, context, SPOKEN_AUDIOBOOK);
+    screens->home_items[2] = shelf_item(screens, context, SPOKEN_PODCAST);
+    screens->home_items[3] = app_screens_open_item("Settings", &screens->settings.menu.screen);
+    screens->home_items[4] = app_screens_open_item("Diagnostics", &screens->diagnostics.screen);
+    screens->home_items[5] = app_screens_open_item("Now Playing", &screens->now_playing.screen);
+    screens->home_items[5].shown = player_has_track;
+    screens->home_items[5].shown_context = context.player;
     home_art_init(&screens->home_art, context.covers, context.store, context.player, theme);
     MenuConfig home = {.title = "EchoPod",
                        .items = screens->home_items,

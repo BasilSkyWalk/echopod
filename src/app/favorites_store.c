@@ -21,6 +21,7 @@ void favorites_store_load(FavoritesStore *store, const Library *library)
     uint8_t bytes[FAVORITES_FILE_CAPACITY];
     uint32_t length = 0;
     store->library = library;
+    store->revision++;
     if (!read_favorites(bytes, &length) || !favorites_decode(bytes, length, &store->favorites)) {
         favorites_clear(&store->favorites);
     }
@@ -46,6 +47,7 @@ FavoriteResult favorites_store_toggle_album(FavoritesStore *store, uint16_t albu
         return (FavoriteResult){.change = FAVORITE_FULL, .saved = true};
     }
     favorites_toggle(&store->favorites, key);
+    store->revision++;
     FavoriteChange change = present ? FAVORITE_REMOVED : FAVORITE_ADDED;
     return (FavoriteResult){.change = change, .saved = save(store)};
 }

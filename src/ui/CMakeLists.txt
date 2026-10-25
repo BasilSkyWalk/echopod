@@ -21,5 +21,5 @@ add_library(echo_ui STATIC
 target_include_directories(echo_ui PUBLIC include)
 target_link_libraries(echo_ui
     PUBLIC echo_core echo_gfx
-    PRIVATE echo_options
+    PRIVATE echo_options echo_compact
 )

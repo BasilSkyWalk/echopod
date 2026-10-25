@@ -217,7 +217,7 @@ void board_display_service(void)
         return;
     }
     uint32_t percent = backlight_ramp_percent(backlight_percent(brightness), elapsed_ms);
-    register_write(PWM_DUTY, pwm_period * percent / 100u);
+    register_write(PWM_DUTY, backlight_duty(pwm_period, percent));
 }
 
 void board_backlight_off(void)

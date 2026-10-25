@@ -73,6 +73,8 @@ static uint32_t stopped_since_ms;
 static bool tone_active;
 static char last_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint8_t volume_level;
+static uint8_t extra_attenuation;
+static void (*stream_service)(void);
 static bool volume_set;
 static HalAudioOutput output_setting;
 static uint32_t last_jack_poll_ms;
@@ -274,7 +276,9 @@ static void update_consumed(void)
 
 static void serve_fade(void)
 {
-    if (engine_ready && transferring && !tone_active) {
+    if (stream_service != NULL) {
+        stream_service();
+    } else if (engine_ready && transferring && !tone_active) {
         update_consumed();
         pump(consumed);
     }
@@ -448,7 +452,8 @@ static DacCurve output_curve(void)
 static void apply_volume(void)
 {
     if (volume_set) {
-        dac_path_set_volume(dac_volume_value(volume_level, output_curve()));
+        uint32_t value = dac_volume_value(volume_level, output_curve()) + extra_attenuation;
+        dac_path_set_volume(value < DAC_VOLUME_MUTED ? (uint8_t)value : DAC_VOLUME_MUTED);
     }
 }
 
@@ -598,6 +603,10 @@ void hal_audio_service(void)
     if ((transferring || tone_active) && dac_path_take_underrun()) {
         stats.output_underruns++;
     }
+    if (stream_service != NULL) {
+        stream_service();
+        return;
+    }
     if (!engine_ready || !transferring || tone_active) {
         return;
     }
@@ -710,4 +719,61 @@ void board_audio_shut_down(void)
     stop_path();
     board_core1_stop();
     using_core1 = false;
+}
+
+uint8_t board_audio_volume_level(void)
+{
+    return volume_level;
+}
+
+void board_audio_set_attenuation(uint8_t steps)
+{
+    extra_attenuation = steps;
+    apply_volume();
+}
+
+static void clear_ring(void)
+{
+    for (uint32_t index = 0; index < RING_WORDS; index++) {
+        music_ring[index] = 0;
+    }
+}
+
+bool board_audio_stream_open(uint32_t rate, void (*service)(void))
+{
+    ensure_engine();
+    ensure_audio_clock();
+    board_audio_shut_down();
+    clear_ring();
+    stream_service = service;
+    return ensure_path(rate);
+}
+
+uint32_t *board_audio_stream_ring(uint32_t *frames)
+{
+    *frames = RING_FRAMES;
+    return music_ring;
+}
+
+bool board_audio_stream_play(void)
+{
+    return start_transfer(RING_WORDS, true);
+}
+
+void board_audio_stream_pause(void)
+{
+    clear_ring();
+    stop_transfer();
+}
+
+uint32_t board_audio_stream_consumed(void)
+{
+    update_consumed();
+    return transferring ? consumed : 0;
+}
+
+void board_audio_stream_close(void)
+{
+    stream_service = NULL;
+    board_audio_shut_down();
 }

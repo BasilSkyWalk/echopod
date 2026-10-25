@@ -19,6 +19,11 @@ target_compile_options(echo_options INTERFACE
     -Wformat=2
 )
 
+add_library(echo_compact INTERFACE)
+if(CMAKE_CROSSCOMPILING)
+    target_compile_options(echo_compact INTERFACE -Os)
+endif()
+
 if(ECHO_SANITIZE)
     target_compile_options(echo_options INTERFACE
         -fsanitize=undefined

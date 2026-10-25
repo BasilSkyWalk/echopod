@@ -60,12 +60,34 @@ add_library(echo_device_logic STATIC
     start_record.c
     sd_card.c
     stall_watch.c
+    stream_drift.c
     tick_clock.c
     updater.c
+    usb_audio.c
+    usb_audio_sink.c
     usb_device.c
     usb_fallback.c
     wav_source.c
 )
+if(CMAKE_CROSSCOMPILING)
+    set_source_files_properties(
+        bt_module.c
+        core1_control.c
+        dac_sequence.c
+        emmc_layout.c
+        exfat_create.c
+        fat_create.c
+        fat_reserve.c
+        image_crc.c
+        panic_text.c
+        sd_card.c
+        start_record.c
+        updater.c
+        usb_audio.c
+        usb_device.c
+        PROPERTIES COMPILE_OPTIONS -Os
+    )
+endif()
 target_include_directories(echo_device_logic PUBLIC include)
 target_link_libraries(echo_device_logic
     PUBLIC echo_core echo_hal echo_codec echo_libmad

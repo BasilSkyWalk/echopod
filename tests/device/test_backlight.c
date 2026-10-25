@@ -23,10 +23,27 @@ static void the_pwm_runs_at_ten_kilohertz_from_pclk(void)
     BacklightPwm pwm = backlight_pwm(48000000u, 47);
     CHECK(!pwm.full);
     CHECK_EQUAL(4800u, pwm.period);
-    CHECK_EQUAL(2256u, pwm.duty);
     pwm = backlight_pwm(24000000u, 47);
     CHECK_EQUAL(2400u, pwm.period);
-    CHECK_EQUAL(1128u, pwm.duty);
+}
+
+static void the_duty_register_counts_the_time_the_backlight_is_off(void)
+{
+    CHECK_EQUAL(2544u, backlight_pwm(48000000u, 47).duty);
+    CHECK_EQUAL(1272u, backlight_pwm(24000000u, 47).duty);
+    CHECK_EQUAL(2208u, backlight_duty(2400u, 8));
+    CHECK_EQUAL(480u, backlight_duty(2400u, 80));
+    CHECK_EQUAL(0u, backlight_duty(2400u, 100));
+}
+
+static void brighter_levels_hold_the_pin_low_for_less_of_the_period(void)
+{
+    uint32_t previous = UINT32_MAX;
+    for (uint8_t level = HAL_DISPLAY_BRIGHTNESS_MIN; level < HAL_DISPLAY_BRIGHTNESS_MAX; level++) {
+        uint32_t duty = backlight_pwm(24000000u, backlight_percent(level)).duty;
+        CHECK(duty < previous);
+        previous = duty;
+    }
 }
 
 static void full_brightness_skips_the_pwm(void)
@@ -55,6 +72,8 @@ int main(void)
         TEST_CASE(levels_get_brighter_up_to_full_at_the_top),
         TEST_CASE(levels_outside_the_range_are_clamped),
         TEST_CASE(the_pwm_runs_at_ten_kilohertz_from_pclk),
+        TEST_CASE(the_duty_register_counts_the_time_the_backlight_is_off),
+        TEST_CASE(brighter_levels_hold_the_pin_low_for_less_of_the_period),
         TEST_CASE(full_brightness_skips_the_pwm),
         TEST_CASE(the_fade_in_rises_from_dim_to_the_target),
         TEST_CASE(the_fade_in_to_full_stays_on_the_pwm_until_it_ends),

@@ -4,7 +4,12 @@
 #include <stdint.h>
 
 #include "device/msc.h"
+#include "device/usb_audio.h"
 #include "device/usb_device.h"
+
+enum {
+    USB_PORT_PACKET_WORDS = (USB_AUDIO_MAX_PACKET + 3) / 4
+};
 
 typedef enum UsbConnectStep {
     USB_CONNECT_OK,
@@ -32,9 +37,13 @@ typedef struct UsbPort {
     bool high_speed_allowed;
     uint16_t bulk_packet;
     uint32_t setup[2];
-    uint32_t out_packet[USB_HIGH_SPEED_PACKET_SIZE / 4];
+    bool control_out_pending;
+    UsbSetup control_out;
+    uint32_t out_packet[USB_PORT_PACKET_WORDS];
     UsbDevice device;
     Msc *msc;
+    UsbAudio *audio;
+    void (*receive_stream)(const uint8_t *bytes, uint32_t length);
 } UsbPort;
 
 bool usb_vbus_present(void);
