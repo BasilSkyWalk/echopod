@@ -12,6 +12,11 @@ static const char INTRO_PATH[] =
     "/Music/Sigur R\xc3\xb3s/\xc3\x81g\xc3\xa6tis byrjun/01 Intro.flac";
 static const char EMOJI_PATH[] = "/Music/\xf0\x9f\x8e\xb5 Emoji/track.mp3";
 
+enum {
+    UTC_2026_HALF_SECONDS = 883612800,
+    UTC_2027_HALF_SECONDS = 899380800
+};
+
 typedef struct Card {
     SparseCard sparse;
     FatVolume volume;
@@ -426,6 +431,16 @@ static Listing list(Card *card, const char *path, const char *wanted)
     return listing;
 }
 
+static void check_written_in_2026(const char *name, uint32_t modified)
+{
+    if (strcmp(name, "exfat_mbr") == 0) {
+        CHECK(modified >= UTC_2026_HALF_SECONDS && modified < UTC_2027_HALF_SECONDS);
+        return;
+    }
+    CHECK_EQUAL(2026u, (modified >> 25) + 1980u);
+    CHECK_EQUAL(10u, modified >> 21 & 15u);
+}
+
 static void check_root_listing(const char *name)
 {
     Card *card = mounted(name);
@@ -436,8 +451,8 @@ static void check_root_listing(const char *name)
     CHECK(notes.found);
     CHECK(!notes.match.file.directory);
     CHECK_EQUAL(700, notes.match.file.size);
-    CHECK_EQUAL(2026u, (notes.match.modified >> 25) + 1980u);
-    CHECK_EQUAL(10u, notes.match.modified >> 21 & 15u);
+    CHECK_EQUAL(700, notes.match.listed_size);
+    check_written_in_2026(name, notes.match.modified);
     CHECK(list(card, "/", "README.TXT").found);
     CHECK(list(card, "/", ".echo").found);
     CHECK(!list(card, "/", ".").found);
@@ -507,6 +522,15 @@ static void a_file_is_not_a_directory_to_list(void)
     sparse_card_free(&card->sparse);
 }
 
+static void exfat_times_become_utc_half_seconds_from_their_offset(void)
+{
+    CHECK_EQUAL(891888371u, fat_exfat_utc_stamp(0x5CEB984Bu, 0x96));
+    CHECK_EQUAL(891908171u, fat_exfat_utc_stamp(0x5CEB984Bu, 0xEA));
+    CHECK_EQUAL(891898271u, fat_exfat_utc_stamp(0x5CEB984Bu, 0x16));
+    CHECK_EQUAL(157766400u, fat_exfat_utc_stamp(0x00210000u, 0x80));
+    CHECK_EQUAL(2051222399u, fat_exfat_utc_stamp(0xEF9FBF7Du, 0x00));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -538,6 +562,7 @@ int main(void)
         TEST_CASE(the_fat32_root_lists_its_files_and_folders),
         TEST_CASE(the_fat16_root_lists_its_files_and_folders),
         TEST_CASE(the_exfat_root_lists_its_files_and_folders),
+        TEST_CASE(exfat_times_become_utc_half_seconds_from_their_offset),
         TEST_CASE(fat32_folders_list_long_unicode_names),
         TEST_CASE(exfat_folders_list_long_unicode_names),
         TEST_CASE(a_listed_file_opens_and_reads),

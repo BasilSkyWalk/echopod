@@ -8,6 +8,17 @@ enum {
     ENTRY_FILE = 0x85,
     ENTRY_STREAM = 0xC0,
     MODIFIED_TIMESTAMP = 12,
+    MODIFIED_UTC_OFFSET = 23,
+    UTC_OFFSET_VALID = 0x80,
+    UTC_OFFSET_NEGATIVE = 0x40,
+    UTC_OFFSET_QUARTERS = 0x7F,
+    UTC_OFFSET_RANGE = 0x80,
+    SECONDS_PER_QUARTER_HOUR = 900,
+    SECONDS_PER_DAY = 86400,
+    DAYS_PER_ERA = 146097,
+    YEARS_PER_ERA = 400,
+    DAYS_BEFORE_UNIX_EPOCH = 719468,
+    FIRST_FAT_YEAR = 1980,
     ENTRY_NAME = 0xC1,
     ATTRIBUTE_HIDDEN = 0x02,
     ATTRIBUTE_DIRECTORY = 0x10,
@@ -27,6 +38,7 @@ typedef struct EntrySet {
     uint8_t secondaries;
     uint8_t name_length;
     uint32_t modified;
+    uint8_t utc_offset;
     bool directory;
     bool hidden;
     bool contiguous;
@@ -64,9 +76,41 @@ static void read_names(FatVolume *volume, FatFile *directory, uint32_t first, co
     }
 }
 
+static uint32_t days_from_civil(uint32_t year, uint32_t month, uint32_t day)
+{
+    uint32_t shifted = month <= 2 ? year - 1u : year;
+    uint32_t era = shifted / YEARS_PER_ERA;
+    uint32_t year_of_era = shifted - era * YEARS_PER_ERA;
+    uint32_t day_of_year = (153u * ((month + 9u) % 12u) + 2u) / 5u + day - 1u;
+    uint32_t day_of_era = year_of_era * 365u + year_of_era / 4u - year_of_era / 100u + day_of_year;
+    return era * DAYS_PER_ERA + day_of_era - DAYS_BEFORE_UNIX_EPOCH;
+}
+
+static int32_t utc_offset_half_seconds(uint8_t utc_offset)
+{
+    if ((utc_offset & UTC_OFFSET_VALID) == 0) {
+        return 0;
+    }
+    int32_t quarters = utc_offset & UTC_OFFSET_QUARTERS;
+    if ((utc_offset & UTC_OFFSET_NEGATIVE) != 0) {
+        quarters -= UTC_OFFSET_RANGE;
+    }
+    return quarters * (SECONDS_PER_QUARTER_HOUR / 2);
+}
+
+uint32_t fat_exfat_utc_stamp(uint32_t timestamp, uint8_t utc_offset)
+{
+    uint32_t date = timestamp >> 16;
+    uint32_t days = days_from_civil(FIRST_FAT_YEAR + (date >> 9), date >> 5 & 15u, date & 31u);
+    uint32_t clock =
+        (timestamp >> 11 & 31u) * 1800u + (timestamp >> 5 & 63u) * 30u + (timestamp & 31u);
+    uint32_t local = days * (SECONDS_PER_DAY / 2) + clock;
+    return local - (uint32_t)utc_offset_half_seconds(utc_offset);
+}
+
 static bool file_from_set(const EntrySet *set, FatFile *found)
 {
-    uint32_t high = set->directory ? set->data_high : set->valid_high;
+    uint32_t high = set->directory ? set->data_high : set->valid_high | set->data_high;
     uint32_t size = set->directory ? set->data_low : set->valid_low;
     if (high != 0 || (set->directory && size == 0)) {
         return false;
@@ -85,6 +129,7 @@ static bool read_set(FatVolume *volume, FatFile *directory, uint32_t index, Entr
     set->directory = (fat_le16(entry + 4) & ATTRIBUTE_DIRECTORY) != 0;
     set->hidden = (fat_le16(entry + 4) & ATTRIBUTE_HIDDEN) != 0;
     set->modified = fat_le32(entry + MODIFIED_TIMESTAMP);
+    set->utc_offset = entry[MODIFIED_UTC_OFFSET];
     return set->secondaries >= MINIMUM_SECONDARIES && set->secondaries <= MAXIMUM_SECONDARIES &&
            read_stream(volume, directory, index + 1, set);
 }
@@ -129,7 +174,8 @@ bool exfat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *foun
         read_names(volume, &cursor->directory, index + 1, &set);
         if (file_from_set(&set, &found->file)) {
             found->hidden = set.hidden;
-            found->modified = set.modified;
+            found->modified = fat_exfat_utc_stamp(set.modified, set.utc_offset);
+            found->listed_size = set.data_low;
             fat_utf8_from_units(volume->long_name, set.name_length, found->name,
                                 sizeof found->name);
             return true;

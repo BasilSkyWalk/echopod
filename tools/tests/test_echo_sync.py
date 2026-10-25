@@ -19,7 +19,8 @@ from test_library_index import write_silent_flac
 
 SCAN_RECORD = struct.Struct("<4sIII16s")
 MEBIBYTE = 1024 * 1024
-FIXED_UTC = echo_sync.CardVolume("FAT32", True, False, 0, False, "")
+FIXED_UTC = echo_sync.CardVolume("FAT32", True, False, 0, "")
+EXFAT = echo_sync.CardVolume("exFAT", True, True, 0, "")
 
 
 class MemoryCard:
@@ -151,7 +152,7 @@ class StampTest(unittest.TestCase):
         self.assertEqual(0, echo_sync.dos_stamp(-11644473600))
 
     def test_a_fixed_offset_shifts_utc_to_the_cards_clock(self):
-        volume = echo_sync.CardVolume("FAT32", True, False, 3600, False, "")
+        volume = echo_sync.CardVolume("FAT32", True, False, 3600, "")
         stat = FakeStat(datetime(2025, 3, 1, 10, 0, 0, tzinfo=timezone.utc))
         entry = echo_sync.host_entry(FakeEntry("a.flac", stat), volume)
         self.assertEqual(echo_sync.dos_stamp(stat.st_mtime_ns // 10 ** 9 + 3600), entry.modified)
@@ -163,16 +164,21 @@ class StampTest(unittest.TestCase):
         self.assertEqual(exact.modified,
                          echo_sync.host_entry(FakeEntry("a.flac", later), FIXED_UTC).modified)
 
-    def test_exfat_times_use_the_offset_in_force_when_the_file_was_written(self):
-        volume = echo_sync.CardVolume("exFAT", True, True, 0, True, "")
-        stat = FakeStat(datetime(2020, 1, 1, tzinfo=timezone.utc),
-                        birth=datetime(2025, 7, 1, tzinfo=timezone.utc).timestamp())
-        entry = echo_sync.host_entry(FakeEntry("a.flac", stat), volume)
-        offset = echo_sync.offset_at(stat.st_birthtime)
-        self.assertEqual(echo_sync.dos_stamp(stat.st_mtime_ns // 10 ** 9 + offset), entry.modified)
+    def test_exfat_times_are_utc_half_seconds_as_the_player_computes(self):
+        written = datetime(2026, 7, 11, 13, 32, 22, tzinfo=timezone.utc)
+        entry = echo_sync.host_entry(FakeEntry("a.flac", FakeStat(written)), EXFAT)
+        self.assertEqual(891888371, entry.modified)
+        later = FakeStat(written, extra_ns=1_990_000_000)
+        self.assertEqual(891888371, echo_sync.host_entry(FakeEntry("a.flac", later), EXFAT).modified)
+
+    def test_exfat_needs_no_time_zone_guess_on_any_computer(self):
+        for platform in ("win32", "darwin", "linux"):
+            volume = echo_sync.card_volume("exFAT", "", platform)
+            self.assertTrue(volume.exfat)
+            self.assertEqual("", volume.caveat)
 
     def test_exfat_files_of_4_gib_or_more_are_left_out_as_the_player_does(self):
-        volume = echo_sync.CardVolume("exFAT", True, True, 0, True, "")
+        volume = EXFAT
         stat = FakeStat(datetime(2025, 1, 1, tzinfo=timezone.utc), size=1 << 32)
         self.assertIsNone(echo_sync.host_entry(FakeEntry("big.wav", stat), volume))
         self.assertIsNotNone(echo_sync.host_entry(FakeEntry("big.wav", stat), FIXED_UTC))

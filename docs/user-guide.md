@@ -103,8 +103,8 @@ It reads the whole card, as the player does, and writes `library.db`, `covers.bi
 **When the player rescans anyway.** If the fingerprints differ, the player rescans as it would without the computer, and nothing is lost. That happens when:
 
 - the music changed after the computer ran;
-- the card is exFAT (most cards over 32 GB) and its music was copied by a computer in another time zone, by Linux, or by a phone or camera. exFAT keeps a time-zone offset with each file time that computers don't show, so the computer assumes the music was copied by a computer set to its own time zone. FAT32 cards on Windows don't have this problem;
-- the computer is a Mac or runs Linux: how these read the card's file times hasn't been checked against the player yet;
+- the card is exFAT and a file's time was saved without a time-zone tag (modern Windows, macOS and Linux always add one; some cameras and old devices don't);
+- the card is FAT32 and the computer is a Mac or runs Linux: how these read FAT32 file times hasn't been checked against the player yet;
 - the card has folders more than 31 levels deep or paths longer than 1,023 bytes (the player can't fingerprint those);
 - a name was saved decomposed (for example by Linux) and read on a Mac, or only as an old DOS short name with accented letters.
 
