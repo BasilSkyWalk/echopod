@@ -43,8 +43,6 @@ SEM_FAILCRITICALERRORS = 0x0001
 MAC_MOUNT_LINE = re.compile(r"^.* on (.+) \(([^,)]+)(?:, ([^)]*))?\)$")
 MOUNT_ESCAPE = re.compile(r"\\([0-7]{3})")
 REQUIREMENTS = Path(__file__).resolve().with_name("requirements.txt")
-EXFAT_CAVEAT = ("exFAT file times are matched assuming the music was copied by a computer set to "
-                "this time zone; if the player still rescans, see docs/user-guide.md")
 MAC_CAVEAT = ("on a Mac the player's file times are a best guess; after the player has scanned "
               "the card, --check shows whether they match")
 LINUX_CAVEAT = ("on Linux the card's file times are read as UTC (or the mount's time_offset); "
@@ -87,13 +85,7 @@ class CardVolume:
     supported: bool
     exfat: bool
     fixed_offset: int
-    offset_when_written: bool
     caveat: str
-
-    def offset(self, stat):
-        if self.offset_when_written:
-            return offset_at(last_write_seconds(stat))
-        return self.fixed_offset
 
 
 @dataclass
@@ -174,20 +166,6 @@ def current_offset():
     return time.localtime().tm_gmtoff
 
 
-def offset_at(seconds):
-    try:
-        return time.localtime(seconds).tm_gmtoff
-    except (OSError, OverflowError, ValueError):
-        return current_offset()
-
-
-def last_write_seconds(stat):
-    birth = getattr(stat, "st_birthtime", None)
-    if birth is None and sys.platform == "win32":
-        birth = stat.st_ctime
-    return stat.st_mtime if birth is None else max(birth, stat.st_mtime)
-
-
 def card_name(name, platform=sys.platform):
     if platform == "win32":
         return name.encode("utf-8", "surrogatepass")
@@ -196,14 +174,20 @@ def card_name(name, platform=sys.platform):
     return name.encode("utf-8", "surrogateescape")
 
 
+def card_stamp(stat, volume):
+    seconds = stat.st_mtime_ns // NANOSECONDS
+    if volume.exfat:
+        return seconds // 2 & WORD_MASK
+    return dos_stamp(seconds + volume.fixed_offset)
+
+
 def host_entry(entry, volume):
     stat = entry.stat(follow_symlinks=False)
     directory = entry.is_dir(follow_symlinks=False)
     if volume.exfat and not directory and stat.st_size >= EXFAT_SIZE_LIMIT:
         return None
-    local_seconds = stat.st_mtime_ns // NANOSECONDS + volume.offset(stat)
     return CardEntry(card_name(entry.name), directory, 0 if directory else stat.st_size,
-                     dos_stamp(local_seconds), entry.path)
+                     card_stamp(stat, volume), entry.path)
 
 
 def host_lister(volume):
@@ -365,14 +349,15 @@ def card_volume(name, options="", platform=sys.platform):
     kind = (name or "").lower()
     exfat = kind in EXFAT_NAMES
     if kind not in FAT_NAMES and not exfat:
-        return CardVolume(name or "unknown", False, False, current_offset(), False, OTHER_CAVEAT)
+        return CardVolume(name or "unknown", False, False, current_offset(), OTHER_CAVEAT)
     label = "exFAT" if exfat else "FAT32" if kind == "fat32" else "FAT"
+    if exfat:
+        return CardVolume(label, True, True, 0, "")
     if platform.startswith("linux"):
-        return CardVolume(label, True, exfat, mount_option_offset(options), False, LINUX_CAVEAT)
+        return CardVolume(label, True, False, mount_option_offset(options), LINUX_CAVEAT)
     if platform == "win32":
-        return CardVolume(label, True, exfat, current_offset(), exfat,
-                          EXFAT_CAVEAT if exfat else "")
-    return CardVolume(label, True, exfat, current_offset(), exfat, MAC_CAVEAT)
+        return CardVolume(label, True, False, current_offset(), "")
+    return CardVolume(label, True, False, current_offset(), MAC_CAVEAT)
 
 
 def detect_volume(card):

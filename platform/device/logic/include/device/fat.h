@@ -69,10 +69,12 @@ typedef struct FatDirEntry {
     FatFile file;
     bool hidden;
     uint32_t modified;
+    uint32_t listed_size;
     char name[FAT_NAME_CAPACITY];
 } FatDirEntry;
 
 bool fat_mount(FatVolume *volume, BlockDevice device);
+uint32_t fat_exfat_utc_stamp(uint32_t timestamp, uint8_t utc_offset);
 bool fat_open_directory(FatVolume *volume, const char *path, FatDirCursor *cursor);
 bool fat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *entry);
 bool fat_open(FatVolume *volume, const char *path, FatFile *file);
