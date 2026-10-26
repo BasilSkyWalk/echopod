@@ -95,7 +95,7 @@ Headless runs use a virtual clock, so scripted screenshots are deterministic.
 | Back | Back; hold to go home | Back; hold to go home | Cancel |
 | Power | Screen off or on; hold 2 s to turn off | Same | Same |
 
-The screen turns off after the screen timeout or a tap of Power. With the screen off, ▶‖ pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks, all without waking the screen; Power turns it back on.
+The screen turns off after the screen timeout or a tap of Power. With the screen off, Play pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks, all without waking the screen; Power turns it back on.
 
 Home also lists Audiobooks and Podcasts when the card has an `Audiobooks` or `Podcasts` folder: every book and episode remembers where you stopped, plays in order, and hold vol± jumps 30 s forward or 15 s back. Books and episodes stay out of the Music lists (`docs/user-guide.md`).
 
