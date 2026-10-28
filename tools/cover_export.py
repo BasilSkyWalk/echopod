@@ -1,5 +1,6 @@
 import argparse
 import io
+import posixpath
 import struct
 import sys
 from dataclasses import dataclass, field
@@ -25,6 +26,14 @@ ASF_PICTURE_HEAD = struct.Struct("<BI")
 FOLDER_IMAGE_STEMS = ("cover", "folder", "front", "albumart")
 FOLDER_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png")
 MAX_COVERS = 0xFFFF
+STAMP = struct.Struct("<I")
+STAMP_NUMBERS = struct.Struct("<III")
+RECORD_BYTES = (FULL_SIZE * FULL_SIZE + HALF_SIZE * HALF_SIZE) * 2
+SLOT_BYTES = ENTRY.size + STAMP.size + RECORD_BYTES
+EMBEDDED_ART = 1
+FILE_ART = 2
+WORD_MASK = 0xFFFFFFFF
+UNKNOWN_STAMP = 0
 
 
 @dataclass
@@ -33,6 +42,21 @@ class AlbumSource:
     title: str
     artist: str
     paths: list = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Art:
+    data: bytes
+    file: Path
+    relative: str
+    picture_length: int = None
+
+
+@dataclass
+class CoverSet:
+    records: dict = field(default_factory=dict)
+    stamps: dict = field(default_factory=dict)
+    missing: list = field(default_factory=list)
 
 
 def fnv1a(data, start=FNV_OFFSET):
@@ -147,32 +171,81 @@ def embedded_pictures(path):
     return pictures
 
 
+def name_order(path):
+    return path.name.encode("utf-8", "surrogateescape")
+
+
 def folder_image(folder):
     try:
-        candidates = sorted(path for path in folder.iterdir() if path.is_file())
+        candidates = sorted((path for path in folder.iterdir() if path.is_file()), key=name_order)
     except OSError:
         return None
     for stem in FOLDER_IMAGE_STEMS:
         for path in candidates:
             if path.stem.lower() == stem and path.suffix.lower() in FOLDER_IMAGE_SUFFIXES:
-                return path.read_bytes()
+                return path
     return None
 
 
-def find_art(root, relative_paths):
-    if not relative_paths:
-        return None
-    pictures = embedded_pictures(root / relative_paths[0])
+def chosen_picture(pictures):
     for picture_type, data in pictures:
         if picture_type == FRONT_COVER:
             return data
-    if pictures:
-        return pictures[0][1]
-    for folder in dict.fromkeys((root / relative).parent for relative in relative_paths):
-        data = folder_image(folder)
-        if data is not None:
-            return data
+    return pictures[0][1] if pictures else None
+
+
+def folder_art(root, relative_paths):
+    for folder in dict.fromkeys(posixpath.dirname(relative) for relative in relative_paths):
+        image = folder_image(root / folder)
+        if image is not None:
+            try:
+                return Art(image.read_bytes(), image, posixpath.join(folder, image.name))
+            except OSError:
+                return None
     return None
+
+
+def locate_art(root, relative_paths):
+    if not relative_paths:
+        return None
+    first = relative_paths[0]
+    picture = chosen_picture(embedded_pictures(root / first))
+    if picture is not None:
+        return Art(picture, root / first, first, len(picture))
+    return folder_art(root, relative_paths)
+
+
+def find_art(root, relative_paths):
+    art = locate_art(root, relative_paths)
+    return None if art is None else art.data
+
+
+def art_stamp(card_path, first, second, third):
+    numbers = STAMP_NUMBERS.pack(first & WORD_MASK, second & WORD_MASK, third & WORD_MASK)
+    return fnv1a(numbers, fnv1a(card_path))
+
+
+def file_card_path(art, name):
+    folder = posixpath.dirname(art.relative).encode("utf-8")
+    return b"/" + (folder + b"/" if folder else b"") + name
+
+
+def stamp_for(art, describe=None):
+    try:
+        size = art.file.stat().st_size
+    except OSError:
+        return UNKNOWN_STAMP
+    if art.picture_length is not None:
+        card_path = b"/" + art.relative.encode("utf-8")
+        return art_stamp(card_path, size, art.picture_length, EMBEDDED_ART)
+    try:
+        described = None if describe is None else describe(art.file)
+    except OSError:
+        described = None
+    if described is None:
+        return UNKNOWN_STAMP
+    name, modified = described
+    return art_stamp(file_card_path(art, name), size, modified, FILE_ART)
 
 
 def album_sources(model):
@@ -241,6 +314,31 @@ def encode_covers(images):
     return encode_records({key: cover_record(images[key]) for key in sorted(images)[:MAX_COVERS]})
 
 
+def stamped_layout(capacity):
+    slots = min(max(capacity - HEADER.size, 0) // SLOT_BYTES, MAX_COVERS)
+    stamps_start = HEADER.size + slots * ENTRY.size
+    return slots, stamps_start, stamps_start + slots * STAMP.size
+
+
+def stamped_size(count):
+    return HEADER.size + count * SLOT_BYTES
+
+
+def encode_stamped(records, stamps, capacity):
+    slots, stamps_start, records_start = stamped_layout(capacity)
+    keys = sorted(records)[:slots]
+    data = bytearray(records_start + len(keys) * RECORD_BYTES)
+    HEADER.pack_into(data, 0, MAGIC, VERSION, len(keys), FULL_SIZE, HALF_SIZE, stamps_start)
+    for index, key in enumerate(keys):
+        if len(records[key]) != RECORD_BYTES:
+            raise ValueError(f"cover record for {key:08x} is {len(records[key])} bytes")
+        offset = records_start + index * RECORD_BYTES
+        ENTRY.pack_into(data, HEADER.size + index * ENTRY.size, key, offset)
+        STAMP.pack_into(data, stamps_start + index * STAMP.size, stamps.get(key, UNKNOWN_STAMP))
+        data[offset:offset + RECORD_BYTES] = records[key]
+    return bytes(data)
+
+
 def load_image(data):
     from PIL import Image
     image = Image.open(io.BytesIO(data))
@@ -252,21 +350,31 @@ def unchanged(image):
     return image
 
 
-def collect_images(root, sources, convert=unchanged):
-    images, missing = {}, []
+def converted(art, convert):
+    try:
+        return None if art is None else convert(load_image(art.data))
+    except Exception:
+        return None
+
+
+def collect_covers(root, sources, convert=unchanged, describe=None):
+    covers = CoverSet()
     for source in sources:
-        if source.key in images:
+        if source.key in covers.records:
             continue
-        data = find_art(root, source.paths)
-        try:
-            image = None if data is None else convert(load_image(data))
-        except Exception:
-            image = None
+        art = locate_art(root, source.paths)
+        image = converted(art, convert)
         if image is None:
-            missing.append(f"{source.artist} - {source.title}")
+            covers.missing.append(f"{source.artist} - {source.title}")
         else:
-            images[source.key] = image
-    return images, missing
+            covers.records[source.key] = image
+            covers.stamps[source.key] = stamp_for(art, describe)
+    return covers
+
+
+def collect_images(root, sources, convert=unchanged):
+    covers = collect_covers(root, sources, convert)
+    return covers.records, covers.missing
 
 
 def parse_arguments(argv):

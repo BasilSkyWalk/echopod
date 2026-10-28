@@ -12,6 +12,7 @@ from pathlib import Path
 TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS_DIRECTORY))
 
+import cover_export
 import echo_sync
 import library_index
 from test_cover_export import image_bytes
@@ -373,6 +374,27 @@ class SyncTest(unittest.TestCase):
                          echo_sync.stored_fingerprint(scan))
         self.assertIn("Eject the card safely", output.replace("eject", "Eject"))
         self.assertEqual(0, self.run_sync("--check")[0])
+
+    def test_covers_use_the_players_layout_for_the_cards_file(self):
+        self.prepare_echo()
+        status, output = self.run_sync()
+        self.assertEqual(0, status, output)
+        covers = (self.echo / "covers.bin").read_bytes()
+        slots, stamps_start, records_start = cover_export.stamped_layout(MEBIBYTE)
+        self.assertEqual(stamps_start, struct.unpack_from("<I", covers, 12)[0])
+        self.assertEqual(records_start, struct.unpack_from("<I", covers, 20)[0])
+        art = cover_export.locate_art(self.card, ["Artist/Album/01 - Song.flac"])
+        describe = echo_sync.art_describer(echo_sync.detect_volume(self.card))
+        stamp = cover_export.stamp_for(art, describe)
+        self.assertEqual(stamp, struct.unpack_from("<I", covers, stamps_start)[0])
+
+    def test_cover_files_are_described_with_the_players_name_and_time(self):
+        image = self.card / "Artist" / "Album" / "cover.png"
+        describe = echo_sync.art_describer(FIXED_UTC)
+        expected = echo_sync.card_stamp(image.stat(), FIXED_UTC)
+        self.assertEqual((b"cover.png", expected), describe(image))
+        unsupported = echo_sync.CardVolume("NTFS", False, False, 0, "")
+        self.assertIsNone(echo_sync.art_describer(unsupported))
 
     def test_the_firmware_tag_in_scan_bin_is_kept(self):
         self.prepare_echo()

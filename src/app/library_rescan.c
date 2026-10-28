@@ -38,6 +38,7 @@ typedef struct RescanFiles {
     HalDir dir;
     HalFile file;
     HalFile library;
+    HalFile covers;
     HalFile scratch;
     HalDirEntry entry;
     RescanProgress progress;
@@ -63,6 +64,7 @@ static bool next_entry(void *context, ScanEntry *entry)
         return false;
     }
     entry->directory = files->entry.directory;
+    entry->modified = files->entry.modified;
     for (size_t index = 0; index < sizeof entry->name; index++) {
         entry->name[index] = files->entry.name[index];
     }
@@ -75,12 +77,12 @@ static void close_dir(void *context)
     hal_dir_close(&files->dir);
 }
 
-static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
+static bool read_handle(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
-    RescanFiles *files = context;
+    const HalFile *file = context;
     hal_system_keep_alive();
     uint32_t since = hal_clock_microseconds();
-    bool read = hal_file_read(files->file, offset, buffer, length);
+    bool read = hal_file_read(*file, offset, buffer, length);
     spend(TIME_READ, since);
     return read;
 }
@@ -94,7 +96,7 @@ static bool open_file(void *context, const char *path, ByteSource *source, uint3
     if (!opened) {
         return false;
     }
-    *source = (ByteSource){.read = read_file, .context = files};
+    *source = (ByteSource){.read = read_handle, .context = &files->file};
     *size = files->file.size;
     return true;
 }
@@ -120,16 +122,6 @@ static bool write_library(void *context, uint32_t offset, const void *bytes, uin
     return timed_write(LIBRARY_STORE_PATH, offset, bytes, length);
 }
 
-static bool read_scratch(void *context, uint32_t offset, void *bytes, uint32_t length)
-{
-    RescanFiles *files = context;
-    hal_system_keep_alive();
-    uint32_t since = hal_clock_microseconds();
-    bool read = hal_file_read(files->scratch, offset, bytes, length);
-    spend(TIME_READ, since);
-    return read;
-}
-
 static bool write_scratch(void *context, uint32_t offset, const void *bytes, uint32_t length)
 {
     (void)context;
@@ -144,16 +136,6 @@ static void report(void *context, uint32_t files, uint32_t tracks)
     if (rescan->progress.tracks != NULL) {
         rescan->progress.tracks(files, tracks);
     }
-}
-
-static bool read_library(void *context, uint32_t offset, void *buffer, uint32_t length)
-{
-    RescanFiles *files = context;
-    hal_system_keep_alive();
-    uint32_t since = hal_clock_microseconds();
-    bool read = hal_file_read(files->library, offset, buffer, length);
-    spend(TIME_READ, since);
-    return read;
 }
 
 static bool write_covers(void *context, uint32_t offset, const void *bytes, uint32_t length)
@@ -198,24 +180,29 @@ static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *sca
 {
     RescanFiles *files = scan->files.context;
     uint32_t capacity = reserved_size_of(COVER_CACHE_PATH);
-    *stats = (CoverStats){.albums = 0, .covers = 0, .missing = 0};
+    *stats = (CoverStats){.albums = 0, .covers = 0, .reused = 0, .missing = 0};
     if (capacity == 0) {
         return SCAN_NO_ROOM;
     }
     if (!hal_file_open(&files->library, LIBRARY_STORE_PATH)) {
         return SCAN_WRITE_FAILED;
     }
+    bool previous = hal_file_open(&files->covers, COVER_CACHE_PATH);
     CoverJob job = {
         .files = scan->files,
-        .library = {read_library, files},
+        .library = {read_handle, &files->library},
         .library_size = files->library.size,
         .sink = {write_covers, NULL},
+        .previous = {previous ? read_handle : NULL, &files->covers},
         .capacity = capacity,
         .memory = scan->memory,
         .size = scan->size,
         .progress = {report_covers, files},
     };
     ScanResult result = entry->covers(&job, stats);
+    if (previous) {
+        hal_file_close(&files->covers);
+    }
     hal_file_close(&files->library);
     return result;
 }
@@ -271,7 +258,7 @@ RescanOutcome library_rescan_run(RescanProgress progress)
         .size = size,
         .listing = listing,
         .listing_size = listing_size,
-        .scratch = {read_scratch, write_scratch, &files, files.scratch.size},
+        .scratch = {read_handle, write_scratch, &files.scratch, files.scratch.size},
         .sink = {write_library, NULL},
         .capacity = capacity,
         .progress = {report, &files},

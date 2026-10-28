@@ -62,7 +62,7 @@ void jpeg_bits_reset(JpegBits *bits, ImageReader *reader)
     *bits = (JpegBits){.reader = reader, .buffer = 0, .count = 0, .padding = 0, .marker = false};
 }
 
-static uint32_t next_byte(JpegBits *bits)
+static uint32_t next_byte_slow(JpegBits *bits)
 {
     ImageReader *reader = bits->reader;
     while (!bits->marker) {
@@ -90,6 +90,19 @@ static uint32_t next_byte(JpegBits *bits)
         bits->failed = true;
     }
     return 0;
+}
+
+static uint32_t next_byte(JpegBits *bits)
+{
+    ImageReader *reader = bits->reader;
+    if (!bits->marker && !reader->failed && reader->cursor < reader->filled) {
+        uint8_t byte = reader->buffer[reader->cursor];
+        if (byte != BYTE_FF) {
+            reader->cursor++;
+            return byte;
+        }
+    }
+    return next_byte_slow(bits);
 }
 
 static void fill(JpegBits *bits)

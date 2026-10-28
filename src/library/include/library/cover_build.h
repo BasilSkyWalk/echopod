@@ -22,6 +22,7 @@ typedef struct CoverJob {
     ByteSource library;
     uint32_t library_size;
     ByteSink sink;
+    ByteSource previous;
     uint32_t capacity;
     void *memory;
     uint32_t size;
@@ -31,6 +32,7 @@ typedef struct CoverJob {
 typedef struct CoverStats {
     uint32_t albums;
     uint32_t covers;
+    uint32_t reused;
     uint32_t missing;
 } CoverStats;
 

@@ -14,7 +14,7 @@ Version 0.2.0 adds audiobooks and podcasts, USB DAC mode and echo-sync (`docs/re
 | Gapless playback and fades | device | DAC fades around play, pause, seek, skip and rate changes; MP3s trimmed by their LAME tag's encoder delay and padding (tested on a computer, not yet heard on the player) |
 | Resume after power-off | device | The exact queue and position come back |
 | Library built on the player | device | At first start, after music changes over USB, and from Settings → Rescan library; tested up to 6,558 tracks on the player and 20,000 on a computer; 1,563 tracks and 144 albums in about 1 min 45 s |
-| Album covers built on the player | device | Embedded art or `cover`/`folder`/`front`/`albumart` JPEG or PNG; room for 2,674 albums |
+| Album covers built on the player | device | Embedded art or `cover`/`folder`/`front`/`albumart` JPEG or PNG; room for 2,673 albums; a rescan decodes only new or changed art (simulator and tests; not yet timed on the player) |
 | Browse: Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists, Favorites | device | Fast scroll with letter jumps in A–Z lists |
 | Cover Flow | device | Every music album, by album artist |
 | Now Playing | device | Cover, progress, seek, modes, volume |

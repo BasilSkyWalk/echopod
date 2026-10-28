@@ -106,6 +106,13 @@ class ArtSearchTest(unittest.TestCase):
                                                  "Artist/Album/02 - Other.flac"])
         self.assertIsNone(data)
 
+    def test_folder_images_are_ordered_by_their_name_bytes_as_on_the_player(self):
+        (self.album / "folder.jpg").write_bytes(image_bytes((0, 0, 255), image_format="JPEG"))
+        (self.album / "Folder.png").write_bytes(image_bytes((255, 0, 0)))
+        if len(list(self.album.glob("*older*"))) < 2:
+            self.skipTest("the file system folds case")
+        self.assertEqual("Folder.png", cover_export.folder_image(self.album).name)
+
     def test_a_missing_track_counts_as_no_art(self):
         (self.album / "Folder.JPG").write_bytes(image_bytes((0, 0, 255), image_format="JPEG"))
         data = cover_export.find_art(self.root, ["Artist/Album/missing.flac"])
@@ -154,6 +161,81 @@ class EncodeCoversTest(unittest.TestCase):
         self.assertEqual(0x001F, struct.unpack_from("<H", data, first_offset)[0])
         half_start = second_offset + 112 * 112 * 2
         self.assertEqual(0xF800, struct.unpack_from("<H", data, half_start)[0])
+
+
+class ArtStampTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        self.album = self.root / "Artist" / "Album"
+        self.album.mkdir(parents=True)
+        self.track = self.album / "01 - Song.flac"
+        write_silent_flac(self.track, 1)
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def expected(self, path, numbers):
+        return cover_export.fnv1a(struct.pack("<III", *numbers), cover_export.fnv1a(path))
+
+    def test_embedded_art_hashes_the_track_path_size_and_picture_length(self):
+        picture = image_bytes((255, 0, 0))
+        add_picture(self.track, picture, 3)
+        art = cover_export.locate_art(self.root, ["Artist/Album/01 - Song.flac"])
+        numbers = (self.track.stat().st_size, len(picture), cover_export.EMBEDDED_ART)
+        self.assertEqual(self.expected(b"/Artist/Album/01 - Song.flac", numbers),
+                         cover_export.stamp_for(art))
+
+    def test_a_cover_file_hashes_its_card_path_size_and_time(self):
+        image = self.album / "cover.png"
+        image.write_bytes(image_bytes((0, 0, 255)))
+        art = cover_export.locate_art(self.root, ["Artist/Album/01 - Song.flac"])
+        stamp = cover_export.stamp_for(art, lambda path: (path.name.encode("utf-8"), 77))
+        numbers = (image.stat().st_size, 77, cover_export.FILE_ART)
+        self.assertEqual(self.expected(b"/Artist/Album/cover.png", numbers), stamp)
+
+    def test_a_cover_file_at_the_top_of_the_card_has_one_slash(self):
+        image = self.root / "cover.png"
+        image.write_bytes(image_bytes((0, 0, 255)))
+        write_silent_flac(self.root / "Song.flac", 1)
+        art = cover_export.locate_art(self.root, ["Song.flac"])
+        stamp = cover_export.stamp_for(art, lambda path: (path.name.encode("utf-8"), 5))
+        numbers = (image.stat().st_size, 5, cover_export.FILE_ART)
+        self.assertEqual(self.expected(b"/cover.png", numbers), stamp)
+
+    def test_a_cover_file_without_the_players_time_gets_no_stamp(self):
+        (self.album / "cover.png").write_bytes(image_bytes((0, 0, 255)))
+        art = cover_export.locate_art(self.root, ["Artist/Album/01 - Song.flac"])
+        self.assertEqual(cover_export.UNKNOWN_STAMP, cover_export.stamp_for(art))
+        self.assertEqual(cover_export.UNKNOWN_STAMP, cover_export.stamp_for(art, lambda path: None))
+
+
+class EncodeStampedTest(unittest.TestCase):
+    def test_records_sit_in_the_players_slots_with_a_stamp_each(self):
+        record = (bytes(range(256)) * 123)[:cover_export.RECORD_BYTES]
+        capacity = cover_export.HEADER.size + 5 * cover_export.SLOT_BYTES + 100
+        data = cover_export.encode_stamped({900: record, 100: record}, {900: 9, 100: 1}, capacity)
+        slots, stamps_start, records_start = cover_export.stamped_layout(capacity)
+        self.assertEqual(5, slots)
+        self.assertEqual((b"EMCV", 1, 2, 112, 56, stamps_start), HEADER.unpack_from(data, 0))
+        self.assertEqual((100, records_start), ENTRY.unpack_from(data, HEADER.size))
+        self.assertEqual((900, records_start + cover_export.RECORD_BYTES),
+                         ENTRY.unpack_from(data, HEADER.size + ENTRY.size))
+        self.assertEqual((1, 9), struct.unpack_from("<II", data, stamps_start))
+        self.assertEqual(records_start + 2 * cover_export.RECORD_BYTES, len(data))
+        self.assertEqual(record, data[records_start:records_start + cover_export.RECORD_BYTES])
+
+    def test_albums_past_the_last_slot_are_left_out(self):
+        record = bytes(cover_export.RECORD_BYTES)
+        capacity = cover_export.stamped_size(1)
+        data = cover_export.encode_stamped({1: record, 2: record}, {}, capacity)
+        self.assertEqual(1, HEADER.unpack_from(data, 0)[2])
+        self.assertEqual(capacity, len(data))
+        self.assertEqual(0, struct.unpack_from("<I", data, cover_export.stamped_layout(capacity)[1])[0])
+
+    def test_a_record_of_the_wrong_size_is_refused(self):
+        with self.assertRaises(ValueError):
+            cover_export.encode_stamped({1: b"short"}, {}, cover_export.stamped_size(1))
 
 
 class AlbumCoversTest(unittest.TestCase):

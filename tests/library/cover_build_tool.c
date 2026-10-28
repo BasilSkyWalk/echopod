@@ -39,6 +39,7 @@ static bool next_entry(void *context, ScanEntry *entry)
         return false;
     }
     entry->directory = files->entry.directory;
+    entry->modified = files->entry.modified;
     memcpy(entry->name, files->entry.name, sizeof entry->name);
     return true;
 }
@@ -105,6 +106,20 @@ static bool save(const char *folder, const char *name, const Output *output)
     return fclose(file) == 0 && written;
 }
 
+static bool load(const char *folder, const char *name, Output *output)
+{
+    char path[1024];
+    snprintf(path, sizeof path, "%s/%s", folder, name);
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        return false;
+    }
+    size_t length = fread(output->bytes, 1, output->capacity, file);
+    fclose(file);
+    output->length = (uint32_t)length;
+    return length > 0;
+}
+
 int main(int argc, char **argv)
 {
     static uint8_t memory[MEMORY_SIZE];
@@ -131,15 +146,23 @@ int main(int argc, char **argv)
         return 2;
     }
     CoverStats cover_stats;
+    bool previous = load(argv[2], "covers.bin", &covers);
     CoverJob job = {
-        system, {read_output, &library}, LIBRARY_CAPACITY, {write_output, &covers}, COVERS_CAPACITY,
-        memory, sizeof memory,           {NULL, NULL}};
+        .files = system,
+        .library = {read_output, &library},
+        .library_size = LIBRARY_CAPACITY,
+        .sink = {write_output, &covers},
+        .previous = {previous ? read_output : NULL, &covers},
+        .capacity = COVERS_CAPACITY,
+        .memory = memory,
+        .size = sizeof memory,
+    };
     result = cover_build(&job, &cover_stats);
     if (result != SCAN_OK) {
         fprintf(stderr, "covers failed: %d\n", result);
         return 3;
     }
-    printf("%u tracks, %u albums, %u covers, %u missing\n", scan_stats.tracks, cover_stats.albums,
-           cover_stats.covers, cover_stats.missing);
+    printf("%u tracks, %u albums, %u covers, %u reused, %u missing\n", scan_stats.tracks,
+           cover_stats.albums, cover_stats.covers, cover_stats.reused, cover_stats.missing);
     return save(argv[2], "library.db", &library) && save(argv[2], "covers.bin", &covers) ? 0 : 4;
 }

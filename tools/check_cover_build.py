@@ -1,5 +1,6 @@
 import argparse
 import io
+import re
 import shutil
 import struct
 import subprocess
@@ -16,6 +17,9 @@ import cover_export
 HEADER = struct.Struct("<4sHHHHI")
 ENTRY = struct.Struct("<II")
 RECORD_BYTES = check_cover_decode.RECORD_BYTES
+TOOL_COVERS_CAPACITY = 8 * 1024 * 1024
+NANOSECONDS = 1_000_000_000
+TOOL_COUNTS = re.compile(r"(\d+) covers, (\d+) reused")
 
 
 def image(width, height, seed):
@@ -124,6 +128,39 @@ def check(covers, expected):
     return failures
 
 
+def simulator_describe(path):
+    return path.name.encode("utf-8"), path.stat().st_mtime_ns // NANOSECONDS
+
+
+def export_like_echo_sync(music, output):
+    sources = cover_export.album_sources_from_library((output / "library.db").read_bytes())
+    covers = cover_export.collect_covers(music, sources, cover_export.cover_record,
+                                         simulator_describe)
+    data = cover_export.encode_stamped(covers.records, covers.stamps, TOOL_COVERS_CAPACITY)
+    (output / "covers.bin").write_bytes(data)
+    return len(covers.records)
+
+
+def run_tool(tool, music, output):
+    result = subprocess.run([str(tool), str(music), str(output)], capture_output=True, text=True)
+    print(result.stdout.strip())
+    if result.returncode != 0:
+        print(f"FAIL tool exit {result.returncode}: {result.stderr}", file=sys.stderr)
+    return result
+
+
+def reuse_failures(tool, music, output):
+    exported = export_like_echo_sync(music, output)
+    result = run_tool(tool, music, output)
+    counts = TOOL_COUNTS.search(result.stdout)
+    if result.returncode != 0 or counts is None:
+        return ["the player side couldn't read echo-sync's covers"]
+    covers, reused = int(counts.group(1)), int(counts.group(2))
+    if (covers, reused) != (exported, exported):
+        return [f"echo-sync wrote {exported} covers, the player kept {reused} of {covers}"]
+    return []
+
+
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(description="Check covers built on the device side")
     parser.add_argument("--tool", type=Path, required=True)
@@ -139,13 +176,10 @@ def main(argv=None):
     output = arguments.work / "output"
     output.mkdir(parents=True)
     expected = build_music(music, arguments.fixtures / "tags")
-    result = subprocess.run([str(arguments.tool), str(music), str(output)], capture_output=True,
-                            text=True)
-    print(result.stdout.strip())
-    if result.returncode != 0:
-        print(f"FAIL tool exit {result.returncode}: {result.stderr}", file=sys.stderr)
+    if run_tool(arguments.tool, music, output).returncode != 0:
         return 1
     failures = check(read_covers((output / "covers.bin").read_bytes()), expected)
+    failures += reuse_failures(arguments.tool, music, output)
     for failure in failures:
         print(f"FAIL {failure}", file=sys.stderr)
     return 1 if failures else 0

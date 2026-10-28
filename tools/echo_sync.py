@@ -504,12 +504,28 @@ def album_sources(card, model, library_path):
         return cover_export.album_sources(build_library(card)[0])
 
 
-def build_covers(card, sources, verbose):
+def art_describer(volume):
+    if not volume.supported:
+        return None
+
+    def describe(path):
+        return card_name(path.name), card_stamp(path.stat(), volume)
+    return describe
+
+
+def covers_capacity(path, count):
+    return target_size(existing_size(path), cover_export.stamped_size(count),
+                       COVERS_FILE.standard_size)
+
+
+def build_covers(card, sources, volume, options):
     step("Finding album covers...")
-    records, missing = cover_export.collect_images(card, sources, cover_export.cover_record)
-    data = cover_export.encode_records(records)
-    print(f"{plural(len(records), 'cover')}, {len(missing):,} without art")
-    for album in missing if verbose else ():
+    covers = cover_export.collect_covers(card, sources, cover_export.cover_record,
+                                         art_describer(volume))
+    capacity = covers_capacity(card / ECHO_FOLDER / COVERS_FILE.name, len(covers.records))
+    data = cover_export.encode_stamped(covers.records, covers.stamps, capacity)
+    print(f"{plural(len(covers.records), 'cover')}, {len(covers.missing):,} without art")
+    for album in covers.missing if options.verbose else ():
         print(f"  no cover: {album}")
     return data
 
@@ -568,7 +584,7 @@ def sync(card, volume, options):
     if options.library:
         model, library_data = build_library(card)
     if options.covers:
-        covers_data = build_covers(card, album_sources(card, model, library_path), options.verbose)
+        covers_data = build_covers(card, album_sources(card, model, library_path), volume, options)
     if before is not None and not options.dry_run:
         forget_fingerprint(echo / SCAN_FILE.name)
     print(f"{'Planned for' if options.dry_run else 'Writing'} {echo}")

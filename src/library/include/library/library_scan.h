@@ -14,6 +14,7 @@ enum {
 
 typedef struct ScanEntry {
     bool directory;
+    uint32_t modified;
     char name[SCAN_NAME_CAPACITY];
 } ScanEntry;
 
