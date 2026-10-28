@@ -16,7 +16,11 @@ enum {
     SLOT_2 = SLOT_1 + SLOT_SECTORS,
     STOCK_IMAGE_SIZE = 0x2000004,
     STOCK_FW_SIZE = 0x01FC4000,
+    STOCK_V4_FW_SIZE = 0x01FCC000,
     STOCK_FW_END = 0x2000000,
+    MARKER_AT = 0x54000,
+    MARKER_LENGTH = 11,
+    READ_CHUNK = 8192,
     STOCK_SLOT_SECTORS = STOCK_FW_END / 512 + 16,
     STOCK_SLOT_2 = SLOT_1 + STOCK_SLOT_SECTORS,
     STORAGE_SECTORS = STOCK_SLOT_2 + STOCK_SLOT_SECTORS,
@@ -359,26 +363,43 @@ static void images_that_could_not_boot_are_invalid(void)
     check_invalid(broken_image(CODE_OFFSET + 4, 0x03050201), IMAGE_SIZE);
 }
 
+static const char EIGHT_GB_MARKER[] = "HIFIEC00IMG";
+static const char SMALL_MODEL_MARKER[] = "MINIV100IMG";
+
+static uint32_t stock_fw_size(const uint8_t *image)
+{
+    return (uint32_t)image[0x1F4] | (uint32_t)image[0x1F5] << 8 | (uint32_t)image[0x1F6] << 16 |
+           (uint32_t)image[0x1F7] << 24;
+}
+
 static void seal_stock(uint8_t *image)
 {
-    memcpy(image + STOCK_FW_SIZE, image, 512);
+    memcpy(image + stock_fw_size(image), image, 512);
     put_le32(image + STOCK_FW_END, image_crc_update(0, image, STOCK_FW_END));
 }
 
-static uint8_t *stock_image(uint8_t seed)
+static uint8_t *model_image(uint8_t seed, uint32_t fw_size, const char *marker, uint32_t marker_at)
 {
     uint8_t *image = calloc(STOCK_IMAGE_SIZE, 1);
     for (uint32_t index = 0; index < 0x1F4; index++) {
         image[index] = (uint8_t)(index * 3 + seed);
     }
     memcpy(image + 0x10, "Rockchip", 8);
-    put_le32(image + 0x1F4, STOCK_FW_SIZE);
+    put_le32(image + 0x1F4, fw_size);
     memcpy(image + 0x1F8, "RKnanoFW", 8);
-    for (uint32_t index = 0x200; index < STOCK_FW_SIZE; index += 4093) {
+    for (uint32_t index = 0x200; index < fw_size; index += 4093) {
         image[index] = (uint8_t)((index >> 4) ^ seed);
+    }
+    if (marker != NULL) {
+        memcpy(image + marker_at, marker, MARKER_LENGTH);
     }
     seal_stock(image);
     return image;
+}
+
+static uint8_t *stock_image(uint8_t seed)
+{
+    return model_image(seed, STOCK_FW_SIZE, EIGHT_GB_MARKER, MARKER_AT);
 }
 
 static UpdateStorage stock_target(void)
@@ -401,15 +422,44 @@ static void a_stock_image_is_recognised_as_stock(void)
     CHECK_EQUAL(UPDATE_STOCK, check_stock(stock_image(1), STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
 }
 
+static void firmware_4_stock_images_are_recognised_as_stock(void)
+{
+    uint8_t *image = model_image(1, STOCK_V4_FW_SIZE, EIGHT_GB_MARKER, MARKER_AT);
+    CHECK_EQUAL(UPDATE_STOCK, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+}
+
+static void a_model_marker_across_two_reads_is_found(void)
+{
+    uint8_t *image = model_image(1, STOCK_FW_SIZE, EIGHT_GB_MARKER, 7 * READ_CHUNK - 5);
+    CHECK_EQUAL(UPDATE_STOCK, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+    image = model_image(1, STOCK_FW_SIZE, EIGHT_GB_MARKER, 7 * READ_CHUNK - MARKER_LENGTH);
+    CHECK_EQUAL(UPDATE_STOCK, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+    image = model_image(1, STOCK_FW_SIZE, EIGHT_GB_MARKER, 7 * READ_CHUNK - 1);
+    CHECK_EQUAL(UPDATE_STOCK, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+}
+
+static void the_512_mb_model_and_unmarked_images_are_invalid(void)
+{
+    uint8_t *image = model_image(1, STOCK_V4_FW_SIZE, SMALL_MODEL_MARKER, MARKER_AT);
+    CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+    image = model_image(1, STOCK_FW_SIZE, NULL, 0);
+    CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+    image = model_image(1, STOCK_FW_SIZE, EIGHT_GB_MARKER, MARKER_AT);
+    memcpy(image + 2 * MARKER_AT, SMALL_MODEL_MARKER, MARKER_LENGTH);
+    seal_stock(image);
+    CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+}
+
+static void a_stock_header_copy_off_a_sector_is_invalid(void)
+{
+    uint8_t *image = model_image(1, STOCK_FW_SIZE + 4, EIGHT_GB_MARKER, MARKER_AT);
+    CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+}
+
 static void damaged_or_other_model_stock_images_are_invalid(void)
 {
     uint8_t *image = stock_image(1);
     image[0x100000] ^= 1;
-    CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
-    image = stock_image(1);
-    put_le32(image + 0x1F4, 0x01FCC000);
-    memcpy(image + 0x01FCC000, image, 512);
-    put_le32(image + STOCK_FW_END, image_crc_update(0, image, STOCK_FW_END));
     CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
     image = stock_image(1);
     memcpy(image + 0x10, "ECHOFW\0\0", 8);
@@ -475,6 +525,10 @@ int main(void)
         TEST_CASE(a_write_failure_in_slot_2_leaves_slot_1_untouched),
         TEST_CASE(a_block_that_reads_back_wrong_fails_the_install),
         TEST_CASE(a_stock_image_is_recognised_as_stock),
+        TEST_CASE(firmware_4_stock_images_are_recognised_as_stock),
+        TEST_CASE(a_model_marker_across_two_reads_is_found),
+        TEST_CASE(the_512_mb_model_and_unmarked_images_are_invalid),
+        TEST_CASE(a_stock_header_copy_off_a_sector_is_invalid),
         TEST_CASE(damaged_or_other_model_stock_images_are_invalid),
         TEST_CASE(a_stock_image_needs_a_slot_it_fits),
         TEST_CASE(installing_a_stock_image_fills_both_slots_slot_2_first),

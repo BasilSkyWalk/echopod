@@ -26,8 +26,9 @@ enum {
     FW_END = 0x500000,
     CHUNK_COUNT = FW_END / UPDATER_CHUNK_BYTES,
     BRAND_OFFSET = 0x10,
-    STOCK_FW_SIZE = 0x01FC4000,
     STOCK_FW_END = 0x2000000,
+    MARKER_LENGTH = 11,
+    MARKER_CARRY = MARKER_LENGTH - 1,
     PASSES = 2
 };
 
@@ -38,7 +39,18 @@ enum {
 
 static const uint8_t MAGIC[8] = {'R', 'K', 'n', 'a', 'n', 'o', 'F', 'W'};
 static const uint8_t STOCK_BRAND[8] = {'R', 'o', 'c', 'k', 'c', 'h', 'i', 'p'};
+static const uint8_t EIGHT_GB_MARKER[MARKER_LENGTH] = {'H', 'I', 'F', 'I', 'E', 'C',
+                                                       '0', '0', 'I', 'M', 'G'};
+static const uint8_t SMALL_MODEL_MARKER[MARKER_LENGTH] = {'M', 'I', 'N', 'I', 'V', '1',
+                                                          '0', '0', 'I', 'M', 'G'};
 static const uint32_t ROW_2[4] = {0x03078CD0u, 0x03079DCCu, 4, 0};
+
+typedef struct ModelScan {
+    uint8_t carry[MARKER_CARRY];
+    bool carried;
+    bool eight_gb;
+    bool small_model;
+} ModelScan;
 
 static uint32_t source_chunk[CHUNK_WORDS];
 static uint32_t target_chunk[CHUNK_WORDS];
@@ -188,14 +200,48 @@ static bool matches_installed(const UpdateFile *file, const UpdateStorage *stora
            chunk_matches_slot(file, storage, storage->slot_2, 0);
 }
 
-static bool crc_is_valid(const UpdateFile *file, uint32_t fw_end)
+static void find_markers(ModelScan *scan, const uint8_t *bytes, uint32_t length)
+{
+    for (uint32_t index = 0; index + MARKER_LENGTH <= length; index++) {
+        if (bytes[index] == EIGHT_GB_MARKER[0] &&
+            has_text(bytes + index, EIGHT_GB_MARKER, MARKER_LENGTH)) {
+            scan->eight_gb = true;
+        } else if (bytes[index] == SMALL_MODEL_MARKER[0] &&
+                   has_text(bytes + index, SMALL_MODEL_MARKER, MARKER_LENGTH)) {
+            scan->small_model = true;
+        }
+    }
+}
+
+static void scan_chunk(ModelScan *scan, const uint8_t *bytes)
+{
+    if (scan->carried) {
+        uint8_t seam[2 * MARKER_CARRY];
+        for (uint32_t index = 0; index < MARKER_CARRY; index++) {
+            seam[index] = scan->carry[index];
+            seam[MARKER_CARRY + index] = bytes[index];
+        }
+        find_markers(scan, seam, sizeof seam);
+    }
+    find_markers(scan, bytes, UPDATER_CHUNK_BYTES);
+    for (uint32_t index = 0; index < MARKER_CARRY; index++) {
+        scan->carry[index] = bytes[UPDATER_CHUNK_BYTES - MARKER_CARRY + index];
+    }
+    scan->carried = true;
+}
+
+static bool crc_is_valid(const UpdateFile *file, uint32_t fw_end, ModelScan *scan)
 {
     uint32_t crc = 0;
     for (uint32_t chunk = 0; chunk < fw_end / UPDATER_CHUNK_BYTES; chunk++) {
         if (!read_file_chunk(file, chunk, source_chunk)) {
             return false;
         }
-        crc = image_crc_update(crc, (const uint8_t *)source_chunk, UPDATER_CHUNK_BYTES);
+        const uint8_t *bytes = (const uint8_t *)source_chunk;
+        crc = image_crc_update(crc, bytes, UPDATER_CHUNK_BYTES);
+        if (scan != NULL) {
+            scan_chunk(scan, bytes);
+        }
     }
     uint32_t stored = 0;
     return file->read(file->context, fw_end, &stored, sizeof stored) &&
@@ -206,13 +252,16 @@ static UpdateCheck stock_check(const UpdateFile *file, const UpdateStorage *stor
                                const uint32_t *header)
 {
     const uint8_t *bytes = (const uint8_t *)header;
+    uint32_t fw_size = le32(bytes + FW_SIZE_OFFSET);
     bool fits = STOCK_FW_END / SECTOR_BYTES <= storage->slot_sectors;
-    bool valid = fits && has_text(bytes + MAGIC_OFFSET, MAGIC, sizeof MAGIC) &&
+    bool copy_fits = fw_size >= HEADER_BYTES && fw_size % SECTOR_BYTES == 0 &&
+                     fw_size <= STOCK_FW_END - HEADER_BYTES;
+    ModelScan scan = {.carried = false, .eight_gb = false, .small_model = false};
+    bool valid = fits && copy_fits && has_text(bytes + MAGIC_OFFSET, MAGIC, sizeof MAGIC) &&
                  has_text(bytes + BRAND_OFFSET, STOCK_BRAND, sizeof STOCK_BRAND) &&
-                 le32(bytes + FW_SIZE_OFFSET) == STOCK_FW_SIZE &&
-                 header_copy_matches(file, header, STOCK_FW_SIZE) &&
-                 crc_is_valid(file, STOCK_FW_END);
-    return valid ? UPDATE_STOCK : UPDATE_INVALID;
+                 header_copy_matches(file, header, fw_size) &&
+                 crc_is_valid(file, STOCK_FW_END, &scan);
+    return valid && scan.eight_gb && !scan.small_model ? UPDATE_STOCK : UPDATE_INVALID;
 }
 
 UpdateCheck updater_check(const UpdateFile *file, const UpdateStorage *storage)
@@ -234,7 +283,7 @@ UpdateCheck updater_check(const UpdateFile *file, const UpdateStorage *storage)
     if (matches_installed(file, storage, le32(bytes + FW1_END_OFFSET))) {
         return UPDATE_ALREADY_INSTALLED;
     }
-    return crc_is_valid(file, FW_END) ? UPDATE_VALID : UPDATE_INVALID;
+    return crc_is_valid(file, FW_END, NULL) ? UPDATE_VALID : UPDATE_INVALID;
 }
 
 static bool read_source(const SlotCopy *copy, uint32_t chunk)
