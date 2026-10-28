@@ -26,6 +26,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 
 ## Music and library
 
+- **Gapless MP3** needs the LAME tag that LAME and ffmpeg write. MP3s without one (some iTunes and older encoders) keep a short gap between tracks. After a seek, or when playback resumes part-way through a track, that track's silent end isn't trimmed, so the next track starts a few tens of milliseconds late.
 - **Formats:** FLAC, MP3 and WAV play, at 44.1, 48, 88.2, 96, 176.4 and 192 kHz. ALAC, APE and the other formats FiiO lists appear in the library but don't play; EchoPod says so.
 - **Building the library takes time.** On the first start, after music changes over USB, and once after updating to 0.2.0 (the library format changed). A 1,563-track, 144-album card takes about 1 minute 45 seconds: 20 s for the tracks and 1.4 minutes for the covers, where decoding each album's picture takes about half a second. The player is busy until it finishes: let it finish before you plug it in. echo-sync can build the library on a computer instead.
 - **Library size:** tested on the player with 6,558 tracks, and with over 1,600 albums; on a computer with 20,000 tracks. Larger libraries may stop with an error when the library file (4 MB) is full.

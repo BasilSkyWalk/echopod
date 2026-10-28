@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -249,7 +250,7 @@ static void a_missing_track_does_not_start_core_1(void)
 }
 
 static uint32_t reference_samples(const char *name, uint32_t start_offset, int32_t (*out)[2],
-                                  uint32_t capacity)
+                                  uint32_t capacity, Mp3Stream *probed)
 {
     Fixture mp3 = load(name, "mp3");
     FlacInput whole = {.read = read_fixture, .context = &mp3, .size = mp3.size};
@@ -274,6 +275,7 @@ static uint32_t reference_samples(const char *name, uint32_t start_offset, int32
         }
     }
     free(mp3.bytes);
+    *probed = probe;
     return count;
 }
 
@@ -286,16 +288,19 @@ static bool mp3_streams_like_the_decoder(const char *name, uint32_t ring_bytes)
     if (!interface.open(interface.context, name, 0, &info)) {
         return false;
     }
-    uint32_t expected = reference_samples(name, control.start_offset, mp3_reference, 120000);
-    bool ok = info.codec == AUDIO_CODEC_MP3 && expected > 0;
+    Mp3Stream probe;
+    uint32_t decoded = reference_samples(name, control.start_offset, mp3_reference, 120000, &probe);
+    uint32_t lead = probe.lead_trim;
+    uint32_t expected = decoded - lead - probe.tail_trim;
+    bool ok = info.codec == AUDIO_CODEC_MP3 && decoded > 0 && info.stream.total_samples == expected;
     uint32_t next_sample = 0;
     AudioFrame frame;
     AudioFrameResult result = AUDIO_FRAME_READY;
     while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
-        ok = frame.first_sample == next_sample && frame.bits == 24;
+        ok = frame.first_sample == next_sample && frame.bits == 24 && frame.samples > 0;
         for (uint32_t index = 0; ok && index < frame.samples; index++) {
-            ok = frame.left[index] == mp3_reference[next_sample + index][0] &&
-                 frame.right[index] == mp3_reference[next_sample + index][1];
+            ok = frame.left[index] == mp3_reference[lead + next_sample + index][0] &&
+                 frame.right[index] == mp3_reference[lead + next_sample + index][1];
         }
         next_sample += frame.samples;
         interface.release(interface.context);
@@ -310,6 +315,91 @@ static void an_mp3_streams_through_core_1_like_its_decoder(void)
     CHECK(mp3_streams_like_the_decoder("mp3/cbr_128_44k_stereo_tagged", BIG_RING_BYTES));
     CHECK(mp3_streams_like_the_decoder("mp3/vbr_48k_mono", SMALL_RING_BYTES));
     CHECK(mp3_streams_like_the_decoder("mp3/cbr_192_48k_stereo_bare", SMALL_RING_BYTES));
+    CHECK(mp3_streams_like_the_decoder("mp3/mpeg2_22k_stereo", SMALL_RING_BYTES));
+}
+
+static uint32_t stream_left(const char *name, uint32_t *rate)
+{
+    start_with(BIG_RING_BYTES, true);
+    AudioTrackInfo info;
+    if (!interface.open(interface.context, name, 0, &info)) {
+        return 0;
+    }
+    *rate = info.stream.sample_rate;
+    uint32_t count = 0;
+    AudioFrame frame;
+    while (next_frame(&frame) == AUDIO_FRAME_READY) {
+        for (uint32_t index = 0; index < frame.samples && count < 120000; index++) {
+            mp3_reference[count++][0] = frame.left[index];
+        }
+        interface.release(interface.context);
+    }
+    interface.close(interface.context);
+    return count;
+}
+
+static int best_sine_lag(uint32_t count, uint32_t rate)
+{
+    static const double TONE_HZ = 440.0;
+    static const double TWO_PI = 6.283185307179586;
+    int reach = (int)(rate / TONE_HZ / 2.0) - 2;
+    int best = 0;
+    double best_score = -1.0e300;
+    for (int lag = -reach; lag <= reach; lag++) {
+        double score = 0.0;
+        for (uint32_t index = count / 10; index < count - count / 10; index++) {
+            double phase = TWO_PI * TONE_HZ * ((double)index + lag) / rate;
+            score += mp3_reference[index][0] * sin(phase);
+        }
+        if (score > best_score) {
+            best_score = score;
+            best = lag;
+        }
+    }
+    return best;
+}
+
+static bool lines_up_with_its_source(const char *name, uint32_t expected)
+{
+    uint32_t rate = 0;
+    uint32_t count = stream_left(name, &rate);
+    int lag = best_sine_lag(count, rate);
+    return count == expected && lag >= -1 && lag <= 1;
+}
+
+static void a_trimmed_mp3_lines_up_with_the_sound_it_was_made_from(void)
+{
+    CHECK(lines_up_with_its_source("mp3/cbr_128_44k_stereo_tagged", 66150));
+    CHECK(lines_up_with_its_source("mp3/vbr_48k_mono", 96000));
+    CHECK(lines_up_with_its_source("mp3/mpeg2_22k_stereo", 22050));
+}
+
+static void a_trimmed_mp3_starts_at_its_first_real_sample(void)
+{
+    start_with(BIG_RING_BYTES, true);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "mp3/cbr_128_44k_stereo_tagged", 0, &info));
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    CHECK_EQUAL(0u, frame.first_sample);
+    CHECK_EQUAL(1152u - 576u - MP3_DECODER_DELAY, frame.samples);
+    interface.release(interface.context);
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    CHECK_EQUAL(1152u - 576u - MP3_DECODER_DELAY, frame.first_sample);
+    CHECK_EQUAL(1152u, frame.samples);
+    interface.close(interface.context);
+}
+
+static void a_trimmed_mp3_opened_part_way_counts_real_samples(void)
+{
+    start_with(BIG_RING_BYTES, true);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "mp3/cbr_128_44k_stereo_tagged", 1000, &info));
+    CHECK(control.start_offset > 481u);
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    CHECK_EQUAL(44100u, frame.first_sample);
+    interface.close(interface.context);
 }
 
 static void an_mp3_describes_its_stream(void)
@@ -320,7 +410,7 @@ static void an_mp3_describes_its_stream(void)
     CHECK_EQUAL(48000u, info.stream.sample_rate);
     CHECK_EQUAL(1, info.stream.channels);
     CHECK_EQUAL(0, info.stream.bits_per_sample);
-    CHECK_EQUAL(85u * 1152u, info.stream.total_samples);
+    CHECK_EQUAL(96000u, info.stream.total_samples);
     CHECK_EQUAL(9504u - 192u, info.audio_bytes);
     interface.close(interface.context);
     CHECK_EQUAL(1, close_count);
@@ -359,6 +449,9 @@ int main(void)
         TEST_CASE(closing_idles_core_1_and_closes_the_file),
         TEST_CASE(a_missing_track_does_not_start_core_1),
         TEST_CASE(an_mp3_streams_through_core_1_like_its_decoder),
+        TEST_CASE(a_trimmed_mp3_lines_up_with_the_sound_it_was_made_from),
+        TEST_CASE(a_trimmed_mp3_starts_at_its_first_real_sample),
+        TEST_CASE(a_trimmed_mp3_opened_part_way_counts_real_samples),
         TEST_CASE(an_mp3_describes_its_stream),
         TEST_CASE(an_mp3_opened_part_way_starts_counting_from_there),
         TEST_CASE(a_file_that_is_not_mp3_is_refused),

@@ -238,6 +238,8 @@ static bool open_stream(void *context, const char *path, uint32_t start_ms, Audi
     source->start_offset = flac_position(decoder);
     source->end_offset = source->input.size;
     source->written = source->start_offset;
+    source->lead_trim = 0;
+    source->play_end = UINT32_MAX;
     source->slot = 0;
     source->read_failed = false;
     source->bits_per_sample = info->bits_per_sample;
@@ -297,6 +299,12 @@ static void drop_stale_slots(Core1Source *source)
     }
 }
 
+static void advance_slot(Core1Source *source)
+{
+    source->region.control->slots[source->slot].state = STREAM_SLOT_EMPTY;
+    source->slot = (source->slot + 1) % STREAM_SLOTS;
+}
+
 static AudioFrameResult next_frame(void *context, AudioFrame *frame)
 {
     Core1Source *source = context;
@@ -304,31 +312,42 @@ static AudioFrameResult next_frame(void *context, AudioFrame *frame)
     if (!source->streaming || source->read_failed) {
         return AUDIO_FRAME_ERROR;
     }
-    drop_stale_slots(source);
-    volatile StreamSlot *slot = &source->region.control->slots[source->slot];
-    if (slot->state != STREAM_SLOT_FULL) {
-        return AUDIO_FRAME_WAIT;
+    for (;;) {
+        drop_stale_slots(source);
+        volatile StreamSlot *slot = &source->region.control->slots[source->slot];
+        if (slot->state != STREAM_SLOT_FULL) {
+            return AUDIO_FRAME_WAIT;
+        }
+        observe();
+        if (slot->result != AUDIO_FRAME_READY) {
+            return slot->result == AUDIO_FRAME_END ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
+        }
+        uint32_t first = slot->first_sample;
+        if (first >= source->play_end) {
+            return AUDIO_FRAME_END;
+        }
+        uint32_t end = smaller(first + slot->samples, source->play_end);
+        uint32_t from = first > source->lead_trim ? first : source->lead_trim;
+        if (from >= end) {
+            advance_slot(source);
+            continue;
+        }
+        uint32_t skip = from - first;
+        int32_t (*channels)[FLAC_MAX_BLOCK] = source->region.samples[source->slot];
+        *frame = (AudioFrame){
+            .left = channels[0] + skip,
+            .right = channels[source->channels > 1 ? 1 : 0] + skip,
+            .first_sample = from - source->lead_trim,
+            .samples = end - from,
+            .bits = source->bits_per_sample,
+        };
+        return AUDIO_FRAME_READY;
     }
-    observe();
-    if (slot->result != AUDIO_FRAME_READY) {
-        return slot->result == AUDIO_FRAME_END ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
-    }
-    int32_t (*channels)[FLAC_MAX_BLOCK] = source->region.samples[source->slot];
-    *frame = (AudioFrame){
-        .left = channels[0],
-        .right = channels[source->channels > 1 ? 1 : 0],
-        .first_sample = slot->first_sample,
-        .samples = slot->samples,
-        .bits = source->bits_per_sample,
-    };
-    return AUDIO_FRAME_READY;
 }
 
 static void release_frame(void *context)
 {
-    Core1Source *source = context;
-    source->region.control->slots[source->slot].state = STREAM_SLOT_EMPTY;
-    source->slot = (source->slot + 1) % STREAM_SLOTS;
+    advance_slot(context);
 }
 
 static void close_stream(void *context)
@@ -355,11 +374,17 @@ static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTr
         stop_streaming(source);
         return false;
     }
+    uint32_t playable = mp3_playable_samples(&mp3);
     uint32_t target = (uint32_t)((uint64_t)start_ms * mp3.sample_rate / MILLISECONDS_PER_SECOND);
-    target = target < mp3.total_samples ? target : mp3.total_samples;
-    source->start_offset = mp3_seek_offset(&mp3, target);
+    target = smaller(target, playable);
+    source->start_offset =
+        target == 0 ? mp3.audio_start : mp3_seek_offset(&mp3, target + mp3.lead_trim);
+    target += mp3.lead_trim;
+    bool from_start = source->start_offset == mp3.audio_start;
     source->end_offset = mp3.audio_end;
     source->written = source->start_offset;
+    source->lead_trim = mp3.lead_trim;
+    source->play_end = from_start ? mp3.total_samples - mp3.tail_trim : UINT32_MAX;
     source->slot = 0;
     source->read_failed = false;
     source->bits_per_sample = MP3_OUTPUT_BITS;
@@ -369,7 +394,7 @@ static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTr
                                          .bits_per_sample = 0,
                                          .min_block = mp3.samples_per_frame,
                                          .max_block = mp3.samples_per_frame,
-                                         .total_samples = mp3.total_samples},
+                                         .total_samples = playable},
                               .audio_bytes = mp3.audio_end - mp3.audio_start,
                               .codec = AUDIO_CODEC_MP3};
     volatile StreamControl *control = source->region.control;
@@ -378,8 +403,8 @@ static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTr
     control->bits_per_sample = MP3_OUTPUT_BITS;
     control->min_block = mp3.samples_per_frame;
     control->max_block = mp3.samples_per_frame;
-    control->total_samples = mp3.total_samples;
-    control->first_sample = target;
+    control->total_samples = playable;
+    control->first_sample = from_start ? 0 : target;
     control->start_offset = source->start_offset;
     control->end_offset = source->end_offset;
     control->written = source->written;

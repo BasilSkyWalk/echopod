@@ -120,6 +120,64 @@ static void seeking_with_a_table_follows_it(void)
     CHECK_EQUAL(expected, middle);
 }
 
+static void a_lame_tag_trims_the_encoder_delay_and_padding(void)
+{
+    Mp3Stream stream;
+    CHECK(probe("cbr_128_44k_stereo_tagged", &stream));
+    CHECK_EQUAL(576u + MP3_DECODER_DELAY, stream.lead_trim);
+    CHECK_EQUAL(1242u - MP3_DECODER_DELAY, stream.tail_trim);
+    CHECK_EQUAL(59u * 1152u, stream.total_samples);
+    CHECK_EQUAL(66150u, mp3_playable_samples(&stream));
+}
+
+static void trimming_leaves_exactly_the_encoded_length(void)
+{
+    Mp3Stream stream;
+    CHECK(probe("vbr_48k_mono", &stream));
+    CHECK_EQUAL(96000u, mp3_playable_samples(&stream));
+    CHECK(probe("mpeg2_22k_stereo", &stream));
+    CHECK_EQUAL(22050u, mp3_playable_samples(&stream));
+}
+
+static void a_file_without_an_info_frame_is_not_trimmed(void)
+{
+    Mp3Stream stream;
+    CHECK(probe("cbr_192_48k_stereo_bare", &stream));
+    CHECK_EQUAL(0u, stream.lead_trim);
+    CHECK_EQUAL(0u, stream.tail_trim);
+    CHECK_EQUAL(stream.total_samples, mp3_playable_samples(&stream));
+}
+
+static void an_unknown_encoder_tag_is_not_trusted(void)
+{
+    Mp3Stream stream;
+    load("cbr_128_44k_stereo_tagged");
+    CHECK(memcmp(fixture.bytes + 220, "Lavc", 4) == 0);
+    memcpy(fixture.bytes + 220, "Xxxx", 4);
+    FlacInput input = {.read = read_fixture, .context = NULL, .size = fixture.size};
+    CHECK(mp3_probe(input, &stream));
+    CHECK_EQUAL(0u, stream.lead_trim);
+    CHECK_EQUAL(0u, stream.tail_trim);
+    CHECK_EQUAL(59u * 1152u, mp3_playable_samples(&stream));
+}
+
+static void trims_longer_than_the_track_are_ignored(void)
+{
+    Mp3Stream stream;
+    load("mpeg2_22k_stereo");
+    CHECK(memcmp(fixture.bytes + 21, "Info", 4) == 0);
+    CHECK(memcmp(fixture.bytes + 141, "Lavc", 4) == 0);
+    memcpy(fixture.bytes + 29, "\0\0\0\5", 4);
+    fixture.bytes[141 + 21] = 0xFF;
+    fixture.bytes[141 + 22] = 0xFF;
+    fixture.bytes[141 + 23] = 0xFF;
+    FlacInput input = {.read = read_fixture, .context = NULL, .size = fixture.size};
+    CHECK(mp3_probe(input, &stream));
+    CHECK_EQUAL(5u * 576u, stream.total_samples);
+    CHECK_EQUAL(0u, stream.lead_trim);
+    CHECK_EQUAL(0u, stream.tail_trim);
+}
+
 static void other_files_are_not_mp3(void)
 {
     Mp3Stream stream;
@@ -151,6 +209,11 @@ int main(void)
         TEST_CASE(mpeg_2_frames_hold_576_samples),
         TEST_CASE(seeking_a_constant_rate_file_is_proportional),
         TEST_CASE(seeking_with_a_table_follows_it),
+        TEST_CASE(a_lame_tag_trims_the_encoder_delay_and_padding),
+        TEST_CASE(trimming_leaves_exactly_the_encoded_length),
+        TEST_CASE(a_file_without_an_info_frame_is_not_trimmed),
+        TEST_CASE(an_unknown_encoder_tag_is_not_trusted),
+        TEST_CASE(trims_longer_than_the_track_are_ignored),
         TEST_CASE(other_files_are_not_mp3),
         TEST_CASE(the_signature_spots_tags_and_frame_headers),
     };

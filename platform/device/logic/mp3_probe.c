@@ -10,11 +10,14 @@ enum {
     SCAN_LIMIT = 65536,
     SCAN_WINDOW = 256,
     HEADER_BYTES = 4,
-    INFO_BYTES = 156,
+    INFO_BYTES = 192,
     VBRI_OFFSET = 36,
     XING_FRAMES_FLAG = 1,
     XING_BYTES_FLAG = 2,
     XING_TOC_FLAG = 4,
+    XING_QUALITY_FLAG = 8,
+    LAME_TAG_BYTES = 24,
+    LAME_DELAY_FIELD = 21,
     MPEG_1 = 3,
     MPEG_2 = 2,
     MPEG_2_5 = 0,
@@ -195,6 +198,27 @@ static uint32_t side_info_bytes(const Header *header)
     return header->mono ? 9 : 17;
 }
 
+static bool encoder_tagged(const uint8_t *bytes)
+{
+    return same_tag(bytes, "LAME", 4) || same_tag(bytes, "Lavc", 4) || same_tag(bytes, "Lavf", 4);
+}
+
+static void read_gapless(const uint8_t *bytes, uint32_t field, uint32_t length, Mp3Stream *stream)
+{
+    if (field + LAME_TAG_BYTES > length || !encoder_tagged(bytes + field)) {
+        return;
+    }
+    const uint8_t *delays = bytes + field + LAME_DELAY_FIELD;
+    uint32_t delay = (uint32_t)delays[0] << 4 | (uint32_t)delays[1] >> 4;
+    uint32_t padding = ((uint32_t)delays[1] & 0x0Fu) << 8 | (uint32_t)delays[2];
+    uint32_t lead = delay + MP3_DECODER_DELAY;
+    uint32_t tail = padding > MP3_DECODER_DELAY ? padding - MP3_DECODER_DELAY : 0;
+    if (lead + tail < stream->total_samples) {
+        stream->lead_trim = lead;
+        stream->tail_trim = tail;
+    }
+}
+
 static bool read_info(FlacInput input, uint32_t frame, const Header *header, uint32_t end,
                       Mp3Stream *stream)
 {
@@ -221,6 +245,13 @@ static bool read_info(FlacInput input, uint32_t frame, const Header *header, uin
             }
             stream->has_toc = true;
         }
+        if ((flags & XING_TOC_FLAG) != 0) {
+            field += MP3_TOC_ENTRIES;
+        }
+        if ((flags & XING_QUALITY_FLAG) != 0) {
+            field += 4;
+        }
+        read_gapless(bytes, field, length, stream);
         return true;
     }
     if (same_tag(bytes + VBRI_OFFSET, "VBRI", 4)) {
@@ -254,6 +285,11 @@ bool mp3_probe(FlacInput input, Mp3Stream *stream)
     uint64_t bits = (uint64_t)(end - frame) * BITS_PER_BYTE * header.rate;
     stream->total_samples = (uint32_t)(bits / (header.kbps * KILO));
     return true;
+}
+
+uint32_t mp3_playable_samples(const Mp3Stream *stream)
+{
+    return stream->total_samples - stream->lead_trim - stream->tail_trim;
 }
 
 uint32_t mp3_seek_offset(const Mp3Stream *stream, uint32_t sample)

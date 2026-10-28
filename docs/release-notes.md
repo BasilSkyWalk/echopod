@@ -1,5 +1,11 @@
 # EchoPod release notes
 
+## Unreleased
+
+### Fixed
+
+- **Gapless MP3.** MP3s made with LAME or ffmpeg now play without a gap between tracks: the player reads the encoder delay and padding from the file's LAME tag and drops the silence the encoder added at each end.
+
 ## 0.2.0
 
 ### New

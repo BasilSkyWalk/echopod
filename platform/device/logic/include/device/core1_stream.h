@@ -97,6 +97,8 @@ typedef struct Core1Source {
     uint32_t start_offset;
     uint32_t end_offset;
     uint32_t written;
+    uint32_t lead_trim;
+    uint32_t play_end;
     uint32_t fill_budget;
     uint8_t bits_per_sample;
     uint8_t channels;
