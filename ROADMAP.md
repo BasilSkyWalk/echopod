@@ -27,7 +27,7 @@ Version 0.3.0 makes USB DAC mode play on more computers and phones, accepts FiiO
 | Settings | device | Shuffle, repeat, sleep timer, screen timeout, auto off, brightness, gain, output, start screen, USB mode |
 | Battery and power | device | Battery level, charging, low-battery shutdown, auto off |
 | USB mass storage | device | Internal storage and the SD card, read/write, at high speed; SD card reads at about 3.9 MB/s |
-| USB DAC mode | device | Settings → USB mode → DAC: a USB Audio Class 1.0 sound card, 16 or 24-bit at 44.1 or 48 kHz, with its own remembered volume; played on the player from Windows 11 at 48 kHz, 24-bit |
+| USB DAC mode | device | Settings → USB mode → DAC: a USB Audio Class 1.0 sound card, 16 or 24-bit at 44.1 or 48 kHz, with its own remembered volume; played on the player from Windows 11 (all four formats) and an Android phone |
 | Updates and the way back to FiiO | device | EchoPod installs its own updates and FiiO's 8 GB firmware from a file copy |
 | Configurable start screen | sim | Works in the simulator; not yet checked on the player |
 
