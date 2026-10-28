@@ -10,10 +10,10 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 
 ## Installing
 
-- **Tested on one player.** One Echo Mini 8 GB, starting from FiiO firmware 3.7.0 and 3.9.0, installed from Windows 11. Other units, other FiiO versions and other computers haven't been tried.
+- **Tested on one player.** One Echo Mini 8 GB, starting from FiiO firmware 3.7.0, 3.9.0 and 4.0.0, installed from Windows 11. Other units, other FiiO versions and other computers haven't been tried.
 - **Installing from a Mac is unproven.** Earlier attempts to copy an image from a Mac with FiiO's firmware running were refused (FiiO's firmware showed "Updating" for under a second and kept itself). The cause isn't known. Install from Windows if you can.
 - **The 512 MB Echo Mini isn't supported.** EchoPod refuses its firmware, and its firmware ignores EchoPod's file.
-- **Going back to FiiO's firmware** is checked with FiiO's 8 GB 3.7.0, 3.8.0, 3.9.0 and 4.0.0 images (4.0.0 on a computer only; EchoPod 0.2.0 refuses it, see `docs/user-guide.md`). Another custom firmware can't be installed from EchoPod: go back to FiiO's first.
+- **Going back to FiiO's firmware** is checked with FiiO's 8 GB 3.7.0, 3.8.0, 3.9.0 and 4.0.0 images, and 0.3.0 installed FiiO 4.0.0 on the player and was installed back from it (EchoPod 0.2.0 refuses 4.0.0, see `docs/user-guide.md`). Another custom firmware can't be installed from EchoPod: go back to FiiO's first.
 - **If the player doesn't start at all,** the only recovery known is the chip's maskrom mode (`docs/device-recovery.md`). It works, but it needs a patched tool and care.
 
 ## USB

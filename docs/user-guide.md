@@ -11,7 +11,7 @@ Read `docs/known-issues.md` before you install. EchoPod has been tested on one p
 - **Echo Mini 8 GB: supported.** Its FiiO update file is called `HIFIECnn.IMG`.
 - **Echo Mini 512 MB: not supported.** Its FiiO update file is called `MINIVnnn.IMG`. Its firmware ignores EchoPod's file, and EchoPod refuses its firmware.
 
-Tested starting points: FiiO firmware 3.7.0 and 3.9.0 (Settings → About on the player shows yours).
+Tested starting points: FiiO firmware 3.7.0, 3.9.0 and 4.0.0 (Settings → About on the player shows yours).
 
 ## Before you install
 
