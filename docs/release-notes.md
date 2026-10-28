@@ -1,9 +1,11 @@
 # EchoPod release notes
 
-## Unreleased
+## 0.3.0
 
 ### Fixed
 
+- **Going back to FiiO's firmware 4.0.0.** EchoPod refused FiiO's newest 8 GB firmware (`HIFIEC40.IMG`) as "isn't a valid image for this player": it told the 8 GB and 512 MB models apart by a size field that FiiO changed in 4.0.0. It now looks for the update file name each FiiO image is built to look for (`HIFIECnn.IMG` on the 8 GB model, `MINIVnnn.IMG` on the 512 MB one), checked against FiiO's 3.7.0 to 4.0.0 images, and still refuses the 512 MB model's firmware. On 0.2.0, install FiiO 3.9.0 first and update to 4.0.0 from there.
+- **USB DAC plays on more computers and phones.** Android always picked 96 kHz, and some computers pick 88.2 or 96 kHz too, but this chip can't take packets that large, so those hosts showed the format and played nothing. DAC mode now offers 44.1 and 48 kHz (16 or 24-bit), the formats proven on the player, and no longer depends on the order in which the computer sets the format and the rate. If you set your computer to 88.2 or 96 kHz before, pick 48 kHz.
 - **Gapless MP3.** MP3s made with LAME or ffmpeg now play without a gap between tracks: the player reads the encoder delay and padding from the file's LAME tag and drops the silence the encoder added at each end.
 
 ### Faster

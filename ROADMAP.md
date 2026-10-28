@@ -4,7 +4,7 @@ Status: `device` (works on the player) · `sim` (works in the simulator only) ·
 
 ## Where it stands
 
-Version 0.2.0 adds audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
+Version 0.3.0 makes USB DAC mode play on more computers and phones, accepts FiiO's 4.0.0 firmware for the way back, adds gapless MP3 and keeps covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
 
 ## Features
 
@@ -27,7 +27,7 @@ Version 0.2.0 adds audiobooks and podcasts, USB DAC mode and echo-sync (`docs/re
 | Settings | device | Shuffle, repeat, sleep timer, screen timeout, auto off, brightness, gain, output, start screen, USB mode |
 | Battery and power | device | Battery level, charging, low-battery shutdown, auto off |
 | USB mass storage | device | Internal storage and the SD card, read/write, at high speed; SD card reads at about 3.9 MB/s |
-| USB DAC mode | device | Settings → USB mode → DAC: a USB Audio Class 1.0 sound card, 16 or 24-bit up to 96 kHz, with its own remembered volume; played on the player from Windows 11 at 48 kHz, 24-bit |
+| USB DAC mode | device | Settings → USB mode → DAC: a USB Audio Class 1.0 sound card, 16 or 24-bit at 44.1 or 48 kHz, with its own remembered volume; played on the player from Windows 11 at 48 kHz, 24-bit |
 | Updates and the way back to FiiO | device | EchoPod installs its own updates and FiiO's 8 GB firmware from a file copy |
 | Configurable start screen | sim | Works in the simulator; not yet checked on the player |
 

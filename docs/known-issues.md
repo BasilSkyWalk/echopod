@@ -13,6 +13,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **Tested on one player.** One Echo Mini 8 GB, starting from FiiO firmware 3.7.0 and 3.9.0, installed from Windows 11. Other units, other FiiO versions and other computers haven't been tried.
 - **Installing from a Mac is unproven.** Earlier attempts to copy an image from a Mac with FiiO's firmware running were refused (FiiO's firmware showed "Updating" for under a second and kept itself). The cause isn't known. Install from Windows if you can.
 - **The 512 MB Echo Mini isn't supported.** EchoPod refuses its firmware, and its firmware ignores EchoPod's file.
+- **Going back to FiiO's firmware** is checked with FiiO's 8 GB 3.7.0, 3.8.0, 3.9.0 and 4.0.0 images (4.0.0 on a computer only; EchoPod 0.2.0 refuses it, see `docs/user-guide.md`). Another custom firmware can't be installed from EchoPod: go back to FiiO's first.
 - **If the player doesn't start at all,** the only recovery known is the chip's maskrom mode (`docs/device-recovery.md`). It works, but it needs a patched tool and care.
 
 ## USB
@@ -21,7 +22,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **Eject both drives before you unplug.** Unplugging first can lose the last changes, and the player warns you ("Unplugged before ejecting"). Once, a file deleted from Windows and ejected properly was still on internal storage afterwards; it hasn't happened again.
 - **The SD card can be marked as needing repair.** Twice a computer reported the card's exFAT volume as not cleanly closed. Nothing was lost. If Windows offers to scan and fix the card, let it (or run `chkdsk /f` on its drive letter; on a Mac, Disk Utility's First Aid).
 - **Speed on a Mac hasn't been measured.** On Windows 11, copying runs at about 3.7 MB/s to the SD card and 5 MB/s to internal storage, and reading from the SD card at about 3.9 MB/s.
-- **USB DAC mode is tested on one player with Windows 11** (48 kHz, 24-bit). Other computers, a Mac and the other rates haven't been tried. If it doesn't appear as a sound card, crackles, or plays at the wrong speed, set Settings → USB mode back to Storage and report what you saw. Known limits: full speed only (up to 96 kHz, 16 or 24-bit); about 20 ms of delay; the player stays in DAC mode until you unplug it or hold Back; Power doesn't turn the screen off during DAC mode. If the computer stops sending audio and starts again, the first 20 ms are silent.
+- **USB DAC mode is tested on one player with Windows 11** (48 kHz, 24-bit). Other computers, a Mac and the other rates haven't been tried. If it doesn't appear as a sound card, crackles, or plays at the wrong speed, set Settings → USB mode back to Storage and report what you saw. Known limits: full speed only (44.1 or 48 kHz, 16 or 24-bit; 88.2 and 96 kHz don't fit this chip's USB buffer); about 20 ms of delay; the player stays in DAC mode until you unplug it or hold Back; Power doesn't turn the screen off during DAC mode. If the computer stops sending audio and starts again, the first 20 ms are silent.
 - **macOS leaves `._` files** beside everything it copies. EchoPod ignores them, but they take space. `dot_clean` on the drive removes them.
 
 ## Music and library

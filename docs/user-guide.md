@@ -60,7 +60,7 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 4. Use the computer's volume, the player's volume keys, or both. DAC mode has its own volume, separate from music: it starts at 30 of 50, the screen shows it ("48 kHz 24-bit · Volume 30"), holding Vol± changes it quickly, and the player remembers it for next time. Start low.
 5. Unplug when you're done, or hold Back for a second and let go to go back to the player's own music (it keeps charging).
 
-The player accepts 16 or 24-bit at 44.1, 48, 88.2 and 96 kHz; the computer picks one (on Windows: Sound settings → EchoPod → Properties → Advanced). Music on the player stops while it's a DAC, and your drives don't appear: set USB mode back to Storage to copy music. The setting takes effect the next time you plug in. A charger works the same in both modes.
+The player accepts 16 or 24-bit at 44.1 and 48 kHz; the computer picks one (on Windows: Sound settings → EchoPod → Properties → Advanced). Music on the player stops while it's a DAC, and your drives don't appear: set USB mode back to Storage to copy music. The setting takes effect the next time you plug in. A charger works the same in both modes.
 
 ## Build the library on a computer
 
@@ -170,12 +170,13 @@ Podcasts/
 
 1. Download FiiO's firmware for the **8 GB** Echo Mini from FiiO's website and unzip it.
 2. Delete `HIFIEC90.IMG` from internal storage if it's still there.
-3. Copy FiiO's `HIFIECnn.IMG` (for example `HIFIEC39.IMG`) to the top level of internal storage, unchanged.
+3. Copy FiiO's `HIFIECnn.IMG` (for example `HIFIEC40.IMG`) to the top level of internal storage, unchanged. Don't copy the `MINIVnnn.IMG` file from the same zip: that one is for the 512 MB model, and EchoPod refuses it.
 4. Eject both drives. The player checks the file (this takes a while) and shows "Installing FiiO firmware", then "FiiO firmware installed".
 5. Unplug, take the microSD card out, hold Power to turn the player off, and switch it on. FiiO's firmware starts, shows "Updating" once more for a minute or two while it installs the same file, and deletes it.
 
 ## If something goes wrong
 
+- **"isn't a valid image for this player" when going back to FiiO:** check that you copied the `HIFIECnn.IMG` file, not `MINIVnnn.IMG`, and that it's unchanged (its hash matches the one in FiiO's zip). EchoPod 0.2.0 and earlier also refuse FiiO's 4.0.0 firmware: update EchoPod first, or install FiiO 3.9.0 (`HIFIEC39.IMG`) and then FiiO's own update to 4.0.0. To switch to another custom firmware, go back to FiiO's first: EchoPod only installs its own images and FiiO's.
 - **The install doesn't take** (FiiO's firmware comes back after a short "Updating"): copy the file again, check its hash on the player's drive, and make sure it's the only `HIFIECnn.IMG` there. If it keeps failing, the only other way in is maskrom (below).
 - **The player doesn't start at all:** every case so far was recovered through the chip's maskrom mode, which writes FiiO's firmware back from a computer over USB. It needs a patched `rkdeveloptool` and some care; the steps are in `docs/device-recovery.md`.
 - **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step and Last USB lines from Home → Diagnostics.
