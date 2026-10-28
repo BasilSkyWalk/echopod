@@ -401,9 +401,9 @@ static uint32_t next_frame_parity(void)
     return (read_register(DSTS) & DSTS_ODD_FRAME) != 0 ? EP_SET_EVEN_FRAME : EP_SET_ODD_FRAME;
 }
 
-static void arm_iso_out(const UsbPort *port)
+static void arm_iso_out(void)
 {
-    uint32_t packet = usb_audio_packet_bytes(port->audio);
+    uint32_t packet = USB_AUDIO_MAX_PACKET;
     uint32_t control = read_register(out_control(BULK_ENDPOINT)) & ~EP_MAX_PACKET_MASK;
     write_register(out_control(BULK_ENDPOINT) + 0x10u, ONE_PACKET | packet);
     write_register(out_control(BULK_ENDPOINT),
@@ -418,7 +418,7 @@ static bool streaming(const UsbPort *port)
 static void start_stream(const UsbPort *port)
 {
     if (streaming(port) && (read_register(out_control(BULK_ENDPOINT)) & EP_ENABLE) == 0) {
-        arm_iso_out(port);
+        arm_iso_out();
     }
 }
 
@@ -611,7 +611,7 @@ static void handle_out_endpoints(UsbPort *port)
         if ((events & EP_INT_TRANSFER_DONE) != 0 && port->audio == NULL) {
             arm_bulk_out(port);
         } else if ((events & EP_INT_TRANSFER_DONE) != 0 && streaming(port)) {
-            arm_iso_out(port);
+            arm_iso_out();
         }
     }
 }

@@ -8,7 +8,10 @@
 #include "device/usb_device.h"
 
 enum {
-    USB_PORT_PACKET_WORDS = (USB_AUDIO_MAX_PACKET + 3) / 4
+    USB_PORT_PACKET_BYTES = (int)USB_AUDIO_MAX_PACKET > (int)USB_HIGH_SPEED_PACKET_SIZE
+        ? USB_AUDIO_MAX_PACKET
+        : USB_HIGH_SPEED_PACKET_SIZE,
+    USB_PORT_PACKET_WORDS = (USB_PORT_PACKET_BYTES + 3) / 4
 };
 
 typedef enum UsbConnectStep {

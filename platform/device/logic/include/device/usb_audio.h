@@ -7,7 +7,7 @@
 
 enum {
     USB_AUDIO_ENDPOINT = 0x01,
-    USB_AUDIO_MAX_PACKET = 582,
+    USB_AUDIO_MAX_PACKET = 294,
     USB_AUDIO_DEFAULT_RATE = 48000,
     USB_AUDIO_CHANGED_FORMAT = 1,
     USB_AUDIO_CHANGED_VOLUME = 2,
@@ -31,4 +31,3 @@ UsbReply usb_audio_receive(UsbAudio *audio, UsbSetup setup, const uint8_t *data,
 uint8_t usb_audio_take_changes(UsbAudio *audio);
 uint8_t usb_audio_sample_bytes(const UsbAudio *audio);
 uint8_t usb_audio_attenuation(const UsbAudio *audio);
-uint16_t usb_audio_packet_bytes(const UsbAudio *audio);

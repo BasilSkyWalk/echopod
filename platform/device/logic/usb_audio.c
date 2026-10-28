@@ -32,9 +32,7 @@ enum {
     VOLUME_MIN = -16384,
     VOLUME_MAX = 0,
     VOLUME_RESOLUTION = 128,
-    RATE_BYTES = 3,
-    FRAMES_PER_SECOND = 1000,
-    CHANNELS = 2
+    RATE_BYTES = 3
 };
 
 typedef enum AudioControl {
@@ -44,24 +42,23 @@ typedef enum AudioControl {
     CONTROL_RATE
 } AudioControl;
 
-static const uint32_t RATES[] = {44100, 48000, 88200, 96000};
+static const uint32_t RATES[] = {44100, 48000};
 
 static const uint8_t DEVICE_DESCRIPTOR[] = {
     18,   1,    0x10, 0x01, 0x00, 0x00, 0x00, USB_PACKET_SIZE, 0x09, 0x12, 0x02,
     0x00, 0x00, 0x01, 1,    2,    0,    1};
 
 static const uint8_t CONFIGURATION_DESCRIPTOR[] = {
-    9,    2,    171,  0,    2,    1,    0,    0x80, 50,   9,    4,    0,    0,    0,    1,    1,
+    9,    2,    159,  0,    2,    1,    0,    0x80, 50,   9,    4,    0,    0,    0,    1,    1,
     0,    0,    9,    0x24, 1,    0x00, 0x01, 40,   0,    1,    1,    12,   0x24, 2,    1,    0x01,
     0x01, 0,    2,    0x03, 0x00, 0,    0,    10,   0x24, 6,    2,    1,    1,    0x03, 0x00, 0x00,
     0,    9,    0x24, 3,    3,    0x02, 0x03, 0,    2,    0,    9,    4,    1,    0,    0,    1,
     2,    0,    0,    9,    4,    1,    1,    1,    1,    2,    0,    0,    7,    0x24, 1,    1,
-    1,    0x01, 0x00, 20,   0x24, 2,    1,    2,    2,    16,   4,    0x44, 0xAC, 0x00, 0x80, 0xBB,
-    0x00, 0x88, 0x58, 0x01, 0x00, 0x77, 0x01, 9,    5,    0x01, 0x09, 0x84, 0x01, 1,    0,    0,
-    7,    0x25, 1,    0x01, 0,    0,    0,    9,    4,    1,    2,    1,    1,    2,    0,    0,
-    7,    0x24, 1,    1,    1,    0x01, 0x00, 20,   0x24, 2,    1,    2,    3,    24,   4,    0x44,
-    0xAC, 0x00, 0x80, 0xBB, 0x00, 0x88, 0x58, 0x01, 0x00, 0x77, 0x01, 9,    5,    0x01, 0x09, 0x46,
-    0x02, 1,    0,    0,    7,    0x25, 1,    0x01, 0,    0,    0};
+    1,    0x01, 0x00, 14,   0x24, 2,    1,    2,    2,    16,   2,    0x44, 0xAC, 0x00, 0x80, 0xBB,
+    0x00, 9,    5,    0x01, 0x09, 0xC4, 0x00, 1,    0,    0,    7,    0x25, 1,    0x01, 0,    0,
+    0,    9,    4,    1,    2,    1,    1,    2,    0,    0,    7,    0x24, 1,    1,    1,    0x01,
+    0x00, 14,   0x24, 2,    1,    2,    3,    24,   2,    0x44, 0xAC, 0x00, 0x80, 0xBB, 0x00, 9,
+    5,    0x01, 0x09, 0x26, 0x01, 1,    0,    0,    7,    0x25, 1,    0x01, 0,    0,    0};
 
 void usb_audio_init(UsbAudio *audio, UsbDevice *device)
 {
@@ -290,17 +287,6 @@ uint8_t usb_audio_take_changes(UsbAudio *audio)
 uint8_t usb_audio_sample_bytes(const UsbAudio *audio)
 {
     return audio->alt == 0 ? 0 : (uint8_t)(audio->alt + 1);
-}
-
-uint16_t usb_audio_packet_bytes(const UsbAudio *audio)
-{
-    uint32_t sample_bytes = usb_audio_sample_bytes(audio);
-    if (sample_bytes == 0) {
-        return USB_AUDIO_MAX_PACKET;
-    }
-    uint32_t frames = (audio->rate + FRAMES_PER_SECOND - 1) / FRAMES_PER_SECOND + 1;
-    uint32_t bytes = frames * CHANNELS * sample_bytes;
-    return (uint16_t)(bytes < USB_AUDIO_MAX_PACKET ? bytes : USB_AUDIO_MAX_PACKET);
 }
 
 uint8_t usb_audio_attenuation(const UsbAudio *audio)

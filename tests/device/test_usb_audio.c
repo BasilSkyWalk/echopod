@@ -1,9 +1,15 @@
+#include <stddef.h>
+
 #include "check.h"
 #include "device/usb_audio.h"
 
 enum {
-    CONFIGURATION_LENGTH = 171
+    CONFIGURATION_LENGTH = 159,
+    FORMAT_LENGTH = 14,
+    RATE_COUNT = 2
 };
+
+static const uint32_t RATES[RATE_COUNT] = {44100, 48000};
 
 static UsbDevice device;
 
@@ -88,31 +94,30 @@ static const uint8_t *format_of_setting(UsbReply reply, int setting)
 {
     for (uint16_t offset = 0; offset < reply.length; offset += reply.data[offset]) {
         const uint8_t *bytes = reply.data + offset;
-        if (bytes[0] == 20 && bytes[1] == 0x24 && bytes[2] == 2 && setting-- == 0) {
+        if (bytes[0] == FORMAT_LENGTH && bytes[1] == 0x24 && bytes[2] == 2 && setting-- == 0) {
             return bytes;
         }
     }
     return NULL;
 }
 
-static void both_streaming_settings_offer_four_rates(void)
+static void both_streaming_settings_offer_the_same_two_rates(void)
 {
     UsbAudio audio = ready_audio();
     UsbReply reply = configuration(&audio);
-    static const uint32_t rates[] = {44100, 48000, 88200, 96000};
     for (int setting = 0; setting < 2; setting++) {
         const uint8_t *format = format_of_setting(reply, setting);
         CHECK(format != NULL);
         CHECK_EQUAL(setting == 0 ? 2 : 3, format[5]);
         CHECK_EQUAL(setting == 0 ? 16 : 24, format[6]);
-        CHECK_EQUAL(4, format[7]);
-        for (int index = 0; index < 4; index++) {
-            CHECK_EQUAL(rates[index], rate_at(format + 8 + 3 * index));
+        CHECK_EQUAL(RATE_COUNT, format[7]);
+        for (int index = 0; index < RATE_COUNT; index++) {
+            CHECK_EQUAL(RATES[index], rate_at(format + 8 + 3 * index));
         }
     }
 }
 
-static void each_streaming_endpoint_fits_ninety_seven_frames(void)
+static void each_streaming_endpoint_fits_forty_nine_frames(void)
 {
     UsbAudio audio = ready_audio();
     UsbReply reply = configuration(&audio);
@@ -120,9 +125,19 @@ static void each_streaming_endpoint_fits_ninety_seven_frames(void)
     const uint8_t *twenty_four = find_descriptor(reply, 5, 1);
     CHECK_EQUAL(USB_AUDIO_ENDPOINT, sixteen[2]);
     CHECK_EQUAL(0x09, sixteen[3]);
-    CHECK_EQUAL(97 * 4, sixteen[4] | sixteen[5] << 8);
+    CHECK_EQUAL(49 * 4, sixteen[4] | sixteen[5] << 8);
     CHECK_EQUAL(USB_AUDIO_MAX_PACKET, twenty_four[4] | twenty_four[5] << 8);
-    CHECK_EQUAL(97 * 6, USB_AUDIO_MAX_PACKET);
+    CHECK_EQUAL(49 * 6, USB_AUDIO_MAX_PACKET);
+}
+
+static void every_offered_format_fits_one_armed_packet(void)
+{
+    for (uint32_t sample_bytes = 2; sample_bytes <= 3; sample_bytes++) {
+        for (int index = 0; index < RATE_COUNT; index++) {
+            uint32_t frames = (RATES[index] + 999) / 1000 + 1;
+            CHECK(frames * 2 * sample_bytes <= USB_AUDIO_MAX_PACKET);
+        }
+    }
 }
 
 static void choosing_a_streaming_setting_reports_the_sample_size(void)
@@ -174,28 +189,16 @@ static void the_host_sets_and_reads_the_sample_rate(void)
     CHECK_EQUAL(44100, rate_at(reply.data));
 }
 
-static void the_endpoint_is_armed_for_the_largest_packet_of_the_current_format(void)
-{
-    UsbAudio audio = ready_audio();
-    CHECK_EQUAL(USB_AUDIO_MAX_PACKET, usb_audio_packet_bytes(&audio));
-    audio.alt = 2;
-    CHECK_EQUAL(49 * 2 * 3, usb_audio_packet_bytes(&audio));
-    audio.alt = 1;
-    CHECK_EQUAL(49 * 2 * 2, usb_audio_packet_bytes(&audio));
-    audio.rate = 44100;
-    CHECK_EQUAL(46 * 2 * 2, usb_audio_packet_bytes(&audio));
-    audio.alt = 2;
-    audio.rate = 96000;
-    CHECK_EQUAL(USB_AUDIO_MAX_PACKET, usb_audio_packet_bytes(&audio));
-}
-
 static void an_unsupported_rate_stalls_and_keeps_the_old_one(void)
 {
     UsbAudio audio = ready_audio();
-    static const uint8_t rate[] = {0x00, 0xEE, 0x02};
-    UsbReply reply = usb_audio_receive(&audio, setup(0x22, 0x01, 0x0100, 0x01, 3), rate, 3);
-    CHECK_EQUAL(USB_REPLY_STALL, reply.kind);
-    CHECK_EQUAL(48000, audio.rate);
+    static const uint8_t rates[][3] = {{0x00, 0xEE, 0x02}, {0x00, 0x77, 0x01}, {0x88, 0x58, 0x01}};
+    for (size_t index = 0; index < sizeof rates / sizeof rates[0]; index++) {
+        UsbReply reply =
+            usb_audio_receive(&audio, setup(0x22, 0x01, 0x0100, 0x01, 3), rates[index], 3);
+        CHECK_EQUAL(USB_REPLY_STALL, reply.kind);
+        CHECK_EQUAL(48000, audio.rate);
+    }
 }
 
 static void the_volume_range_is_minus_sixty_four_to_zero_decibels(void)
@@ -266,14 +269,14 @@ int main(void)
         TEST_CASE(the_device_is_a_full_speed_composite_of_audio_interfaces),
         TEST_CASE(the_configuration_walks_to_its_declared_length),
         TEST_CASE(the_control_header_covers_its_units),
-        TEST_CASE(both_streaming_settings_offer_four_rates),
-        TEST_CASE(each_streaming_endpoint_fits_ninety_seven_frames),
+        TEST_CASE(both_streaming_settings_offer_the_same_two_rates),
+        TEST_CASE(each_streaming_endpoint_fits_forty_nine_frames),
+        TEST_CASE(every_offered_format_fits_one_armed_packet),
         TEST_CASE(choosing_a_streaming_setting_reports_the_sample_size),
         TEST_CASE(unknown_settings_stall),
         TEST_CASE(a_bus_reset_or_new_configuration_stops_streaming),
         TEST_CASE(the_host_sets_and_reads_the_sample_rate),
         TEST_CASE(an_unsupported_rate_stalls_and_keeps_the_old_one),
-        TEST_CASE(the_endpoint_is_armed_for_the_largest_packet_of_the_current_format),
         TEST_CASE(the_volume_range_is_minus_sixty_four_to_zero_decibels),
         TEST_CASE(host_volume_becomes_half_decibel_attenuation),
         TEST_CASE(volume_below_the_range_is_clamped),
