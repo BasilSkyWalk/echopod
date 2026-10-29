@@ -32,6 +32,7 @@ class FontData:
     ascent: int
     descent: int
     glyphs: list
+    pack_faces: tuple = (0, 0)
 
 
 def quantize_alpha(value):
@@ -74,12 +75,22 @@ def render_glyph(font, codepoint):
                       advance, list(cropped.getdata()))
 
 
+def pack_face_numbers(assets_directory):
+    path = assets_directory / "glyph_pack.json"
+    if not path.exists():
+        return {}
+    faces = json.loads(path.read_text())["faces"]
+    return {face["name"]: number for number, face in enumerate(faces, start=1)}
+
+
 def build_font(spec, ranges, assets_directory):
     path = assets_directory / spec["file"]
     font = load_font(path, spec["size"])
     ascent, descent = font.getmetrics()
     glyphs = [render_glyph(font, codepoint) for codepoint in covered_codepoints(path, ranges)]
-    return FontData(spec["name"], ascent, descent, glyphs)
+    numbers = pack_face_numbers(assets_directory)
+    faces = tuple(numbers[name] if name else 0 for name in spec.get("pack_faces", [None, None]))
+    return FontData(spec["name"], ascent, descent, glyphs, faces)
 
 
 def constant_name(name):
@@ -124,6 +135,8 @@ def font_source(font):
         f"    .bitmap_size = {len(bitmap)},",
         f"    .ascent = {font.ascent},",
         f"    .descent = {font.descent},",
+        *([f"    .pack_faces = {{{font.pack_faces[0]}, {font.pack_faces[1]}}},"]
+          if any(font.pack_faces) else []),
         "};",
         "",
     ])

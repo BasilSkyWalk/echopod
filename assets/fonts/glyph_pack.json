@@ -1,0 +1,66 @@
+{
+  "faces": [
+    {
+      "name": "cjk_16",
+      "file": "noto-cjk/NotoSansCJKsc-Regular.otf",
+      "size": 16,
+      "character_sets": ["hangul", "hanzi", "kanji", "kana", "cjk_punctuation", "fullwidth"]
+    },
+    {
+      "name": "cjk_12",
+      "file": "noto-cjk/NotoSansCJKsc-Regular.otf",
+      "size": 12,
+      "character_sets": ["hangul", "hanzi", "kanji", "kana", "cjk_punctuation", "fullwidth"]
+    },
+    {
+      "name": "inter_regular_12_latin1",
+      "file": "inter/Inter-Regular.ttf",
+      "size": 12,
+      "ranges": [[160, 255]]
+    },
+    {
+      "name": "inter_regular_16_latin1",
+      "file": "inter/Inter-Regular.ttf",
+      "size": 16,
+      "ranges": [[160, 255]]
+    },
+    {
+      "name": "inter_semibold_16_latin1",
+      "file": "inter/Inter-SemiBold.ttf",
+      "size": 16,
+      "ranges": [[160, 255]]
+    }
+  ],
+  "character_sets": {
+    "hangul": {
+      "description": "Hangul syllables in KS X 1001",
+      "codec": "euc_kr",
+      "leads": [176, 200],
+      "ranges": [[44032, 55203]]
+    },
+    "hanzi": {
+      "description": "Simplified Chinese hanzi in GB 2312",
+      "codec": "gb2312",
+      "leads": [176, 247],
+      "ranges": [[19968, 40959]]
+    },
+    "kanji": {
+      "description": "Japanese kanji in JIS X 0208",
+      "codec": "euc_jp",
+      "leads": [176, 244],
+      "ranges": [[19968, 40959]]
+    },
+    "kana": {
+      "description": "Hiragana and katakana",
+      "ranges": [[12353, 12438], [12443, 12543]]
+    },
+    "cjk_punctuation": {
+      "description": "CJK symbols and punctuation, without the vertical repeat marks",
+      "ranges": [[12288, 12336], [12342, 12351]]
+    },
+    "fullwidth": {
+      "description": "Fullwidth forms",
+      "ranges": [[65281, 65374]]
+    }
+  }
+}

@@ -7,7 +7,7 @@
 #include "hal/system.h"
 
 #define OVERLAY_BASE 0x0307A000u
-#define OVERLAY_CAPACITY 0x25000u
+#define OVERLAY_CAPACITY 0x18000u
 #define OVERLAY_IMAGE_OFFSET 0x200000u
 #define OVERLAY_MAGIC 0x4C564F45u
 

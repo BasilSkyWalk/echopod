@@ -9,6 +9,7 @@
 #include "sim_audio.h"
 #include "sim_clock.h"
 #include "sim_display.h"
+#include "sim_glyphs.h"
 #include "sim_input.h"
 #include "sim_options.h"
 #include "sim_power.h"
@@ -193,6 +194,7 @@ int main(int argument_count, char **arguments)
     sim_storage_configure(session.options.card_directory, session.options.system_directory);
     sim_audio_start(session.options.headless);
     sim_power_configure(session.options.battery_percent, session.options.battery_charging);
+    sim_glyphs_attach();
     app_start();
     app_show_splash();
     run(&session);

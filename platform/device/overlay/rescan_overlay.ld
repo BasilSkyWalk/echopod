@@ -2,7 +2,7 @@ ENTRY(rescan_overlay_entry)
 
 MEMORY
 {
-    HIGH_RAM (rx) : ORIGIN = 0x0307A000, LENGTH = 0x25000
+    HIGH_RAM (rx) : ORIGIN = 0x0307A000, LENGTH = 0x18000
 }
 
 SECTIONS

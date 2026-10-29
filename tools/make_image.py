@@ -18,7 +18,7 @@ FW_SIZE_OFFSET = 0x1F4
 CODE_BASE = 0x03050000
 OVERLAY_OFFSET = 0x200000
 OVERLAY_BASE = 0x0307A000
-OVERLAY_CAPACITY = 0x25000
+OVERLAY_CAPACITY = 0x18000
 OVERLAY_HEADER_SIZE = 16
 OVERLAY_MAGIC = b"EOVL"
 CORE1_MP3_OFFSET = 0x240000
@@ -26,6 +26,17 @@ CORE1_FLAC_OFFSET = 0x280000
 CORE1_MODULE_CAPACITY = 0x20000
 CORE1_MODULE_HEADER_SIZE = 512
 CORE1_MODULE_MAGIC = b"EC1M"
+GLYPH_TABLE_OFFSET = 0x2C0000
+GLYPH_TABLE_MAGIC = b"EGPT"
+GLYPH_TABLE_SIZE = 512
+GLYPH_FACE_LIMIT = (GLYPH_TABLE_SIZE - 8) // 8
+GLYPH_PAYLOAD_LIMIT = 0x30000
+GLYPH_REGIONS = (
+    (GLYPH_PAYLOAD_LIMIT, OVERLAY_OFFSET),
+    (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, FW_SIZE),
+    (OVERLAY_OFFSET + OVERLAY_CAPACITY, CORE1_MP3_OFFSET),
+    (CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_FLAC_OFFSET),
+)
 TABLE_CAPACITY = 91
 TABLE_OFFSET = 0x208
 ROW = struct.Struct("<4I")
@@ -81,6 +92,7 @@ class ImageParts:
     overlay: bytes = b""
     core1_mp3: bytes = b""
     core1_flac: bytes = b""
+    glyph_faces: tuple = ()
 
 
 def crc_table():
@@ -172,6 +184,7 @@ def assemble(parts):
     place_overlay(image, parts)
     place_core1_module(image, parts.core1_mp3, CORE1_MP3_OFFSET)
     place_core1_module(image, parts.core1_flac, CORE1_FLAC_OFFSET)
+    place_glyph_faces(image, parts)
     end = fw_end(FW_SIZE)
     struct.pack_into("<I", image, end, crc32(image[:end]))
     return bytes(image)
@@ -198,6 +211,50 @@ def place_core1_module(image, program, offset):
     start = offset + CORE1_MODULE_HEADER_SIZE
     image[offset:offset + len(header)] = header
     image[start:start + len(program)] = program
+
+
+def glyph_face_offsets(sizes):
+    """Image offsets for faces of these sizes: largest first, first fit, 512-byte aligned."""
+    free = [list(region) for region in GLYPH_REGIONS]
+    offsets = [0] * len(sizes)
+    for index in sorted(range(len(sizes)), key=lambda item: -sizes[item]):
+        if sizes[index] == 0:
+            continue
+        for region in free:
+            if region[1] - region[0] >= sizes[index]:
+                offsets[index] = region[0]
+                region[0] += (sizes[index] + 511) // 512 * 512
+                break
+        else:
+            raise ImageError(f"glyph face {index + 1} ({sizes[index]:,} bytes) doesn't fit the image")
+    return offsets
+
+
+def place_glyph_faces(image, parts):
+    faces = parts.glyph_faces
+    if not faces:
+        return
+    if len(faces) > GLYPH_FACE_LIMIT:
+        raise ImageError(f"the glyph table holds at most {GLYPH_FACE_LIMIT} faces")
+    if PAYLOAD_OFFSET + len(parts.payload) > GLYPH_PAYLOAD_LIMIT:
+        raise ImageError("the payload reaches the glyph packs")
+    offsets = glyph_face_offsets([len(face) for face in faces])
+    table = bytearray(GLYPH_TABLE_SIZE)
+    struct.pack_into("<4sI", table, 0, GLYPH_TABLE_MAGIC, len(faces))
+    for index, (face, offset) in enumerate(zip(faces, offsets)):
+        struct.pack_into("<II", table, 8 + 8 * index, offset, len(face))
+        image[offset:offset + len(face)] = face
+    image[GLYPH_TABLE_OFFSET:GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE] = table
+
+
+def glyph_faces_in(image):
+    """The faces an image's glyph table lists, as bytes (empty for an empty face)."""
+    magic, count = struct.unpack_from("<4sI", image, GLYPH_TABLE_OFFSET)
+    if magic != GLYPH_TABLE_MAGIC:
+        return []
+    entries = [struct.unpack_from("<II", image, GLYPH_TABLE_OFFSET + 8 + 8 * index)
+               for index in range(count)]
+    return [image[offset:offset + size] for offset, size in entries]
 
 
 def split_image(image):
@@ -270,7 +327,7 @@ def generated_header(version):
 
 
 def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", core1_flac=b"",
-                version=DEFAULT_VERSION):
+                version=DEFAULT_VERSION, glyph_faces=()):
     check_firmware(firmware)
     code_size, data_size = len(firmware.code), len(firmware.data)
     header = generated_header(version)
@@ -287,7 +344,7 @@ def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", co
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     return assemble(ImageParts(bytes(header), tuple(rows), payload, bytes(MARKER_SIZE), overlay,
                                core1_mp3,
-                               core1_flac))
+                               core1_flac, tuple(glyph_faces)))
 
 
 def validate_image(image):
@@ -417,6 +474,8 @@ def parse_arguments(argv):
     parser.add_argument("--overlay", type=Path, help="rescan overlay ELF linked at 0x0307A000")
     parser.add_argument("--core1-mp3", type=Path, help="core 1 MP3 program, a raw binary")
     parser.add_argument("--core1-flac", type=Path, help="core 1 FLAC program, a raw binary")
+    parser.add_argument("--glyph-face", type=Path, action="append", default=[],
+                        help="glyph pack face, in face order; a missing file is an empty face")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -430,8 +489,10 @@ def main(argv=None):
         overlay = overlay_from_elf(arguments.overlay.read_bytes()) if arguments.overlay else b""
         core1_mp3 = arguments.core1_mp3.read_bytes() if arguments.core1_mp3 else b""
         core1_flac = arguments.core1_flac.read_bytes() if arguments.core1_flac else b""
+        glyph_faces = [path.read_bytes() if path.exists() else b""
+                       for path in arguments.glyph_face]
         image = build_image(firmware, arguments.brand, build_tag, date, overlay, core1_mp3,
-                            core1_flac, arguments.version)
+                            core1_flac, arguments.version, glyph_faces)
     except ImageError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -445,6 +506,7 @@ def main(argv=None):
           f"code {len(firmware.code):,} bytes, "
           f"overlay {len(overlay):,} bytes, core 1 MP3 {len(core1_mp3):,} bytes, "
           f"core 1 FLAC {len(core1_flac):,} bytes, "
+          f"glyph faces {sum(len(face) for face in glyph_faces):,} bytes, "
           f".data {len(firmware.data)} bytes, .bss {firmware.bss_size:,} bytes, "
           f"crc {word(image, fw_end(FW_SIZE)):#010x}")
     return 0

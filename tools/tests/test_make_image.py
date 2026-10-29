@@ -492,3 +492,56 @@ class Core1ModuleTest(unittest.TestCase):
     def test_no_program_leaves_the_space_empty(self):
         offset = make_image.CORE1_MP3_OFFSET
         self.assertEqual(bytes(16), build()[offset:offset + 16])
+
+
+class GlyphFaceTest(unittest.TestCase):
+    def test_faces_land_where_the_table_says(self):
+        faces = [b"\x01" * 700, b"", b"\x02" * 513, b"\x03" * 10]
+        image = build(glyph_faces=faces)
+        offset = make_image.GLYPH_TABLE_OFFSET
+        self.assertEqual(b"EGPT", image[offset:offset + 4])
+        self.assertEqual(4, word(image, offset + 4))
+        self.assertEqual(faces, make_image.glyph_faces_in(image))
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_faces_start_on_sector_boundaries(self):
+        image = build(glyph_faces=[b"\x01" * 700, b"\x02" * 300, b"\x03" * 5])
+        table = make_image.GLYPH_TABLE_OFFSET
+        for index in range(3):
+            self.assertEqual(0, word(image, table + 8 + 8 * index) % 512)
+
+    def test_an_empty_face_has_no_place(self):
+        image = build(glyph_faces=[b"", b"\x05" * 8])
+        table = make_image.GLYPH_TABLE_OFFSET
+        self.assertEqual((0, 0), (word(image, table + 8), word(image, table + 12)))
+
+    def test_faces_stay_clear_of_everything_else(self):
+        sizes = [1_700_000, 1_100_000, 8_000, 8_000, 8_000]
+        offsets = make_image.glyph_face_offsets(sizes)
+        taken = [(make_image.OVERLAY_OFFSET, make_image.OVERLAY_OFFSET + make_image.OVERLAY_CAPACITY),
+                 (make_image.CORE1_MP3_OFFSET, make_image.CORE1_MP3_OFFSET + 512 +
+                  make_image.CORE1_MODULE_CAPACITY),
+                 (make_image.CORE1_FLAC_OFFSET, make_image.CORE1_FLAC_OFFSET + 512 +
+                  make_image.CORE1_MODULE_CAPACITY),
+                 (make_image.GLYPH_TABLE_OFFSET, make_image.GLYPH_TABLE_OFFSET + 512),
+                 (make_image.FW_SIZE, make_image.IMAGE_SIZE),
+                 (0, make_image.GLYPH_PAYLOAD_LIMIT)]
+        placed = sorted(zip(offsets, sizes))
+        for (start, size), (next_start, _) in zip(placed, placed[1:]):
+            self.assertLessEqual(start + size, next_start)
+        for start, size in placed:
+            for low, high in taken:
+                self.assertTrue(start + size <= low or start >= high, (start, size, low, high))
+
+    def test_faces_too_big_for_the_image_are_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            make_image.glyph_face_offsets([2_000_000, 2_000_000])
+
+    def test_no_faces_leave_the_table_empty(self):
+        offset = make_image.GLYPH_TABLE_OFFSET
+        self.assertEqual(bytes(8), build()[offset:offset + 8])
+        self.assertEqual([], make_image.glyph_faces_in(build()))
+
+    def test_the_fw1_end_ignores_the_faces(self):
+        self.assertEqual(word(build(), make_image.FW1_END_OFFSET),
+                         word(build(glyph_faces=[b"\x01" * 100]), make_image.FW1_END_OFFSET))

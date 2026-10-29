@@ -176,6 +176,7 @@ void board_main(void)
     board_input_start();
     board_display_start();
     switch_off_when_empty(boot_millivolts);
+    board_glyphs_start();
     app_start();
     app_show_splash();
     board_stall_pause(false);

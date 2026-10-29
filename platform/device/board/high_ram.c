@@ -59,6 +59,7 @@ HalHighRamTest hal_system_high_ram_test(void)
         return (HalHighRamTest){.status = HAL_HIGH_RAM_BAD_MEMORY, .bad_address = bad};
     }
     uint32_t result = call_from_high_ram();
+    board_glyphs_start();
     HalHighRamStatus status = result == PROBE_EXPECTED ? HAL_HIGH_RAM_OK : HAL_HIGH_RAM_BAD_CALL;
     return (HalHighRamTest){
         .status = status, .size = HIGH_RAM_END - HIGH_RAM_BASE, .call_result = result};

@@ -5,10 +5,6 @@
       126
     ],
     [
-      160,
-      255
-    ],
-    [
       8211,
       8212
     ],
@@ -53,17 +49,20 @@
     {
       "name": "inter_regular_12",
       "file": "inter/Inter-Regular.ttf",
-      "size": 12
+      "size": 12,
+      "pack_faces": ["inter_regular_12_latin1", "cjk_12"]
     },
     {
       "name": "inter_regular_16",
       "file": "inter/Inter-Regular.ttf",
-      "size": 16
+      "size": 16,
+      "pack_faces": ["inter_regular_16_latin1", "cjk_16"]
     },
     {
       "name": "inter_semibold_16",
       "file": "inter/Inter-SemiBold.ttf",
-      "size": 16
+      "size": 16,
+      "pack_faces": ["inter_semibold_16_latin1", "cjk_16"]
     }
   ]
 }

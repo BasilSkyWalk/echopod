@@ -9,6 +9,7 @@ add_executable(echo_device
     board/dmac.c
     board/display.c
     board/emmc.c
+    board/glyphs.c
     board/gpio.c
     board/jack.c
     board/high_ram.c
@@ -93,6 +94,7 @@ set_source_files_properties(board/libc.c board/startup.c PROPERTIES
 )
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
+        board/glyphs.c
         board/high_ram.c
         board/overlay.c
         board/panic.c
@@ -129,6 +131,10 @@ target_link_options(echo_rescan_overlay PRIVATE
 set(ECHO_FIRMWARE_VERSION "0.3.0" CACHE STRING "major.minor.patch written to the image header")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
+set(ECHO_GLYPH_FACE_ARGUMENTS "")
+foreach(face_file ${ECHO_GLYPH_FACE_FILES})
+    list(APPEND ECHO_GLYPH_FACE_ARGUMENTS --glyph-face ${face_file})
+endforeach()
 
 add_custom_target(echo_device_image ALL
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
@@ -137,6 +143,7 @@ add_custom_target(echo_device_image ALL
         --overlay $<TARGET_FILE:echo_rescan_overlay>
         --core1-mp3 ${ECHO_CORE1_MP3_BINARY}
         --core1-flac ${ECHO_CORE1_BINARY}
+        ${ECHO_GLYPH_FACE_ARGUMENTS}
         --output ${ECHO_DEVICE_IMAGE}
     BYPRODUCTS ${ECHO_DEVICE_IMAGE}
     DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}

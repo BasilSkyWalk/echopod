@@ -1,1 +1,2 @@
 tests/fixtures/** -text
+src/fonts/packs/*.bin binary

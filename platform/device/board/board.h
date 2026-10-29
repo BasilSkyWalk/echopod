@@ -22,6 +22,7 @@ void board_backlight_full(void);
 bool board_display_lit(void);
 void board_display_clear(void);
 void board_input_start(void);
+void board_glyphs_start(void);
 void board_input_sample(uint32_t now_ms);
 BatteryGauge board_battery_gauge(void);
 void board_systick_handler(const uint32_t *frame);

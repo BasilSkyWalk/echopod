@@ -23,15 +23,23 @@ static void every_font_covers_printable_ascii(void)
     }
 }
 
-static void every_font_covers_western_european_accents(void)
+static void every_font_builds_in_its_punctuation(void)
 {
-    const uint32_t accented[] = {0xE9,   0xF6,   0xF8,   0xC5,   0xF1,  0xDF,
-                                 0x2026, 0x2019, 0x203A, 0x2605, 0x2713};
+    const uint32_t built_in[] = {0x2026, 0x2019, 0x203A, 0x2605, 0x2713};
     for (size_t font = 0; font < FONT_COUNT; font++) {
-        for (size_t index = 0; index < sizeof accented / sizeof accented[0]; index++) {
-            const Glyph *glyph = font_find_glyph(ALL_FONTS[font], accented[index]);
-            CHECK(glyph != NULL && glyph->codepoint == accented[index]);
+        for (size_t index = 0; index < sizeof built_in / sizeof built_in[0]; index++) {
+            const Glyph *glyph = font_find_glyph(ALL_FONTS[font], built_in[index]);
+            CHECK(glyph != NULL && glyph->codepoint == built_in[index]);
         }
+    }
+}
+
+static void every_font_sends_accents_to_a_pack(void)
+{
+    for (size_t font = 0; font < FONT_COUNT; font++) {
+        CHECK(ALL_FONTS[font]->pack_faces[0] != 0);
+        CHECK(ALL_FONTS[font]->pack_faces[1] != 0);
+        CHECK(ALL_FONTS[font]->pack_faces[0] != ALL_FONTS[font]->pack_faces[1]);
     }
 }
 
@@ -61,7 +69,8 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(every_font_covers_printable_ascii),
-        TEST_CASE(every_font_covers_western_european_accents),
+        TEST_CASE(every_font_builds_in_its_punctuation),
+        TEST_CASE(every_font_sends_accents_to_a_pack),
         TEST_CASE(glyphs_are_sorted_by_codepoint),
         TEST_CASE(glyph_bitmaps_stay_inside_the_font_bitmap),
     };

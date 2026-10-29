@@ -32,6 +32,7 @@ echo_add_unit_test(NAME test_strip_renderer SOURCES gfx/test_strip_renderer.c LI
 echo_add_unit_test(NAME test_frame_diff SOURCES gfx/test_frame_diff.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_font SOURCES gfx/test_font.c gfx/tiny_font.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_text SOURCES gfx/test_text.c gfx/tiny_font.c LIBRARIES echo_gfx)
+echo_add_unit_test(NAME test_font_pack SOURCES gfx/test_font_pack.c gfx/tiny_font.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_fonts SOURCES fonts/test_fonts.c LIBRARIES echo_fonts)
 
 add_library(echo_library_fixtures STATIC
@@ -277,6 +278,10 @@ if(ECHO_BUILD_SIM)
         SOURCES sim/test_sim_storage.c
         LIBRARIES echo_sim_storage
     )
+    echo_add_unit_test(NAME test_sim_glyphs
+        SOURCES sim/test_sim_glyphs.c
+        LIBRARIES echo_sim_glyphs echo_fonts
+    )
     target_compile_definitions(test_sim_storage PRIVATE
         ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
         ECHO_TEST_OUTPUT_DIR="${CMAKE_CURRENT_BINARY_DIR}"
@@ -381,6 +386,12 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             --config ${PROJECT_SOURCE_DIR}/assets/fonts/fonts.json
             --output ${PROJECT_SOURCE_DIR}/src/fonts
             --style ${PROJECT_SOURCE_DIR}/.clang-format
+            --check
+    )
+    add_test(NAME glyph_packs_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/glyph_pack.py
+            --config ${PROJECT_SOURCE_DIR}/assets/fonts/glyph_pack.json
+            --output ${PROJECT_SOURCE_DIR}/src/fonts/packs
             --check
     )
     add_test(NAME cover_fixture_up_to_date

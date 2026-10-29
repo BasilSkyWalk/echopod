@@ -4,7 +4,8 @@ MEMORY
 {
     DATA_RAM (rw) : ORIGIN = 0x03004000, LENGTH = 0x48000
     CODE_RAM (rx) : ORIGIN = 0x03050000, LENGTH = 0x2666C
-    HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x25000
+    HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x18000
+    GLYPH_RAM (rw) : ORIGIN = 0x03092000, LENGTH = 0xD000
 }
 
 SECTIONS
@@ -44,6 +45,12 @@ SECTIONS
         *(.high_ram .high_ram.*)
         . = ALIGN(4);
     } > HIGH_RAM
+
+    .glyph_ram (NOLOAD) :
+    {
+        *(.glyph_ram .glyph_ram.*)
+        . = ALIGN(4);
+    } > GLYPH_RAM
 
     .comment 0 : { *(.comment) }
     .ARM.attributes 0 : { *(.ARM.attributes) }
