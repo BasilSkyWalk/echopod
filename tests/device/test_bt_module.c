@@ -679,6 +679,21 @@ static void a_dropped_link_clears_the_pairing(void)
     CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
 }
 
+static void a_late_play_report_still_lets_a_resume_send_the_play_notice(void)
+{
+    static const uint8_t PLAY_NOTICE[] = {'C', 0x86, '0', '0', 0x00};
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, START_MS + 500, &frame);
+    bt_module_set_stream(&module, false, START_MS + 600, &frame);
+    poll(START_MS + 600 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame);
+    receive_text("CC", START_MS + 800);
+    settle(START_MS + 800);
+    CHECK(bt_module_set_stream(&module, true, START_MS + 900, &frame));
+    CHECK(poll(START_MS + 900 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(frame_bytes_are(&frame, PLAY_NOTICE, sizeof PLAY_NOTICE));
+}
+
 static void buds_controls_are_counted_without_sending_anything(void)
 {
     BtModuleFrame frame;
@@ -789,6 +804,7 @@ int main(void)
         TEST_CASE(ctok_after_clok_clears_the_pairing),
         TEST_CASE(a_paired_link_without_a_connection_can_be_dropped),
         TEST_CASE(a_dropped_link_clears_the_pairing),
+        TEST_CASE(a_late_play_report_still_lets_a_resume_send_the_play_notice),
         TEST_CASE(buds_controls_are_counted_without_sending_anything),
         TEST_CASE(a_play_report_without_a_stream_is_not_answered),
         TEST_CASE(the_first_stream_start_sends_only_cy0_1e),

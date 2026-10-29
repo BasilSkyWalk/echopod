@@ -238,7 +238,6 @@ static void handle_play_report(BtModule *module, bool playing, uint32_t now_ms)
         module->status.pairing == HAL_BLUETOOTH_PAIRED) {
         mark_connected(module, now_ms);
     }
-    module->play_state = playing ? PLAY_STATE_PLAYING : PLAY_STATE_PAUSED;
     module->query_paused = module->status.state == HAL_BLUETOOTH_CONNECTED;
     module->query_paused_ms = now_ms;
     if (playing) {
