@@ -144,6 +144,7 @@ static UsbSessionEnd serve(void)
             refreshed = hal_clock_milliseconds();
         }
         usb_poll(&port);
+        board_display_service();
         if (usb_fallback_due(&fallback, session_works(), hal_clock_milliseconds())) {
             fall_back_to_full_speed();
         }

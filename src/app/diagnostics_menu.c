@@ -154,24 +154,6 @@ static const char *core1_accel_value(const void *context)
     return core1_accel_text;
 }
 
-static char core1_decode_text[DIAGNOSTICS_VALUE_CAPACITY];
-
-static ScreenAction run_core1_decode_test(void *context)
-{
-    Core1DecodeOption *decode = context;
-    decode->result = hal_system_core1_decode_test();
-    decode->run = true;
-    return screen_action_none();
-}
-
-static const char *core1_decode_value(const void *context)
-{
-    const Core1DecodeOption *decode = context;
-    diagnostics_core1_decode_text(decode->run, decode->result, core1_decode_text,
-                                  sizeof core1_decode_text);
-    return core1_decode_text;
-}
-
 static char boot_hold_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static const char *boot_hold_value(const void *context)
@@ -365,66 +347,64 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
                                                 .select = run_core1_test,
                                                 .context = &screens->core1,
                                                 .value = core1_value};
-    screens->core1_decode = (Core1DecodeOption){.run = false};
-    screens->diagnostics_items[13] = (MenuItem){.label = "Core 1 decode",
-                                                .select = run_core1_decode_test,
-                                                .context = &screens->core1_decode,
-                                                .value = core1_decode_value};
-    screens->diagnostics_items[14] = (MenuItem){
+    screens->diagnostics_items[13] = (MenuItem){
         .label = "Battery", .select = NULL, .context = NULL, .value = diagnostics_row_battery};
-    screens->diagnostics_items[15] =
+    screens->diagnostics_items[14] =
         (MenuItem){.label = "Boot hold", .select = NULL, .context = NULL, .value = boot_hold_value};
-    screens->diagnostics_items[16] = (MenuItem){
+    screens->diagnostics_items[15] = (MenuItem){
         .label = "Last start", .select = NULL, .context = NULL, .value = diagnostics_row_start};
-    screens->diagnostics_items[17] = (MenuItem){
+    screens->diagnostics_items[16] = (MenuItem){
         .label = "Last step", .select = NULL, .context = NULL, .value = diagnostics_row_last_step};
-    screens->diagnostics_items[18] = (MenuItem){.label = "Last battery",
+    screens->diagnostics_items[17] = (MenuItem){.label = "Last battery",
                                                 .select = NULL,
                                                 .context = NULL,
                                                 .value = diagnostics_row_last_battery};
+    screens->diagnostics_items[18] = (MenuItem){.label = "Bluetooth",
+                                                .select = bluetooth_screen_open_details,
+                                                .context = &screens->bluetooth,
+                                                .value = NULL,
+                                                .opens = true};
     screens->diagnostics_items[19] =
-        app_screens_open_item("Bluetooth", bluetooth_screen_init(&screens->bluetooth, theme));
-    screens->diagnostics_items[20] =
         (MenuItem){.label = "Stall test", .select = run_stall_test, .context = NULL, .value = NULL};
     screens->high_ram = (HighRamOption){.run = false};
-    screens->diagnostics_items[22] = (MenuItem){.label = "High RAM",
+    screens->diagnostics_items[21] = (MenuItem){.label = "High RAM",
                                                 .select = run_high_ram_test,
                                                 .context = &screens->high_ram,
                                                 .value = high_ram_value};
-    screens->diagnostics_items[21] = (MenuItem){.label = "Power taps",
+    screens->diagnostics_items[20] = (MenuItem){.label = "Power taps",
                                                 .select = toggle_power_taps,
                                                 .context = options,
                                                 .value = power_taps_value};
-    screens->diagnostics_items[23] = (MenuItem){.label = "Jack 3.5",
+    screens->diagnostics_items[22] = (MenuItem){.label = "Jack 3.5",
                                                 .select = NULL,
                                                 .context = NULL,
                                                 .value = diagnostics_row_jack_single_ended};
-    screens->diagnostics_items[24] = (MenuItem){.label = "Jack 4.4",
+    screens->diagnostics_items[23] = (MenuItem){.label = "Jack 4.4",
                                                 .select = NULL,
                                                 .context = NULL,
                                                 .value = diagnostics_row_jack_balanced};
     screens->core1_accel = (Core1AccelOption){.run = false};
-    screens->diagnostics_items[25] = (MenuItem){.label = "LPC accel",
+    screens->diagnostics_items[24] = (MenuItem){.label = "LPC accel",
                                                 .select = run_core1_accel_test,
                                                 .context = &screens->core1_accel,
                                                 .value = core1_accel_value};
-    screens->diagnostics_items[26] = (MenuItem){.label = "Tone 192k",
+    screens->diagnostics_items[25] = (MenuItem){.label = "Tone 192k",
                                                 .select = toggle_dma_tone,
                                                 .context = &screens->high_rate_tone,
                                                 .value = dma_tone_value};
-    screens->diagnostics_items[27] = (MenuItem){
+    screens->diagnostics_items[26] = (MenuItem){
         .label = "Watchdog test", .select = run_watchdog_test, .context = NULL, .value = NULL};
-    screens->diagnostics_items[28] = (MenuItem){.label = "Tone 176k",
+    screens->diagnostics_items[27] = (MenuItem){.label = "Tone 176k",
                                                 .select = toggle_dma_tone,
                                                 .context = &screens->tone_176,
                                                 .value = dma_tone_value};
-    screens->diagnostics_items[29] = (MenuItem){
+    screens->diagnostics_items[28] = (MenuItem){
         .label = "USB HW2 HW3", .select = NULL, .context = NULL, .value = usb_config_value};
-    screens->diagnostics_items[30] =
+    screens->diagnostics_items[29] =
         (MenuItem){.label = "USB HW4 CFG", .select = NULL, .context = NULL, .value = usb_phy_value};
-    screens->diagnostics_items[31] =
+    screens->diagnostics_items[30] =
         (MenuItem){.label = "USB RX TX", .select = NULL, .context = NULL, .value = usb_fifo_value};
-    screens->diagnostics_items[32] = (MenuItem){
+    screens->diagnostics_items[31] = (MenuItem){
         .label = "Last USB", .select = NULL, .context = NULL, .value = diagnostics_row_usb_last};
     app_screens_build_menu(&screens->diagnostics, "Diagnostics", screens->diagnostics_items,
                            DIAGNOSTICS_ITEM_COUNT, theme);

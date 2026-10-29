@@ -2,6 +2,8 @@ add_library(echo_app STATIC
     app.c
     card_files.c
     app_screens.c
+    bluetooth_link.c
+    bluetooth_store.c
     browse_screen.c
     cover_cache.c
     default_theme.c
@@ -20,6 +22,7 @@ add_library(echo_app STATIC
     settings_store.c
     spoken_store.c
     screens/bluetooth_screen.c
+    screens/charge_screen.c
     screens/cover_flow_screen.c
     screens/font_sample_screen.c
     screens/now_playing_screen.c

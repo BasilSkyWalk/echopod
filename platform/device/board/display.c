@@ -237,8 +237,8 @@ void board_display_after_clock_change(void)
 void board_display_start(void)
 {
     brightness = HAL_DISPLAY_BRIGHTNESS_MAX;
-    backlight_on = true;
-    drive_backlight(true);
+    backlight_on = false;
+    drive_backlight(false);
     mux_panel_pins();
     gpio_output(PANEL_RESET, true);
     set_bus_idle();

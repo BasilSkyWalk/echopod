@@ -94,3 +94,35 @@ void icon_draw_bolt(Canvas *canvas, Rect area, Color color)
         }
     }
 }
+
+static int along(int row, int from_row, int from_x, int to_row, int to_x)
+{
+    int span = to_row - from_row;
+    return span == 0 ? from_x : from_x + (to_x - from_x) * (row - from_row) / span;
+}
+
+static void dot(Canvas *canvas, Rect area, int x, int row, Color color)
+{
+    canvas_fill_rect(canvas, (Rect){area.x + x, area.y + row, 1, 1}, color);
+}
+
+void icon_draw_bluetooth(Canvas *canvas, Rect area, Color color)
+{
+    int last = area.height - 1;
+    int quarter = last / 4;
+    int lower = last - quarter;
+    int right = area.width - 1;
+    int middle = right / 2;
+    canvas_fill_rect(canvas, (Rect){area.x + middle, area.y, 1, area.height}, color);
+    for (int row = 0; row <= last; row++) {
+        if (row <= quarter) {
+            dot(canvas, area, along(row, 0, middle, quarter, right), row, color);
+        } else if (row >= lower) {
+            dot(canvas, area, along(row, lower, right, last, middle), row, color);
+        }
+        if (row >= quarter && row <= lower) {
+            dot(canvas, area, along(row, quarter, right, lower, 0), row, color);
+            dot(canvas, area, along(row, quarter, 0, lower, right), row, color);
+        }
+    }
+}

@@ -198,21 +198,6 @@ static void core_1_failures_name_the_step(void)
     }
 }
 
-static void the_core_1_decode_row_shows_average_block_time_against_real_time(void)
-{
-    char text[DIAGNOSTICS_VALUE_CAPACITY];
-    HalCore1Decode result = {.status = HAL_CORE1_RAN,
-                             .mhz = 100,
-                             .blocks = 12,
-                             .average_us = 31400,
-                             .longest_us = 40600,
-                             .block_us = 48000};
-    diagnostics_core1_decode_text(true, result, text, sizeof text);
-    CHECK(text_is("100: 31/48 ms max 41", text));
-    diagnostics_core1_decode_text(false, result, text, sizeof text);
-    CHECK(text_is("", text));
-}
-
 static void the_accelerator_row_shows_both_classes_and_the_timing(void)
 {
     char text[DIAGNOSTICS_VALUE_CAPACITY];
@@ -238,41 +223,6 @@ static void the_accelerator_row_shows_both_classes_and_the_timing(void)
     CHECK(text_is("Timeout at t5", text));
     diagnostics_core1_accel_text(true, (HalCore1Accel){.status = HAL_CORE1_NO_REPLY}, text,
                                  sizeof text);
-    CHECK(text_is("No reply", text));
-}
-
-static void a_decode_that_used_the_accelerator_says_so(void)
-{
-    char text[DIAGNOSTICS_VALUE_CAPACITY];
-    diagnostics_core1_decode_text(true,
-                                  (HalCore1Decode){.status = HAL_CORE1_RAN,
-                                                   .mhz = 100,
-                                                   .blocks = 10,
-                                                   .average_us = 18200,
-                                                   .longest_us = 21000,
-                                                   .block_us = 24000,
-                                                   .lpc_in_hardware = 40},
-                                  text, sizeof text);
-    CHECK(text_is("100: 18/24 ms max 21 hw", text));
-}
-
-static void a_core_1_decode_without_blocks_or_track_says_so(void)
-{
-    char text[DIAGNOSTICS_VALUE_CAPACITY];
-    diagnostics_core1_decode_text(true, (HalCore1Decode){.status = HAL_CORE1_RAN, .mhz = 100}, text,
-                                  sizeof text);
-    CHECK(text_is("No blocks", text));
-    diagnostics_core1_decode_text(true, (HalCore1Decode){.status = HAL_CORE1_NO_TRACK}, text,
-                                  sizeof text);
-    CHECK(text_is("Play a track first", text));
-    diagnostics_core1_decode_text(true, (HalCore1Decode){.status = HAL_CORE1_NOT_FLAC}, text,
-                                  sizeof text);
-    CHECK(text_is("Not FLAC", text));
-    diagnostics_core1_decode_text(true, (HalCore1Decode){.status = HAL_CORE1_READ_FAILED}, text,
-                                  sizeof text);
-    CHECK(text_is("Read failed", text));
-    diagnostics_core1_decode_text(true, (HalCore1Decode){.status = HAL_CORE1_NO_REPLY}, text,
-                                  sizeof text);
     CHECK(text_is("No reply", text));
 }
 
@@ -415,10 +365,7 @@ int main(void)
         TEST_CASE(the_core_1_row_is_empty_until_run),
         TEST_CASE(a_core_1_run_shows_its_clock_and_loop_cycles),
         TEST_CASE(core_1_failures_name_the_step),
-        TEST_CASE(the_core_1_decode_row_shows_average_block_time_against_real_time),
-        TEST_CASE(a_core_1_decode_without_blocks_or_track_says_so),
         TEST_CASE(the_accelerator_row_shows_both_classes_and_the_timing),
-        TEST_CASE(a_decode_that_used_the_accelerator_says_so),
         TEST_CASE(the_loop_row_shows_cycles_per_iteration),
         TEST_CASE(a_running_tone_shows_the_read_position),
         TEST_CASE(a_tone_that_ended_by_itself_says_so),

@@ -46,3 +46,8 @@ HalPowerHold hal_power_boot_hold(void)
 {
     return (HalPowerHold){.function = 0, .output = true, .high = true};
 }
+
+bool hal_power_take_usb_start(void)
+{
+    return false;
+}

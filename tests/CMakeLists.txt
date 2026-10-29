@@ -177,6 +177,11 @@ echo_add_unit_test(NAME test_diagnostics_values
     LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+echo_add_unit_test(NAME test_bluetooth_link
+    SOURCES app/test_bluetooth_link.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 echo_add_unit_test(NAME test_bluetooth_screen
     SOURCES app/test_bluetooth_screen.c app/fake_hal.c
     LIBRARIES echo_app echo_library_scan

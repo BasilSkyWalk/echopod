@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "bluetooth_store.h"
 #include "cover_cache.h"
 #include "favorites_store.h"
 #include "hal/storage.h"
@@ -31,6 +32,7 @@ static const CardFile CARD_FILES[] = {
     {COVER_CACHE_PATH, COVERS_FILE_BYTES},      {MUSIC_CHECK_PATH, SMALL_FILE_BYTES},
     {PLAYER_UP_NEXT_PATH, SMALL_FILE_BYTES},    {SPOKEN_STORE_PATH, SMALL_FILE_BYTES},
     {LIBRARY_SCRATCH_PATH, SCRATCH_FILE_BYTES}, {RESCAN_TIMES_PATH, SMALL_FILE_BYTES},
+    {BLUETOOTH_STORE_PATH, SMALL_FILE_BYTES},
 };
 
 CardFilesReport card_files_prepare(void)

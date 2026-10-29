@@ -42,7 +42,8 @@ enum {
     FIFO_MODE_SHIFT = 16,
     FIFO_MODE_UNIT = 16,
     TX_WAIT_POLLS = 100000,
-    RX_BYTES_PER_SERVICE = 256
+    RX_BYTES_PER_SERVICE = 256,
+    ROUTE_SETTLE_MS = 500
 };
 
 static const GpioPin MODULE_POWER = {2, 7};
@@ -50,10 +51,13 @@ static const GpioPin UART_PIN_A = {2, 16};
 static const GpioPin UART_PIN_B = {2, 17};
 static const GpioPin AUDIO_MUTE = {2, 0};
 static const GpioPin WIRED_OUTPUT = {2, 14};
+static const GpioPin PANEL_STRAP = {2, 9};
 
 static BtModule module;
 static bool powered;
 static bool routed;
+static uint32_t rerouted_ms;
+static bool matched_stock;
 
 static void uart_write(uint32_t offset, uint32_t value)
 {
@@ -132,11 +136,40 @@ static void power_on(void)
     powered = true;
 }
 
+static void match_stock_housekeeping(void)
+{
+    register_write(GRF_BASE + 0xC4u, 0x00010000u);
+    register_write(CRU_BASE + 0x84u, 0x00920092u);
+    register_write(CRU_BASE + 0xA0u, 0x00020002u);
+    register_write(CRU_BASE + 0xC0u, 0x00680068u);
+    register_write(GRF_BASE + 0x14u, 0x00200020u);
+    register_write(GRF_BASE + 0x54u, 0x00010001u);
+    gpio_mux(PANEL_STRAP, GPIO_FUNCTION_GPIO);
+    gpio_output(PANEL_STRAP, false);
+    matched_stock = true;
+}
+
 static void route_to_module(bool to_module)
 {
+    if (to_module && !matched_stock) {
+        match_stock_housekeeping();
+    }
     gpio_output(AUDIO_MUTE, to_module);
     gpio_output(WIRED_OUTPUT, !to_module);
+    if (routed != to_module) {
+        rerouted_ms = hal_clock_milliseconds();
+    }
     routed = to_module;
+}
+
+bool board_bluetooth_pin(bool mute_pin, bool level)
+{
+    return routed ? mute_pin : level;
+}
+
+bool board_bluetooth_settling(void)
+{
+    return rerouted_ms != 0 && hal_clock_milliseconds() - rerouted_ms < ROUTE_SETTLE_MS;
 }
 
 static void follow_stream(void)
@@ -186,10 +219,10 @@ void hal_bluetooth_scan(void)
     }
 }
 
-void hal_bluetooth_connect(uint8_t index)
+void hal_bluetooth_connect(const HalBluetoothDevice *device)
 {
     BtModuleFrame frame;
-    if (powered && bt_module_connect(&module, index, hal_clock_milliseconds(), &frame)) {
+    if (powered && bt_module_connect(&module, device, hal_clock_milliseconds(), &frame)) {
         send(&frame);
     }
 }

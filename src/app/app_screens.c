@@ -139,6 +139,7 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
         .power = context.power,
         .toast = context.toast,
         .rescan_requested = context.rescan_requested,
+        .bluetooth = &screens->bluetooth,
         .sleep_option = 0,
     };
     settings_screens_init(&screens->settings, settings, context.theme);
@@ -206,6 +207,7 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
                                     .covers = context.covers,
                                     .up_next = up_next_screen_init(&screens->up_next, up_next)};
     message_screen_init(&screens->no_library, no_library);
+    bluetooth_screen_init(&screens->bluetooth, context.bluetooth, theme);
     now_playing_screen_init(&screens->now_playing, now_playing);
     build_music(screens, context);
     build_settings(screens, context);

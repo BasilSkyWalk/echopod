@@ -108,6 +108,7 @@ void board_wait_for_key(void)
     while (hal_input_next_transition(&transition)) {
     }
     for (;;) {
+        board_display_service();
         if (hal_input_next_transition(&transition) && transition.pressed) {
             return;
         }

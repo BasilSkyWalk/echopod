@@ -103,7 +103,6 @@ typedef struct FakeHal {
     int test_tone_count;
     int loop_bench_count;
     int core1_test_count;
-    int core1_decode_count;
     int core1_accel_count;
     bool dma_tone_running;
     uint32_t dma_tone_rate;
@@ -113,7 +112,7 @@ typedef struct FakeHal {
     int bluetooth_scan_count;
     int bluetooth_service_count;
     int bluetooth_connect_count;
-    int bluetooth_connect_index;
+    HalBluetoothDevice bluetooth_connected_to;
     int bluetooth_disconnect_count;
     HalUsbMode usb_mode;
     uint8_t dac_volume;
@@ -706,11 +705,6 @@ HalCore1Test hal_system_core1_test(void)
     return (HalCore1Test){.status = HAL_CORE1_RAN, .mhz = 100};
 }
 
-int fake_hal_core1_decode_count(void)
-{
-    return fake.core1_decode_count;
-}
-
 int fake_hal_core1_accel_count(void)
 {
     return fake.core1_accel_count;
@@ -722,15 +716,23 @@ HalCore1Accel hal_system_core1_accel_test(void)
     return (HalCore1Accel){.status = HAL_CORE1_UNAVAILABLE};
 }
 
-HalCore1Decode hal_system_core1_decode_test(void)
-{
-    fake.core1_decode_count++;
-    return (HalCore1Decode){.status = HAL_CORE1_NO_TRACK};
-}
-
 HalPowerHold hal_power_boot_hold(void)
 {
     return (HalPowerHold){.function = 0, .output = true, .high = true};
+}
+
+static bool usb_start;
+
+void fake_hal_set_usb_start(bool started)
+{
+    usb_start = started;
+}
+
+bool hal_power_take_usb_start(void)
+{
+    bool started = usb_start;
+    usb_start = false;
+    return started;
 }
 
 HalStartInfo hal_system_start_info(void)
@@ -777,9 +779,9 @@ int fake_hal_bluetooth_connect_count(void)
     return fake.bluetooth_connect_count;
 }
 
-int fake_hal_bluetooth_connect_index(void)
+const HalBluetoothDevice *fake_hal_bluetooth_connect_target(void)
 {
-    return fake.bluetooth_connect_index;
+    return &fake.bluetooth_connected_to;
 }
 
 int fake_hal_bluetooth_disconnect_count(void)
@@ -787,10 +789,10 @@ int fake_hal_bluetooth_disconnect_count(void)
     return fake.bluetooth_disconnect_count;
 }
 
-void hal_bluetooth_connect(uint8_t index)
+void hal_bluetooth_connect(const HalBluetoothDevice *device)
 {
     fake.bluetooth_connect_count++;
-    fake.bluetooth_connect_index = index;
+    fake.bluetooth_connected_to = *device;
 }
 
 void hal_bluetooth_disconnect(void)

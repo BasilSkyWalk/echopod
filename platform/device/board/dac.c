@@ -253,6 +253,9 @@ static bool dac_read(void *context, uint8_t address, uint32_t map, uint8_t *valu
 static void dac_set_pin(void *context, DacPin pin, bool level)
 {
     (void)context;
+    if (pin == DAC_PIN_MUTE || pin == DAC_PIN_ENABLE_A) {
+        level = board_bluetooth_pin(pin == DAC_PIN_MUTE, level);
+    }
     gpio_output(DAC_PINS[pin], level);
 }
 

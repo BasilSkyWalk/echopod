@@ -46,6 +46,7 @@ static void show_percent(uint32_t percent)
     string_builder_append_unsigned(&builder, percent);
     string_builder_append_char(&builder, '%');
     app_show_notice(install_title, text);
+    board_display_service();
 }
 
 static void report(void *context, uint32_t done, uint32_t total)

@@ -216,6 +216,7 @@ static void serve(void)
     while (usb_vbus_present() && !user_left()) {
         serve_usb();
         hal_audio_service();
+        board_display_service();
         follow_host();
         keep_output();
         repeat_volume();

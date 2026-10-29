@@ -23,7 +23,7 @@ static const SimDevice DEVICES[] = {
 typedef struct SimBluetooth {
     HalBluetoothStatus status;
     uint32_t since_ms;
-    uint8_t target;
+    HalBluetoothDevice target;
 } SimBluetooth;
 
 static SimBluetooth bluetooth;
@@ -49,14 +49,13 @@ void hal_bluetooth_scan(void)
     enter_state(HAL_BLUETOOTH_SCANNING);
 }
 
-void hal_bluetooth_connect(uint8_t index)
+void hal_bluetooth_connect(const HalBluetoothDevice *device)
 {
     HalBluetoothState state = bluetooth.status.state;
-    bool idle = state == HAL_BLUETOOTH_READY || state == HAL_BLUETOOTH_SCANNING;
-    if (!idle || index >= bluetooth.status.device_count) {
+    if (state != HAL_BLUETOOTH_READY && state != HAL_BLUETOOTH_SCANNING) {
         return;
     }
-    bluetooth.target = index;
+    bluetooth.target = *device;
     bluetooth.status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
     enter_state(HAL_BLUETOOTH_CONNECTING);
 }
@@ -72,7 +71,7 @@ void hal_bluetooth_disconnect(void)
 static void finish_connect(void)
 {
     bluetooth.status.pairing = HAL_BLUETOOTH_PAIRED;
-    bluetooth.status.connected = bluetooth.status.devices[bluetooth.target];
+    bluetooth.status.connected = bluetooth.target;
     enter_state(HAL_BLUETOOTH_CONNECTED);
 }
 

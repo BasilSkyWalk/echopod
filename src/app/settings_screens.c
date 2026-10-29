@@ -259,9 +259,15 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
     screens->theme = theme;
     screens->items[SETTINGS_RESCAN_ITEM] = (MenuItem){
         .label = "Rescan library", .select = request_rescan, .context = &screens->context};
+    screens->items[SETTINGS_BLUETOOTH_ITEM] = (MenuItem){.label = "Bluetooth",
+                                                         .select = bluetooth_screen_open,
+                                                         .context = context.bluetooth,
+                                                         .value = bluetooth_screen_summary,
+                                                         .opens = true};
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
-        int item = index < SETTINGS_RESCAN_ITEM ? index : index + 1;
+        int item = index < SETTINGS_BLUETOOTH_ITEM ? index : index + 1;
+        item = item < SETTINGS_RESCAN_ITEM ? item : item + 1;
         screens->items[item] = (MenuItem){.label = CHOICES[index].title,
                                           .select = open_choice,
                                           .context = &screens->entries[index],

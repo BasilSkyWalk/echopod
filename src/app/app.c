@@ -4,6 +4,7 @@
 
 #include "app_internal.h"
 #include "app_screens.h"
+#include "bluetooth_link.h"
 #include "card_files.h"
 #include "core/deadline.h"
 #include "core/key_tracker.h"
@@ -27,6 +28,7 @@
 #include "library_store.h"
 #include "music_check.h"
 #include "player.h"
+#include "screens/charge_screen.h"
 #include "settings_store.h"
 #include "ui/fade.h"
 #include "ui/header.h"
@@ -40,7 +42,8 @@
 enum {
     STRIP_HEIGHT = 34,
     RESCAN_PROGRESS_MS = 250,
-    BATTERY_CHECK_MS = 250
+    BATTERY_CHECK_MS = 250,
+    CHARGE_LIT_MS = 5000
 };
 
 static const KeyConfig KEY_CONFIG = {
@@ -90,6 +93,7 @@ typedef struct AppState {
     bool light_after_frame;
     const char *goodbye_text;
     Toast toast;
+    BluetoothLink bluetooth;
     uint32_t shown_refusals;
     StatusBarState status_bar;
     AppScreens screens;
@@ -104,6 +108,9 @@ typedef struct AppState {
     AppOptions options;
     bool display_on;
     bool powered_off;
+    bool charging;
+    uint32_t charge_lit_until_ms;
+    HalBattery charge_battery;
 } AppState;
 
 static AppState app;
@@ -187,12 +194,52 @@ static void save_session(void)
     save_settings();
 }
 
-static void finish_shut_down(void)
+static void power_off_now(void)
 {
-    app.saying_goodbye = false;
     set_display(false);
     app.powered_off = true;
     hal_power_off();
+}
+
+static void light_charge_screen(uint32_t now_ms)
+{
+    app.charge_lit_until_ms = now_ms + CHARGE_LIT_MS;
+    if (!app.display_on) {
+        set_display(true);
+    }
+}
+
+static void start_charging(uint32_t now_ms)
+{
+    if (player_status(&app.player).state == PLAYER_PLAYING) {
+        player_toggle_pause(&app.player);
+    }
+    player_release_output(&app.player);
+    bluetooth_link_sleep(&app.bluetooth);
+    app.charging = true;
+    app.charge_battery = hal_power_battery();
+    light_charge_screen(now_ms);
+}
+
+static void stop_charging(uint32_t now_ms)
+{
+    app.charging = false;
+    bluetooth_link_start(&app.bluetooth, &app.toast, now_ms);
+    power_policy_wake(&app.power, now_ms);
+    if (!app.display_on) {
+        set_display(true);
+    }
+    app_show_splash();
+}
+
+static void finish_shut_down(void)
+{
+    app.saying_goodbye = false;
+    if (hal_power_battery().usb_power) {
+        start_charging(app.now_ms);
+        return;
+    }
+    power_off_now();
 }
 
 static void shut_down(const char *text)
@@ -490,11 +537,20 @@ static StatusPlayback playback_of(PlayerState state)
     return STATUS_PLAYBACK_NONE;
 }
 
+static StatusBluetooth bluetooth_of(const BluetoothLink *link)
+{
+    if (!link->saved.enabled || link->dozing) {
+        return STATUS_BLUETOOTH_OFF;
+    }
+    return link->connected ? STATUS_BLUETOOTH_CONNECTED : STATUS_BLUETOOTH_ON;
+}
+
 static StatusBarState current_status_bar(void)
 {
     HalBattery battery = hal_power_battery();
     return (StatusBarState){
         .playback = playback_of(player_status(&app.player).state),
+        .bluetooth = bluetooth_of(&app.bluetooth),
         .battery_known = battery.known,
         .battery_percent = battery.percent,
         .charging = battery.charging,
@@ -578,6 +634,7 @@ static void start_screens(uint32_t now_ms)
         .toast = &app.toast,
         .covers = &app.covers,
         .rescan_requested = &app.rescan_requested,
+        .bluetooth = &app.bluetooth,
     };
     Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);
@@ -609,6 +666,7 @@ void app_start(void)
     app.options = (AppOptions){.show_frame_time = false, .ignore_power_taps = false};
     app.toast = (Toast){.visible = false};
     app.powered_off = false;
+    app.charging = false;
     app.saying_goodbye = false;
     app.goodbye_text = GOODBYE_TEXT;
     low_battery_init(&app.low_battery);
@@ -619,8 +677,12 @@ void app_start(void)
     settings_store_load(&app.settings);
     start_playback();
     start_hardware(now_ms);
+    bluetooth_link_start(&app.bluetooth, &app.toast, now_ms);
     start_screens(now_ms);
     report_card_files(files, now_ms);
+    if (hal_power_take_usb_start()) {
+        start_charging(now_ms);
+    }
 }
 
 static void show_rescan_progress(uint32_t files, uint32_t tracks)
@@ -704,6 +766,50 @@ void app_request_rescan_if_music_changed(void)
     app.music_check_requested = true;
 }
 
+static void draw_charge(void *context, Canvas *canvas)
+{
+    (void)context;
+    charge_screen_draw(canvas, &DEFAULT_THEME, app.charge_battery);
+}
+
+static void follow_charge_keys(uint32_t now_ms)
+{
+    KeyEvent event;
+    while (app.charging && key_tracker_next_event(&app.keys, &event)) {
+        if (event.key == KEY_POWER && event.gesture == KEY_GESTURE_LONG_PRESS) {
+            stop_charging(now_ms);
+        } else {
+            light_charge_screen(now_ms);
+        }
+    }
+}
+
+static void charge_step(uint32_t now_ms)
+{
+    follow_charge_keys(now_ms);
+    if (!app.charging) {
+        return;
+    }
+    if (deadline_reached(now_ms, app.battery_check_ms)) {
+        app.battery_check_ms = now_ms + BATTERY_CHECK_MS;
+        app.charge_battery = hal_power_battery();
+        if (!app.charge_battery.usb_power) {
+            app.charging = false;
+            power_off_now();
+            return;
+        }
+    }
+    if (app.display_on && deadline_reached(now_ms, app.charge_lit_until_ms)) {
+        set_display(false);
+    }
+    if (app.display_on) {
+        render((FrameDrawer){.draw = draw_charge, .context = NULL}, true);
+        light_after_first_frame();
+    } else {
+        use_wanted_clock();
+    }
+}
+
 void app_step(void)
 {
     if (app.powered_off) {
@@ -733,6 +839,10 @@ void app_step(void)
     hal_bluetooth_service();
     read_input();
     key_tracker_update(&app.keys, now_ms);
+    if (app.charging) {
+        charge_step(now_ms);
+        return;
+    }
     if (fade_running()) {
         drain_key_events();
     } else {
@@ -743,6 +853,7 @@ void app_step(void)
     }
     if (!app.powered_off) {
         player_update(&app.player, now_ms);
+        bluetooth_link_step(&app.bluetooth, &app.player, now_ms);
         spoken_store_follow(&app.spoken, player_status(&app.player), now_ms);
         explain_refusals(now_ms);
         update_power(now_ms);
@@ -761,6 +872,11 @@ void app_step(void)
         light_after_first_frame();
     }
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
+}
+
+bool app_charging(void)
+{
+    return app.charging;
 }
 
 void app_show_notice(const char *title, const char *message)
@@ -782,7 +898,11 @@ void app_show_splash(void)
 
 void app_wake(void)
 {
-    power_policy_wake(&app.power, hal_clock_milliseconds());
+    uint32_t now_ms = hal_clock_milliseconds();
+    power_policy_wake(&app.power, now_ms);
+    if (app.charging) {
+        light_charge_screen(now_ms);
+    }
 }
 
 const FrameStats *app_frame_stats(void)

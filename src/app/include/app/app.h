@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 #include "core/frame_stats.h"
 
 void app_start(void);
@@ -15,3 +17,4 @@ void app_remember_dac_volume(uint8_t level);
 void app_request_rescan(void);
 void app_request_rescan_if_music_changed(void);
 void app_show_splash(void);
+bool app_charging(void);

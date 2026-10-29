@@ -44,6 +44,9 @@ HalJackPins hal_audio_jack_pins(void)
 bool board_jack_poll(void)
 {
     prepare_pins();
+    if (board_bluetooth_settling()) {
+        return false;
+    }
     return jack_sense_sample(
         &sense, jack_kind_of(gpio_read(SINGLE_ENDED_SENSE), gpio_read(BALANCED_SENSE)));
 }

@@ -104,11 +104,6 @@ HalCore1Accel hal_system_core1_accel_test(void)
     return (HalCore1Accel){.status = HAL_CORE1_UNAVAILABLE};
 }
 
-HalCore1Decode hal_system_core1_decode_test(void)
-{
-    return (HalCore1Decode){.status = HAL_CORE1_UNAVAILABLE};
-}
-
 HalStartInfo hal_system_start_info(void)
 {
     return (HalStartInfo){.warm = false, .starts = 1};

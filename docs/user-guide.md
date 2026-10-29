@@ -136,6 +136,20 @@ The computer picks each album's cover the way the player does: the picture insid
 
 With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks (or jumps 30 s / 15 s in audiobooks and podcasts).
 
+## Charging
+
+The player charges whenever it's plugged in, on or off. Turning it off while it's plugged in (or plugging a charger into a switched-off player) shows the charge screen: the battery level, or "Charged" when it's full. The screen goes dark after 5 seconds; press any button to see it again. Hold Power for 2 seconds to turn the player on, or unplug it to switch it off completely. Plugging into a computer still opens USB mode.
+
+## Bluetooth headphones
+
+Settings → Bluetooth shows whether Bluetooth is on and which headphones are connected. Open it to turn Bluetooth on or off, connect, or pair new headphones:
+
+1. Put the headphones in pairing mode. The player lists what it finds under the Bluetooth row.
+2. Select them and press ▶. The row says "Connecting…", then the player shows "Connected to …".
+3. Music now plays through the headphones whenever nothing is plugged into either jack. Plugging wired headphones in moves the sound to them; after you unplug, the next pause and play goes back to Bluetooth.
+
+The player remembers the headphones and reconnects to them by itself, every time you turn it on while Bluetooth is on. The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. To pair a different pair, hold ▶ on the saved headphones to forget them. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery until you open its screen again or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
+
 ## Audiobooks and podcasts
 
 Put audiobooks in a folder called `Audiobooks` and podcasts in a folder called `Podcasts`, at the top of the card (any capitalisation; `Audiobook` and `Podcast` work too). Home then shows **Audiobooks** and **Podcasts**; they stay hidden while those folders don't exist. Books and episodes stay out of Music (Cover Flow, Albums, Artists, Genres, Songs and shuffle), so they never turn up between your albums.

@@ -121,9 +121,6 @@ typedef enum HalCore1Status {
     HAL_CORE1_NO_REPLY,
     HAL_CORE1_BAD_REPLY,
     HAL_CORE1_NO_STOP,
-    HAL_CORE1_NO_TRACK,
-    HAL_CORE1_NOT_FLAC,
-    HAL_CORE1_READ_FAILED,
     HAL_CORE1_BUSY
 } HalCore1Status;
 
@@ -134,18 +131,6 @@ typedef struct HalCore1Test {
 } HalCore1Test;
 
 HalCore1Test hal_system_core1_test(void);
-
-typedef struct HalCore1Decode {
-    HalCore1Status status;
-    uint32_t mhz;
-    uint32_t blocks;
-    uint32_t average_us;
-    uint32_t longest_us;
-    uint32_t block_us;
-    uint32_t lpc_in_hardware;
-} HalCore1Decode;
-
-HalCore1Decode hal_system_core1_decode_test(void);
 
 typedef struct HalCore1Accel {
     HalCore1Status status;

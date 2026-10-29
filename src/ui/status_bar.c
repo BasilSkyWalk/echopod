@@ -10,6 +10,7 @@ enum {
     FILL_INSET = 2,
     NUB_DIVISOR = 5,
     BOLT_WIDTH_TENTHS = 6,
+    BLUETOOTH_WIDTH_TENTHS = 7,
     TENTHS = 10,
     FULL_PERCENT = 100
 };
@@ -28,6 +29,14 @@ Rect status_bar_playback_area(const Theme *theme)
 {
     int size = theme->metrics.status_icon_size;
     return (Rect){theme->metrics.padding, icon_top(theme), size, size};
+}
+
+Rect status_bar_bluetooth_area(const Theme *theme)
+{
+    Rect playback = status_bar_playback_area(theme);
+    int width = playback.width * BLUETOOTH_WIDTH_TENTHS / TENTHS;
+    return (Rect){playback.x + playback.width + theme->metrics.padding / 2, playback.y,
+                  width > 0 ? width : 1, playback.height};
 }
 
 Rect status_bar_battery_area(const Theme *theme)
@@ -126,6 +135,11 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
         icon_draw_play(canvas, icon, color);
     } else if (state.playback == STATUS_PLAYBACK_PAUSED) {
         icon_draw_pause(canvas, icon, color);
+    }
+    if (state.bluetooth != STATUS_BLUETOOTH_OFF) {
+        Color tint =
+            state.bluetooth == STATUS_BLUETOOTH_CONNECTED ? color : theme->colors.text_tertiary;
+        icon_draw_bluetooth(canvas, status_bar_bluetooth_area(theme), tint);
     }
     if (state.battery_known) {
         draw_battery(canvas, theme, state);

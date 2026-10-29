@@ -29,7 +29,7 @@ enum {
     HOME_ITEM_COUNT = 6,
     SHELF_COUNT = 2,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 33,
+    DIAGNOSTICS_ITEM_COUNT = 32,
     START_PATH_CAPACITY = 2
 };
 
@@ -61,11 +61,6 @@ typedef struct Core1Option {
     bool run;
     HalCore1Test test;
 } Core1Option;
-
-typedef struct Core1DecodeOption {
-    bool run;
-    HalCore1Decode result;
-} Core1DecodeOption;
 
 typedef struct Core1AccelOption {
     bool run;
@@ -114,7 +109,6 @@ typedef struct AppScreens {
     DmaToneOption tone_176;
     LoopOption loop;
     Core1Option core1;
-    Core1DecodeOption core1_decode;
     Core1AccelOption core1_accel;
     MenuItem home_items[HOME_ITEM_COUNT];
     HomeArt home_art;
@@ -135,6 +129,7 @@ typedef struct AppScreensContext {
     CoverCache *covers;
     bool *rescan_requested;
     SpokenStore *spoken;
+    BluetoothLink *bluetooth;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);

@@ -94,6 +94,7 @@ set_source_files_properties(board/libc.c board/startup.c PROPERTIES
 )
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
+        board/bluetooth.c
         board/glyphs.c
         board/high_ram.c
         board/overlay.c

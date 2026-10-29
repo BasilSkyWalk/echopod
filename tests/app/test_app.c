@@ -37,8 +37,8 @@ enum {
     SETTINGS_TIMEOUT_INDEX = 4,
     SETTINGS_BRIGHTNESS_INDEX = 5,
     SETTINGS_GAIN_INDEX = 6,
-    SETTINGS_START_INDEX = 8,
-    SETTINGS_RESCAN_INDEX = 9,
+    SETTINGS_START_INDEX = 9,
+    SETTINGS_RESCAN_INDEX = 10,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -55,15 +55,14 @@ enum {
     DIAGNOSTICS_STOPWATCH_INDEX = 6,
     DIAGNOSTICS_TEST_TONE_INDEX = 7,
     DIAGNOSTICS_DMA_TONE_INDEX = 8,
-    DIAGNOSTICS_ACCEL_INDEX = 25,
-    DIAGNOSTICS_HIGH_RATE_TONE_INDEX = 26,
-    DIAGNOSTICS_WATCHDOG_TEST_INDEX = 27,
-    DIAGNOSTICS_TONE_176_INDEX = 28,
+    DIAGNOSTICS_ACCEL_INDEX = 24,
+    DIAGNOSTICS_HIGH_RATE_TONE_INDEX = 25,
+    DIAGNOSTICS_WATCHDOG_TEST_INDEX = 26,
+    DIAGNOSTICS_TONE_176_INDEX = 27,
     DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
     DIAGNOSTICS_CORE1_INDEX = 12,
-    DIAGNOSTICS_CORE1_DECODE_INDEX = 13,
-    DIAGNOSTICS_STALL_TEST_INDEX = 20,
-    DIAGNOSTICS_POWER_TAPS_INDEX = 21,
+    DIAGNOSTICS_STALL_TEST_INDEX = 19,
+    DIAGNOSTICS_POWER_TAPS_INDEX = 20,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 600,
@@ -866,6 +865,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
           2500);
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/scan.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/upnext.bin"));
+    CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/bluetooth.bin"));
     step();
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
     CHECK(toast_is("Library: 0 tracks"));
@@ -874,7 +874,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(10, fake_hal_reserve_count());
+    CHECK_EQUAL(11, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -1057,10 +1057,77 @@ static void the_sleep_timer_turns_the_player_off(void)
     tap(KEY_PLAY);
     CHECK(app_toast_text() != NULL);
     wait_ms(FIFTEEN_MINUTES_MS - 1000);
-    CHECK_EQUAL(0, fake_hal_power_off_count());
+    CHECK(!app_charging());
     wait_ms(1000);
     wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    CHECK(app_charging());
+}
+
+static const HalBattery ON_USB = {
+    .known = true, .percent = 64, .millivolts = 3900, .usb_power = true, .charging = true};
+
+static void switching_off_on_usb_power_shows_the_charge_screen(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    fake_hal_set_battery(ON_USB);
+    hold_power();
+    wait_ms(GOODBYE_MS);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    CHECK(app_charging());
+    CHECK(fake_hal_display_on());
+    CHECK_EQUAL(PLAYER_PAUSED, app_player_status().state);
+}
+
+static void the_charge_screen_goes_dark_and_a_key_lights_it(void)
+{
+    start_app_with_library();
+    fake_hal_set_battery(ON_USB);
+    hold_power();
+    wait_ms(GOODBYE_MS);
+    wait_ms(5000);
+    CHECK(!fake_hal_display_on());
+    tap(KEY_PLAY);
+    CHECK(fake_hal_display_on());
+    CHECK(app_charging());
+}
+
+static void holding_power_on_the_charge_screen_turns_the_player_on(void)
+{
+    start_app_with_library();
+    fake_hal_set_battery(ON_USB);
+    hold_power();
+    wait_ms(GOODBYE_MS);
+    hold_power();
+    CHECK(!app_charging());
+    CHECK(fake_hal_display_on());
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+}
+
+static void unplugging_on_the_charge_screen_turns_the_player_off(void)
+{
+    start_app_with_library();
+    fake_hal_set_battery(ON_USB);
+    hold_power();
+    wait_ms(GOODBYE_MS);
+    fake_hal_set_battery((HalBattery){.known = true, .percent = 64, .millivolts = 3900});
+    wait_ms(500);
     CHECK_EQUAL(1, fake_hal_power_off_count());
+}
+
+static void a_cable_start_opens_the_charge_screen(void)
+{
+    fake_hal_reset();
+    fake_hal_set_battery(ON_USB);
+    fake_hal_set_usb_start(true);
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+    CHECK(app_charging());
+    wait_ms(100);
+    CHECK(fake_hal_display_on());
+    CHECK(!fake_hal_bluetooth_powered());
 }
 
 static void an_empty_battery_saves_and_turns_the_player_off(void)
@@ -1662,16 +1729,6 @@ static void the_core_1_test_runs_once_per_press(void)
     CHECK(title_is("Diagnostics"));
 }
 
-static void the_core_1_decode_test_runs_once_per_press(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_CORE1_DECODE_INDEX);
-    CHECK_EQUAL(0, fake_hal_core1_decode_count());
-    tap(KEY_PLAY);
-    CHECK_EQUAL(1, fake_hal_core1_decode_count());
-    CHECK(title_is("Diagnostics"));
-}
-
 static void the_accelerator_test_runs_once_per_press(void)
 {
     start_app();
@@ -1774,7 +1831,6 @@ int main(void)
         TEST_CASE(ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off),
         TEST_CASE(the_loop_benchmark_runs_once_per_press),
         TEST_CASE(the_core_1_test_runs_once_per_press),
-        TEST_CASE(the_core_1_decode_test_runs_once_per_press),
         TEST_CASE(the_accelerator_test_runs_once_per_press),
         TEST_CASE(a_clock_that_does_not_lock_stays_where_it_was),
         TEST_CASE(the_stopwatch_stays_open_after_waking),
@@ -1833,6 +1889,11 @@ int main(void)
         TEST_CASE(a_full_card_says_it_is_full),
         TEST_CASE(an_empty_battery_saves_and_turns_the_player_off),
         TEST_CASE(an_empty_battery_on_usb_power_keeps_playing),
+        TEST_CASE(switching_off_on_usb_power_shows_the_charge_screen),
+        TEST_CASE(the_charge_screen_goes_dark_and_a_key_lights_it),
+        TEST_CASE(holding_power_on_the_charge_screen_turns_the_player_on),
+        TEST_CASE(unplugging_on_the_charge_screen_turns_the_player_off),
+        TEST_CASE(a_cable_start_opens_the_charge_screen),
         TEST_CASE(holding_play_on_an_album_adds_it_to_favorites),
         TEST_CASE(menu_on_now_playing_opens_up_next),
         TEST_CASE(choosing_a_song_in_up_next_plays_it),

@@ -7,7 +7,8 @@ enum {
     HAL_BLUETOOTH_ADDRESS_SIZE = 6,
     HAL_BLUETOOTH_NAME_CAPACITY = 32,
     HAL_BLUETOOTH_DEVICE_CAPACITY = 6,
-    HAL_BLUETOOTH_RECENT_CAPACITY = 12
+    HAL_BLUETOOTH_RECENT_CAPACITY = 12,
+    HAL_BLUETOOTH_EVENT_CAPACITY = 6
 };
 
 typedef enum HalBluetoothState {
@@ -39,7 +40,16 @@ typedef struct HalBluetoothLink {
     uint16_t fifo_peak;
     uint8_t recent_length;
     uint8_t recent[HAL_BLUETOOTH_RECENT_CAPACITY];
+    uint8_t event_count;
+    char events[HAL_BLUETOOTH_EVENT_CAPACITY][2];
 } HalBluetoothLink;
+
+typedef struct HalBluetoothRemote {
+    uint8_t plays;
+    uint8_t pauses;
+    uint8_t nexts;
+    uint8_t previouses;
+} HalBluetoothRemote;
 
 typedef struct HalBluetoothStatus {
     HalBluetoothState state;
@@ -51,11 +61,12 @@ typedef struct HalBluetoothStatus {
     uint8_t device_count;
     HalBluetoothDevice devices[HAL_BLUETOOTH_DEVICE_CAPACITY];
     HalBluetoothLink link;
+    HalBluetoothRemote remote;
 } HalBluetoothStatus;
 
 void hal_bluetooth_set_power(bool on);
 void hal_bluetooth_scan(void);
-void hal_bluetooth_connect(uint8_t index);
+void hal_bluetooth_connect(const HalBluetoothDevice *device);
 void hal_bluetooth_disconnect(void);
 void hal_bluetooth_set_stream(bool on);
 void hal_bluetooth_service(void);

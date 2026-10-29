@@ -13,6 +13,7 @@ static const GpioPin CHARGE_STATUS = {2, 3};
 
 static bool charge_status_ready;
 static HalPowerHold boot_hold;
+static bool usb_start;
 
 void board_power_hold(void)
 {
@@ -24,11 +25,22 @@ void board_power_hold(void)
     gpio_mux(POWER_KEY, GPIO_FUNCTION_GPIO);
     gpio_input(POWER_KEY);
     register_write(GRF_PORT2_LOW_PULL, POWER_KEY_PULL_OFF);
+    boot_hold.usb_power = usb_vbus_present();
+    boot_hold.key_down = gpio_read(POWER_KEY);
+    bool held_by_key = boot_hold.output && boot_hold.high;
+    usb_start = boot_hold.usb_power && !boot_hold.key_down && !held_by_key;
 }
 
 HalPowerHold hal_power_boot_hold(void)
 {
     return boot_hold;
+}
+
+bool hal_power_take_usb_start(void)
+{
+    bool started = usb_start;
+    usb_start = false;
+    return started;
 }
 static BatteryDisplay display;
 
@@ -61,6 +73,7 @@ HalBattery hal_power_battery(void)
 void board_power_cut(void)
 {
     board_backlight_off();
+    board_bluetooth_off();
     __asm__ volatile("cpsid i" ::: "memory");
     board_start_record_power_off();
     gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
@@ -81,6 +94,7 @@ void hal_power_off(void)
     while (gpio_read(POWER_KEY)) {
     }
     board_backlight_off();
+    board_bluetooth_off();
     __asm__ volatile("cpsid i" ::: "memory");
     board_start_record_power_off();
     gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);

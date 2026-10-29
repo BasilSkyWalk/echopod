@@ -13,14 +13,23 @@ enum {
     STREAM_ON_LEVEL = 0x1E,
     PLAY_NOTICE = 0x86,
     PAUSE_NOTICE = 0x87,
+    PLAY_STATE_STARTED = 0,
+    PLAY_STATE_PAUSED = 1,
+    PLAY_STATE_PLAYING = 2,
     UNKNOWN_SIZE = 1
 };
 
 static void set_state(BtModule *module, HalBluetoothState state, uint32_t now_ms)
 {
+    if (state == HAL_BLUETOOTH_CONNECTED && module->status.state != HAL_BLUETOOTH_CONNECTED) {
+        module->resend_stream = true;
+        module->resend_on = false;
+    }
     if (state != HAL_BLUETOOTH_CONNECTED) {
         module->status.streaming = false;
         module->play_notice = 0;
+        module->play_state = PLAY_STATE_STARTED;
+        module->resend_stream = false;
     }
     module->status.state = state;
     module->state_since_ms = now_ms;
@@ -182,6 +191,7 @@ static void handle_status(BtModule *module, const uint8_t *bytes, uint32_t size,
                     size - CONNECTED_HEADER_SIZE);
         set_state(module, HAL_BLUETOOTH_CONNECTED, now_ms);
     } else if (module->status.state == HAL_BLUETOOTH_CONNECTED) {
+        module->status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
         set_state(module, HAL_BLUETOOTH_READY, now_ms);
     }
 }
@@ -216,15 +226,55 @@ static void handle_link(BtModule *module, const uint8_t *bytes, uint32_t size, u
 static void handle_disconnected(BtModule *module, uint32_t now_ms)
 {
     HalBluetoothState state = module->status.state;
+    module->status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
     if (state == HAL_BLUETOOTH_CONNECTED || state == HAL_BLUETOOTH_CONNECTING) {
         set_state(module, HAL_BLUETOOTH_READY, now_ms);
     }
+}
+
+static void handle_play_report(BtModule *module, bool playing, uint32_t now_ms)
+{
+    if (module->status.state != HAL_BLUETOOTH_CONNECTED &&
+        module->status.pairing == HAL_BLUETOOTH_PAIRED) {
+        mark_connected(module, now_ms);
+    }
+    module->play_state = playing ? PLAY_STATE_PLAYING : PLAY_STATE_PAUSED;
+    module->query_paused = module->status.state == HAL_BLUETOOTH_CONNECTED;
+    module->query_paused_ms = now_ms;
+    if (playing) {
+        module->status.remote.plays++;
+    } else {
+        module->status.remote.pauses++;
+    }
+}
+
+static char event_letter(uint8_t byte)
+{
+    return byte >= 'A' && byte <= 'Z' ? (char)byte : '.';
+}
+
+static void note_event(HalBluetoothLink *link, const uint8_t *bytes, uint32_t size)
+{
+    if (bytes[1] == 'Q' || bytes[1] == 'S') {
+        return;
+    }
+    if (link->event_count == HAL_BLUETOOTH_EVENT_CAPACITY) {
+        for (uint32_t index = 1; index < HAL_BLUETOOTH_EVENT_CAPACITY; index++) {
+            link->events[index - 1][0] = link->events[index][0];
+            link->events[index - 1][1] = link->events[index][1];
+        }
+        link->event_count--;
+    }
+    link->events[link->event_count][0] = event_letter(bytes[1]);
+    link->events[link->event_count][1] = size > 2 ? event_letter(bytes[2]) : '.';
+    link->event_count++;
 }
 
 static void handle_frame(BtModule *module, const uint8_t *bytes, uint32_t size, uint32_t now_ms)
 {
     module->status.link.frames++;
     module->answered = true;
+    note_event(&module->status.link, bytes, size);
     switch (bytes[1]) {
     case 'V':
         handle_ready(module, bytes[3], now_ms);
@@ -241,6 +291,16 @@ static void handle_frame(BtModule *module, const uint8_t *bytes, uint32_t size, 
         break;
     case 'T':
         handle_disconnected(module, now_ms);
+        break;
+    case 'P':
+    case 'C':
+        handle_play_report(module, bytes[1] == 'C', now_ms);
+        break;
+    case 'A':
+        module->status.remote.previouses++;
+        break;
+    case 'B':
+        module->status.remote.nexts++;
         break;
     default:
         break;
@@ -347,14 +407,14 @@ bool bt_module_scan(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
     return command(frame, 'S');
 }
 
-bool bt_module_connect(BtModule *module, uint8_t index, uint32_t now_ms, BtModuleFrame *frame)
+bool bt_module_connect(BtModule *module, const HalBluetoothDevice *device, uint32_t now_ms,
+                       BtModuleFrame *frame)
 {
     HalBluetoothState state = module->status.state;
-    bool idle = state == HAL_BLUETOOTH_READY || state == HAL_BLUETOOTH_SCANNING;
-    if (!idle || index >= module->status.device_count) {
+    if (state != HAL_BLUETOOTH_READY && state != HAL_BLUETOOTH_SCANNING) {
         return false;
     }
-    module->target = module->status.devices[index];
+    module->target = *device;
     module->status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
     start_waiting(module, HAL_BLUETOOTH_CONNECTING, now_ms);
     return address_command(frame, 'L', module->target.address);
@@ -402,11 +462,26 @@ static bool follow_connect(BtModule *module, uint32_t now_ms, BtModuleFrame *fra
 
 static bool query_status(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
 {
+    if (module->query_paused && now_ms - module->query_paused_ms < BT_MODULE_QUERY_PAUSE_MS) {
+        return false;
+    }
+    module->query_paused = false;
     if (now_ms - module->last_query_ms < BT_MODULE_QUERY_PERIOD_MS) {
         return false;
     }
     module->last_query_ms = now_ms;
     return command(frame, 'Q');
+}
+
+static bool answer_play_report(BtModule *module, BtModuleFrame *frame)
+{
+    if (!module->resend_stream) {
+        return false;
+    }
+    module->resend_stream = false;
+    *frame = (BtModuleFrame){.bytes = {'C', 'Y', '0', module->resend_on ? STREAM_ON_LEVEL : 0, 0},
+                             .length = COMMAND_SIZE};
+    return true;
 }
 
 static bool send_play_notice(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
@@ -440,7 +515,8 @@ bool bt_module_poll(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
     case HAL_BLUETOOTH_CONNECTING:
         return follow_connect(module, now_ms, frame);
     case HAL_BLUETOOTH_CONNECTED:
-        return send_play_notice(module, now_ms, frame) || query_status(module, now_ms, frame);
+        return answer_play_report(module, frame) || send_play_notice(module, now_ms, frame) ||
+               query_status(module, now_ms, frame);
     case HAL_BLUETOOTH_READY:
         return query_status(module, now_ms, frame);
     default:
@@ -454,7 +530,14 @@ bool bt_module_set_stream(BtModule *module, bool on, uint32_t now_ms, BtModuleFr
         return false;
     }
     module->status.streaming = on;
-    module->play_notice = on ? PLAY_NOTICE : PAUSE_NOTICE;
+    module->play_notice = 0;
+    if (on && module->play_state == PLAY_STATE_PAUSED) {
+        module->play_notice = PLAY_NOTICE;
+        module->play_state = PLAY_STATE_PLAYING;
+    } else if (!on && module->play_state != PLAY_STATE_PAUSED) {
+        module->play_notice = PAUSE_NOTICE;
+        module->play_state = PLAY_STATE_PAUSED;
+    }
     module->stream_changed_ms = now_ms;
     *frame = (BtModuleFrame){.bytes = {'C', 'Y', '0', on ? STREAM_ON_LEVEL : 0, 0},
                              .length = COMMAND_SIZE};

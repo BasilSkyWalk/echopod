@@ -357,18 +357,33 @@ static void connecting_sends_cl06_with_the_picked_address(void)
 {
     BtModuleFrame frame;
     found_phones();
-    CHECK(bt_module_connect(&module, 1, CONNECT_MS, &frame));
+    CHECK(bt_module_connect(&module, &module.status.devices[1], CONNECT_MS, &frame));
     CHECK(frame_is_connect(&frame, "CL06", SPEAKER));
     CHECK_EQUAL(HAL_BLUETOOTH_CONNECTING, module.status.state);
     CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
 }
 
-static void connecting_needs_a_found_device(void)
+static void connecting_needs_a_ready_module(void)
 {
     BtModuleFrame frame;
-    found_phones();
-    CHECK(!bt_module_connect(&module, 2, CONNECT_MS, &frame));
-    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+    HalBluetoothDevice device = {.name = "WH-1000XM4"};
+    memcpy(device.address, PHONES, sizeof device.address);
+    bt_module_power_on(&module, START_MS);
+    CHECK(!bt_module_connect(&module, &device, START_MS + 100, &frame));
+    CHECK_EQUAL(HAL_BLUETOOTH_STARTING, module.status.state);
+}
+
+static void a_remembered_device_connects_without_a_scan(void)
+{
+    BtModuleFrame frame;
+    HalBluetoothDevice device = {.name = "WH-1000XM4"};
+    memcpy(device.address, PHONES, sizeof device.address);
+    power_on_ready();
+    CHECK(bt_module_connect(&module, &device, CONNECT_MS, &frame));
+    CHECK(frame_is_connect(&frame, "CL06", PHONES));
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTING, module.status.state);
+    CHECK(bt_module_poll(&module, CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS, &frame));
+    CHECK(frame_is_connect(&frame, "CH06", PHONES));
 }
 
 static void connecting_works_while_still_scanning(void)
@@ -378,7 +393,7 @@ static void connecting_works_while_still_scanning(void)
     bt_module_scan(&module, START_MS + 500, &frame);
     receive_device(PHONES, "WH-1000XM4", START_MS + 1500);
     settle(START_MS + 1500);
-    CHECK(bt_module_connect(&module, 0, CONNECT_MS, &frame));
+    CHECK(bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame));
     CHECK(frame_is_connect(&frame, "CL06", PHONES));
 }
 
@@ -386,7 +401,7 @@ static void clok_reports_paired(void)
 {
     BtModuleFrame frame;
     found_phones();
-    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
     receive_text("CLOK", CONNECT_MS + 1000);
     settle(CONNECT_MS + 1000);
     CHECK_EQUAL(HAL_BLUETOOTH_PAIRED, module.status.pairing);
@@ -399,7 +414,7 @@ static void cler_and_cher_report_a_failed_pairing(void)
     for (int index = 0; index < 2; index++) {
         BtModuleFrame frame;
         found_phones();
-        bt_module_connect(&module, 0, CONNECT_MS, &frame);
+        bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
         receive_text(FAILURES[index], CONNECT_MS + 1000);
         settle(CONNECT_MS + 1000);
         CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_FAILED, module.status.pairing);
@@ -411,7 +426,7 @@ static void an_unanswered_connect_retries_once_with_ch06(void)
 {
     BtModuleFrame frame;
     found_phones();
-    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
     CHECK(!poll(CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS - 1, &frame));
     CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS, &frame));
     CHECK(frame_is_connect(&frame, "CH06", PHONES));
@@ -422,7 +437,7 @@ static void a_connect_without_a_result_is_cancelled_after_thirty_seconds(void)
 {
     BtModuleFrame frame;
     found_phones();
-    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
     receive_text("CKKK", CONNECT_MS + 100);
     settle(CONNECT_MS + 100);
     CHECK(!poll(CONNECT_MS + BT_MODULE_CONNECT_LIMIT_MS - 1, &frame));
@@ -447,7 +462,7 @@ static void cqo_reports_the_connected_device(void)
 {
     BtModuleFrame frame;
     found_phones();
-    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
     receive_text("CLOK", CONNECT_MS + 1000);
     receive_connected(PHONES, "WH-1000XM4", CONNECT_MS + 1000);
     settle(CONNECT_MS + 1000);
@@ -470,7 +485,7 @@ static void chok_connects_the_picked_device(void)
 {
     BtModuleFrame frame;
     found_phones();
-    bt_module_connect(&module, 1, CONNECT_MS, &frame);
+    bt_module_connect(&module, &module.status.devices[1], CONNECT_MS, &frame);
     receive_text("CHOK", CONNECT_MS + 1000);
     settle(CONNECT_MS + 1000);
     CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
@@ -525,7 +540,7 @@ static void a_disconnect_cancels_a_pending_connect(void)
 {
     BtModuleFrame frame;
     found_phones();
-    bt_module_connect(&module, 0, CONNECT_MS, &frame);
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
     CHECK(bt_module_disconnect(&module, START_MS + 500, &frame));
     CHECK(frame_is(&frame, "CT00"));
     CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
@@ -536,19 +551,32 @@ static bool frame_bytes_are(const BtModuleFrame *frame, const uint8_t *bytes, ui
     return frame->length == length && memcmp(frame->bytes, bytes, length) == 0;
 }
 
-static void starting_the_stream_sends_cy0_1e_then_the_play_notice(void)
+static void the_first_stream_start_sends_only_cy0_1e(void)
 {
     static const uint8_t STREAM_ON[] = {'C', 'Y', '0', 0x1E, 0x00};
-    static const uint8_t PLAY_NOTICE[] = {'C', 0x86, '0', '0', 0x00};
     BtModuleFrame frame;
     connected_for(START_MS + 400);
     CHECK(bt_module_set_stream(&module, true, START_MS + 500, &frame));
     CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
     CHECK(module.status.streaming);
-    CHECK(!poll(START_MS + 500 + BT_MODULE_PLAY_NOTICE_DELAY_MS - 1, &frame));
-    CHECK(poll(START_MS + 500 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
-    CHECK(frame_bytes_are(&frame, PLAY_NOTICE, sizeof PLAY_NOTICE));
+    CHECK(!poll(START_MS + 500 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
     CHECK(!poll(START_MS + 500 + 2 * BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+}
+
+static void resuming_after_a_stop_sends_the_play_notice(void)
+{
+    static const uint8_t STREAM_ON[] = {'C', 'Y', '0', 0x1E, 0x00};
+    static const uint8_t PLAY_NOTICE[] = {'C', 0x86, '0', '0', 0x00};
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, START_MS + 500, &frame);
+    bt_module_set_stream(&module, false, START_MS + 600, &frame);
+    poll(START_MS + 600 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame);
+    CHECK(bt_module_set_stream(&module, true, START_MS + 900, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
+    CHECK(!poll(START_MS + 900 + BT_MODULE_PLAY_NOTICE_DELAY_MS - 1, &frame));
+    CHECK(poll(START_MS + 900 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(frame_bytes_are(&frame, PLAY_NOTICE, sizeof PLAY_NOTICE));
 }
 
 static void stopping_the_stream_sends_cy0_00_then_the_pause_notice(void)
@@ -564,6 +592,119 @@ static void stopping_the_stream_sends_cy0_00_then_the_pause_notice(void)
     CHECK(!module.status.streaming);
     CHECK(poll(START_MS + 800 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
     CHECK(frame_bytes_are(&frame, PAUSE_NOTICE, sizeof PAUSE_NOTICE));
+}
+
+static void module_messages_are_kept_without_status_or_scan_replies(void)
+{
+    found_phones();
+    receive_text("CKKK", START_MS + 1600);
+    settle(START_MS + 1600);
+    const HalBluetoothLink *link = &module.status.link;
+    CHECK_EQUAL(2, link->event_count);
+    CHECK_EQUAL('V', link->events[0][0]);
+    CHECK_EQUAL('.', link->events[0][1]);
+    CHECK_EQUAL('K', link->events[1][0]);
+    CHECK_EQUAL('K', link->events[1][1]);
+}
+
+static void a_play_report_pauses_status_queries_for_fifty_seconds(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    uint32_t heard_ms = START_MS + 500 + BT_MODULE_SILENCE_MS;
+    receive_text("CP", START_MS + 500);
+    settle(START_MS + 500);
+    CHECK(!poll(heard_ms + BT_MODULE_QUERY_PERIOD_MS * 2, &frame));
+    CHECK(!poll(heard_ms + BT_MODULE_QUERY_PAUSE_MS - 1, &frame));
+    CHECK(poll(heard_ms + BT_MODULE_QUERY_PAUSE_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+}
+
+static void a_play_report_after_clok_means_connected(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CLOK", CONNECT_MS + 1000);
+    settle(CONNECT_MS + 1000);
+    receive_text("CC", CONNECT_MS + 1200);
+    settle(CONNECT_MS + 1200);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+    CHECK_EQUAL(0x11, module.status.connected.address[0]);
+}
+
+static void a_play_report_before_a_link_keeps_the_status_poll(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    uint32_t heard_ms = START_MS + 500 + BT_MODULE_SILENCE_MS;
+    receive_text("CP", START_MS + 500);
+    settle(START_MS + 500);
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+    CHECK(poll(heard_ms + BT_MODULE_QUERY_PERIOD_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+}
+
+static void ctok_after_clok_clears_the_pairing(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CLOK", CONNECT_MS + 1000);
+    settle(CONNECT_MS + 1000);
+    receive_text("CTOK", CONNECT_MS + 2000);
+    settle(CONNECT_MS + 2000);
+    CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+}
+
+static void a_dropped_link_clears_the_pairing(void)
+{
+    connected_for(START_MS + 400);
+    module.status.pairing = HAL_BLUETOOTH_PAIRED;
+    receive_text("CQI", START_MS + 500);
+    settle(START_MS + 500);
+    CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
+}
+
+static void buds_controls_are_counted_without_sending_anything(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, START_MS + 500, &frame);
+    receive_text("CP", START_MS + 600);
+    CHECK(!poll(START_MS + 600 + BT_MODULE_SILENCE_MS, &frame));
+    receive_text("CC", START_MS + 700);
+    receive_text("CA", START_MS + 700);
+    receive_text("CB", START_MS + 700);
+    receive_text("CB", START_MS + 700);
+    CHECK(!poll(START_MS + 700 + BT_MODULE_SILENCE_MS, &frame));
+    CHECK_EQUAL(1, module.status.remote.pauses);
+    CHECK_EQUAL(1, module.status.remote.plays);
+    CHECK_EQUAL(1, module.status.remote.previouses);
+    CHECK_EQUAL(2, module.status.remote.nexts);
+    CHECK(module.status.streaming);
+}
+
+static void a_play_report_without_a_stream_is_not_answered(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    receive_text("CC", START_MS + 600);
+    CHECK(!poll(START_MS + 600 + BT_MODULE_SILENCE_MS, &frame));
+    receive_text("CP", START_MS + 700);
+    CHECK(!poll(START_MS + 700 + BT_MODULE_SILENCE_MS, &frame));
+}
+
+static void a_new_link_is_told_the_stream_is_off(void)
+{
+    static const uint8_t STREAM_OFF[] = {'C', 'Y', '0', 0x00, 0x00};
+    BtModuleFrame frame;
+    power_on_ready();
+    receive_connected(PHONES, "WH-1000XM4", START_MS + 400);
+    CHECK(poll(START_MS + 400 + BT_MODULE_SILENCE_MS, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_OFF, sizeof STREAM_OFF));
+    CHECK(!poll(START_MS + 410, &frame));
 }
 
 static void streaming_needs_a_connection(void)
@@ -613,7 +754,8 @@ int main(void)
         TEST_CASE(frames_are_counted),
         TEST_CASE(powering_off_forgets_the_session),
         TEST_CASE(connecting_sends_cl06_with_the_picked_address),
-        TEST_CASE(connecting_needs_a_found_device),
+        TEST_CASE(connecting_needs_a_ready_module),
+        TEST_CASE(a_remembered_device_connects_without_a_scan),
         TEST_CASE(connecting_works_while_still_scanning),
         TEST_CASE(clok_reports_paired),
         TEST_CASE(cler_and_cher_report_a_failed_pairing),
@@ -627,7 +769,17 @@ int main(void)
         TEST_CASE(disconnecting_sends_ct00_and_ctok_confirms_it),
         TEST_CASE(disconnecting_needs_a_link),
         TEST_CASE(a_disconnect_cancels_a_pending_connect),
-        TEST_CASE(starting_the_stream_sends_cy0_1e_then_the_play_notice),
+        TEST_CASE(module_messages_are_kept_without_status_or_scan_replies),
+        TEST_CASE(a_new_link_is_told_the_stream_is_off),
+        TEST_CASE(a_play_report_pauses_status_queries_for_fifty_seconds),
+        TEST_CASE(a_play_report_after_clok_means_connected),
+        TEST_CASE(a_play_report_before_a_link_keeps_the_status_poll),
+        TEST_CASE(ctok_after_clok_clears_the_pairing),
+        TEST_CASE(a_dropped_link_clears_the_pairing),
+        TEST_CASE(buds_controls_are_counted_without_sending_anything),
+        TEST_CASE(a_play_report_without_a_stream_is_not_answered),
+        TEST_CASE(the_first_stream_start_sends_only_cy0_1e),
+        TEST_CASE(resuming_after_a_stop_sends_the_play_notice),
         TEST_CASE(stopping_the_stream_sends_cy0_00_then_the_pause_notice),
         TEST_CASE(streaming_needs_a_connection),
         TEST_CASE(a_dropped_link_ends_the_stream),
