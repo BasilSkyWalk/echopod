@@ -151,11 +151,28 @@ static void a_paired_reply_is_waited_for_without_searching(void)
     CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
     fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRED;
     step(START_MS + 1000);
-    step(START_MS + 100 + BLUETOOTH_LINK_RETRY_MS);
+    step(START_MS + 100 + BLUETOOTH_LINK_CONFIRM_MS - 1);
     CHECK_EQUAL(0, fake_hal_bluetooth_scan_count());
     CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
-    step(START_MS + 100 + BLUETOOTH_LINK_CONFIRM_MS);
-    CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
+    CHECK_EQUAL(0, fake_hal_bluetooth_disconnect_count());
+}
+
+static void a_stalled_pairing_is_reset_and_tried_again(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    ready();
+    step(START_MS + 100);
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRED;
+    uint32_t stalled_ms = START_MS + 100 + BLUETOOTH_LINK_CONFIRM_MS;
+    step(stalled_ms);
+    CHECK_EQUAL(1, fake_hal_bluetooth_disconnect_count());
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_NONE;
+    step(stalled_ms + BLUETOOTH_LINK_RESET_MS - 1);
+    CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
+    step(stalled_ms + BLUETOOTH_LINK_RESET_MS);
+    CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
 }
 
 static void a_search_and_a_reconnect_take_turns(void)
@@ -265,13 +282,42 @@ static void the_buds_pause_and_resume_playback(void)
     play();
     step(START_MS + 100);
     fake_hal_bluetooth()->remote.pauses++;
-    step(START_MS + 200);
+    step(START_MS + 100 + BLUETOOTH_LINK_ECHO_MS);
     CHECK_EQUAL(PLAYER_PAUSED, player.state);
     CHECK(!fake_hal_bluetooth()->streaming);
     fake_hal_bluetooth()->remote.plays++;
-    step(START_MS + 300);
+    step(START_MS + 100 + 2 * BLUETOOTH_LINK_ECHO_MS);
     CHECK_EQUAL(PLAYER_PLAYING, player.state);
     CHECK(fake_hal_bluetooth()->streaming);
+}
+
+static void reports_right_after_the_stream_starts_are_ignored(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    connect_to(&BUDS);
+    play();
+    step(START_MS + 100);
+    fake_hal_bluetooth()->remote.pauses++;
+    step(START_MS + 200);
+    CHECK_EQUAL(PLAYER_PLAYING, player.state);
+    CHECK(fake_hal_bluetooth()->streaming);
+}
+
+static void a_play_report_does_not_resume_what_the_player_paused(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    connect_to(&BUDS);
+    play();
+    step(START_MS + 100);
+    player_toggle_pause(&player);
+    step(START_MS + 200);
+    fake_hal_bluetooth()->remote.plays++;
+    step(START_MS + 200 + BLUETOOTH_LINK_ECHO_MS);
+    CHECK_EQUAL(PLAYER_PAUSED, player.state);
 }
 
 static void the_buds_skip_tracks(void)
@@ -392,6 +438,7 @@ int main(void)
         TEST_CASE(power_on_reconnects_the_saved_device),
         TEST_CASE(a_failed_reconnect_is_retried_later),
         TEST_CASE(a_paired_reply_is_waited_for_without_searching),
+        TEST_CASE(a_stalled_pairing_is_reset_and_tried_again),
         TEST_CASE(nothing_is_retried_while_connecting),
         TEST_CASE(a_search_and_a_reconnect_take_turns),
         TEST_CASE(connecting_saves_the_device_and_says_so),
@@ -399,6 +446,8 @@ int main(void)
         TEST_CASE(headphones_take_the_sound_back),
         TEST_CASE(the_buds_wait_for_the_next_play_after_headphones),
         TEST_CASE(the_buds_pause_and_resume_playback),
+        TEST_CASE(reports_right_after_the_stream_starts_are_ignored),
+        TEST_CASE(a_play_report_does_not_resume_what_the_player_paused),
         TEST_CASE(the_buds_skip_tracks),
         TEST_CASE(presses_from_before_the_connection_are_ignored),
         TEST_CASE(losing_the_buds_pauses_playback),

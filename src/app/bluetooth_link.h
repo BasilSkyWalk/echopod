@@ -10,7 +10,9 @@
 
 enum {
     BLUETOOTH_LINK_RETRY_MS = 15000,
-    BLUETOOTH_LINK_CONFIRM_MS = 120000,
+    BLUETOOTH_LINK_CONFIRM_MS = 20000,
+    BLUETOOTH_LINK_RESET_MS = 2000,
+    BLUETOOTH_LINK_ECHO_MS = 3000,
     BLUETOOTH_LINK_IDLE_OFF_MS = 300000,
     BLUETOOTH_LINK_TOAST_CAPACITY = 48
 };
@@ -26,7 +28,9 @@ typedef struct BluetoothLink {
     bool dozing;
     bool wired;
     bool searched;
+    bool buds_paused;
     uint32_t retried_ms;
+    uint32_t changed_ms;
     uint32_t unlinked_ms;
     HalBluetoothRemote seen;
     char toast_text[BLUETOOTH_LINK_TOAST_CAPACITY];

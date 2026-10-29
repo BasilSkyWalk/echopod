@@ -658,6 +658,18 @@ static void ctok_after_clok_clears_the_pairing(void)
     CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
 }
 
+static void a_paired_link_without_a_connection_can_be_dropped(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CLOK", CONNECT_MS + 1000);
+    settle(CONNECT_MS + 1000);
+    CHECK(bt_module_disconnect(&module, CONNECT_MS + 2000, &frame));
+    CHECK(frame_is(&frame, "CT00"));
+    CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
+}
+
 static void a_dropped_link_clears_the_pairing(void)
 {
     connected_for(START_MS + 400);
@@ -775,6 +787,7 @@ int main(void)
         TEST_CASE(a_play_report_after_clok_means_connected),
         TEST_CASE(a_play_report_before_a_link_keeps_the_status_poll),
         TEST_CASE(ctok_after_clok_clears_the_pairing),
+        TEST_CASE(a_paired_link_without_a_connection_can_be_dropped),
         TEST_CASE(a_dropped_link_clears_the_pairing),
         TEST_CASE(buds_controls_are_counted_without_sending_anything),
         TEST_CASE(a_play_report_without_a_stream_is_not_answered),

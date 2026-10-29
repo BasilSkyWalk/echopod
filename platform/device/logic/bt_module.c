@@ -423,11 +423,13 @@ bool bt_module_connect(BtModule *module, const HalBluetoothDevice *device, uint3
 bool bt_module_disconnect(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
 {
     HalBluetoothState state = module->status.state;
+    bool paired = state == HAL_BLUETOOTH_READY && module->status.pairing == HAL_BLUETOOTH_PAIRED;
     if (state == HAL_BLUETOOTH_CONNECTING) {
         set_state(module, HAL_BLUETOOTH_READY, now_ms);
-    } else if (state != HAL_BLUETOOTH_CONNECTED) {
+    } else if (state != HAL_BLUETOOTH_CONNECTED && !paired) {
         return false;
     }
+    module->status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
     return command(frame, 'T');
 }
 

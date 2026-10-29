@@ -151,6 +151,8 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
         link->connected = true;
         link->reconnecting = false;
         link->streamed = false;
+        link->buds_paused = false;
+        link->changed_ms = now_ms;
         link->seen = status->remote;
         remember(link, &status->connected);
         announce(link, "Connected to ", status->connected.name, now_ms);
@@ -174,8 +176,11 @@ static void find_device(BluetoothLink *link, const HalBluetoothStatus *status, u
     if (status->state != HAL_BLUETOOTH_READY) {
         return;
     }
-    if (status->pairing == HAL_BLUETOOTH_PAIRED &&
-        now_ms - link->retried_ms < BLUETOOTH_LINK_CONFIRM_MS) {
+    if (status->pairing == HAL_BLUETOOTH_PAIRED) {
+        if (now_ms - link->retried_ms >= BLUETOOTH_LINK_CONFIRM_MS) {
+            hal_bluetooth_disconnect();
+            link->retried_ms = now_ms - BLUETOOTH_LINK_RETRY_MS + BLUETOOTH_LINK_RESET_MS;
+        }
         return;
     }
     link->reconnecting = false;
@@ -195,23 +200,28 @@ static uint8_t pressed(uint8_t count, uint8_t seen)
     return (uint8_t)(count - seen);
 }
 
-static void follow_remote(BluetoothLink *link, const HalBluetoothStatus *status, Player *player)
+static void follow_remote(BluetoothLink *link, const HalBluetoothStatus *status, Player *player,
+                          uint32_t now_ms)
 {
     HalBluetoothRemote remote = status->remote;
     HalBluetoothRemote seen = link->seen;
     link->seen = remote;
+    if (player->state != PLAYER_PAUSED) {
+        link->buds_paused = false;
+    }
     if (!link->connected) {
         return;
     }
-    if (pressed(remote.pauses, seen.pauses) > 0 && player->state == PLAYER_PLAYING) {
+    bool settled = now_ms - link->changed_ms >= BLUETOOTH_LINK_ECHO_MS;
+    if (settled && pressed(remote.pauses, seen.pauses) > 0 && link->streamed &&
+        player->state == PLAYER_PLAYING) {
         player_toggle_pause(player);
+        link->buds_paused = true;
     }
-    if (pressed(remote.plays, seen.plays) > 0) {
-        if (player->state == PLAYER_PAUSED) {
-            player_toggle_pause(player);
-        } else if (link->streamed) {
-            hal_bluetooth_set_stream(true);
-        }
+    if (settled && pressed(remote.plays, seen.plays) > 0 && link->buds_paused &&
+        player->state == PLAYER_PAUSED) {
+        player_toggle_pause(player);
+        link->buds_paused = false;
     }
     for (uint8_t count = pressed(remote.nexts, seen.nexts); count > 0; count--) {
         player_skip(player, 1);
@@ -221,7 +231,7 @@ static void follow_remote(BluetoothLink *link, const HalBluetoothStatus *status,
     }
 }
 
-static void follow_player(BluetoothLink *link, const Player *player)
+static void follow_player(BluetoothLink *link, const Player *player, uint32_t now_ms)
 {
     if (player->state != PLAYER_PLAYING) {
         link->wired = false;
@@ -231,6 +241,7 @@ static void follow_player(BluetoothLink *link, const Player *player)
     bool stream = link->connected && player->state == PLAYER_PLAYING && !link->wired;
     if (stream != link->streamed) {
         link->streamed = stream;
+        link->changed_ms = now_ms;
         hal_bluetooth_set_stream(stream);
     }
 }
@@ -254,8 +265,8 @@ void bluetooth_link_step(BluetoothLink *link, Player *player, uint32_t now_ms)
     }
     const HalBluetoothStatus *status = hal_bluetooth_status();
     follow_connection(link, status, player, now_ms);
-    follow_remote(link, status, player);
-    follow_player(link, player);
+    follow_remote(link, status, player, now_ms);
+    follow_player(link, player, now_ms);
     find_device(link, status, now_ms);
     doze(link, now_ms);
 }
