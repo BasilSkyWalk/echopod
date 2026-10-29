@@ -146,7 +146,7 @@ Settings → Bluetooth shows whether Bluetooth is on and which headphones are co
 
 1. Put the headphones in pairing mode. The player lists what it finds under the Bluetooth row.
 2. Select them and press ▶. The row says "Connecting…", then the player shows "Connected to …".
-3. Music now plays through the headphones whenever nothing is plugged into either jack. Plugging wired headphones in moves the sound to them; after you unplug, the next pause and play goes back to Bluetooth.
+3. Music now plays through the headphones whenever nothing is plugged into either jack. To switch to wired headphones, pause, plug them in and press play: while music is going to Bluetooth the player can't see the jack. After you unplug, the next play goes back to Bluetooth.
 
 The player remembers the headphones and reconnects to them by itself, every time you turn it on while Bluetooth is on. The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. To pair a different pair, hold ▶ on the saved headphones to forget them. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery until you open its screen again or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
 

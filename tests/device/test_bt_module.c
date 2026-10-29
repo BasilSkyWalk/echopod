@@ -594,6 +594,27 @@ static void stopping_the_stream_sends_cy0_00_then_the_pause_notice(void)
     CHECK(frame_bytes_are(&frame, PAUSE_NOTICE, sizeof PAUSE_NOTICE));
 }
 
+static void status_changes_and_sent_links_are_kept(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    receive_text("CQI", START_MS + 1600);
+    settle(START_MS + 1600);
+    receive_text("CQI", START_MS + 1700);
+    settle(START_MS + 1700);
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CQL", CONNECT_MS + 100);
+    settle(CONNECT_MS + 100);
+    const HalBluetoothLink *link = &module.status.link;
+    CHECK_EQUAL(4, link->event_count);
+    CHECK_EQUAL('Q', link->events[1][0]);
+    CHECK_EQUAL('I', link->events[1][1]);
+    CHECK_EQUAL('>', link->events[2][0]);
+    CHECK_EQUAL('L', link->events[2][1]);
+    CHECK_EQUAL('Q', link->events[3][0]);
+    CHECK_EQUAL('L', link->events[3][1]);
+}
+
 static void module_messages_are_kept_without_status_or_scan_replies(void)
 {
     found_phones();
@@ -797,6 +818,7 @@ int main(void)
         TEST_CASE(disconnecting_needs_a_link),
         TEST_CASE(a_disconnect_cancels_a_pending_connect),
         TEST_CASE(module_messages_are_kept_without_status_or_scan_replies),
+        TEST_CASE(status_changes_and_sent_links_are_kept),
         TEST_CASE(a_new_link_is_told_the_stream_is_off),
         TEST_CASE(a_play_report_pauses_status_queries_for_fifty_seconds),
         TEST_CASE(a_play_report_after_clok_means_connected),

@@ -228,7 +228,7 @@ static void write_events(const HalBluetoothLink *link, char *text)
         string_builder_append(&builder, " none");
     }
     for (uint8_t index = 0; index < link->event_count; index++) {
-        string_builder_append(&builder, " C");
+        string_builder_append(&builder, link->events[index][0] == '>' ? " " : " C");
         string_builder_append_char(&builder, link->events[index][0]);
         string_builder_append_char(&builder, link->events[index][1]);
     }

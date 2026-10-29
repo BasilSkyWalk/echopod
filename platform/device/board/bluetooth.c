@@ -167,6 +167,11 @@ bool board_bluetooth_pin(bool mute_pin, bool level)
     return routed ? mute_pin : level;
 }
 
+bool board_bluetooth_routed(void)
+{
+    return routed;
+}
+
 bool board_bluetooth_settling(void)
 {
     return rerouted_ms != 0 && hal_clock_milliseconds() - rerouted_ms < ROUTE_SETTLE_MS;

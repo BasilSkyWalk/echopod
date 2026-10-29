@@ -252,11 +252,8 @@ static char event_letter(uint8_t byte)
     return byte >= 'A' && byte <= 'Z' ? (char)byte : '.';
 }
 
-static void note_event(HalBluetoothLink *link, const uint8_t *bytes, uint32_t size)
+static void add_event(HalBluetoothLink *link, char first, char second)
 {
-    if (bytes[1] == 'Q' || bytes[1] == 'S') {
-        return;
-    }
     if (link->event_count == HAL_BLUETOOTH_EVENT_CAPACITY) {
         for (uint32_t index = 1; index < HAL_BLUETOOTH_EVENT_CAPACITY; index++) {
             link->events[index - 1][0] = link->events[index][0];
@@ -264,16 +261,31 @@ static void note_event(HalBluetoothLink *link, const uint8_t *bytes, uint32_t si
         }
         link->event_count--;
     }
-    link->events[link->event_count][0] = event_letter(bytes[1]);
-    link->events[link->event_count][1] = size > 2 ? event_letter(bytes[2]) : '.';
+    link->events[link->event_count][0] = first;
+    link->events[link->event_count][1] = second;
     link->event_count++;
+}
+
+static void note_event(BtModule *module, const uint8_t *bytes, uint32_t size)
+{
+    bool same_status = bytes[1] == 'Q' && size > 2 && bytes[2] == module->status.link_status;
+    if (bytes[1] == 'S' || same_status) {
+        return;
+    }
+    add_event(&module->status.link, event_letter(bytes[1]),
+              size > 2 ? event_letter(bytes[2]) : '.');
+}
+
+static void note_sent(BtModule *module, char command_letter)
+{
+    add_event(&module->status.link, '>', command_letter);
 }
 
 static void handle_frame(BtModule *module, const uint8_t *bytes, uint32_t size, uint32_t now_ms)
 {
     module->status.link.frames++;
     module->answered = true;
-    note_event(&module->status.link, bytes, size);
+    note_event(module, bytes, size);
     switch (bytes[1]) {
     case 'V':
         handle_ready(module, bytes[3], now_ms);
@@ -416,6 +428,7 @@ bool bt_module_connect(BtModule *module, const HalBluetoothDevice *device, uint3
     module->target = *device;
     module->status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
     start_waiting(module, HAL_BLUETOOTH_CONNECTING, now_ms);
+    note_sent(module, 'L');
     return address_command(frame, 'L', module->target.address);
 }
 
@@ -429,6 +442,7 @@ bool bt_module_disconnect(BtModule *module, uint32_t now_ms, BtModuleFrame *fram
         return false;
     }
     module->status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
+    note_sent(module, 'T');
     return command(frame, 'T');
 }
 
@@ -452,10 +466,12 @@ static bool follow_connect(BtModule *module, uint32_t now_ms, BtModuleFrame *fra
     if (elapsed >= BT_MODULE_CONNECT_LIMIT_MS) {
         module->status.pairing = HAL_BLUETOOTH_PAIRING_FAILED;
         set_state(module, HAL_BLUETOOTH_READY, now_ms);
+        note_sent(module, 'T');
         return command(frame, 'T');
     }
     if (!module->answered && !module->repeated && elapsed >= BT_MODULE_CONNECT_RETRY_MS) {
         module->repeated = true;
+        note_sent(module, 'H');
         return address_command(frame, 'H', module->target.address);
     }
     return false;
