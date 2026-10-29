@@ -1,10 +1,14 @@
 # EchoPod release notes
 
-## Unreleased
+## 0.4.0
 
 ### New
 
 - **Chinese, Japanese and Korean names.** Song, artist and album names in Korean, Simplified Chinese and Japanese no longer show as `?`: the player now has the 2,350 common Hangul syllables, the 6,763 hanzi of GB 2312, the kanji of JIS X 0208, kana and CJK punctuation, at both text sizes (Noto Sans CJK SC). The characters are stored in the firmware image and read as a screen needs them. Traditional-only Chinese characters, emoji and other scripts still show as `?`.
+
+### Changed
+
+- **Accented letters** (é, ü, ñ…) are now read the same way instead of being built into the firmware's code. They look exactly as before, and the space they free leaves room for future features.
 
 ## 0.3.0
 

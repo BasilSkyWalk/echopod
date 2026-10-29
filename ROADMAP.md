@@ -4,7 +4,7 @@ Status: `device` (works on the player) · `sim` (works in the simulator only) ·
 
 ## Where it stands
 
-Version 0.3.0 makes USB DAC mode play on more computers and phones, accepts FiiO's 4.0.0 firmware for the way back, adds gapless MP3 and keeps covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
+Version 0.4.0 shows Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
 
 ## Features
 
