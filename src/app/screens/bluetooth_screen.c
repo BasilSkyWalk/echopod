@@ -15,7 +15,8 @@ enum {
 
 typedef enum RowKind {
     ROW_POWER,
-    ROW_SAVED,
+    ROW_KNOWN,
+    ROW_SEARCH,
     ROW_NEARBY
 } RowKind;
 
@@ -36,14 +37,14 @@ static bool enabled(const BluetoothScreen *bluetooth)
     return bluetooth->link->saved.enabled;
 }
 
-static bool has_saved_row(const BluetoothScreen *bluetooth)
+static int known_count(const BluetoothScreen *bluetooth)
 {
-    return enabled(bluetooth) && bluetooth->link->saved.has_device;
+    return enabled(bluetooth) ? bluetooth->link->saved.count : 0;
 }
 
-static int first_nearby_row(const BluetoothScreen *bluetooth)
+static int search_row(const BluetoothScreen *bluetooth)
 {
-    return has_saved_row(bluetooth) ? 2 : 1;
+    return 1 + known_count(bluetooth);
 }
 
 static RowKind row_kind(const BluetoothScreen *bluetooth, int index)
@@ -51,19 +52,25 @@ static RowKind row_kind(const BluetoothScreen *bluetooth, int index)
     if (index == 0) {
         return ROW_POWER;
     }
-    return index < first_nearby_row(bluetooth) ? ROW_SAVED : ROW_NEARBY;
+    if (index < search_row(bluetooth)) {
+        return ROW_KNOWN;
+    }
+    return index == search_row(bluetooth) ? ROW_SEARCH : ROW_NEARBY;
 }
 
 static const HalBluetoothDevice *nearby_device(const BluetoothScreen *bluetooth, int index)
 {
-    int position = index - first_nearby_row(bluetooth);
+    int position = index - search_row(bluetooth) - 1;
     return &hal_bluetooth_status()->devices[bluetooth->nearby[position]];
 }
 
 static int row_count(const void *context)
 {
     const BluetoothScreen *bluetooth = context;
-    return first_nearby_row(bluetooth) + bluetooth->nearby_count;
+    if (!enabled(bluetooth)) {
+        return 1;
+    }
+    return search_row(bluetooth) + 1 + bluetooth->nearby_count;
 }
 
 static const char *row_label(const void *context, int index)
@@ -72,27 +79,32 @@ static const char *row_label(const void *context, int index)
     switch (row_kind(bluetooth, index)) {
     case ROW_POWER:
         return "Bluetooth";
-    case ROW_SAVED:
-        return bluetooth->link->saved.device.name;
+    case ROW_KNOWN:
+        return bluetooth->link->saved.devices[index - 1].name;
+    case ROW_SEARCH:
+        return "Pair new device";
     default:
         return nearby_device(bluetooth, index)->name;
     }
 }
 
-static const char *saved_value(const BluetoothScreen *bluetooth)
+static const char *known_value(const BluetoothScreen *bluetooth, int index)
 {
-    const BluetoothLink *link = bluetooth->link;
-    if (link->connected) {
-        return link->streamed ? "Playing" : "Connected";
-    }
-    HalBluetoothState state = hal_bluetooth_status()->state;
-    if (link->dozing || state == HAL_BLUETOOTH_OFF) {
-        return "Not connected";
-    }
-    if (link->reconnecting || state == HAL_BLUETOOTH_STARTING) {
+    switch (bluetooth_link_device_state(bluetooth->link, index)) {
+    case BLUETOOTH_DEVICE_PLAYING:
+        return "Playing";
+    case BLUETOOTH_DEVICE_CONNECTED:
+        return "Connected";
+    case BLUETOOTH_DEVICE_CONNECTING:
         return "Connecting…";
+    default:
+        return NULL;
     }
-    return "Not connected";
+}
+
+static bool scanning(void)
+{
+    return hal_bluetooth_status()->state == HAL_BLUETOOTH_SCANNING;
 }
 
 static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
@@ -100,8 +112,12 @@ static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
     if (!bluetooth->pairing || !same_address(nearby_device(bluetooth, index), &bluetooth->paired)) {
         return NULL;
     }
-    return hal_bluetooth_status()->pairing == HAL_BLUETOOTH_PAIRING_FAILED ? "Didn't connect"
-                                                                           : "Connecting…";
+    const BluetoothLink *link = bluetooth->link;
+    bool trying = link->attempting || link->has_target || link->paired_seen;
+    if (!trying && hal_bluetooth_status()->pairing == HAL_BLUETOOTH_PAIRING_FAILED) {
+        return "Didn't connect";
+    }
+    return "Connecting…";
 }
 
 static const char *row_value(const void *context, int index)
@@ -110,8 +126,10 @@ static const char *row_value(const void *context, int index)
     switch (row_kind(bluetooth, index)) {
     case ROW_POWER:
         return enabled(bluetooth) ? "On" : "Off";
-    case ROW_SAVED:
-        return saved_value(bluetooth);
+    case ROW_KNOWN:
+        return known_value(bluetooth, index - 1);
+    case ROW_SEARCH:
+        return scanning() ? "Searching…" : NULL;
     default:
         return nearby_value(bluetooth, index);
     }
@@ -120,39 +138,41 @@ static const char *row_value(const void *context, int index)
 static void find_nearby(BluetoothScreen *bluetooth)
 {
     const HalBluetoothStatus *status = hal_bluetooth_status();
-    const BluetoothLink *link = bluetooth->link;
     bluetooth->nearby_count = 0;
-    if (!enabled(bluetooth) || link->connected) {
+    if (!enabled(bluetooth) || bluetooth->link->connected) {
         return;
     }
     for (uint8_t index = 0; index < status->device_count; index++) {
-        if (link->saved.has_device && same_address(&status->devices[index], &link->saved.device)) {
-            continue;
+        if (!bluetooth_link_knows(bluetooth->link, &status->devices[index])) {
+            bluetooth->nearby[bluetooth->nearby_count++] = index;
         }
-        bluetooth->nearby[bluetooth->nearby_count++] = index;
     }
 }
 
-static const char *power_hint(const BluetoothScreen *bluetooth)
+static const char *known_hint(const BluetoothScreen *bluetooth, int index)
 {
-    if (!enabled(bluetooth)) {
-        return "Play turns Bluetooth on";
+    switch (bluetooth_link_device_state(bluetooth->link, index)) {
+    case BLUETOOTH_DEVICE_PLAYING:
+    case BLUETOOTH_DEVICE_CONNECTED:
+        return "Play disconnects · hold Play forgets";
+    case BLUETOOTH_DEVICE_CONNECTING:
+        return "Connecting… hold Play to forget";
+    default:
+        return "Play connects · hold Play forgets";
     }
-    if (!bluetooth->link->connected && bluetooth->nearby_count == 0 &&
-        hal_bluetooth_status()->state == HAL_BLUETOOTH_SCANNING) {
-        return "Searching… put headphones in pairing mode";
-    }
-    return "Play turns Bluetooth off";
 }
 
 static const char *hint(const BluetoothScreen *bluetooth)
 {
-    switch (row_kind(bluetooth, bluetooth->list.selected)) {
+    int selected = bluetooth->list.selected;
+    switch (row_kind(bluetooth, selected)) {
     case ROW_POWER:
-        return power_hint(bluetooth);
-    case ROW_SAVED:
-        return bluetooth->link->connected ? "Hold Play to forget this device"
-                                          : "Play connects · hold Play forgets";
+        return enabled(bluetooth) ? "Play turns Bluetooth off" : "Play turns Bluetooth on";
+    case ROW_KNOWN:
+        return known_hint(bluetooth, selected - 1);
+    case ROW_SEARCH:
+        return scanning() ? "Searching… put headphones in pairing mode"
+                          : "Play searches for new headphones";
     default:
         return "Play pairs with this device";
     }
@@ -291,10 +311,13 @@ static ScreenAction choose(void *context, int index)
         bluetooth->pairing = false;
         bluetooth_link_set_enabled(link, !enabled(bluetooth), now_ms);
         break;
-    case ROW_SAVED:
-        if (!link->connected) {
-            bluetooth_link_connect_saved(link, now_ms);
-        }
+    case ROW_KNOWN:
+        bluetooth->pairing = false;
+        bluetooth_link_choose(link, index - 1, now_ms);
+        break;
+    case ROW_SEARCH:
+        bluetooth->pairing = false;
+        bluetooth_link_search(link, now_ms);
         break;
     default:
         bluetooth->paired = *nearby_device(bluetooth, index);
@@ -309,9 +332,8 @@ static ScreenAction choose(void *context, int index)
 static ScreenAction hold(void *context, int index)
 {
     BluetoothScreen *bluetooth = context;
-    if (row_kind(bluetooth, index) == ROW_SAVED) {
-        bluetooth_link_forget(bluetooth->link);
-        list_view_select(&bluetooth->list, 0, bluetooth->now_ms);
+    if (row_kind(bluetooth, index) == ROW_KNOWN) {
+        bluetooth_link_forget(bluetooth->link, index - 1);
         refresh(bluetooth);
     }
     return screen_action_none();

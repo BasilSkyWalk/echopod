@@ -8,15 +8,18 @@
 const char BLUETOOTH_STORE_PATH[] = "/.echo/bluetooth.bin";
 
 enum {
-    STORE_VERSION = 1,
     HEADER_SIZE = 3,
-    ADDRESS_AT = HEADER_SIZE,
-    NAME_AT = ADDRESS_AT + HAL_BLUETOOTH_ADDRESS_SIZE,
-    ENABLED_AT = NAME_AT + HAL_BLUETOOTH_NAME_CAPACITY,
-    RECORD_SIZE = ENABLED_AT + 1
+    VERSION_AT = 2,
+    DEVICE_SIZE = HAL_BLUETOOTH_ADDRESS_SIZE + HAL_BLUETOOTH_NAME_CAPACITY,
+    OLD_VERSION = 1,
+    OLD_ENABLED_AT = HEADER_SIZE + DEVICE_SIZE,
+    OLD_SIZE = OLD_ENABLED_AT + 1,
+    VERSION = 2,
+    ENABLED_AT = HEADER_SIZE,
+    COUNT_AT = ENABLED_AT + 1,
+    DEVICES_AT = COUNT_AT + 1,
+    RECORD_SIZE = DEVICES_AT + BLUETOOTH_STORE_DEVICES * DEVICE_SIZE
 };
-
-static const uint8_t HEADER[HEADER_SIZE] = {'B', 'T', STORE_VERSION};
 
 static bool has_address(const HalBluetoothDevice *device)
 {
@@ -28,50 +31,96 @@ static bool has_address(const HalBluetoothDevice *device)
     return false;
 }
 
-static bool read_record(uint8_t *record)
+static void read_device(const uint8_t *bytes, HalBluetoothDevice *device)
+{
+    for (size_t index = 0; index < HAL_BLUETOOTH_ADDRESS_SIZE; index++) {
+        device->address[index] = bytes[index];
+    }
+    for (size_t index = 0; index < HAL_BLUETOOTH_NAME_CAPACITY; index++) {
+        device->name[index] = (char)bytes[HAL_BLUETOOTH_ADDRESS_SIZE + index];
+    }
+    device->name[HAL_BLUETOOTH_NAME_CAPACITY - 1] = '\0';
+}
+
+static void write_device(const HalBluetoothDevice *device, uint8_t *bytes)
+{
+    for (size_t index = 0; index < HAL_BLUETOOTH_ADDRESS_SIZE; index++) {
+        bytes[index] = device->address[index];
+    }
+    for (size_t index = 0; index < HAL_BLUETOOTH_NAME_CAPACITY; index++) {
+        bytes[HAL_BLUETOOTH_ADDRESS_SIZE + index] = (uint8_t)device->name[index];
+    }
+}
+
+static uint32_t read_record(uint8_t *record)
 {
     HalFile file;
     if (!hal_file_open(&file, BLUETOOTH_STORE_PATH)) {
-        return false;
+        return 0;
     }
-    bool read = file.size >= RECORD_SIZE && hal_file_read(file, 0, record, RECORD_SIZE);
+    uint32_t size = file.size < RECORD_SIZE ? file.size : RECORD_SIZE;
+    bool read = size >= HEADER_SIZE && hal_file_read(file, 0, record, size);
     hal_file_close(&file);
-    for (size_t index = 0; read && index < HEADER_SIZE; index++) {
-        read = record[index] == HEADER[index];
+    if (!read || record[0] != 'B' || record[1] != 'T') {
+        return 0;
     }
-    return read;
+    return size;
+}
+
+static void load_old(const uint8_t *record, uint32_t size, BluetoothSaved *saved)
+{
+    if (size < OLD_SIZE) {
+        return;
+    }
+    read_device(record + HEADER_SIZE, &saved->devices[0]);
+    saved->count = has_address(&saved->devices[0]) ? 1 : 0;
+    saved->enabled = record[OLD_ENABLED_AT] == 1;
+}
+
+static void load_list(const uint8_t *record, uint32_t size, BluetoothSaved *saved)
+{
+    if (size < RECORD_SIZE) {
+        return;
+    }
+    saved->enabled = record[ENABLED_AT] == 1;
+    uint8_t count = record[COUNT_AT];
+    for (uint8_t index = 0; index < count && index < BLUETOOTH_STORE_DEVICES; index++) {
+        HalBluetoothDevice *device = &saved->devices[saved->count];
+        read_device(record + DEVICES_AT + index * DEVICE_SIZE, device);
+        if (has_address(device)) {
+            saved->count++;
+        }
+    }
 }
 
 void bluetooth_store_load(BluetoothSaved *saved)
 {
-    uint8_t record[RECORD_SIZE];
-    *saved = (BluetoothSaved){.enabled = false, .has_device = false};
-    if (!read_record(record)) {
+    static uint8_t record[RECORD_SIZE];
+    *saved = (BluetoothSaved){.enabled = false, .count = 0};
+    uint32_t size = read_record(record);
+    if (size == 0) {
         return;
     }
-    for (size_t index = 0; index < HAL_BLUETOOTH_ADDRESS_SIZE; index++) {
-        saved->device.address[index] = record[ADDRESS_AT + index];
+    if (record[VERSION_AT] == OLD_VERSION) {
+        load_old(record, size, saved);
+    } else if (record[VERSION_AT] == VERSION) {
+        load_list(record, size, saved);
     }
-    for (size_t index = 0; index < HAL_BLUETOOTH_NAME_CAPACITY; index++) {
-        saved->device.name[index] = (char)record[NAME_AT + index];
-    }
-    saved->device.name[HAL_BLUETOOTH_NAME_CAPACITY - 1] = '\0';
-    saved->has_device = has_address(&saved->device);
-    saved->enabled = record[ENABLED_AT] == 1;
 }
 
 void bluetooth_store_save(const BluetoothSaved *saved)
 {
-    uint8_t record[RECORD_SIZE] = {0};
-    for (size_t index = 0; index < HEADER_SIZE; index++) {
-        record[index] = HEADER[index];
+    static uint8_t record[RECORD_SIZE];
+    for (size_t index = 0; index < RECORD_SIZE; index++) {
+        record[index] = 0;
     }
-    for (size_t index = 0; saved->has_device && index < HAL_BLUETOOTH_ADDRESS_SIZE; index++) {
-        record[ADDRESS_AT + index] = saved->device.address[index];
-    }
-    for (size_t index = 0; saved->has_device && index < HAL_BLUETOOTH_NAME_CAPACITY; index++) {
-        record[NAME_AT + index] = (uint8_t)saved->device.name[index];
-    }
+    record[0] = 'B';
+    record[1] = 'T';
+    record[VERSION_AT] = VERSION;
     record[ENABLED_AT] = saved->enabled ? 1 : 0;
+    record[COUNT_AT] = saved->count;
+    for (uint8_t index = 0; index < saved->count && index < BLUETOOTH_STORE_DEVICES; index++) {
+        write_device(&saved->devices[index], record + DEVICES_AT + index * DEVICE_SIZE);
+    }
     (void)hal_file_write(BLUETOOTH_STORE_PATH, record, RECORD_SIZE);
 }

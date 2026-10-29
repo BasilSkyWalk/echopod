@@ -21,9 +21,9 @@ static BluetoothScreen bluetooth;
 static Screen *open_screen(bool enabled, const HalBluetoothDevice *saved, bool details)
 {
     fake_hal_reset();
-    BluetoothSaved stored = {.enabled = enabled, .has_device = saved != NULL};
+    BluetoothSaved stored = {.enabled = enabled, .count = saved != NULL ? 1 : 0};
     if (saved != NULL) {
-        stored.device = *saved;
+        stored.devices[0] = *saved;
     }
     bluetooth_store_save(&stored);
     toast = (Toast){0};
@@ -89,13 +89,21 @@ static void play_on_the_switch_turns_bluetooth_on_and_off(void)
     CHECK(row_is(0, "Bluetooth", "Off"));
 }
 
+static void step_link(uint32_t now_ms)
+{
+    static Player idle;
+    bluetooth_link_step(&link, &idle, now_ms);
+}
+
 static void a_ready_module_searches_while_the_screen_is_open(void)
 {
     Screen *screen = open_screen(true, NULL, false);
     fake_hal_bluetooth()->state = HAL_BLUETOOTH_READY;
-    bluetooth_link_step(&link, &(Player){0}, START_MS + 100);
+    step_link(START_MS + 100);
     CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
     screen->update(screen->context, START_MS + 100);
+    CHECK(row_is(1, "Pair new device", "Searching…"));
+    tap(screen, KEY_VOLUME_UP, START_MS + 200);
     CHECK(line_is(BLUETOOTH_SCREEN_HINT_LINE, "Searching… put headphones in pairing mode"));
 }
 
@@ -104,10 +112,11 @@ static void found_devices_are_listed_below_the_saved_one(void)
     Screen *screen = open_screen(true, &BUDS, false);
     find_two_devices();
     screen->update(screen->context, START_MS + 100);
-    CHECK_EQUAL(3, bluetooth_screen_row_count(&bluetooth));
+    CHECK_EQUAL(4, bluetooth_screen_row_count(&bluetooth));
     CHECK(row_is(0, "Bluetooth", "On"));
-    CHECK(row_is(1, "OnePlus Buds 3", "Not connected"));
-    CHECK(row_is(2, "Kitchen", ""));
+    CHECK(row_is(1, "OnePlus Buds 3", ""));
+    CHECK(row_is(2, "Pair new device", "Searching…"));
+    CHECK(row_is(3, "Kitchen", ""));
 }
 
 static void play_on_a_found_device_pairs_with_it(void)
@@ -115,16 +124,21 @@ static void play_on_a_found_device_pairs_with_it(void)
     Screen *screen = open_screen(true, NULL, false);
     find_two_devices();
     screen->update(screen->context, START_MS + 100);
+    CHECK(row_is(3, "Kitchen", ""));
     tap(screen, KEY_VOLUME_UP, START_MS + 200);
     tap(screen, KEY_VOLUME_UP, START_MS + 300);
+    tap(screen, KEY_VOLUME_UP, START_MS + 400);
     CHECK(line_is(BLUETOOTH_SCREEN_HINT_LINE, "Play pairs with this device"));
-    tap(screen, KEY_PLAY, START_MS + 400);
+    tap(screen, KEY_PLAY, START_MS + 500);
+    CHECK(row_is(3, "Kitchen", "Connecting…"));
+    fake_hal_bluetooth()->state = HAL_BLUETOOTH_READY;
+    step_link(START_MS + 600);
     CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
     CHECK(strcmp("Kitchen", fake_hal_bluetooth_connect_target()->name) == 0);
-    CHECK(row_is(2, "Kitchen", "Connecting…"));
     fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
-    screen->update(screen->context, START_MS + 500);
-    CHECK(row_is(2, "Kitchen", "Didn't connect"));
+    step_link(START_MS + 700);
+    screen->update(screen->context, START_MS + 700);
+    CHECK(row_is(3, "Kitchen", "Didn't connect"));
 }
 
 static void the_connected_device_shows_its_state(void)
@@ -133,12 +147,32 @@ static void the_connected_device_shows_its_state(void)
     find_two_devices();
     fake_hal_bluetooth()->state = HAL_BLUETOOTH_CONNECTED;
     fake_hal_bluetooth()->connected = BUDS;
-    bluetooth_link_step(&link, &(Player){0}, START_MS + 100);
+    step_link(START_MS + 100);
     screen->update(screen->context, START_MS + 100);
-    CHECK_EQUAL(2, bluetooth_screen_row_count(&bluetooth));
+    CHECK_EQUAL(3, bluetooth_screen_row_count(&bluetooth));
     CHECK(row_is(1, "OnePlus Buds 3", "Connected"));
+    CHECK(row_is(2, "Pair new device", ""));
     tap(screen, KEY_VOLUME_UP, START_MS + 200);
-    CHECK(line_is(BLUETOOTH_SCREEN_HINT_LINE, "Hold Play to forget this device"));
+    CHECK(line_is(BLUETOOTH_SCREEN_HINT_LINE, "Play disconnects · hold Play forgets"));
+    tap(screen, KEY_PLAY, START_MS + 300);
+    CHECK_EQUAL(1, fake_hal_bluetooth_disconnect_count());
+}
+
+static void pair_new_device_disconnects_and_searches(void)
+{
+    Screen *screen = open_screen(true, &BUDS, false);
+    fake_hal_bluetooth()->state = HAL_BLUETOOTH_CONNECTED;
+    fake_hal_bluetooth()->connected = BUDS;
+    step_link(START_MS + 100);
+    screen->update(screen->context, START_MS + 100);
+    tap(screen, KEY_VOLUME_UP, START_MS + 200);
+    tap(screen, KEY_VOLUME_UP, START_MS + 300);
+    CHECK(line_is(BLUETOOTH_SCREEN_HINT_LINE, "Play searches for new headphones"));
+    tap(screen, KEY_PLAY, START_MS + 400);
+    CHECK_EQUAL(1, fake_hal_bluetooth_disconnect_count());
+    fake_hal_bluetooth()->state = HAL_BLUETOOTH_READY;
+    step_link(START_MS + 500);
+    CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
 }
 
 static void holding_play_on_the_saved_device_forgets_it(void)
@@ -146,15 +180,15 @@ static void holding_play_on_the_saved_device_forgets_it(void)
     Screen *screen = open_screen(true, &BUDS, false);
     fake_hal_bluetooth()->state = HAL_BLUETOOTH_CONNECTED;
     fake_hal_bluetooth()->connected = BUDS;
-    bluetooth_link_step(&link, &(Player){0}, START_MS + 100);
+    step_link(START_MS + 100);
     screen->update(screen->context, START_MS + 100);
     tap(screen, KEY_VOLUME_UP, START_MS + 200);
     press(screen, KEY_PLAY, KEY_GESTURE_LONG_PRESS, START_MS + 300);
     CHECK_EQUAL(1, fake_hal_bluetooth_disconnect_count());
-    CHECK_EQUAL(1, bluetooth_screen_row_count(&bluetooth));
+    CHECK_EQUAL(2, bluetooth_screen_row_count(&bluetooth));
     BluetoothSaved saved;
     bluetooth_store_load(&saved);
-    CHECK(!saved.has_device);
+    CHECK_EQUAL(0, saved.count);
 }
 
 static void play_on_a_disconnected_saved_device_reconnects(void)
@@ -165,6 +199,8 @@ static void play_on_a_disconnected_saved_device_reconnects(void)
     tap(screen, KEY_VOLUME_UP, START_MS + 200);
     CHECK(line_is(BLUETOOTH_SCREEN_HINT_LINE, "Play connects · hold Play forgets"));
     tap(screen, KEY_PLAY, START_MS + 300);
+    CHECK(row_is(1, "OnePlus Buds 3", "Connecting…"));
+    step_link(START_MS + 400);
     CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
     CHECK(strcmp("OnePlus Buds 3", fake_hal_bluetooth_connect_target()->name) == 0);
 }
@@ -205,7 +241,7 @@ static void the_settings_row_summarises_the_link(void)
     bluetooth_link_set_enabled(&link, true, START_MS + 100);
     fake_hal_bluetooth()->state = HAL_BLUETOOTH_CONNECTED;
     fake_hal_bluetooth()->connected = BUDS;
-    bluetooth_link_step(&link, &(Player){0}, START_MS + 200);
+    step_link(START_MS + 200);
     CHECK(strcmp("OnePlus Buds 3", bluetooth_screen_summary(&bluetooth)) == 0);
 }
 
@@ -214,9 +250,9 @@ static void a_connection_is_saved_once(void)
     Screen *screen = open_screen(true, NULL, false);
     fake_hal_bluetooth()->state = HAL_BLUETOOTH_CONNECTED;
     fake_hal_bluetooth()->connected = BUDS;
-    bluetooth_link_step(&link, &(Player){0}, START_MS + 100);
+    step_link(START_MS + 100);
     int writes = fake_hal_write_count();
-    bluetooth_link_step(&link, &(Player){0}, START_MS + 200);
+    step_link(START_MS + 200);
     screen->update(screen->context, START_MS + 200);
     CHECK_EQUAL(writes, fake_hal_write_count());
 }
@@ -229,7 +265,7 @@ static void a_damaged_store_is_ignored(void)
     BluetoothSaved saved;
     bluetooth_store_load(&saved);
     CHECK(!saved.enabled);
-    CHECK(!saved.has_device);
+    CHECK_EQUAL(0, saved.count);
 }
 
 int main(void)
@@ -241,6 +277,7 @@ int main(void)
         TEST_CASE(found_devices_are_listed_below_the_saved_one),
         TEST_CASE(play_on_a_found_device_pairs_with_it),
         TEST_CASE(the_connected_device_shows_its_state),
+        TEST_CASE(pair_new_device_disconnects_and_searches),
         TEST_CASE(holding_play_on_the_saved_device_forgets_it),
         TEST_CASE(play_on_a_disconnected_saved_device_reconnects),
         TEST_CASE(leaving_keeps_the_module_on_and_stops_browsing),

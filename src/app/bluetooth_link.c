@@ -5,13 +5,18 @@
 #include "core/string_builder.h"
 #include "hal/audio.h"
 
-static bool same_device(const HalBluetoothDevice *first, const HalBluetoothDevice *second)
+static bool same_address(const HalBluetoothDevice *first, const HalBluetoothDevice *second)
 {
     for (size_t index = 0; index < HAL_BLUETOOTH_ADDRESS_SIZE; index++) {
         if (first->address[index] != second->address[index]) {
             return false;
         }
     }
+    return true;
+}
+
+static bool same_name(const HalBluetoothDevice *first, const HalBluetoothDevice *second)
+{
     for (size_t index = 0; index < HAL_BLUETOOTH_NAME_CAPACITY; index++) {
         if (first->name[index] != second->name[index]) {
             return false;
@@ -21,6 +26,16 @@ static bool same_device(const HalBluetoothDevice *first, const HalBluetoothDevic
         }
     }
     return true;
+}
+
+static int find_known(const BluetoothLink *link, const HalBluetoothDevice *device)
+{
+    for (int index = 0; index < link->saved.count; index++) {
+        if (same_address(&link->saved.devices[index], device)) {
+            return index;
+        }
+    }
+    return -1;
 }
 
 static void announce(BluetoothLink *link, const char *text, const char *name, uint32_t now_ms)
@@ -35,16 +50,26 @@ static void announce(BluetoothLink *link, const char *text, const char *name, ui
     }
 }
 
+static void reset_session(BluetoothLink *link, uint32_t now_ms)
+{
+    link->connected = false;
+    link->streamed = false;
+    link->forgetting = false;
+    link->held = false;
+    link->attempting = false;
+    link->has_target = false;
+    link->paired_seen = false;
+    link->search_now = false;
+    link->searched = true;
+    link->retried_ms = now_ms - BLUETOOTH_LINK_RETRY_MS;
+    link->unlinked_ms = now_ms;
+}
+
 static void wake(BluetoothLink *link, uint32_t now_ms)
 {
     hal_bluetooth_set_power(true);
     link->dozing = false;
-    link->connected = false;
-    link->streamed = false;
-    link->reconnecting = false;
-    link->forgetting = false;
-    link->retried_ms = now_ms - BLUETOOTH_LINK_RETRY_MS;
-    link->unlinked_ms = now_ms;
+    reset_session(link, now_ms);
 }
 
 void bluetooth_link_start(BluetoothLink *link, Toast *toast, uint32_t now_ms)
@@ -67,10 +92,8 @@ void bluetooth_link_set_enabled(BluetoothLink *link, bool enabled, uint32_t now_
         return;
     }
     hal_bluetooth_set_power(false);
-    link->connected = false;
-    link->streamed = false;
-    link->reconnecting = false;
     link->dozing = false;
+    reset_session(link, now_ms);
 }
 
 void bluetooth_link_browse(BluetoothLink *link, bool browsing, uint32_t now_ms)
@@ -83,39 +106,83 @@ void bluetooth_link_browse(BluetoothLink *link, bool browsing, uint32_t now_ms)
     }
 }
 
-void bluetooth_link_pair(BluetoothLink *link, const HalBluetoothDevice *device, uint32_t now_ms)
+static bool busy(void)
 {
-    link->forgetting = false;
-    link->reconnecting = false;
-    link->retried_ms = now_ms;
-    hal_bluetooth_connect(device);
+    HalBluetoothState state = hal_bluetooth_status()->state;
+    return state == HAL_BLUETOOTH_CONNECTED || state == HAL_BLUETOOTH_CONNECTING;
 }
 
-void bluetooth_link_connect_saved(BluetoothLink *link, uint32_t now_ms)
+static void aim_at(BluetoothLink *link, const HalBluetoothDevice *device, uint32_t now_ms)
 {
-    if (!link->saved.has_device) {
+    link->held = false;
+    link->forgetting = false;
+    link->target = *device;
+    link->has_target = true;
+    link->retried_ms = now_ms - BLUETOOTH_LINK_RETRY_MS;
+    if (busy() || link->paired_seen) {
+        hal_bluetooth_disconnect();
+        link->paired_seen = false;
+        link->retried_ms += BLUETOOTH_LINK_RESET_MS;
+    }
+}
+
+void bluetooth_link_choose(BluetoothLink *link, int index, uint32_t now_ms)
+{
+    if (index < 0 || index >= link->saved.count) {
         return;
     }
-    link->forgetting = false;
-    link->reconnecting = true;
-    link->searched = false;
-    link->retried_ms = now_ms;
-    hal_bluetooth_connect(&link->saved.device);
+    const HalBluetoothDevice *device = &link->saved.devices[index];
+    if (link->connected && same_address(&link->linked, device)) {
+        hal_bluetooth_disconnect();
+        link->held = true;
+        link->has_target = false;
+        return;
+    }
+    aim_at(link, device, now_ms);
 }
 
-void bluetooth_link_forget(BluetoothLink *link)
+void bluetooth_link_pair(BluetoothLink *link, const HalBluetoothDevice *device, uint32_t now_ms)
 {
-    if (link->connected || hal_bluetooth_status()->state == HAL_BLUETOOTH_CONNECTING) {
+    aim_at(link, device, now_ms);
+}
+
+void bluetooth_link_search(BluetoothLink *link, uint32_t now_ms)
+{
+    if (busy() || link->paired_seen) {
         hal_bluetooth_disconnect();
-        link->forgetting = true;
+        link->paired_seen = false;
     }
-    link->connected = false;
-    link->reconnecting = false;
-    if (link->saved.has_device) {
-        link->saved.has_device = false;
-        link->saved.device = (HalBluetoothDevice){.address = {0}, .name = {0}};
-        bluetooth_store_save(&link->saved);
+    link->held = true;
+    link->has_target = false;
+    link->search_now = true;
+    link->unlinked_ms = now_ms;
+}
+
+void bluetooth_link_forget(BluetoothLink *link, int index)
+{
+    if (index < 0 || index >= link->saved.count) {
+        return;
     }
+    const HalBluetoothDevice *device = &link->saved.devices[index];
+    bool linked = link->connected && same_address(&link->linked, device);
+    bool aimed = (link->attempting || link->has_target) && same_address(&link->target, device);
+    if (linked || (aimed && (busy() || link->paired_seen))) {
+        hal_bluetooth_disconnect();
+        link->forgetting = linked;
+        link->paired_seen = false;
+    }
+    if (aimed) {
+        link->has_target = false;
+        link->attempting = false;
+    }
+    if (linked) {
+        link->connected = false;
+    }
+    for (int next = index + 1; next < link->saved.count; next++) {
+        link->saved.devices[next - 1] = link->saved.devices[next];
+    }
+    link->saved.count--;
+    bluetooth_store_save(&link->saved);
 }
 
 void bluetooth_link_sleep(BluetoothLink *link)
@@ -127,16 +194,27 @@ void bluetooth_link_sleep(BluetoothLink *link)
     link->dozing = true;
     link->connected = false;
     link->streamed = false;
-    link->reconnecting = false;
+    link->attempting = false;
+    link->paired_seen = false;
 }
 
 static void remember(BluetoothLink *link, const HalBluetoothDevice *device)
 {
-    if (link->saved.has_device && same_device(&link->saved.device, device)) {
+    int known = find_known(link, device);
+    if (known == 0 && same_name(&link->saved.devices[0], device)) {
         return;
     }
-    link->saved.device = *device;
-    link->saved.has_device = true;
+    int last = known >= 0 ? known : link->saved.count;
+    if (last >= BLUETOOTH_STORE_DEVICES) {
+        last = BLUETOOTH_STORE_DEVICES - 1;
+    }
+    for (int index = last; index > 0; index--) {
+        link->saved.devices[index] = link->saved.devices[index - 1];
+    }
+    link->saved.devices[0] = *device;
+    if (known < 0 && link->saved.count < BLUETOOTH_STORE_DEVICES) {
+        link->saved.count++;
+    }
     bluetooth_store_save(&link->saved);
 }
 
@@ -149,7 +227,11 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
     }
     if (connected && !link->connected && !link->forgetting) {
         link->connected = true;
-        link->reconnecting = false;
+        link->linked = status->connected;
+        link->held = false;
+        link->has_target = false;
+        link->attempting = false;
+        link->paired_seen = false;
         link->streamed = false;
         link->buds_paused = false;
         link->changed_ms = now_ms;
@@ -163,9 +245,50 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
         }
         link->streamed = false;
         link->unlinked_ms = now_ms;
-        link->retried_ms = now_ms;
-        announce(link, "Bluetooth disconnected", NULL, now_ms);
+        if (!link->has_target) {
+            link->retried_ms = now_ms;
+        }
+        announce(link, "Disconnected from ", link->linked.name, now_ms);
     }
+}
+
+static const HalBluetoothDevice *next_target(const BluetoothLink *link)
+{
+    if (link->has_target) {
+        return &link->target;
+    }
+    if (!link->held && link->saved.count > 0) {
+        return &link->saved.devices[0];
+    }
+    return NULL;
+}
+
+static void attempt(BluetoothLink *link, const HalBluetoothDevice *device, uint32_t now_ms)
+{
+    link->target = *device;
+    link->has_target = false;
+    link->attempting = true;
+    link->searched = false;
+    link->retried_ms = now_ms;
+    hal_bluetooth_connect(&link->target);
+}
+
+static bool wait_for_link(BluetoothLink *link, const HalBluetoothStatus *status, uint32_t now_ms)
+{
+    if (status->pairing != HAL_BLUETOOTH_PAIRED) {
+        link->paired_seen = false;
+        return false;
+    }
+    if (!link->paired_seen) {
+        link->paired_seen = true;
+        link->paired_ms = now_ms;
+    } else if (now_ms - link->paired_ms >= BLUETOOTH_LINK_CONFIRM_MS) {
+        hal_bluetooth_disconnect();
+        link->paired_seen = false;
+        link->has_target = true;
+        link->retried_ms = now_ms - BLUETOOTH_LINK_RETRY_MS + BLUETOOTH_LINK_RESET_MS;
+    }
+    return true;
 }
 
 static void find_device(BluetoothLink *link, const HalBluetoothStatus *status, uint32_t now_ms)
@@ -173,24 +296,28 @@ static void find_device(BluetoothLink *link, const HalBluetoothStatus *status, u
     if (link->connected || link->forgetting) {
         return;
     }
-    if (status->state != HAL_BLUETOOTH_READY) {
+    if (status->state == HAL_BLUETOOTH_CONNECTING) {
+        link->attempting = true;
         return;
     }
-    if (status->pairing == HAL_BLUETOOTH_PAIRED) {
-        if (now_ms - link->retried_ms >= BLUETOOTH_LINK_CONFIRM_MS) {
-            hal_bluetooth_disconnect();
-            link->retried_ms = now_ms - BLUETOOTH_LINK_RETRY_MS + BLUETOOTH_LINK_RESET_MS;
-        }
+    if (status->state != HAL_BLUETOOTH_READY || wait_for_link(link, status, now_ms)) {
         return;
     }
-    link->reconnecting = false;
+    link->attempting = false;
+    if (link->search_now) {
+        link->search_now = false;
+        link->searched = true;
+        hal_bluetooth_scan();
+        return;
+    }
+    const HalBluetoothDevice *device = next_target(link);
     bool due = now_ms - link->retried_ms >= BLUETOOTH_LINK_RETRY_MS;
-    if (link->saved.has_device && due && (!link->browsing || link->searched)) {
-        bluetooth_link_connect_saved(link, now_ms);
+    if (device != NULL && due && (link->has_target || !link->browsing || link->searched)) {
+        attempt(link, device, now_ms);
     } else if (link->browsing && !link->searched) {
         link->searched = true;
         hal_bluetooth_scan();
-    } else if (link->browsing && !link->saved.has_device) {
+    } else if (link->browsing && device == NULL) {
         hal_bluetooth_scan();
     }
 }
@@ -254,7 +381,8 @@ static void doze(BluetoothLink *link, uint32_t now_ms)
     if (now_ms - link->unlinked_ms >= BLUETOOTH_LINK_IDLE_OFF_MS) {
         hal_bluetooth_set_power(false);
         link->dozing = true;
-        link->reconnecting = false;
+        link->attempting = false;
+        link->paired_seen = false;
     }
 }
 
@@ -271,27 +399,59 @@ void bluetooth_link_step(BluetoothLink *link, Player *player, uint32_t now_ms)
     doze(link, now_ms);
 }
 
+static bool connecting(const BluetoothLink *link)
+{
+    return link->attempting || link->paired_seen || link->has_target ||
+           hal_bluetooth_status()->state == HAL_BLUETOOTH_CONNECTING;
+}
+
+BluetoothDeviceState bluetooth_link_device_state(const BluetoothLink *link, int index)
+{
+    if (index < 0 || index >= link->saved.count || !link->saved.enabled || link->dozing) {
+        return BLUETOOTH_DEVICE_IDLE;
+    }
+    const HalBluetoothDevice *device = &link->saved.devices[index];
+    if (link->connected && same_address(&link->linked, device)) {
+        return link->streamed ? BLUETOOTH_DEVICE_PLAYING : BLUETOOTH_DEVICE_CONNECTED;
+    }
+    if (connecting(link) && same_address(&link->target, device)) {
+        return BLUETOOTH_DEVICE_CONNECTING;
+    }
+    bool starting = hal_bluetooth_status()->state == HAL_BLUETOOTH_STARTING;
+    if (starting && index == 0 && !link->held && !link->connected) {
+        return BLUETOOTH_DEVICE_CONNECTING;
+    }
+    return BLUETOOTH_DEVICE_IDLE;
+}
+
+bool bluetooth_link_knows(const BluetoothLink *link, const HalBluetoothDevice *device)
+{
+    return find_known(link, device) >= 0;
+}
+
 const char *bluetooth_link_summary(const BluetoothLink *link)
 {
     if (!link->saved.enabled) {
         return "Off";
     }
     if (link->connected) {
-        return link->saved.device.name;
+        return link->linked.name;
     }
     if (link->dozing) {
         return "Not connected";
     }
-    switch (hal_bluetooth_status()->state) {
-    case HAL_BLUETOOTH_STARTING:
+    HalBluetoothState state = hal_bluetooth_status()->state;
+    if (state == HAL_BLUETOOTH_STARTING) {
         return "Starting…";
-    case HAL_BLUETOOTH_NO_REPLY:
-        return "Not responding";
-    case HAL_BLUETOOTH_SCANNING:
-        return "Searching…";
-    case HAL_BLUETOOTH_CONNECTING:
-        return "Connecting…";
-    default:
-        return link->saved.has_device ? "Not connected" : "On";
     }
+    if (state == HAL_BLUETOOTH_NO_REPLY) {
+        return "Not responding";
+    }
+    if (state == HAL_BLUETOOTH_SCANNING) {
+        return "Searching…";
+    }
+    if (connecting(link)) {
+        return "Connecting…";
+    }
+    return link->saved.count > 0 ? "Not connected" : "On";
 }
