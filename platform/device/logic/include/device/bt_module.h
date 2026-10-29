@@ -34,7 +34,7 @@ typedef struct BtModule {
     HalBluetoothDevice target;
     bool answered;
     bool repeated;
-    uint8_t play_notice;
+    bool stream_pending;
     uint8_t play_state;
     bool query_paused;
     bool resend_stream;
