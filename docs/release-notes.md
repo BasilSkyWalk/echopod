@@ -1,6 +1,6 @@
 # EchoPod release notes
 
-## Unreleased
+## 0.6.0
 
 ### New
 
@@ -9,7 +9,10 @@
 
 ### Fixed
 
-- **Bluetooth connects faster and finds headphones put in pairing mode.** "Connecting…" could last 20–30 seconds after the headphones had already announced the connection, and headphones the player already knew didn't show up when put in pairing mode while it was searching, until Bluetooth was turned off and on. The player now asks the module for its status every second while connecting (stock does this too), so "Connected" shows within a second of the link coming up, whether the player made it or the headphones did. Like stock, a search that follows a connection attempt restarts the module first (the screen keeps saying Searching… for the half second it takes), so a stuck module no longer hides new headphones; the first search after Bluetooth comes on starts at once. Remembered headphones found by a search connect straight away while the search runs; after Pair new device or a disconnect, their row shows "Nearby" instead. Found devices stay listed between searches. Diagnostics → Bluetooth now keeps the last 12 messages over two lines, including the search, stop, connect and disconnect commands the player sent, and keeps them when Bluetooth is turned off and on.
+- **Bluetooth connects within seconds.** "Connecting…" could last 20–30 seconds after the headphones had already announced the connection. The player now asks the Bluetooth module for its status every second while connecting, as stock does, so "Connected" shows within about a second of the link coming up, whether the player or the headphones started it.
+- **Headphones put in pairing mode are found.** Headphones the player already knew didn't show up when put in pairing mode while it was searching, until Bluetooth was turned off and on. Like stock, a search that follows a connection attempt now restarts the module first (half a second, still shown as Searching…). Remembered headphones a search finds connect straight away; after Pair new device or a disconnect, their row shows "Nearby" instead. Devices found stay listed between searches.
+- **Play no longer pauses again on Bluetooth.** A late "paused" report from the headphones could pause playback right after Play was pressed. Reports are now ignored for 3 seconds after Play or Pause on the player, and a pause the headphones cause shows "Paused by <name>".
+- **Diagnostics → Bluetooth** keeps the last 12 module messages over two lines, with the commands the player sent and the seconds between them, and keeps them when Bluetooth is turned off and on.
 
 ## 0.5.0
 
