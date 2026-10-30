@@ -246,6 +246,7 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
         link->connected = false;
         if (link->streamed && player->state == PLAYER_PLAYING) {
             player_toggle_pause(player);
+            link->player_state = (uint8_t)player->state;
         }
         link->streamed = false;
         link->unlinked_ms = now_ms;
@@ -401,11 +402,14 @@ static void follow_remote(BluetoothLink *link, const HalBluetoothStatus *status,
     if (settled && pressed(remote.pauses, seen.pauses) > 0 && link->streamed &&
         player->state == PLAYER_PLAYING) {
         player_toggle_pause(player);
+        link->player_state = (uint8_t)player->state;
         link->buds_paused = true;
+        announce(link, "Paused by ", link->linked.name, now_ms);
     }
     if (settled && pressed(remote.plays, seen.plays) > 0 && link->buds_paused &&
         player->state == PLAYER_PAUSED) {
         player_toggle_pause(player);
+        link->player_state = (uint8_t)player->state;
         link->buds_paused = false;
     }
     for (uint8_t count = pressed(remote.nexts, seen.nexts); count > 0; count--) {
@@ -454,6 +458,10 @@ void bluetooth_link_step(BluetoothLink *link, Player *player, uint32_t now_ms)
         return;
     }
     const HalBluetoothStatus *status = hal_bluetooth_status();
+    if (player->state != link->player_state) {
+        link->player_state = (uint8_t)player->state;
+        link->changed_ms = now_ms;
+    }
     follow_connection(link, status, player, now_ms);
     follow_remote(link, status, player, now_ms);
     follow_player(link, player, now_ms);

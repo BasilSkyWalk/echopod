@@ -42,6 +42,7 @@ typedef struct BluetoothLink {
     bool paired_seen;
     bool scan_tried;
     bool buds_paused;
+    uint8_t player_state;
     bool fresh;
     bool restarting;
     HalBluetoothDevice target;

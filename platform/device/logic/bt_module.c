@@ -544,19 +544,21 @@ static bool query_status(BtModule *module, uint32_t now_ms, BtModuleFrame *frame
     return command(module, 'Q', now_ms, frame);
 }
 
-static bool answer_play_report(BtModule *module, BtModuleFrame *frame)
+static bool answer_play_report(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
 {
     if (!module->resend_stream) {
         return false;
     }
     module->resend_stream = false;
+    add_event(module, '>', module->resend_on ? 'Y' : 'N', now_ms);
     *frame = (BtModuleFrame){.bytes = {'C', 'Y', '0', module->resend_on ? STREAM_ON_LEVEL : 0, 0},
                              .length = COMMAND_SIZE};
     return true;
 }
 
-static void stream_frame(bool on, BtModuleFrame *frame)
+static void stream_frame(BtModule *module, bool on, uint32_t now_ms, BtModuleFrame *frame)
 {
+    add_event(module, '>', on ? 'Y' : 'N', now_ms);
     *frame = (BtModuleFrame){.bytes = {'C', 'Y', '0', on ? STREAM_ON_LEVEL : 0, 0},
                              .length = COMMAND_SIZE};
 }
@@ -568,7 +570,7 @@ static bool send_pending_stream(BtModule *module, uint32_t now_ms, BtModuleFrame
         return false;
     }
     module->stream_pending = false;
-    stream_frame(module->status.streaming, frame);
+    stream_frame(module, module->status.streaming, now_ms, frame);
     return true;
 }
 
@@ -591,8 +593,8 @@ bool bt_module_poll(BtModule *module, uint32_t now_ms, BtModuleFrame *frame)
     case HAL_BLUETOOTH_CONNECTING:
         return follow_connect(module, now_ms, frame) || query_status(module, now_ms, frame);
     case HAL_BLUETOOTH_CONNECTED:
-        return answer_play_report(module, frame) || send_pending_stream(module, now_ms, frame) ||
-               query_status(module, now_ms, frame);
+        return answer_play_report(module, now_ms, frame) ||
+               send_pending_stream(module, now_ms, frame) || query_status(module, now_ms, frame);
     case HAL_BLUETOOTH_READY:
         return query_status(module, now_ms, frame);
     default:
@@ -617,10 +619,11 @@ bool bt_module_set_stream(BtModule *module, bool on, uint32_t now_ms, BtModuleFr
         module->play_state = PLAY_STATE_PAUSED;
     }
     if (notice == 0) {
-        stream_frame(on, frame);
+        stream_frame(module, on, now_ms, frame);
         return true;
     }
     module->stream_pending = true;
+    add_event(module, '>', notice == PLAY_NOTICE ? '6' : '7', now_ms);
     *frame = (BtModuleFrame){.bytes = {'C', notice, '0', '0', 0}, .length = COMMAND_SIZE};
     return true;
 }
