@@ -423,7 +423,9 @@ static void a_search_that_finds_remembered_headphones_connects_them(void)
     CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
     fake_hal_bluetooth()->devices[0] = BUDS;
     fake_hal_bluetooth()->device_count = 1;
-    ready();
+    fake_hal_bluetooth()->found_now = 1;
+    step(START_MS + 250);
+    CHECK_EQUAL(1, fake_hal_bluetooth_stop_count());
     step(START_MS + 300);
     CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
     CHECK(strcmp("Buds", fake_hal_bluetooth_connect_target()->name) == 0);
@@ -431,6 +433,20 @@ static void a_search_that_finds_remembered_headphones_connects_them(void)
     ready();
     step(START_MS + 400);
     CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
+}
+
+static void an_old_search_result_does_not_stop_a_new_search(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    bluetooth_link_browse(&link, true, START_MS);
+    fake_hal_bluetooth()->state = HAL_BLUETOOTH_SCANNING;
+    fake_hal_bluetooth()->devices[0] = BUDS;
+    fake_hal_bluetooth()->device_count = 1;
+    fake_hal_bluetooth()->found_now = 0;
+    step(START_MS + 100);
+    CHECK_EQUAL(0, fake_hal_bluetooth_stop_count());
 }
 
 static void after_pair_new_device_remembered_headphones_only_show_as_nearby(void)
@@ -586,6 +602,7 @@ int main(void)
         TEST_CASE(browsing_searches_for_devices),
         TEST_CASE(pairing_connects_the_chosen_device),
         TEST_CASE(a_search_that_finds_remembered_headphones_connects_them),
+        TEST_CASE(an_old_search_result_does_not_stop_a_new_search),
         TEST_CASE(after_pair_new_device_remembered_headphones_only_show_as_nearby),
         TEST_CASE(devices_are_remembered_most_recent_first),
         TEST_CASE(choosing_the_connected_device_disconnects_and_stays_off),

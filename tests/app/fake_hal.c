@@ -110,6 +110,7 @@ typedef struct FakeHal {
     HalBluetoothStatus bluetooth;
     bool bluetooth_powered;
     int bluetooth_scan_count;
+    int bluetooth_stop_count;
     int bluetooth_service_count;
     int bluetooth_connect_count;
     HalBluetoothDevice bluetooth_connected_to;
@@ -764,6 +765,19 @@ void hal_bluetooth_set_power(bool on)
 {
     fake.bluetooth_powered = on;
     fake.bluetooth = (HalBluetoothStatus){.state = on ? HAL_BLUETOOTH_STARTING : HAL_BLUETOOTH_OFF};
+}
+
+void hal_bluetooth_stop_scan(void)
+{
+    fake.bluetooth_stop_count++;
+    if (fake.bluetooth.state == HAL_BLUETOOTH_SCANNING) {
+        fake.bluetooth.state = HAL_BLUETOOTH_READY;
+    }
+}
+
+int fake_hal_bluetooth_stop_count(void)
+{
+    return fake.bluetooth_stop_count;
 }
 
 void hal_bluetooth_scan(void)

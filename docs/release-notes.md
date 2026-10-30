@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- **Pairing remembered headphones again.** Headphones the player already knew didn't show up when put in pairing mode, and connecting could take a long time unless Bluetooth was turned off and on. A search that finds remembered headphones now connects to them straight away; after Pair new device or a disconnect, their row shows "Nearby" instead.
+- **Pairing remembered headphones again.** Headphones the player already knew didn't show up when put in pairing mode, and connecting could take a long time unless Bluetooth was turned off and on. A search that finds remembered headphones now connects to them straight away; after Pair new device or a disconnect, their row shows "Nearby" instead. Headphones found while a search runs stop it and connect at once, devices found stay listed between searches instead of disappearing, and the player checks for the finished connection every half second, so "Connecting…" turns to "Connected" as soon as the headphones are ready.
 
 ## 0.5.0
 

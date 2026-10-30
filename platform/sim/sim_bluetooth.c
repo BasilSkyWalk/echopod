@@ -45,8 +45,15 @@ void hal_bluetooth_scan(void)
     if (bluetooth.status.state != HAL_BLUETOOTH_READY) {
         return;
     }
-    bluetooth.status.device_count = 0;
+    bluetooth.status.found_now = 0;
     enter_state(HAL_BLUETOOTH_SCANNING);
+}
+
+void hal_bluetooth_stop_scan(void)
+{
+    if (bluetooth.status.state == HAL_BLUETOOTH_SCANNING) {
+        enter_state(HAL_BLUETOOTH_READY);
+    }
 }
 
 void hal_bluetooth_connect(const HalBluetoothDevice *device)
@@ -85,6 +92,7 @@ static void add_found_devices(uint32_t elapsed_ms)
         memcpy(entry->address, device->address, sizeof entry->address);
         strncpy(entry->name, device->name, sizeof entry->name - 1);
     }
+    bluetooth.status.found_now = (uint8_t)((1u << bluetooth.status.device_count) - 1u);
 }
 
 void hal_bluetooth_service(void)

@@ -42,6 +42,7 @@ typedef struct HalBluetoothLink {
     uint8_t recent[HAL_BLUETOOTH_RECENT_CAPACITY];
     uint8_t event_count;
     char events[HAL_BLUETOOTH_EVENT_CAPACITY][2];
+    uint8_t gaps[HAL_BLUETOOTH_EVENT_CAPACITY];
 } HalBluetoothLink;
 
 typedef struct HalBluetoothRemote {
@@ -59,6 +60,7 @@ typedef struct HalBluetoothStatus {
     bool streaming;
     HalBluetoothDevice connected;
     uint8_t device_count;
+    uint8_t found_now;
     HalBluetoothDevice devices[HAL_BLUETOOTH_DEVICE_CAPACITY];
     HalBluetoothLink link;
     HalBluetoothRemote remote;
@@ -66,6 +68,7 @@ typedef struct HalBluetoothStatus {
 
 void hal_bluetooth_set_power(bool on);
 void hal_bluetooth_scan(void);
+void hal_bluetooth_stop_scan(void);
 void hal_bluetooth_connect(const HalBluetoothDevice *device);
 void hal_bluetooth_disconnect(void);
 void hal_bluetooth_set_stream(bool on);

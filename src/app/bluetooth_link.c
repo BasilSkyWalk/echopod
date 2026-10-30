@@ -284,6 +284,9 @@ static void start_scan(BluetoothLink *link)
 static int found_known(const BluetoothLink *link, const HalBluetoothStatus *status)
 {
     for (uint8_t index = 0; index < status->device_count; index++) {
+        if ((status->found_now & 1u << index) == 0) {
+            continue;
+        }
         int known = find_known(link, &status->devices[index]);
         if (known >= 0) {
             return known;
@@ -317,6 +320,11 @@ static void find_device(BluetoothLink *link, const HalBluetoothStatus *status, u
     }
     if (status->state == HAL_BLUETOOTH_CONNECTING) {
         link->attempting = true;
+        return;
+    }
+    if (status->state == HAL_BLUETOOTH_SCANNING && !link->held && !link->scan_tried &&
+        found_known(link, status) >= 0) {
+        hal_bluetooth_stop_scan();
         return;
     }
     if (status->state != HAL_BLUETOOTH_READY || wait_for_link(link, status, now_ms)) {

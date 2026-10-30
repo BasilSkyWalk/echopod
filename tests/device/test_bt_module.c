@@ -714,6 +714,54 @@ static void a_dropped_link_clears_the_pairing(void)
     CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
 }
 
+static void a_new_scan_keeps_earlier_devices_and_marks_those_found_again(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    CHECK_EQUAL(2, module.status.device_count);
+    CHECK_EQUAL(3, module.status.found_now);
+    bt_module_scan(&module, START_MS + 2000, &frame);
+    CHECK_EQUAL(2, module.status.device_count);
+    CHECK_EQUAL(0, module.status.found_now);
+    receive_device(SPEAKER, "Kitchen", START_MS + 2500);
+    settle(START_MS + 2500);
+    CHECK_EQUAL(2, module.status.found_now);
+}
+
+static void stopping_a_scan_sends_cp00(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    bt_module_scan(&module, START_MS + 500, &frame);
+    CHECK(bt_module_stop_scan(&module, START_MS + 600, &frame));
+    CHECK(frame_is(&frame, "CP00"));
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+    CHECK(!bt_module_stop_scan(&module, START_MS + 700, &frame));
+}
+
+static void a_paired_link_is_checked_every_half_second(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CLOK", CONNECT_MS + 1000);
+    settle(CONNECT_MS + 1000);
+    uint32_t paired_ms = CONNECT_MS + 1000 + BT_MODULE_SILENCE_MS;
+    CHECK(!poll(paired_ms + BT_MODULE_LINK_QUERY_MS - 1, &frame));
+    CHECK(poll(paired_ms + BT_MODULE_LINK_QUERY_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+}
+
+static void messages_record_the_seconds_since_the_last_one(void)
+{
+    power_on_ready();
+    receive_text("CKKK", START_MS + 4600);
+    settle(START_MS + 4600);
+    const HalBluetoothLink *link = &module.status.link;
+    CHECK_EQUAL(2, link->event_count);
+    CHECK_EQUAL(4, link->gaps[1]);
+}
+
 static void buds_controls_are_counted_without_sending_anything(void)
 {
     BtModuleFrame frame;
@@ -825,6 +873,10 @@ int main(void)
         TEST_CASE(a_paired_link_without_a_connection_can_be_dropped),
         TEST_CASE(a_dropped_link_clears_the_pairing),
         TEST_CASE(buds_controls_are_counted_without_sending_anything),
+        TEST_CASE(a_new_scan_keeps_earlier_devices_and_marks_those_found_again),
+        TEST_CASE(stopping_a_scan_sends_cp00),
+        TEST_CASE(a_paired_link_is_checked_every_half_second),
+        TEST_CASE(messages_record_the_seconds_since_the_last_one),
         TEST_CASE(a_play_report_without_a_stream_is_not_answered),
         TEST_CASE(the_first_stream_start_sends_only_cy0_1e),
         TEST_CASE(a_player_pause_and_resume_send_only_cy0),

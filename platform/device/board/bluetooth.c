@@ -224,6 +224,14 @@ void hal_bluetooth_scan(void)
     }
 }
 
+void hal_bluetooth_stop_scan(void)
+{
+    BtModuleFrame frame;
+    if (powered && bt_module_stop_scan(&module, hal_clock_milliseconds(), &frame)) {
+        send(&frame);
+    }
+}
+
 void hal_bluetooth_connect(const HalBluetoothDevice *device)
 {
     BtModuleFrame frame;

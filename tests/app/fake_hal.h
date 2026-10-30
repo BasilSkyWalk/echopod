@@ -41,6 +41,7 @@ int fake_hal_audio_service_count(void);
 HalBluetoothStatus *fake_hal_bluetooth(void);
 bool fake_hal_bluetooth_powered(void);
 int fake_hal_bluetooth_scan_count(void);
+int fake_hal_bluetooth_stop_count(void);
 int fake_hal_bluetooth_service_count(void);
 int fake_hal_bluetooth_connect_count(void);
 const HalBluetoothDevice *fake_hal_bluetooth_connect_target(void);
