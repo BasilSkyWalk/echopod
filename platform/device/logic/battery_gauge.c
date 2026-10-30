@@ -53,6 +53,17 @@ void battery_gauge_add(BatteryGauge *gauge, uint16_t raw)
     }
 }
 
+void battery_gauge_restart(BatteryGauge *gauge)
+{
+    if (gauge->count == 0) {
+        return;
+    }
+    uint32_t latest = (gauge->next + BATTERY_GAUGE_READINGS - 1) % BATTERY_GAUGE_READINGS;
+    gauge->millivolts[0] = gauge->millivolts[latest];
+    gauge->count = 1;
+    gauge->next = 1;
+}
+
 bool battery_gauge_known(const BatteryGauge *gauge)
 {
     return gauge->count > 0;
@@ -70,14 +81,31 @@ uint32_t battery_gauge_millivolts(const BatteryGauge *gauge)
     return total / gauge->count;
 }
 
+uint32_t battery_gauge_recent_millivolts(const BatteryGauge *gauge)
+{
+    uint32_t count =
+        gauge->count < BATTERY_RECENT_READINGS ? gauge->count : BATTERY_RECENT_READINGS;
+    if (count == 0) {
+        return 0;
+    }
+    uint32_t total = 0;
+    for (uint32_t back = 1; back <= count; back++) {
+        total += gauge->millivolts[(gauge->next + BATTERY_GAUGE_READINGS - back) %
+                                   BATTERY_GAUGE_READINGS];
+    }
+    return total / count;
+}
+
 uint8_t battery_gauge_percent(const BatteryGauge *gauge, bool charging)
 {
     uint32_t millivolts = battery_gauge_millivolts(gauge);
-    if (charging) {
-        millivolts =
-            millivolts > CHARGING_OFFSET_MILLIVOLTS ? millivolts - CHARGING_OFFSET_MILLIVOLTS : 0;
+    if (!charging) {
+        return battery_percent_for(millivolts);
     }
-    return battery_percent_for(millivolts);
+    millivolts =
+        millivolts > CHARGING_OFFSET_MILLIVOLTS ? millivolts - CHARGING_OFFSET_MILLIVOLTS : 0;
+    uint8_t percent = battery_percent_for(millivolts);
+    return percent < BATTERY_CHARGING_MAX_PERCENT ? percent : BATTERY_CHARGING_MAX_PERCENT;
 }
 
 void battery_display_init(BatteryDisplay *display)

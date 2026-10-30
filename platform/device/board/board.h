@@ -25,6 +25,7 @@ void board_input_start(void);
 void board_glyphs_start(void);
 void board_input_sample(uint32_t now_ms);
 BatteryGauge board_battery_gauge(void);
+void board_battery_restart(void);
 void board_systick_handler(const uint32_t *frame);
 void device_systick_entry(void);
 void board_stall_beat(void);

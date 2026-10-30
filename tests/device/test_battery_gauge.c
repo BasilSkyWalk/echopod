@@ -65,6 +65,44 @@ static void charging_reads_50_mv_lower(void)
     CHECK_EQUAL(50, battery_gauge_percent(&gauge, true));
 }
 
+static void charging_never_shows_full(void)
+{
+    BatteryGauge gauge;
+    battery_gauge_init(&gauge);
+    battery_gauge_add(&gauge, raw_for(4300));
+    CHECK_EQUAL(BATTERY_CHARGING_MAX_PERCENT, battery_gauge_percent(&gauge, true));
+    CHECK_EQUAL(100, battery_gauge_percent(&gauge, false));
+}
+
+static void a_restart_keeps_only_the_latest_reading(void)
+{
+    BatteryGauge gauge;
+    battery_gauge_init(&gauge);
+    for (int reading = 0; reading < BATTERY_GAUGE_READINGS + 3; reading++) {
+        battery_gauge_add(&gauge, raw_for(4200));
+    }
+    battery_gauge_add(&gauge, raw_for(3900));
+    battery_gauge_restart(&gauge);
+    CHECK(battery_gauge_known(&gauge));
+    CHECK(battery_gauge_millivolts(&gauge) >= 3895 && battery_gauge_millivolts(&gauge) <= 3905);
+    battery_gauge_add(&gauge, raw_for(3700));
+    CHECK(battery_gauge_millivolts(&gauge) >= 3795 && battery_gauge_millivolts(&gauge) <= 3805);
+}
+
+static void the_recent_level_follows_the_last_readings(void)
+{
+    BatteryGauge gauge;
+    battery_gauge_init(&gauge);
+    for (int reading = 0; reading < BATTERY_GAUGE_READINGS; reading++) {
+        battery_gauge_add(&gauge, raw_for(3800));
+    }
+    for (int reading = 0; reading < BATTERY_RECENT_READINGS; reading++) {
+        battery_gauge_add(&gauge, raw_for(3400));
+    }
+    CHECK(battery_gauge_recent_millivolts(&gauge) <= 3405);
+    CHECK(battery_gauge_millivolts(&gauge) > 3700);
+}
+
 static void the_average_spans_several_seconds_of_readings(void)
 {
     CHECK(BATTERY_GAUGE_READINGS >= 64);
@@ -143,6 +181,9 @@ int main(void)
         TEST_CASE(one_reading_gives_a_level),
         TEST_CASE(a_single_odd_reading_moves_the_level_only_a_little),
         TEST_CASE(charging_reads_50_mv_lower),
+        TEST_CASE(charging_never_shows_full),
+        TEST_CASE(a_restart_keeps_only_the_latest_reading),
+        TEST_CASE(the_recent_level_follows_the_last_readings),
         TEST_CASE(the_average_spans_several_seconds_of_readings),
         TEST_CASE(the_shown_percent_starts_at_the_first_level),
         TEST_CASE(a_one_point_wobble_keeps_the_shown_percent),

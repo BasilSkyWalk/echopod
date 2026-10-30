@@ -20,7 +20,7 @@
 static const GpioPin POWER_KEY = {2, 5};
 
 enum {
-    SCANS_PER_BATTERY_READING = 20,
+    SCANS_PER_BATTERY_READING = 200,
     BOOT_READING_WAIT_MS = 2
 };
 
@@ -84,6 +84,13 @@ void board_input_sample(uint32_t now_ms)
     scans++;
     battery_pending = scans % SCANS_PER_BATTERY_READING == 0;
     start_conversion(battery_pending ? ADC_BATTERY_CHANNEL : ADC_KEY_CHANNEL);
+}
+
+void board_battery_restart(void)
+{
+    uint32_t primask = irq_save();
+    battery_gauge_restart(&gauge);
+    irq_restore(primask);
 }
 
 BatteryGauge board_battery_gauge(void)

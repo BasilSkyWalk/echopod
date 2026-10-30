@@ -43,6 +43,8 @@ bool hal_power_take_usb_start(void)
     return started;
 }
 static BatteryDisplay display;
+static bool usb_seen;
+static bool usb_before;
 
 static bool charging_now(bool usb_power)
 {
@@ -56,8 +58,13 @@ static bool charging_now(bool usb_power)
 
 HalBattery hal_power_battery(void)
 {
-    BatteryGauge gauge = board_battery_gauge();
     bool usb_power = usb_vbus_present();
+    if (usb_seen && usb_power != usb_before) {
+        board_battery_restart();
+    }
+    usb_seen = true;
+    usb_before = usb_power;
+    BatteryGauge gauge = board_battery_gauge();
     bool charging = charging_now(usb_power);
     if (!battery_gauge_known(&gauge)) {
         return (HalBattery){.known = false, .usb_power = usb_power, .charging = charging};
@@ -67,7 +74,7 @@ HalBattery hal_power_battery(void)
                             &display, battery_gauge_percent(&gauge, charging), usb_power),
                         .charging = charging,
                         .usb_power = usb_power,
-                        .millivolts = (uint16_t)battery_gauge_millivolts(&gauge)};
+                        .millivolts = (uint16_t)battery_gauge_recent_millivolts(&gauge)};
 }
 
 void board_power_cut(void)
