@@ -4,6 +4,7 @@
 
 ### New
 
+- **Albums stay together when some tracks feature another artist.** When files have no album-artist tag, a track by "The Weeknd & Justice" used to split off from the rest of "Hurry Up Tomorrow" by The Weeknd. Tracks without that tag that share a folder and album name are now one album, under the artist most of them share. Rescan the library (Settings → Rescan library) or run echo-sync again to see it.
 - **Random album.** Cover Flow starts with a Random album tile (a shuffle mark as its cover), just before the first album. Press Play on it to hear a random album from its first track, in order.
 
 ### Fixed
