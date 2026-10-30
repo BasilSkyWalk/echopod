@@ -1,5 +1,23 @@
 # EchoPod release notes
 
+## 0.5.0
+
+### New
+
+- **Bluetooth headphones.** Settings → Bluetooth turns Bluetooth on, pairs headphones (Pair new device) and lists up to six you've used, most recent first. With Bluetooth on, the player connects to your last headphones by itself at start-up and when they come back, and resets and retries a connection that stalls. Press Play on the connected headphones to disconnect them, on others to switch. Music goes to the headphones whenever nothing is in either jack; their pause, play, next, previous and in-ear detection work, and a dropped connection pauses playback. A Bluetooth mark next to the play icon shows Bluetooth on (dim) or connected (bright). With nothing connected for 5 minutes, Bluetooth switches itself off until you open its screen or restart. Tested on the player with OnePlus Buds 3.
+- **Charge screen.** Switching off with a cable plugged in, or plugging a charger into a switched-off player, now shows the battery level and "Charging" or "Charged" (the screen goes dark after 5 seconds; any button lights it). Hold Power to turn the player on, or unplug to switch it off.
+
+### Fixed
+
+- **Switching off on a cable.** Holding Power with a charger or computer plugged in left the screen black and the player unresponsive until the reset button: the cable kept it powered. It now shows the charge screen.
+- **Battery percent** ([#4](https://github.com/BasilSkyWalk/echopod/issues/4)). The level dropped a few points whenever playback or the screen briefly loaded the battery, and could show 98 % on the charger when the battery held less, which then looked like drain while off. It now averages about a minute of readings, never shows more than 99 % while charging, and settles to the true level within a minute of unplugging.
+- **Start-up.** The screen stays dark until EchoPod's first frame, so the panel's noise no longer flashes in the corner.
+- **Dark screen during USB.** A message shown with the screen off (such as "Computer found") could stay almost black for the whole USB session; it now lights fully.
+
+### Known limits
+
+- To switch from Bluetooth to wired headphones, pause, plug them in and press Play: while music goes to Bluetooth the player can't read the jack.
+
 ## 0.4.0
 
 ### New
