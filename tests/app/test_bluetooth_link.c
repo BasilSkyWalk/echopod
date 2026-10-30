@@ -408,6 +408,49 @@ static void browsing_searches_for_devices(void)
     CHECK(summary_is("Searching…"));
 }
 
+static void a_search_that_finds_remembered_headphones_connects_them(void)
+{
+    fresh();
+    BluetoothSaved two = {.enabled = true, .count = 2, .devices = {SPEAKER, BUDS}};
+    bluetooth_store_save(&two);
+    start();
+    bluetooth_link_browse(&link, true, START_MS);
+    ready();
+    step(START_MS + 100);
+    CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
+    step(START_MS + 200);
+    CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
+    fake_hal_bluetooth()->devices[0] = BUDS;
+    fake_hal_bluetooth()->device_count = 1;
+    ready();
+    step(START_MS + 300);
+    CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
+    CHECK(strcmp("Buds", fake_hal_bluetooth_connect_target()->name) == 0);
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
+    ready();
+    step(START_MS + 400);
+    CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
+}
+
+static void after_pair_new_device_remembered_headphones_only_show_as_nearby(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    connect_to(&BUDS);
+    step(START_MS + 100);
+    bluetooth_link_search(&link, START_MS + 200);
+    ready();
+    step(START_MS + 300);
+    fake_hal_bluetooth()->devices[0] = BUDS;
+    fake_hal_bluetooth()->device_count = 1;
+    ready();
+    step(START_MS + 400);
+    CHECK_EQUAL(0, fake_hal_bluetooth_connect_count());
+    CHECK(bluetooth_link_nearby(&link, 0));
+}
+
 static void pairing_connects_the_chosen_device(void)
 {
     fresh();
@@ -542,6 +585,8 @@ int main(void)
         TEST_CASE(browsing_wakes_a_dozing_module),
         TEST_CASE(browsing_searches_for_devices),
         TEST_CASE(pairing_connects_the_chosen_device),
+        TEST_CASE(a_search_that_finds_remembered_headphones_connects_them),
+        TEST_CASE(after_pair_new_device_remembered_headphones_only_show_as_nearby),
         TEST_CASE(devices_are_remembered_most_recent_first),
         TEST_CASE(choosing_the_connected_device_disconnects_and_stays_off),
         TEST_CASE(choosing_another_device_switches_to_it),

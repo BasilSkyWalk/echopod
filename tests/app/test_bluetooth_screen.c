@@ -114,7 +114,7 @@ static void found_devices_are_listed_below_the_saved_one(void)
     screen->update(screen->context, START_MS + 100);
     CHECK_EQUAL(4, bluetooth_screen_row_count(&bluetooth));
     CHECK(row_is(0, "Bluetooth", "On"));
-    CHECK(row_is(1, "OnePlus Buds 3", ""));
+    CHECK(row_is(1, "OnePlus Buds 3", "Nearby"));
     CHECK(row_is(2, "Pair new device", "Searching…"));
     CHECK(row_is(3, "Kitchen", ""));
 }

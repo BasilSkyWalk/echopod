@@ -273,6 +273,25 @@ static void attempt(BluetoothLink *link, const HalBluetoothDevice *device, uint3
     hal_bluetooth_connect(&link->target);
 }
 
+static void start_scan(BluetoothLink *link)
+{
+    link->search_now = false;
+    link->searched = true;
+    link->scan_tried = false;
+    hal_bluetooth_scan();
+}
+
+static int found_known(const BluetoothLink *link, const HalBluetoothStatus *status)
+{
+    for (uint8_t index = 0; index < status->device_count; index++) {
+        int known = find_known(link, &status->devices[index]);
+        if (known >= 0) {
+            return known;
+        }
+    }
+    return -1;
+}
+
 static bool wait_for_link(BluetoothLink *link, const HalBluetoothStatus *status, uint32_t now_ms)
 {
     if (status->pairing != HAL_BLUETOOTH_PAIRED) {
@@ -305,20 +324,21 @@ static void find_device(BluetoothLink *link, const HalBluetoothStatus *status, u
     }
     link->attempting = false;
     if (link->search_now) {
-        link->search_now = false;
-        link->searched = true;
-        hal_bluetooth_scan();
+        start_scan(link);
+        return;
+    }
+    int found = found_known(link, status);
+    if (found >= 0 && !link->held && !link->scan_tried) {
+        link->scan_tried = true;
+        attempt(link, &link->saved.devices[found], now_ms);
         return;
     }
     const HalBluetoothDevice *device = next_target(link);
     bool due = now_ms - link->retried_ms >= BLUETOOTH_LINK_RETRY_MS;
     if (device != NULL && due && (link->has_target || !link->browsing || link->searched)) {
         attempt(link, device, now_ms);
-    } else if (link->browsing && !link->searched) {
-        link->searched = true;
-        hal_bluetooth_scan();
-    } else if (link->browsing && device == NULL) {
-        hal_bluetooth_scan();
+    } else if (link->browsing && (!link->searched || device == NULL)) {
+        start_scan(link);
     }
 }
 
@@ -427,6 +447,20 @@ BluetoothDeviceState bluetooth_link_device_state(const BluetoothLink *link, int 
 bool bluetooth_link_knows(const BluetoothLink *link, const HalBluetoothDevice *device)
 {
     return find_known(link, device) >= 0;
+}
+
+bool bluetooth_link_nearby(const BluetoothLink *link, int index)
+{
+    const HalBluetoothStatus *status = hal_bluetooth_status();
+    if (index < 0 || index >= link->saved.count || link->connected) {
+        return false;
+    }
+    for (uint8_t found = 0; found < status->device_count; found++) {
+        if (same_address(&status->devices[found], &link->saved.devices[index])) {
+            return true;
+        }
+    }
+    return false;
 }
 
 const char *bluetooth_link_summary(const BluetoothLink *link)

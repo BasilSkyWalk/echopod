@@ -98,7 +98,7 @@ static const char *known_value(const BluetoothScreen *bluetooth, int index)
     case BLUETOOTH_DEVICE_CONNECTING:
         return "Connecting…";
     default:
-        return NULL;
+        return bluetooth_link_nearby(bluetooth->link, index) ? "Nearby" : NULL;
     }
 }
 

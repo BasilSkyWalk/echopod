@@ -39,6 +39,7 @@ typedef struct BluetoothLink {
     bool attempting;
     bool has_target;
     bool paired_seen;
+    bool scan_tried;
     bool buds_paused;
     HalBluetoothDevice target;
     HalBluetoothDevice linked;
@@ -61,4 +62,5 @@ void bluetooth_link_sleep(BluetoothLink *link);
 void bluetooth_link_step(BluetoothLink *link, Player *player, uint32_t now_ms);
 BluetoothDeviceState bluetooth_link_device_state(const BluetoothLink *link, int index);
 bool bluetooth_link_knows(const BluetoothLink *link, const HalBluetoothDevice *device);
+bool bluetooth_link_nearby(const BluetoothLink *link, int index);
 const char *bluetooth_link_summary(const BluetoothLink *link);
