@@ -139,6 +139,7 @@ static void make_track(RandomLibrary *library, Random *random, uint32_t index, u
     char path[TEXT_CAPACITY * 3];
     artist_name(random, artist, artist_text, sizeof artist_text);
     bool compilation = below(random, 12) == 0;
+    bool guessed = below(random, 3) == 0;
     snprintf(album_artist_text, sizeof album_artist_text, "%s",
              compilation ? "Various Artists" : artist_text);
     Random album_random = {.state = (artist + 1) * 40503u + album * 7919u + 17u};
@@ -172,7 +173,8 @@ static void make_track(RandomLibrary *library, Random *random, uint32_t index, u
     track->path = keep(library, path);
     track->title = keep(library, title_text);
     track->artist = keep(library, artist_text);
-    track->album_artist = keep(library, album_artist_text);
+    track->album_artist = keep(library, guessed ? artist_text : album_artist_text);
+    track->album_artist_guessed = guessed;
     track->album = keep(library, album_text);
     track->genre = keep(library, GENRES[below(random, sizeof GENRES / sizeof GENRES[0])]);
     track->year = below(random, 8) == 0 ? 0 : (uint16_t)(1960 + below(&album_random, 66));

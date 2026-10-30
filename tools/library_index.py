@@ -5,7 +5,7 @@ import struct
 import sys
 import unicodedata
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
 MAGIC = b"EMDB"
@@ -51,6 +51,7 @@ class TrackInfo:
     disc: int
     number: int
     duration_ms: int
+    album_artist_guessed: bool = False
 
 
 @dataclass
@@ -168,6 +169,7 @@ def track_from_tags(relative_path, tags, duration_seconds):
         disc=min(parse_number(first_tag(tags, "discnumber")) or file_disc or 1, MAX_U8),
         number=min(parse_number(first_tag(tags, "tracknumber")) or file_number, MAX_U8),
         duration_ms=min(round(duration_seconds * 1000), MAX_U32),
+        album_artist_guessed=not album_artist,
     )
 
 
@@ -442,7 +444,25 @@ def name_index(track_infos, name_of):
     return NameIndex((spoken_of(track), name_of(track)) for track in track_infos)
 
 
+def guess_album_artists(track_infos):
+    groups = {}
+    for index, track in enumerate(track_infos):
+        if track.album_artist_guessed:
+            folder = str(PurePosixPath(track.path).parent)
+            groups.setdefault((folder, sort_key(track.album)), []).append(index)
+    guessed = list(track_infos)
+    for members in groups.values():
+        votes = Counter(sort_key(track_infos[index].artist) for index in members)
+        best = min(votes, key=lambda key: (-votes[key], key))
+        first = next(index for index in members if sort_key(track_infos[index].artist) == best)
+        for index in members:
+            guessed[index] = replace(track_infos[index], album_artist=track_infos[first].artist,
+                                     album_artist_guessed=False)
+    return guessed
+
+
 def build_library(track_infos, raw_playlists=()):
+    track_infos = guess_album_artists(track_infos)
     album_artists = name_index(track_infos, lambda track: track.album_artist)
     artists = name_index(track_infos, lambda track: track.artist)
     genres = name_index(track_infos, lambda track: track.genre)

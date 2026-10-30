@@ -144,6 +144,48 @@ class BuildLibraryTest(unittest.TestCase):
                          [self.library.tracks[index].title for index in homogenic.tracks])
 
 
+def guessed_track(path, artist, album):
+    return library_index.TrackInfo(path=path, title="Song", artist=artist, album_artist=artist,
+                                   album=album, genre="Pop", year=2025, disc=1, number=1,
+                                   duration_ms=1000, album_artist_guessed=True)
+
+
+class GuessedAlbumArtistTest(unittest.TestCase):
+    def album_artists_of(self, tracks):
+        library = library_index.build_library(tracks)
+        return [(album.title, library.album_artists[album.album_artist].name, album.track_count)
+                for album in library.albums]
+
+    def test_a_missing_album_artist_tag_is_marked(self):
+        untagged = library_index.track_from_tags("a/b/c.flac", {"artist": ["Y"]}, 1)
+        tagged = library_index.track_from_tags("a/b/c.flac", {"albumartist": ["X"]}, 1)
+        self.assertTrue(untagged.album_artist_guessed)
+        self.assertFalse(tagged.album_artist_guessed)
+
+    def test_a_featured_artist_stays_with_the_album(self):
+        albums = self.album_artists_of([
+            guessed_track("W/Hurry Up Tomorrow/01.flac", "The Weeknd & Justice",
+                          "Hurry Up Tomorrow"),
+            guessed_track("W/Hurry Up Tomorrow/02.flac", "The Weeknd", "Hurry Up Tomorrow"),
+            guessed_track("W/Hurry Up Tomorrow/03.flac", "The Weeknd", "Hurry Up Tomorrow"),
+        ])
+        self.assertEqual([("Hurry Up Tomorrow", "The Weeknd", 3)], albums)
+
+    def test_a_tie_goes_to_the_artist_first_in_order(self):
+        albums = self.album_artists_of([
+            guessed_track("D/Split/01.flac", "Second", "Split"),
+            guessed_track("D/Split/02.flac", "First", "Split"),
+        ])
+        self.assertEqual([("Split", "First", 2)], albums)
+
+    def test_other_folders_keep_their_albums(self):
+        albums = self.album_artists_of([
+            guessed_track("A/Same Name/01.flac", "Alpha", "Same Name"),
+            guessed_track("B/Same Name/01.flac", "Beta", "Same Name"),
+        ])
+        self.assertEqual(2, len(albums))
+
+
 def spoken_test_track(path, title, artist, album):
     return library_index.TrackInfo(path=path, title=title, artist=artist, album_artist=artist,
                                    album=album, genre="Rock", year=0, disc=1, number=1,
