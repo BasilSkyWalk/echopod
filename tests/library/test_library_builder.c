@@ -3,8 +3,10 @@
 #include <string.h>
 
 #include "check.h"
+#include "library/library.h"
 #include "library/library_builder.h"
 #include "library_compare.h"
+#include "memory_source.h"
 #include "random_library.h"
 #include "reference_builder.h"
 
@@ -214,6 +216,7 @@ static BuilderTrack parse_track(char **cursor)
     parsed.disc = (uint8_t)atoi(next_field(cursor));
     parsed.number = (uint8_t)atoi(next_field(cursor));
     parsed.duration_ms = (uint32_t)strtoul(next_field(cursor), NULL, 10);
+    parsed.album_artist_guessed = false;
     return parsed;
 }
 
@@ -290,7 +293,8 @@ static ReferenceTrack reference_track(const BuilderTrack *track)
                             .year = track->year,
                             .disc = track->disc,
                             .number = track->number,
-                            .duration_ms = track->duration_ms};
+                            .duration_ms = track->duration_ms,
+                            .album_artist_guessed = track->album_artist_guessed};
 }
 
 static void build_reference(const RandomLibrary *library, Built *built)
@@ -473,6 +477,92 @@ static void an_empty_library_still_writes_a_valid_header(void)
     free(built.output.bytes);
 }
 
+static BuilderTrack guessed(const char *path, const char *artist, const char *album, uint8_t number)
+{
+    BuilderTrack added = track(path, "Song", artist, artist, album, "Pop", 2025, number);
+    added.album_artist_guessed = true;
+    return added;
+}
+
+typedef struct Opened {
+    Built built;
+    MemorySource memory;
+    Library library;
+} Opened;
+
+static void build_tracks(const BuilderTrack *tracks, size_t count, Opened *opened)
+{
+    LibraryBuilder builder;
+    start(&builder);
+    for (size_t index = 0; index < count; index++) {
+        CHECK_EQUAL(BUILDER_OK, library_builder_add_track(&builder, &tracks[index]));
+    }
+    finish(&builder, &opened->built);
+    CHECK_EQUAL(BUILDER_OK, opened->built.result);
+    opened->memory =
+        (MemorySource){.bytes = opened->built.output.bytes, .size = opened->built.length};
+    CHECK_EQUAL(LIBRARY_OK, library_open(&opened->library, memory_source(&opened->memory),
+                                         opened->built.length));
+}
+
+static bool album_is(const Opened *opened, uint32_t index, const char *artist, uint16_t tracks)
+{
+    LibraryAlbum album;
+    LibraryGroup group;
+    char name[64];
+    return library_read_album(&opened->library, index, &album) &&
+           library_read_group(&opened->library, LIBRARY_ALBUM_ARTISTS, album.album_artist,
+                              &group) &&
+           library_read_string(&opened->library, group.name, name, sizeof name) &&
+           strcmp(artist, name) == 0 && album.track_count == tracks;
+}
+
+static void a_featured_artist_stays_with_the_album(void)
+{
+    const BuilderTrack tracks[] = {
+        guessed("The Weeknd/Hurry Up Tomorrow/01.flac", "The Weeknd & Justice", "Hurry Up Tomorrow",
+                1),
+        guessed("The Weeknd/Hurry Up Tomorrow/02.flac", "The Weeknd", "Hurry Up Tomorrow", 2),
+        guessed("The Weeknd/Hurry Up Tomorrow/03.flac", "The Weeknd", "Hurry Up Tomorrow", 3),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    CHECK_EQUAL(1, library_count(&opened.library, LIBRARY_ALBUMS));
+    CHECK(album_is(&opened, 0, "The Weeknd", 3));
+    CHECK_EQUAL(1, library_count(&opened.library, LIBRARY_ALBUM_ARTISTS));
+    CHECK_EQUAL(2, library_count(&opened.library, LIBRARY_ARTISTS));
+    free(opened.built.output.bytes);
+}
+
+static void a_tie_goes_to_the_artist_first_in_order(void)
+{
+    const BuilderTrack tracks[] = {
+        guessed("Duo/Split/01.flac", "Second", "Split", 1),
+        guessed("Duo/Split/02.flac", "First", "Split", 2),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    CHECK_EQUAL(1, library_count(&opened.library, LIBRARY_ALBUMS));
+    CHECK(album_is(&opened, 0, "First", 2));
+    free(opened.built.output.bytes);
+}
+
+static void tagged_album_artists_and_other_folders_keep_their_albums(void)
+{
+    const BuilderTrack tracks[] = {
+        guessed("A/Same Name/01.flac", "Alpha", "Same Name", 1),
+        guessed("B/Same Name/01.flac", "Beta", "Same Name", 1),
+        track("C/Mix/01.flac", "One", "Gamma", "Various Artists", "Mix", "Pop", 2025, 1),
+        guessed("C/Mix/02.flac", "Delta", "Mix", 2),
+        guessed("D/Discs/CD1/01.flac", "Echo", "Discs", 1),
+        guessed("D/Discs/CD2/01.flac", "Echo", "Discs", 1),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    CHECK_EQUAL(5, library_count(&opened.library, LIBRARY_ALBUMS));
+    free(opened.built.output.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -488,6 +578,9 @@ int main(void)
         TEST_CASE(the_65536th_track_is_too_many),
         TEST_CASE(a_library_bigger_than_its_room_writes_nothing),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
+        TEST_CASE(a_featured_artist_stays_with_the_album),
+        TEST_CASE(a_tie_goes_to_the_artist_first_in_order),
+        TEST_CASE(tagged_album_artists_and_other_folders_keep_their_albums),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     free(scratch_of_size(1)->bytes);

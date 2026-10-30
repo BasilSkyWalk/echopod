@@ -57,18 +57,18 @@ static void fail(const char *what)
 
 static const BuilderTrack TRACKS[] = {
     {SPOKEN_CHAPTER_ONE_PATH, "Arrival", "Reader", "Author", "Book One", "Audiobook", 2020, 1, 1,
-     SPOKEN_CHAPTER_MS},
+     SPOKEN_CHAPTER_MS, false},
     {SPOKEN_CHAPTER_TWO_PATH, "The Road", "Reader", "Author", "Book One", "Audiobook", 2020, 1, 2,
-     SPOKEN_CHAPTER_MS},
+     SPOKEN_CHAPTER_MS, false},
     {SPOKEN_CHAPTER_THREE_PATH, "Home", "Reader", "Author", "Book One", "Audiobook", 2020, 1, 3,
-     SPOKEN_CHAPTER_MS},
+     SPOKEN_CHAPTER_MS, false},
     {SPOKEN_SINGLE_BOOK_PATH, "Single Book", "Reader", "Writer", "Single Book", "Audiobook", 2019,
-     1, 0, SPOKEN_CHAPTER_MS},
-    {SPOKEN_SONG_PATH, "Song", "Band", "Band", "Record", "Rock", 2001, 1, 1, SPOKEN_SONG_MS},
+     1, 0, SPOKEN_CHAPTER_MS, false},
+    {SPOKEN_SONG_PATH, "Song", "Band", "Band", "Record", "Rock", 2001, 1, 1, SPOKEN_SONG_MS, false},
     {SPOKEN_EPISODE_A_PATH, "Episode A", "Host", "Host", "Show", "Podcast", 2024, 1, 0,
-     SPOKEN_EPISODE_MS},
+     SPOKEN_EPISODE_MS, false},
     {SPOKEN_EPISODE_B_PATH, "Episode B", "Host", "Host", "Show", "Podcast", 2024, 1, 0,
-     SPOKEN_EPISODE_MS},
+     SPOKEN_EPISODE_MS, false},
 };
 
 static void check_step(BuilderResult result, const char *step)

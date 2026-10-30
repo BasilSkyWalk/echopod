@@ -170,6 +170,7 @@ static void fill_names(const TrackTags *tags, BuilderTrack *track)
     const char *album_artist = tags->text[TAG_ALBUM_ARTIST];
     track->artist = chosen(artist, chosen(album_artist, UNKNOWN_ARTIST));
     track->album_artist = chosen(album_artist, chosen(artist, UNKNOWN_ARTIST));
+    track->album_artist_guessed = album_artist[0] == 0;
     track->genre = chosen(tags->text[TAG_GENRE], UNKNOWN_GENRE);
 }
 

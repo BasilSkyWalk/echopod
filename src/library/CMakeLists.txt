@@ -19,6 +19,7 @@ add_library(echo_library_scan STATIC
     builder_store.c
     cover_build.c
     library_builder.c
+    library_builder_albums.c
     library_builder_encode.c
     library_builder_model.c
     library_builder_paths.c

@@ -14,6 +14,7 @@ typedef struct ReferenceTrack {
     uint8_t disc;
     uint8_t number;
     uint32_t duration_ms;
+    bool album_artist_guessed;
 } ReferenceTrack;
 
 typedef struct ReferenceSink {

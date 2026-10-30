@@ -83,6 +83,7 @@ typedef struct TrackRow {
     uint8_t disc;
     uint8_t number;
     uint8_t spoken;
+    uint8_t guessed;
     uint32_t duration_ms;
 } TrackRow;
 
@@ -238,6 +239,7 @@ void builder_row_encode(const TrackRow *row, uint8_t *bytes);
 void builder_folder_decode(const uint8_t *bytes, FolderRow *row);
 void builder_folder_encode(const FolderRow *row, uint8_t *bytes);
 
+bool builder_guess_album_artists(BuilderState *state, Prepared *prepared);
 bool builder_rank(BuilderState *state, Prepared *prepared);
 bool builder_model(BuilderState *state, Prepared *prepared);
 bool builder_index_paths(BuilderState *state, Prepared *prepared);

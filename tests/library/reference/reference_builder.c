@@ -222,6 +222,7 @@ ReferenceResult reference_builder_add_track(ReferenceBuilder *builder, const Ref
     TrackRecord record = {.year = track->year,
                           .disc = track->disc,
                           .number = track->number,
+                          .guessed = track->album_artist_guessed ? 1 : 0,
                           .duration_ms = track->duration_ms};
     ReferenceResult result = place_path(builder, track->path, &record);
     if (result == REFERENCE_OK) {
@@ -359,6 +360,60 @@ static bool reserve_playlists(const ReferenceBuilder *builder, Work *work, Libra
     return !work->failed;
 }
 
+static bool same_guessed_album(const ReferenceBuilder *builder, const TrackRecord *first,
+                               const TrackRecord *other)
+{
+    return other->guessed && other->folder == first->folder &&
+           reference_compare_keys(builder, other->album, first->album) == 0;
+}
+
+static uint32_t artist_votes(const ReferenceBuilder *builder, uint32_t first, uint32_t candidate)
+{
+    const TrackRecord *album = reference_track(builder, first);
+    const TrackRecord *artist = reference_track(builder, candidate);
+    uint32_t votes = 0;
+    for (uint32_t index = first; index < builder->track_count; index++) {
+        const TrackRecord *member = reference_track(builder, index);
+        if (same_guessed_album(builder, album, member) &&
+            reference_compare_keys(builder, member->artist, artist->artist) == 0) {
+            votes++;
+        }
+    }
+    return votes;
+}
+
+static void guess_album_artists(ReferenceBuilder *builder)
+{
+    for (uint32_t first = 0; first < builder->track_count; first++) {
+        TrackRecord *album = reference_track(builder, first);
+        if (!album->guessed) {
+            continue;
+        }
+        uint32_t best = album->artist;
+        uint32_t best_votes = 0;
+        for (uint32_t index = first; index < builder->track_count; index++) {
+            const TrackRecord *member = reference_track(builder, index);
+            if (!same_guessed_album(builder, album, member)) {
+                continue;
+            }
+            uint32_t votes = artist_votes(builder, first, index);
+            bool earlier = reference_compare_keys(builder, member->artist, best) < 0;
+            if (votes > best_votes || (votes == best_votes && earlier)) {
+                best_votes = votes;
+                best = member->artist;
+            }
+        }
+        TrackRecord pattern = *album;
+        for (uint32_t index = first; index < builder->track_count; index++) {
+            TrackRecord *member = reference_track(builder, index);
+            if (same_guessed_album(builder, &pattern, member)) {
+                member->album_artist = best;
+                member->guessed = 0;
+            }
+        }
+    }
+}
+
 ReferenceResult reference_builder_prepare(ReferenceBuilder *builder)
 {
     if (builder->prepared) {
@@ -369,6 +424,7 @@ ReferenceResult reference_builder_prepare(ReferenceBuilder *builder)
     if (builder->empty_string == REFERENCE_UNSET) {
         return builder->prepare_result;
     }
+    guess_album_artists(builder);
     builder->work_start = (tracks_end(builder) + 7) & ~7u;
     builder->work_used = 0;
     builder->work_top = builder->strings_floor > builder->work_start

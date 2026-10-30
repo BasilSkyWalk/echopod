@@ -307,6 +307,7 @@ BuilderResult library_builder_add_track(LibraryBuilder *builder, const BuilderTr
                     .disc = track->disc,
                     .number = track->number,
                     .spoken = spoken_kind_of(track->path) != SPOKEN_NONE,
+                    .guessed = track->album_artist_guessed ? 1 : 0,
                     .duration_ms = track->duration_ms};
     const char *texts[BUILDER_FIELDS - 1] = {track->title, track->artist, track->album_artist,
                                              track->album, track->genre};
@@ -385,8 +386,9 @@ BuilderResult library_builder_prepare(LibraryBuilder *builder)
     Prepared *prepared = arena_take(&state->arena, (uint32_t)sizeof(Prepared));
     state->prepared = prepared;
     ready = ready && prepared != NULL && open_caches(state, prepared) &&
-            builder_rank(state, prepared) && builder_model(state, prepared) &&
-            open_playlists(state, prepared) && builder_index_paths(state, prepared);
+            builder_guess_album_artists(state, prepared) && builder_rank(state, prepared) &&
+            builder_model(state, prepared) && open_playlists(state, prepared) &&
+            builder_index_paths(state, prepared);
     state->prepare_result = outcome(state);
     if (!ready && state->prepare_result == BUILDER_OK) {
         state->prepare_result = BUILDER_OUT_OF_MEMORY;
