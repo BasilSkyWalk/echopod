@@ -36,7 +36,12 @@ static void enter_state(HalBluetoothState state)
 
 void hal_bluetooth_set_power(bool on)
 {
+    HalBluetoothDevice devices[HAL_BLUETOOTH_DEVICE_CAPACITY];
+    uint8_t count = bluetooth.status.device_count;
+    memcpy(devices, bluetooth.status.devices, sizeof devices);
     bluetooth = (SimBluetooth){0};
+    memcpy(bluetooth.status.devices, devices, sizeof devices);
+    bluetooth.status.device_count = count;
     enter_state(on ? HAL_BLUETOOTH_STARTING : HAL_BLUETOOTH_OFF);
 }
 

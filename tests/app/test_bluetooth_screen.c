@@ -232,6 +232,43 @@ static void details_show_the_link(void)
     CHECK(line_is(1, "Ready · v5"));
     CHECK(line_is(2, "RX 123 · 9 frames · OE 2 · FIFO 7/16"));
     CHECK(line_is(3, "Msgs CC."));
+    CHECK(line_is(4, ""));
+}
+
+static void details_spread_a_long_message_log_over_two_lines(void)
+{
+    static const char LETTERS[] = "VSKQLHTSPQOX";
+    Screen *screen = open_screen(true, NULL, true);
+    HalBluetoothStatus *status = fake_hal_bluetooth();
+    for (int index = 0; index < HAL_BLUETOOTH_EVENT_CAPACITY; index++) {
+        status->link.events[index][0] = index % 3 == 0 ? '>' : 'C';
+        status->link.events[index][1] = LETTERS[index];
+        status->link.gaps[index] = (uint8_t)index;
+    }
+    status->link.event_count = HAL_BLUETOOTH_EVENT_CAPACITY;
+    screen->update(screen->context, START_MS + 100);
+    CHECK(line_is(3, "Msgs >V CCS+1 CCK+2 >Q+3 CCL+4 CCH+5"));
+    CHECK(line_is(4, " >T+6 CCS+7 CCP+8 >Q+9 CCO+10 CCX+11"));
+}
+
+static void pair_new_device_shows_searching_while_the_module_restarts(void)
+{
+    Screen *screen = open_screen(true, &BUDS, false);
+    fake_hal_bluetooth()->state = HAL_BLUETOOTH_READY;
+    step_link(START_MS + 100);
+    CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
+    step_link(START_MS + 200);
+    CHECK(!fake_hal_bluetooth_powered());
+    screen->update(screen->context, START_MS + 200);
+    CHECK(row_is(1, "OnePlus Buds 3", ""));
+    CHECK(row_is(2, "Pair new device", "Searching…"));
+    CHECK(strcmp("Searching…", bluetooth_screen_summary(&bluetooth)) == 0);
+    step_link(START_MS + 200 + BLUETOOTH_LINK_RESTART_MS);
+    CHECK(fake_hal_bluetooth_powered());
+    screen->update(screen->context, START_MS + 200 + BLUETOOTH_LINK_RESTART_MS);
+    CHECK(row_is(1, "OnePlus Buds 3", ""));
+    CHECK(row_is(2, "Pair new device", "Searching…"));
 }
 
 static void the_settings_row_summarises_the_link(void)
@@ -282,6 +319,8 @@ int main(void)
         TEST_CASE(play_on_a_disconnected_saved_device_reconnects),
         TEST_CASE(leaving_keeps_the_module_on_and_stops_browsing),
         TEST_CASE(details_show_the_link),
+        TEST_CASE(details_spread_a_long_message_log_over_two_lines),
+        TEST_CASE(pair_new_device_shows_searching_while_the_module_restarts),
         TEST_CASE(the_settings_row_summarises_the_link),
         TEST_CASE(a_connection_is_saved_once),
         TEST_CASE(a_damaged_store_is_ignored),

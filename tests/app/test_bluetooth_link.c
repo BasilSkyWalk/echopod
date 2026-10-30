@@ -180,6 +180,22 @@ static void a_stalled_pairing_is_reset_and_tried_again(void)
     CHECK(strcmp("Buds", fake_hal_bluetooth_connect_target()->name) == 0);
 }
 
+static void restart_for_search(uint32_t failed_ms)
+{
+    step(failed_ms);
+    CHECK(!fake_hal_bluetooth_powered());
+    CHECK(summary_is("Searching…"));
+    step(failed_ms + BLUETOOTH_LINK_RESTART_MS - 1);
+    CHECK(!fake_hal_bluetooth_powered());
+    step(failed_ms + BLUETOOTH_LINK_RESTART_MS);
+    CHECK(fake_hal_bluetooth_powered());
+    CHECK_EQUAL(HAL_BLUETOOTH_STARTING, fake_hal_bluetooth()->state);
+    CHECK(summary_is("Searching…"));
+    CHECK_EQUAL(BLUETOOTH_DEVICE_IDLE, bluetooth_link_device_state(&link, 0));
+    ready();
+    step(failed_ms + BLUETOOTH_LINK_RESTART_MS + 100);
+}
+
 static void a_search_and_a_reconnect_take_turns(void)
 {
     fresh();
@@ -190,7 +206,7 @@ static void a_search_and_a_reconnect_take_turns(void)
     step(START_MS + 100);
     CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
     fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
-    step(START_MS + 200);
+    restart_for_search(START_MS + 200);
     CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
     CHECK_EQUAL(HAL_BLUETOOTH_SCANNING, fake_hal_bluetooth()->state);
     step(START_MS + 100 + 2 * BLUETOOTH_LINK_RETRY_MS);
@@ -200,6 +216,96 @@ static void a_search_and_a_reconnect_take_turns(void)
     step(START_MS + 100 + 2 * BLUETOOTH_LINK_RETRY_MS + 100);
     CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
     CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
+}
+
+static void the_first_search_after_power_on_needs_no_restart(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    bluetooth_link_browse(&link, true, START_MS);
+    bluetooth_link_search(&link, START_MS + 50);
+    ready();
+    step(START_MS + 100);
+    CHECK(fake_hal_bluetooth_powered());
+    CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
+    CHECK_EQUAL(0, fake_hal_bluetooth_connect_count());
+}
+
+static void pair_new_device_after_a_connect_attempt_restarts_the_module(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    ready();
+    step(START_MS + 100);
+    CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
+    fake_hal_bluetooth()->state = HAL_BLUETOOTH_CONNECTING;
+    step(START_MS + 200);
+    bluetooth_link_search(&link, START_MS + 300);
+    CHECK_EQUAL(1, fake_hal_bluetooth_disconnect_count());
+    ready();
+    restart_for_search(START_MS + 400);
+    CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
+    CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
+}
+
+static void a_device_chosen_during_a_restart_connects_once_the_module_is_ready(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    bluetooth_link_browse(&link, true, START_MS);
+    ready();
+    step(START_MS + 100);
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
+    step(START_MS + 200);
+    CHECK(!fake_hal_bluetooth_powered());
+    bluetooth_link_pair(&link, &SPEAKER, START_MS + 300);
+    CHECK(summary_is("Connecting…"));
+    step(START_MS + 200 + BLUETOOTH_LINK_RESTART_MS);
+    ready();
+    step(START_MS + 300 + BLUETOOTH_LINK_RESTART_MS);
+    CHECK_EQUAL(0, fake_hal_bluetooth_scan_count());
+    CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
+    CHECK(strcmp("Speaker", fake_hal_bluetooth_connect_target()->name) == 0);
+}
+
+static void leaving_the_screen_during_a_restart_drops_the_search(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    bluetooth_link_browse(&link, true, START_MS);
+    ready();
+    step(START_MS + 100);
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
+    step(START_MS + 200);
+    CHECK(!fake_hal_bluetooth_powered());
+    bluetooth_link_browse(&link, false, START_MS + 300);
+    step(START_MS + 200 + BLUETOOTH_LINK_RESTART_MS);
+    CHECK(fake_hal_bluetooth_powered());
+    ready();
+    step(START_MS + 300 + BLUETOOTH_LINK_RESTART_MS);
+    CHECK_EQUAL(0, fake_hal_bluetooth_scan_count());
+    step(START_MS + 100 + BLUETOOTH_LINK_RETRY_MS);
+    CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
+}
+
+static void turning_bluetooth_off_during_a_restart_keeps_it_off(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    bluetooth_link_browse(&link, true, START_MS);
+    ready();
+    step(START_MS + 100);
+    fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
+    step(START_MS + 200);
+    bluetooth_link_set_enabled(&link, false, START_MS + 300);
+    step(START_MS + 300 + BLUETOOTH_LINK_RESTART_MS);
+    CHECK(!fake_hal_bluetooth_powered());
+    CHECK(summary_is("Off"));
 }
 
 static void nothing_is_retried_while_connecting(void)
@@ -419,23 +525,22 @@ static void a_search_that_finds_remembered_headphones_connects_them(void)
     step(START_MS + 100);
     CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
     fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
-    step(START_MS + 200);
+    restart_for_search(START_MS + 200);
     CHECK_EQUAL(1, fake_hal_bluetooth_scan_count());
     fake_hal_bluetooth()->devices[0] = BUDS;
     fake_hal_bluetooth()->device_count = 1;
     fake_hal_bluetooth()->found_now = 1;
-    step(START_MS + 250);
-    CHECK_EQUAL(1, fake_hal_bluetooth_stop_count());
-    step(START_MS + 300);
+    step(START_MS + 1000);
+    CHECK_EQUAL(0, fake_hal_bluetooth_stop_count());
     CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
     CHECK(strcmp("Buds", fake_hal_bluetooth_connect_target()->name) == 0);
     fake_hal_bluetooth()->pairing = HAL_BLUETOOTH_PAIRING_FAILED;
     ready();
-    step(START_MS + 400);
+    step(START_MS + 1100);
     CHECK_EQUAL(2, fake_hal_bluetooth_connect_count());
 }
 
-static void an_old_search_result_does_not_stop_a_new_search(void)
+static void an_old_search_result_does_not_interrupt_a_new_search(void)
 {
     fresh();
     save(true, &BUDS);
@@ -446,7 +551,7 @@ static void an_old_search_result_does_not_stop_a_new_search(void)
     fake_hal_bluetooth()->device_count = 1;
     fake_hal_bluetooth()->found_now = 0;
     step(START_MS + 100);
-    CHECK_EQUAL(0, fake_hal_bluetooth_stop_count());
+    CHECK_EQUAL(0, fake_hal_bluetooth_connect_count());
 }
 
 static void after_pair_new_device_remembered_headphones_only_show_as_nearby(void)
@@ -587,6 +692,11 @@ int main(void)
         TEST_CASE(a_stalled_pairing_is_reset_and_tried_again),
         TEST_CASE(nothing_is_retried_while_connecting),
         TEST_CASE(a_search_and_a_reconnect_take_turns),
+        TEST_CASE(the_first_search_after_power_on_needs_no_restart),
+        TEST_CASE(pair_new_device_after_a_connect_attempt_restarts_the_module),
+        TEST_CASE(a_device_chosen_during_a_restart_connects_once_the_module_is_ready),
+        TEST_CASE(leaving_the_screen_during_a_restart_drops_the_search),
+        TEST_CASE(turning_bluetooth_off_during_a_restart_keeps_it_off),
         TEST_CASE(connecting_saves_the_device_and_says_so),
         TEST_CASE(playing_with_nothing_plugged_in_streams),
         TEST_CASE(headphones_take_the_sound_back),
@@ -602,7 +712,7 @@ int main(void)
         TEST_CASE(browsing_searches_for_devices),
         TEST_CASE(pairing_connects_the_chosen_device),
         TEST_CASE(a_search_that_finds_remembered_headphones_connects_them),
-        TEST_CASE(an_old_search_result_does_not_stop_a_new_search),
+        TEST_CASE(an_old_search_result_does_not_interrupt_a_new_search),
         TEST_CASE(after_pair_new_device_remembered_headphones_only_show_as_nearby),
         TEST_CASE(devices_are_remembered_most_recent_first),
         TEST_CASE(choosing_the_connected_device_disconnects_and_stays_off),

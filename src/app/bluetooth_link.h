@@ -12,6 +12,7 @@ enum {
     BLUETOOTH_LINK_RETRY_MS = 5000,
     BLUETOOTH_LINK_CONFIRM_MS = 10000,
     BLUETOOTH_LINK_RESET_MS = 2000,
+    BLUETOOTH_LINK_RESTART_MS = 500,
     BLUETOOTH_LINK_ECHO_MS = 3000,
     BLUETOOTH_LINK_IDLE_OFF_MS = 300000,
     BLUETOOTH_LINK_TOAST_CAPACITY = 48
@@ -41,9 +42,12 @@ typedef struct BluetoothLink {
     bool paired_seen;
     bool scan_tried;
     bool buds_paused;
+    bool fresh;
+    bool restarting;
     HalBluetoothDevice target;
     HalBluetoothDevice linked;
     uint32_t retried_ms;
+    uint32_t restart_ms;
     uint32_t paired_ms;
     uint32_t unlinked_ms;
     uint32_t changed_ms;
@@ -63,4 +67,5 @@ void bluetooth_link_step(BluetoothLink *link, Player *player, uint32_t now_ms);
 BluetoothDeviceState bluetooth_link_device_state(const BluetoothLink *link, int index);
 bool bluetooth_link_knows(const BluetoothLink *link, const HalBluetoothDevice *device);
 bool bluetooth_link_nearby(const BluetoothLink *link, int index);
+bool bluetooth_link_searching(const BluetoothLink *link);
 const char *bluetooth_link_summary(const BluetoothLink *link);

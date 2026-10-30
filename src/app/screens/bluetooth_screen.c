@@ -102,9 +102,9 @@ static const char *known_value(const BluetoothScreen *bluetooth, int index)
     }
 }
 
-static bool scanning(void)
+static bool scanning(const BluetoothScreen *bluetooth)
 {
-    return hal_bluetooth_status()->state == HAL_BLUETOOTH_SCANNING;
+    return bluetooth_link_searching(bluetooth->link);
 }
 
 static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
@@ -114,10 +114,7 @@ static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
     }
     const BluetoothLink *link = bluetooth->link;
     bool trying = link->attempting || link->has_target || link->paired_seen;
-    if (!trying && hal_bluetooth_status()->pairing == HAL_BLUETOOTH_PAIRING_FAILED) {
-        return "Didn't connect";
-    }
-    return "Connecting…";
+    return trying ? "Connecting…" : "Didn't connect";
 }
 
 static const char *row_value(const void *context, int index)
@@ -129,7 +126,7 @@ static const char *row_value(const void *context, int index)
     case ROW_KNOWN:
         return known_value(bluetooth, index - 1);
     case ROW_SEARCH:
-        return scanning() ? "Searching…" : NULL;
+        return scanning(bluetooth) ? "Searching…" : NULL;
     default:
         return nearby_value(bluetooth, index);
     }
@@ -171,8 +168,8 @@ static const char *hint(const BluetoothScreen *bluetooth)
     case ROW_KNOWN:
         return known_hint(bluetooth, selected - 1);
     case ROW_SEARCH:
-        return scanning() ? "Searching… put headphones in pairing mode"
-                          : "Play searches for new headphones";
+        return scanning(bluetooth) ? "Searching… put headphones in pairing mode"
+                                   : "Play searches for new headphones";
     default:
         return "Play pairs with this device";
     }
@@ -240,14 +237,17 @@ static void write_link(const HalBluetoothLink *link, char *text)
     string_builder_append_unsigned(&builder, link->fifo_depth);
 }
 
-static void write_events(const HalBluetoothLink *link, char *text)
+static void write_events(const HalBluetoothLink *link, char *text, uint8_t first)
 {
     StringBuilder builder = string_builder_make(text, BLUETOOTH_SCREEN_LINE_CAPACITY);
-    string_builder_append(&builder, "Msgs");
-    if (link->event_count == 0) {
-        string_builder_append(&builder, " none");
+    if (first == 0) {
+        string_builder_append(&builder, link->event_count == 0 ? "Msgs none" : "Msgs");
     }
-    for (uint8_t index = 0; index < link->event_count; index++) {
+    uint8_t last = first + BLUETOOTH_SCREEN_EVENTS_PER_LINE;
+    if (last > link->event_count) {
+        last = link->event_count;
+    }
+    for (uint8_t index = first; index < last; index++) {
         string_builder_append(&builder, link->events[index][0] == '>' ? " " : " C");
         string_builder_append_char(&builder, link->events[index][0]);
         string_builder_append_char(&builder, link->events[index][1]);
@@ -278,7 +278,8 @@ static void refresh(BluetoothScreen *bluetooth)
     write_line(bluetooth->lines[BLUETOOTH_SCREEN_HINT_LINE], hint(bluetooth));
     write_state(status, bluetooth->lines[1]);
     write_link(&status->link, bluetooth->lines[2]);
-    write_events(&status->link, bluetooth->lines[3]);
+    write_events(&status->link, bluetooth->lines[3], 0);
+    write_events(&status->link, bluetooth->lines[4], BLUETOOTH_SCREEN_EVENTS_PER_LINE);
 }
 
 static int footer_lines(const BluetoothScreen *bluetooth)

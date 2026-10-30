@@ -763,8 +763,12 @@ int fake_hal_bluetooth_service_count(void)
 
 void hal_bluetooth_set_power(bool on)
 {
+    HalBluetoothStatus kept = fake.bluetooth;
     fake.bluetooth_powered = on;
-    fake.bluetooth = (HalBluetoothStatus){.state = on ? HAL_BLUETOOTH_STARTING : HAL_BLUETOOTH_OFF};
+    fake.bluetooth = (HalBluetoothStatus){.state = on ? HAL_BLUETOOTH_STARTING : HAL_BLUETOOTH_OFF,
+                                          .device_count = kept.device_count,
+                                          .link = kept.link};
+    memcpy(fake.bluetooth.devices, kept.devices, sizeof kept.devices);
 }
 
 void hal_bluetooth_stop_scan(void)

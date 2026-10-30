@@ -34,9 +34,15 @@ static void settle(uint32_t now_ms)
     poll(now_ms + BT_MODULE_SILENCE_MS, &frame);
 }
 
+static void power_on(uint32_t now_ms)
+{
+    module = (BtModule){0};
+    bt_module_power_on(&module, now_ms);
+}
+
 static void power_on_ready(void)
 {
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     receive_text("CV15", START_MS + 200);
     settle(START_MS + 200);
 }
@@ -49,7 +55,7 @@ static bool frame_is(const BtModuleFrame *frame, const char *text)
 
 static void a_powered_module_waits_for_its_ready_report(void)
 {
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     CHECK_EQUAL(HAL_BLUETOOTH_STARTING, module.status.state);
     receive_text("CV15", START_MS + 300);
     CHECK_EQUAL(HAL_BLUETOOTH_STARTING, module.status.state);
@@ -62,7 +68,7 @@ static void a_powered_module_waits_for_its_ready_report(void)
 static void a_frame_split_across_reads_waits_for_the_rest(void)
 {
     BtModuleFrame frame;
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     receive_text("CV", START_MS + 300);
     poll(START_MS + 300, &frame);
     receive_text("15", START_MS + 301);
@@ -73,7 +79,7 @@ static void a_frame_split_across_reads_waits_for_the_rest(void)
 static void a_cut_off_frame_is_dropped_after_a_pause(void)
 {
     BtModuleFrame frame;
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     receive_text("CV", START_MS + 300);
     poll(START_MS + 300 + BT_MODULE_SILENCE_MS, &frame);
     receive_text("15", START_MS + 400);
@@ -98,7 +104,7 @@ static void a_long_burst_is_read_in_full(void)
 static void no_ready_report_within_five_seconds_means_no_reply(void)
 {
     BtModuleFrame frame;
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     poll(START_MS + BT_MODULE_READY_TIMEOUT_MS - 1, &frame);
     CHECK_EQUAL(HAL_BLUETOOTH_STARTING, module.status.state);
     poll(START_MS + BT_MODULE_READY_TIMEOUT_MS, &frame);
@@ -108,7 +114,7 @@ static void no_ready_report_within_five_seconds_means_no_reply(void)
 static void noise_before_the_ready_report_is_skipped(void)
 {
     static const uint8_t NOISE[] = {0x00, 0xFF, 0x43, 0x00};
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     receive_bytes(NOISE, sizeof NOISE, START_MS + 100);
     receive_text("CV10", START_MS + 100);
     settle(START_MS + 100);
@@ -129,7 +135,7 @@ static void a_scan_sends_cs00(void)
 static void a_scan_needs_a_ready_module(void)
 {
     BtModuleFrame frame;
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     CHECK(!bt_module_scan(&module, START_MS + 10, &frame));
     CHECK_EQUAL(HAL_BLUETOOTH_STARTING, module.status.state);
 }
@@ -226,10 +232,13 @@ static void an_unanswered_scan_is_sent_once_more_after_four_seconds(void)
     power_on_ready();
     uint32_t scan_ms = START_MS + 500;
     bt_module_scan(&module, scan_ms, &frame);
+    CHECK(poll(scan_ms + BT_MODULE_QUERY_PERIOD_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
     CHECK(!poll(scan_ms + BT_MODULE_SCAN_RETRY_MS - 1, &frame));
     CHECK(poll(scan_ms + BT_MODULE_SCAN_RETRY_MS, &frame));
     CHECK(frame_is(&frame, "CS00"));
-    CHECK(!poll(scan_ms + 2 * BT_MODULE_SCAN_RETRY_MS, &frame));
+    CHECK(poll(scan_ms + 2 * BT_MODULE_SCAN_RETRY_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
 }
 
 static void an_answered_scan_is_not_repeated(void)
@@ -240,7 +249,20 @@ static void an_answered_scan_is_not_repeated(void)
     bt_module_scan(&module, scan_ms, &frame);
     receive_text("CKKK", scan_ms + 100);
     settle(scan_ms + 100);
-    CHECK(!poll(scan_ms + BT_MODULE_SCAN_RETRY_MS, &frame));
+    CHECK(poll(scan_ms + BT_MODULE_SCAN_RETRY_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+}
+
+static void a_status_reply_does_not_count_as_an_answer_to_the_scan(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    uint32_t scan_ms = START_MS + 500;
+    bt_module_scan(&module, scan_ms, &frame);
+    receive_text("CQI", scan_ms + 100);
+    settle(scan_ms + 100);
+    CHECK(poll(scan_ms + BT_MODULE_SCAN_RETRY_MS, &frame));
+    CHECK(frame_is(&frame, "CS00"));
 }
 
 static void a_scan_stops_with_cp00_after_thirty_seconds(void)
@@ -256,7 +278,7 @@ static void a_scan_stops_with_cp00_after_thirty_seconds(void)
     CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
 }
 
-static void a_scan_pauses_the_status_poll(void)
+static void a_scanning_module_is_still_asked_for_its_status(void)
 {
     BtModuleFrame frame;
     power_on_ready();
@@ -264,7 +286,13 @@ static void a_scan_pauses_the_status_poll(void)
     bt_module_scan(&module, scan_ms, &frame);
     receive_text("CKKK", scan_ms + 100);
     settle(scan_ms + 100);
-    CHECK(!poll(scan_ms + BT_MODULE_SCAN_LIMIT_MS - 1, &frame));
+    CHECK(!poll(scan_ms + BT_MODULE_QUERY_PERIOD_MS - 1, &frame));
+    CHECK(poll(scan_ms + BT_MODULE_QUERY_PERIOD_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+    receive_text("CQS", scan_ms + BT_MODULE_QUERY_PERIOD_MS + 50);
+    settle(scan_ms + BT_MODULE_QUERY_PERIOD_MS + 50);
+    CHECK_EQUAL(HAL_BLUETOOTH_SCANNING, module.status.state);
+    CHECK_EQUAL('S', module.status.link_status);
 }
 
 static void a_ready_module_is_asked_for_its_status_every_three_seconds(void)
@@ -303,7 +331,7 @@ static void a_connected_reply_skips_its_payload(void)
 
 static void the_last_received_bytes_are_kept(void)
 {
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     receive_text("CV15CKKKCQI0123", START_MS + 100);
     CHECK_EQUAL(HAL_BLUETOOTH_RECENT_CAPACITY, module.status.link.recent_length);
     CHECK(memcmp("5CKKKCQI0123", module.status.link.recent, HAL_BLUETOOTH_RECENT_CAPACITY) == 0);
@@ -318,7 +346,7 @@ static void frames_are_counted(void)
     CHECK_EQUAL(3u, module.status.link.frames);
 }
 
-static void powering_off_forgets_the_session(void)
+static void powering_off_keeps_the_devices_found_and_the_messages(void)
 {
     BtModuleFrame frame;
     power_on_ready();
@@ -327,8 +355,19 @@ static void powering_off_forgets_the_session(void)
     settle(START_MS + 1500);
     bt_module_power_off(&module);
     CHECK_EQUAL(HAL_BLUETOOTH_OFF, module.status.state);
-    CHECK_EQUAL(0u, module.status.device_count);
+    CHECK_EQUAL(1u, module.status.device_count);
+    CHECK_EQUAL(0u, module.status.found_now);
+    CHECK_EQUAL(2, module.status.link.event_count);
+    CHECK_EQUAL('\0', module.status.version);
     CHECK(!poll(START_MS + 60000, &frame));
+    bt_module_power_on(&module, START_MS + 61000);
+    CHECK_EQUAL(HAL_BLUETOOTH_STARTING, module.status.state);
+    CHECK_EQUAL(1u, module.status.device_count);
+    CHECK(strcmp("WH-1000XM4", module.status.devices[0].name) == 0);
+    receive_text("CV15", START_MS + 61200);
+    settle(START_MS + 61200);
+    CHECK_EQUAL(3, module.status.link.event_count);
+    CHECK_EQUAL(60, module.status.link.gaps[2]);
 }
 
 static void found_phones(void)
@@ -368,7 +407,7 @@ static void connecting_needs_a_ready_module(void)
     BtModuleFrame frame;
     HalBluetoothDevice device = {.name = "WH-1000XM4"};
     memcpy(device.address, PHONES, sizeof device.address);
-    bt_module_power_on(&module, START_MS);
+    power_on(START_MS);
     CHECK(!bt_module_connect(&module, &device, START_MS + 100, &frame));
     CHECK_EQUAL(HAL_BLUETOOTH_STARTING, module.status.state);
 }
@@ -427,10 +466,42 @@ static void an_unanswered_connect_retries_once_with_ch06(void)
     BtModuleFrame frame;
     found_phones();
     bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    for (uint32_t second = 1; second < 4; second++) {
+        CHECK(poll(CONNECT_MS + second * BT_MODULE_CONNECT_QUERY_MS, &frame));
+        CHECK(frame_is(&frame, "CQ00"));
+    }
     CHECK(!poll(CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS - 1, &frame));
     CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS, &frame));
     CHECK(frame_is_connect(&frame, "CH06", PHONES));
-    CHECK(!poll(CONNECT_MS + 2 * BT_MODULE_CONNECT_RETRY_MS, &frame));
+    CHECK(poll(CONNECT_MS + 2 * BT_MODULE_CONNECT_RETRY_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+}
+
+static void a_status_reply_does_not_cancel_the_connect_retry(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CQL", CONNECT_MS + 1100);
+    settle(CONNECT_MS + 1100);
+    CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_RETRY_MS, &frame));
+    CHECK(frame_is_connect(&frame, "CH06", PHONES));
+}
+
+static void a_connecting_module_is_asked_for_its_status_every_second(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CKKK", CONNECT_MS + 100);
+    settle(CONNECT_MS + 100);
+    CHECK(!poll(CONNECT_MS + BT_MODULE_CONNECT_QUERY_MS - 1, &frame));
+    CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_QUERY_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+    CHECK(!poll(CONNECT_MS + 2 * BT_MODULE_CONNECT_QUERY_MS - 1, &frame));
+    CHECK(poll(CONNECT_MS + 2 * BT_MODULE_CONNECT_QUERY_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTING, module.status.state);
 }
 
 static void a_connect_without_a_result_is_cancelled_after_thirty_seconds(void)
@@ -440,7 +511,8 @@ static void a_connect_without_a_result_is_cancelled_after_thirty_seconds(void)
     bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
     receive_text("CKKK", CONNECT_MS + 100);
     settle(CONNECT_MS + 100);
-    CHECK(!poll(CONNECT_MS + BT_MODULE_CONNECT_LIMIT_MS - 1, &frame));
+    CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_LIMIT_MS - 1, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
     CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_LIMIT_MS, &frame));
     CHECK(frame_is(&frame, "CT00"));
     CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
@@ -470,6 +542,23 @@ static void cqo_reports_the_connected_device(void)
     CHECK_EQUAL('O', module.status.link_status);
     CHECK(memcmp(PHONES, module.status.connected.address, 6) == 0);
     CHECK(strcmp("WH-1000XM4", module.status.connected.name) == 0);
+}
+
+static void a_connected_status_while_connecting_means_connected(void)
+{
+    BtModuleFrame frame;
+    found_phones();
+    bt_module_connect(&module, &module.status.devices[0], CONNECT_MS, &frame);
+    receive_text("CKKK", CONNECT_MS + 100);
+    receive_text("CQL", CONNECT_MS + 1100);
+    settle(CONNECT_MS + 1100);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTING, module.status.state);
+    receive_connected(PHONES, "WH-1000XM4", CONNECT_MS + 2100);
+    settle(CONNECT_MS + 2100);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+    CHECK(strcmp("WH-1000XM4", module.status.connected.name) == 0);
+    CHECK(poll(CONNECT_MS + BT_MODULE_CONNECT_LIMIT_MS, &frame));
+    CHECK(!frame_is(&frame, "CT00"));
 }
 
 static void a_long_connected_name_is_cut(void)
@@ -620,13 +709,13 @@ static void status_changes_and_sent_links_are_kept(void)
     receive_text("CQL", CONNECT_MS + 100);
     settle(CONNECT_MS + 100);
     const HalBluetoothLink *link = &module.status.link;
-    CHECK_EQUAL(4, link->event_count);
-    CHECK_EQUAL('Q', link->events[1][0]);
-    CHECK_EQUAL('I', link->events[1][1]);
-    CHECK_EQUAL('>', link->events[2][0]);
-    CHECK_EQUAL('L', link->events[2][1]);
-    CHECK_EQUAL('Q', link->events[3][0]);
+    CHECK_EQUAL(5, link->event_count);
+    CHECK_EQUAL('Q', link->events[2][0]);
+    CHECK_EQUAL('I', link->events[2][1]);
+    CHECK_EQUAL('>', link->events[3][0]);
     CHECK_EQUAL('L', link->events[3][1]);
+    CHECK_EQUAL('Q', link->events[4][0]);
+    CHECK_EQUAL('L', link->events[4][1]);
 }
 
 static void module_messages_are_kept_without_status_or_scan_replies(void)
@@ -635,11 +724,44 @@ static void module_messages_are_kept_without_status_or_scan_replies(void)
     receive_text("CKKK", START_MS + 1600);
     settle(START_MS + 1600);
     const HalBluetoothLink *link = &module.status.link;
-    CHECK_EQUAL(2, link->event_count);
+    CHECK_EQUAL(3, link->event_count);
     CHECK_EQUAL('V', link->events[0][0]);
     CHECK_EQUAL('.', link->events[0][1]);
-    CHECK_EQUAL('K', link->events[1][0]);
-    CHECK_EQUAL('K', link->events[1][1]);
+    CHECK_EQUAL('>', link->events[1][0]);
+    CHECK_EQUAL('S', link->events[1][1]);
+    CHECK_EQUAL('K', link->events[2][0]);
+    CHECK_EQUAL('K', link->events[2][1]);
+}
+
+static void scan_and_stop_commands_are_kept_but_status_polls_are_not(void)
+{
+    BtModuleFrame frame;
+    power_on_ready();
+    uint32_t ready_ms = START_MS + 200 + BT_MODULE_SILENCE_MS;
+    CHECK(poll(ready_ms + BT_MODULE_QUERY_PERIOD_MS, &frame));
+    CHECK(frame_is(&frame, "CQ00"));
+    bt_module_scan(&module, ready_ms + 4000, &frame);
+    bt_module_stop_scan(&module, ready_ms + 5000, &frame);
+    const HalBluetoothLink *link = &module.status.link;
+    CHECK_EQUAL(3, link->event_count);
+    CHECK_EQUAL('>', link->events[1][0]);
+    CHECK_EQUAL('S', link->events[1][1]);
+    CHECK_EQUAL('>', link->events[2][0]);
+    CHECK_EQUAL('P', link->events[2][1]);
+    CHECK_EQUAL(1, link->gaps[2]);
+}
+
+static void the_message_log_holds_twelve_entries(void)
+{
+    power_on_ready();
+    for (int round = 0; round < 15; round++) {
+        receive_text("CKKK", START_MS + 300 + (uint32_t)round);
+    }
+    settle(START_MS + 400);
+    const HalBluetoothLink *link = &module.status.link;
+    CHECK_EQUAL(HAL_BLUETOOTH_EVENT_CAPACITY, link->event_count);
+    CHECK_EQUAL('K', link->events[0][0]);
+    CHECK_EQUAL('K', link->events[HAL_BLUETOOTH_EVENT_CAPACITY - 1][0]);
 }
 
 static void a_play_report_pauses_status_queries_for_fifty_seconds(void)
@@ -839,14 +961,15 @@ int main(void)
         TEST_CASE(an_oversized_scan_frame_ends_the_scan),
         TEST_CASE(an_unanswered_scan_is_sent_once_more_after_four_seconds),
         TEST_CASE(an_answered_scan_is_not_repeated),
+        TEST_CASE(a_status_reply_does_not_count_as_an_answer_to_the_scan),
         TEST_CASE(a_scan_stops_with_cp00_after_thirty_seconds),
-        TEST_CASE(a_scan_pauses_the_status_poll),
+        TEST_CASE(a_scanning_module_is_still_asked_for_its_status),
         TEST_CASE(a_ready_module_is_asked_for_its_status_every_three_seconds),
         TEST_CASE(status_replies_set_the_link_letter),
         TEST_CASE(a_connected_reply_skips_its_payload),
         TEST_CASE(the_last_received_bytes_are_kept),
         TEST_CASE(frames_are_counted),
-        TEST_CASE(powering_off_forgets_the_session),
+        TEST_CASE(powering_off_keeps_the_devices_found_and_the_messages),
         TEST_CASE(connecting_sends_cl06_with_the_picked_address),
         TEST_CASE(connecting_needs_a_ready_module),
         TEST_CASE(a_remembered_device_connects_without_a_scan),
@@ -854,6 +977,9 @@ int main(void)
         TEST_CASE(clok_reports_paired),
         TEST_CASE(cler_and_cher_report_a_failed_pairing),
         TEST_CASE(an_unanswered_connect_retries_once_with_ch06),
+        TEST_CASE(a_status_reply_does_not_cancel_the_connect_retry),
+        TEST_CASE(a_connecting_module_is_asked_for_its_status_every_second),
+        TEST_CASE(a_connected_status_while_connecting_means_connected),
         TEST_CASE(a_connect_without_a_result_is_cancelled_after_thirty_seconds),
         TEST_CASE(cqo_reports_the_connected_device),
         TEST_CASE(a_long_connected_name_is_cut),
@@ -865,6 +991,8 @@ int main(void)
         TEST_CASE(a_disconnect_cancels_a_pending_connect),
         TEST_CASE(module_messages_are_kept_without_status_or_scan_replies),
         TEST_CASE(status_changes_and_sent_links_are_kept),
+        TEST_CASE(scan_and_stop_commands_are_kept_but_status_polls_are_not),
+        TEST_CASE(the_message_log_holds_twelve_entries),
         TEST_CASE(a_new_link_is_told_the_stream_is_off),
         TEST_CASE(a_play_report_pauses_status_queries_for_fifty_seconds),
         TEST_CASE(a_play_report_after_clok_means_connected),
