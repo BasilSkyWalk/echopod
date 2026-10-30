@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/random.h"
 #include "core/string_builder.h"
 #include "draw_profile.h"
 #include "hal/clock.h"
@@ -17,7 +18,10 @@ enum {
     LINE_HEIGHT = 20,
     REFLECTION_ROWS = 34,
     REFLECTION_LIGHT = 80,
-    FLOOR_LEVEL = 16
+    FLOOR_LEVEL = 16,
+    RANDOM_POSITION = 0,
+    SHUFFLE_SIZE = 48,
+    SHUFFLE_STROKE = 4
 };
 
 static const CoverFlowLayout LAYOUT = {
@@ -39,6 +43,13 @@ static const Color BACKDROP = COLOR_RGB(0, 0, 0);
 
 static const char STAR_PREFIX[] = "\xE2\x98\x85 ";
 static const char EMPTY_MESSAGE[] = "Nothing here";
+static const char RANDOM_TITLE[] = "Random album";
+static const char RANDOM_HINT[] = "Play any album";
+static const Color SHUFFLE_BACKGROUND = COLOR_RGB(44, 46, 58);
+static const Color SHUFFLE_MARK = COLOR_RGB(255, 255, 255);
+
+static Color shuffle_pixels[SHUFFLE_SIZE * SHUFFLE_SIZE];
+static bool shuffle_drawn;
 
 static int min_of(int first, int second)
 {
@@ -112,11 +123,56 @@ bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint16_
 static uint16_t album_of(const CoverFlowScreen *flow, int position)
 {
     uint16_t album = LIBRARY_NONE;
-    if (position < 0 ||
-        !cover_flow_order_album(flow->config.library, flow->order, (uint32_t)position, &album)) {
+    if (position <= RANDOM_POSITION || !cover_flow_order_album(flow->config.library, flow->order,
+                                                               (uint32_t)position - 1, &album)) {
         return LIBRARY_NONE;
     }
     return album;
+}
+
+static void plot(int x, int y)
+{
+    for (int row = y - SHUFFLE_STROKE / 2; row < y + SHUFFLE_STROKE / 2; row++) {
+        for (int column = x - SHUFFLE_STROKE / 2; column < x + SHUFFLE_STROKE / 2; column++) {
+            if (row >= 0 && row < SHUFFLE_SIZE && column >= 0 && column < SHUFFLE_SIZE) {
+                shuffle_pixels[row * SHUFFLE_SIZE + column] = SHUFFLE_MARK;
+            }
+        }
+    }
+}
+
+static void stroke(int from_x, int from_y, int to_x, int to_y)
+{
+    int steps = max_of(max_of(to_x - from_x, from_x - to_x), max_of(to_y - from_y, from_y - to_y));
+    for (int step = 0; step <= steps; step++) {
+        int x = from_x + (to_x - from_x) * step / max_of(steps, 1);
+        int y = from_y + (to_y - from_y) * step / max_of(steps, 1);
+        plot(x, y);
+    }
+}
+
+static void draw_shuffle_mark(void)
+{
+    for (int index = 0; index < SHUFFLE_SIZE * SHUFFLE_SIZE; index++) {
+        shuffle_pixels[index] = SHUFFLE_BACKGROUND;
+    }
+    static const int16_t LINES[][4] = {
+        {9, 34, 16, 34},  {16, 34, 30, 14}, {30, 14, 39, 14}, {39, 14, 34, 9},
+        {39, 14, 34, 19}, {9, 14, 16, 14},  {16, 14, 22, 23}, {25, 27, 30, 34},
+        {30, 34, 39, 34}, {39, 34, 34, 29}, {39, 34, 34, 39},
+    };
+    for (size_t index = 0; index < sizeof LINES / sizeof LINES[0]; index++) {
+        stroke(LINES[index][0], LINES[index][1], LINES[index][2], LINES[index][3]);
+    }
+    shuffle_drawn = true;
+}
+
+static Image shuffle_image(void)
+{
+    if (!shuffle_drawn) {
+        draw_shuffle_mark();
+    }
+    return (Image){.pixels = shuffle_pixels, .width = SHUFFLE_SIZE, .height = SHUFFLE_SIZE};
 }
 
 static int center_of(const CoverFlowScreen *flow)
@@ -152,7 +208,14 @@ static void refresh_text(CoverFlowScreen *flow, bool force)
     if (flow->count == 0 || (!force && center == flow->text_position)) {
         return;
     }
-    load_text(flow, album_of(flow, center));
+    if (center == RANDOM_POSITION) {
+        StringBuilder title = string_builder_make(flow->title, sizeof flow->title);
+        string_builder_append(&title, RANDOM_TITLE);
+        StringBuilder hint = string_builder_make(flow->artist, sizeof flow->artist);
+        string_builder_append(&hint, RANDOM_HINT);
+    } else {
+        load_text(flow, album_of(flow, center));
+    }
     flow->text_position = center;
     flow->text_changed_ms = flow->now_ms;
 }
@@ -163,7 +226,7 @@ static bool load_nearest_half(CoverFlowScreen *flow)
     for (int distance = 0; distance <= COVER_CACHE_SLOTS / 2; distance++) {
         for (int side = -1; side <= 1; side += 2) {
             int position = center + side * distance;
-            if (position >= 0 && position < flow->count &&
+            if (position > RANDOM_POSITION && position < flow->count &&
                 cover_cache_load_half(flow->config.covers, position, album_of(flow, position))) {
                 return true;
             }
@@ -177,7 +240,8 @@ static void load_covers(CoverFlowScreen *flow)
     if (flow->count == 0 || load_nearest_half(flow)) {
         return;
     }
-    if (flow->position == (int32_t)flow->target * COVER_FLOW_ONE) {
+    if (flow->target != RANDOM_POSITION &&
+        flow->position == (int32_t)flow->target * COVER_FLOW_ONE) {
         cover_cache_load_full(flow->config.covers, album_of(flow, flow->target));
     }
 }
@@ -193,7 +257,7 @@ static int playing_position(const CoverFlowScreen *flow)
     if (!cover_flow_order_find(flow->config.library, flow->order, track.album, &position)) {
         return NO_POSITION;
     }
-    return (int)position;
+    return (int)position + 1;
 }
 
 static void move_target(CoverFlowScreen *flow, int delta)
@@ -201,8 +265,34 @@ static void move_target(CoverFlowScreen *flow, int delta)
     flow->target = max_of(0, min_of(flow->count - 1, flow->target + delta));
 }
 
+static ScreenAction play_random(CoverFlowScreen *flow)
+{
+    Random random = random_seeded(hal_clock_microseconds());
+    uint32_t pick = random_below(&random, flow->order.count);
+    uint16_t album = LIBRARY_NONE;
+    BrowseQuery child;
+    BrowseItem item = {.kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = 0};
+    if (!cover_flow_order_album(flow->config.library, flow->order, pick, &album)) {
+        return screen_action_none();
+    }
+    item.index = album;
+    PlayerListStart start = {.position = 0, .seed = random_next(&random), .in_order = true};
+    if (!browse_child(browse_root_query(BROWSE_ALBUMS), item, &child)) {
+        return screen_action_none();
+    }
+    start.source = child;
+    if (!player_play_from(flow->config.player, start)) {
+        return screen_action_none();
+    }
+    flow->target = (int)pick + 1;
+    return screen_action_push(flow->config.browse->config.now_playing);
+}
+
 static ScreenAction open_album(CoverFlowScreen *flow)
 {
+    if (flow->count > 0 && flow->target == RANDOM_POSITION) {
+        return play_random(flow);
+    }
     BrowseQuery child;
     BrowseItem item = {
         .kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = album_of(flow, flow->target)};
@@ -255,7 +345,7 @@ static void enter(void *context, uint32_t now_ms)
     CoverFlowScreen *flow = context;
     if (!flow->positioned) {
         int playing = playing_position(flow);
-        flow->target = playing != NO_POSITION ? playing : 0;
+        flow->target = playing != NO_POSITION ? playing : min_of(1, flow->count - 1);
         flow->positioned = true;
     }
     flow->position = (int32_t)flow->target * COVER_FLOW_ONE;
@@ -277,6 +367,10 @@ static void update(void *context, uint32_t now_ms)
 
 static bool cover_image(const CoverFlowScreen *flow, int position, Image *image)
 {
+    if (position == RANDOM_POSITION) {
+        *image = shuffle_image();
+        return true;
+    }
     uint16_t album = album_of(flow, position);
     return cover_cache_full(flow->config.covers, album, image) == COVER_LOADED ||
            cover_cache_half(flow->config.covers, position, album, image) == COVER_LOADED;
@@ -375,7 +469,7 @@ Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config)
 {
     flow->config = config;
     flow->order = cover_flow_order_make(config.library);
-    flow->count = (int)flow->order.count;
+    flow->count = flow->order.count > 0 ? (int)flow->order.count + 1 : 0;
     flow->target = 0;
     flow->position = 0;
     flow->positioned = false;

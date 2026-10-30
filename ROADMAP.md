@@ -16,7 +16,7 @@ Version 0.5.0 adds Bluetooth headphones, a charge screen and a steadier battery 
 | Library built on the player | device | At first start, after music changes over USB, and from Settings → Rescan library; tested up to 6,558 tracks on the player and 20,000 on a computer; 1,563 tracks and 144 albums in about 1 min 45 s |
 | Album covers built on the player | device | Embedded art or `cover`/`folder`/`front`/`albumart` JPEG or PNG; room for 2,673 albums; a rescan decodes only new or changed art (simulator and tests; not yet timed on the player) |
 | Browse: Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists, Favorites | device | Fast scroll with letter jumps in A–Z lists |
-| Cover Flow | device | Every music album, by album artist |
+| Cover Flow | device | Every music album, by album artist; a Random album tile first |
 | Now Playing | device | Cover, progress, seek, modes, volume |
 | Queue, shuffle, repeat, Up Next | device | Shuffle Songs or Albums over lists of any size; Play Next and Add to Up Next |
 | M3U and M3U8 playlists | device | Including MusicBee's Windows paths |

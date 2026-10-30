@@ -1,5 +1,15 @@
 # EchoPod release notes
 
+## Unreleased
+
+### New
+
+- **Random album.** Cover Flow starts with a Random album tile (a shuffle mark as its cover), just before the first album. Press Play on it to hear a random album from its first track, in order.
+
+### Fixed
+
+- **Pairing remembered headphones again.** Headphones the player already knew didn't show up when put in pairing mode, and connecting could take a long time unless Bluetooth was turned off and on. A search that finds remembered headphones now connects to them straight away; after Pair new device or a disconnect, their row shows "Nearby" instead.
+
 ## 0.5.0
 
 ### New

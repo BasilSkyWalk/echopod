@@ -129,7 +129,8 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 - Covers are drawn farthest first, so nearer covers overlap them. `gfx/image` draws a cover column by column with nearest-neighbour sampling, clipped to the current strip.
 - `app/cover_cache` holds 7 half-size covers (56 px, 6,272 B each) for the center ±3, in slot `position % 7`, plus one full-size cover (112 px, 25,088 B) for the center, about 69 KB in total.
 - Covers load in `update`, one per frame: the nearest missing half cover first, then the full cover once the motion has stopped. A cover is drawn from the full image when that's loaded for its album, otherwise from the half image, otherwise as a placeholder. Beyond ±3, covers that aren't loaded aren't drawn.
-- Play opens the album's track list, a long Play toggles the favorite, and Back leaves. The screen is full screen: no header or status icons, and the title (★ for favorites) and album artist go under the cover. The first time it opens, it starts at the playing album.
+- Play opens the album's track list, a long Play toggles the favorite, and Back leaves. The screen is full screen: no header or status icons, and the title (★ for favorites) and album artist go under the cover. The first time it opens, it starts at the playing album, or at the first album.
+- Position 0, before the first album, is **Random album**: its cover is a 48 px shuffle mark drawn once into a static image (white crossing arrows on dark slate), and its text is "Random album" / "Play any album". Play there picks one of the music albums with `core/random` seeded from the microsecond clock, plays it from its first track in track order (shuffle off for that queue), moves the flow to that album and opens Now Playing. The albums sit at positions 1 and up, so the cover cache slots and the playing-album lookup are offset by one.
 
 ## Rendering
 

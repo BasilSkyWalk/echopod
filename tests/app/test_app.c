@@ -1377,6 +1377,20 @@ static void cover_flow_starts_at_the_playing_album(void)
     CHECK(title_is("Back In Black"));
 }
 
+static void cover_flow_starts_with_a_random_album(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_COVER_FLOW_INDEX);
+    move_up(1);
+    settle();
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Now Playing"));
+    PlayerStatus status = app_player_status();
+    CHECK_EQUAL(PLAYER_PLAYING, status.state);
+    CHECK_EQUAL(1, status.place.number);
+}
+
 static void holding_play_in_cover_flow_toggles_a_favorite(void)
 {
     start_app_with_library();
@@ -1914,6 +1928,7 @@ int main(void)
         TEST_CASE(cover_flow_shows_the_centre_cover),
         TEST_CASE(cover_flow_starts_at_the_playing_album),
         TEST_CASE(holding_play_in_cover_flow_toggles_a_favorite),
+        TEST_CASE(cover_flow_starts_with_a_random_album),
         TEST_CASE(stopping_the_app_saves_the_session),
         TEST_CASE(each_step_records_its_duration),
     };
