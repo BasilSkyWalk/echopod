@@ -9,7 +9,11 @@ enum {
     MIN_THUMB_HEIGHT = 6,
     SHINE_HEIGHT = 1,
     NARROW_DETAIL_SHARE = 30,
-    PERCENT = 100
+    PERCENT = 100,
+    SECTION_HEIGHT_SHARE = 2,
+    SECTION_SHARE_PARTS_HIGH = 3,
+    SECTION_WIDTH_SHARE = 4,
+    SECTION_SHARE_PARTS_WIDE = 7
 };
 
 static const char CHEVRON[] = "\xE2\x80\xBA";
@@ -303,7 +307,9 @@ static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32
         return;
     }
     const Theme *theme = view->theme;
-    int side = area.height * 2 / 3 < area.width ? area.height * 2 / 3 : area.width;
+    int tall = area.height * SECTION_HEIGHT_SHARE / SECTION_SHARE_PARTS_HIGH;
+    int wide = area.width * SECTION_WIDTH_SHARE / SECTION_SHARE_PARTS_WIDE;
+    int side = tall < wide ? tall : wide;
     Rect box = {area.x + (area.width - side) / 2, area.y + (area.height - side) / 2, side, side};
     Rect inner = {box.x + 1, box.y + 1, side - 2, side - 2};
     canvas_fill_rect(canvas, box, theme->colors.divider);
