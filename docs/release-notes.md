@@ -1,6 +1,6 @@
 # EchoPod release notes
 
-## Unreleased
+## 0.7.1
 
 ### Fixed
 
