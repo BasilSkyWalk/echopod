@@ -22,6 +22,8 @@ static const char *const TIMEOUT_OPTIONS[SCREEN_TIMEOUT_OPTION_COUNT] = {
     "10 s", "20 s", "30 s", "1 min", "2 min", "5 min", "Never"};
 static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2", "3", "4", "5",
                                                                        "6", "7", "8", "9", "10"};
+static const char *const ORIENTATION_OPTIONS[ORIENTATION_COUNT] = {"Landscape", "Portrait",
+                                                                   "Portrait, flipped"};
 static const char *const GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {"Low", "High"};
 static const char *const OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {"Auto", "3.5 mm", "4.4 mm"};
 static const char *const OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
@@ -142,6 +144,17 @@ static void choose_brightness(void *context, int index)
     apply_and_save(context);
 }
 
+static int current_orientation(const void *context)
+{
+    return (int)settings_of(context)->orientation;
+}
+
+static void choose_orientation(void *context, int index)
+{
+    editable_settings(context)->orientation = (Orientation)index;
+    save(context);
+}
+
 static int current_gain(const void *context)
 {
     return (int)settings_of(context)->gain;
@@ -208,6 +221,8 @@ static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
      choose_timeout, NULL},
     {"Brightness", BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,
      choose_brightness, NULL},
+    {"Orientation", ORIENTATION_OPTIONS, ORIENTATION_COUNT, current_orientation, choose_orientation,
+     NULL},
     {"Gain", GAIN_OPTIONS, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
     {"Output", OUTPUT_OPTIONS, OUTPUT_JACK_COUNT, current_output, choose_output, describe_output},
     {"Start screen", START_OPTIONS, START_SCREEN_COUNT, current_start, choose_start, NULL},

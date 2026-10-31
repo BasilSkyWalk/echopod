@@ -8,6 +8,7 @@ enum {
     AUTO_OFF_FIELD = 14,
     USB_MODE_FIELD = 15,
     DAC_VOLUME_FIELD = 16,
+    ORIENTATION_FIELD = 17,
     CHECKSUM_FIELD = 20,
     NEVER_OPTION = 6
 };
@@ -26,6 +27,7 @@ static Settings custom_settings(void)
     settings.auto_off = 3;
     settings.usb_mode = USB_MODE_DAC;
     settings.dac_volume = 37;
+    settings.orientation = ORIENTATION_PORTRAIT_FLIPPED;
     return settings;
 }
 
@@ -51,6 +53,7 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(5u * 60000u, settings_auto_off_ms(&settings));
     CHECK_EQUAL(USB_MODE_STORAGE, settings.usb_mode);
     CHECK_EQUAL(30, settings.dac_volume);
+    CHECK_EQUAL(ORIENTATION_LANDSCAPE, settings.orientation);
 }
 
 static void auto_off_options_are_stocks(void)
@@ -95,9 +98,56 @@ static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(v
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(4, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(5, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
     CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
+}
+
+static void the_orientation_is_saved_at_byte_seventeen(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(ORIENTATION_PORTRAIT_FLIPPED, bytes[ORIENTATION_FIELD]);
+}
+
+static void a_version_four_file_keeps_its_values_and_loads_in_landscape(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 4;
+    bytes[ORIENTATION_FIELD] = 0;
+    rewrite_checksum(bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(ORIENTATION_LANDSCAPE, decoded.orientation);
+    CHECK_EQUAL(3, decoded.brightness);
+    CHECK_EQUAL(USB_MODE_DAC, decoded.usb_mode);
+    CHECK_EQUAL(37, decoded.dac_volume);
+}
+
+static void a_version_four_file_ignores_whatever_sits_in_the_orientation_byte(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 4;
+    bytes[ORIENTATION_FIELD] = ORIENTATION_PORTRAIT;
+    rewrite_checksum(bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(ORIENTATION_LANDSCAPE, decoded.orientation);
+}
+
+static void an_unknown_orientation_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[ORIENTATION_FIELD] = ORIENTATION_COUNT;
+    rewrite_checksum(bytes);
+    CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
 
 static void a_version_three_file_keeps_its_usb_mode_and_gets_the_default_dac_volume(void)
@@ -139,7 +189,7 @@ static void a_newer_version_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 5;
+    bytes[VERSION_FIELD] = 6;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -179,6 +229,7 @@ static void settings_survive_a_round_trip(void)
     CHECK_EQUAL(original.auto_off, decoded.auto_off);
     CHECK_EQUAL(original.usb_mode, decoded.usb_mode);
     CHECK_EQUAL(original.dac_volume, decoded.dac_volume);
+    CHECK_EQUAL(original.orientation, decoded.orientation);
 }
 
 static void a_corrupted_file_is_rejected(void)
@@ -217,6 +268,10 @@ int main(void)
         TEST_CASE(a_version_three_file_keeps_its_usb_mode_and_gets_the_default_dac_volume),
         TEST_CASE(a_dac_volume_above_the_top_is_rejected),
         TEST_CASE(an_unknown_usb_mode_is_rejected),
+        TEST_CASE(the_orientation_is_saved_at_byte_seventeen),
+        TEST_CASE(a_version_four_file_keeps_its_values_and_loads_in_landscape),
+        TEST_CASE(a_version_four_file_ignores_whatever_sits_in_the_orientation_byte),
+        TEST_CASE(an_unknown_orientation_is_rejected),
         TEST_CASE(a_newer_version_is_rejected),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

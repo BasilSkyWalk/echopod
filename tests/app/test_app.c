@@ -13,6 +13,7 @@
 #include "library/cover_build.h"
 #include "library/covers.h"
 #include "library_rescan.h"
+#include "settings/rocker.h"
 #include "settings/settings.h"
 #include "settings_store.h"
 #include "ui/slide.h"
@@ -37,9 +38,10 @@ enum {
     SETTINGS_SLEEP_INDEX = 4,
     SETTINGS_TIMEOUT_INDEX = 6,
     SETTINGS_BRIGHTNESS_INDEX = 7,
-    SETTINGS_GAIN_INDEX = 8,
-    SETTINGS_START_INDEX = 10,
-    SETTINGS_RESCAN_INDEX = 11,
+    SETTINGS_ORIENTATION_INDEX = 8,
+    SETTINGS_GAIN_INDEX = 9,
+    SETTINGS_START_INDEX = 11,
+    SETTINGS_RESCAN_INDEX = 12,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -575,6 +577,65 @@ static void saved_settings_are_restored_at_start(void)
     tap(KEY_PLAY);
     restart_app();
     CHECK_EQUAL(settings_defaults().brightness + 2, fake_hal_display_brightness());
+}
+
+static Orientation swapping_portrait(void)
+{
+    return rocker_swapped_in(ORIENTATION_PORTRAIT) ? ORIENTATION_PORTRAIT
+                                                   : ORIENTATION_PORTRAIT_FLIPPED;
+}
+
+static void choose_orientation(Orientation orientation)
+{
+    open_setting(SETTINGS_ORIENTATION_INDEX);
+    CHECK(title_is("Orientation"));
+    move_down((int)orientation);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+}
+
+static void the_orientation_setting_is_saved(void)
+{
+    start_app_with_library();
+    choose_orientation(ORIENTATION_PORTRAIT_FLIPPED);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(ORIENTATION_PORTRAIT_FLIPPED, settings.orientation);
+}
+
+static void a_swapping_portrait_turns_the_rocker_around_in_lists(void)
+{
+    start_app_with_library();
+    choose_orientation(swapping_portrait());
+    tap(KEY_VOLUME_UP);
+    tap(KEY_PLAY);
+    CHECK(title_is("Brightness"));
+    tap(KEY_BACK);
+    tap(KEY_VOLUME_DOWN);
+    tap(KEY_VOLUME_DOWN);
+    tap(KEY_PLAY);
+    CHECK(title_is("Gain"));
+}
+
+static void the_other_portrait_and_landscape_keep_the_rocker(void)
+{
+    start_app_with_library();
+    Orientation keeping = swapping_portrait() == ORIENTATION_PORTRAIT ? ORIENTATION_PORTRAIT_FLIPPED
+                                                                      : ORIENTATION_PORTRAIT;
+    choose_orientation(keeping);
+    tap(KEY_VOLUME_UP);
+    tap(KEY_PLAY);
+    CHECK(title_is("Gain"));
+}
+
+static void the_rocker_stays_turned_around_after_a_restart(void)
+{
+    start_app_with_library();
+    choose_orientation(swapping_portrait());
+    restart_app();
+    tap(KEY_VOLUME_DOWN);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
 }
 
 static uint16_t scrollbar_probe(void)
@@ -1878,6 +1939,10 @@ int main(void)
         TEST_CASE(the_equalizer_opens_from_settings_and_is_applied),
         TEST_CASE(gain_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),
+        TEST_CASE(the_orientation_setting_is_saved),
+        TEST_CASE(a_swapping_portrait_turns_the_rocker_around_in_lists),
+        TEST_CASE(the_other_portrait_and_landscape_keep_the_rocker),
+        TEST_CASE(the_rocker_stays_turned_around_after_a_restart),
         TEST_CASE(a_new_screen_slides_in_from_the_right),
         TEST_CASE(going_back_slides_the_screen_out_to_the_right),
         TEST_CASE(waking_draws_a_frame_before_the_backlight_comes_on),

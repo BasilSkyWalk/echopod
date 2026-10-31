@@ -1,4 +1,5 @@
 #include "check.h"
+#include "core/hash.h"
 #include "fake_hal.h"
 #include "favorites_store.h"
 #include "fixture_library.h"
@@ -9,6 +10,9 @@
 
 enum {
     BRIGHT = 9,
+    VERSION_FIELD = 4,
+    ORIENTATION_FIELD = 17,
+    CHECKSUM_FIELD = 20,
     CHOSEN_ALBUM = 2,
     OTHER_ALBUM = 1
 };
@@ -55,6 +59,35 @@ static void a_corrupted_settings_file_falls_back_to_the_defaults(void)
     fake_hal_add_file(SETTINGS_STORE_PATH, garbage, sizeof garbage);
     settings_store_load(&settings);
     CHECK_EQUAL(settings_defaults().brightness, settings.settings.brightness);
+}
+
+static void a_settings_file_from_before_orientation_loads_in_landscape(void)
+{
+    Settings older = settings_defaults();
+    older.brightness = BRIGHT;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&older, bytes);
+    bytes[VERSION_FIELD] = 4;
+    bytes[ORIENTATION_FIELD] = 0;
+    uint32_t checksum = hash_update(HASH_START, bytes, CHECKSUM_FIELD);
+    for (int index = 0; index < 4; index++) {
+        bytes[CHECKSUM_FIELD + index] = (uint8_t)(checksum >> (8 * index));
+    }
+    fake_hal_reset();
+    fake_hal_add_file(SETTINGS_STORE_PATH, bytes, sizeof bytes);
+    settings_store_load(&settings);
+    CHECK_EQUAL(BRIGHT, settings.settings.brightness);
+    CHECK_EQUAL(ORIENTATION_LANDSCAPE, settings.settings.orientation);
+}
+
+static void the_orientation_is_loaded_again(void)
+{
+    fake_hal_reset();
+    settings_store_load(&settings);
+    settings.settings.orientation = ORIENTATION_PORTRAIT_FLIPPED;
+    CHECK(settings_store_save(&settings));
+    settings_store_load(&settings);
+    CHECK_EQUAL(ORIENTATION_PORTRAIT_FLIPPED, settings.settings.orientation);
 }
 
 static void hardware_settings_reach_the_hal(void)
@@ -104,6 +137,8 @@ int main(void)
         TEST_CASE(saved_settings_are_loaded_again),
         TEST_CASE(unchanged_settings_are_not_written_again),
         TEST_CASE(a_corrupted_settings_file_falls_back_to_the_defaults),
+        TEST_CASE(a_settings_file_from_before_orientation_loads_in_landscape),
+        TEST_CASE(the_orientation_is_loaded_again),
         TEST_CASE(hardware_settings_reach_the_hal),
         TEST_CASE(toggling_an_album_adds_it_and_saves),
         TEST_CASE(favorites_are_loaded_again),

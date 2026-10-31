@@ -3,10 +3,12 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 4,
+    VERSION = 5,
     FIRST_VERSION = 1,
     AUTO_OFF_VERSION = 2,
     USB_MODE_VERSION = 3,
+    DAC_VOLUME_VERSION = 4,
+    ORIENTATION_VERSION = 5,
     MAGIC_SIZE = 4,
     VERSION_FIELD = 4,
     BRIGHTNESS_FIELD = 6,
@@ -20,6 +22,7 @@ enum {
     AUTO_OFF_FIELD = 14,
     USB_MODE_FIELD = 15,
     DAC_VOLUME_FIELD = 16,
+    ORIENTATION_FIELD = 17,
     CHECKSUM_FIELD = 20,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
@@ -49,6 +52,7 @@ Settings settings_defaults(void)
         .auto_off = DEFAULT_AUTO_OFF_OPTION,
         .usb_mode = USB_MODE_STORAGE,
         .dac_volume = SETTINGS_DEFAULT_DAC_VOLUME,
+        .orientation = ORIENTATION_LANDSCAPE,
     };
 }
 
@@ -115,6 +119,7 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     bytes[AUTO_OFF_FIELD] = settings->auto_off;
     bytes[USB_MODE_FIELD] = (uint8_t)settings->usb_mode;
     bytes[DAC_VOLUME_FIELD] = settings->dac_volume;
+    bytes[ORIENTATION_FIELD] = (uint8_t)settings->orientation;
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
@@ -139,7 +144,9 @@ static bool values_valid(const uint8_t *bytes)
            bytes[START_FIELD] < START_SCREEN_COUNT && bytes[SHUFFLE_FIELD] < SHUFFLE_MODE_COUNT &&
            bytes[REPEAT_FIELD] < REPEAT_MODE_COUNT && bytes[VOLUME_FIELD] <= SETTINGS_VOLUME_MAX &&
            bytes[AUTO_OFF_FIELD] < AUTO_OFF_OPTION_COUNT &&
-           bytes[USB_MODE_FIELD] < USB_MODE_COUNT && bytes[DAC_VOLUME_FIELD] <= SETTINGS_VOLUME_MAX;
+           bytes[USB_MODE_FIELD] < USB_MODE_COUNT &&
+           bytes[DAC_VOLUME_FIELD] <= SETTINGS_VOLUME_MAX &&
+           bytes[ORIENTATION_FIELD] < ORIENTATION_COUNT;
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
@@ -160,8 +167,12 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
                                                             : bytes[AUTO_OFF_FIELD],
         .usb_mode = bytes[VERSION_FIELD] < USB_MODE_VERSION ? USB_MODE_STORAGE
                                                             : (UsbMode)bytes[USB_MODE_FIELD],
-        .dac_volume = bytes[VERSION_FIELD] < VERSION ? (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME
-                                                     : bytes[DAC_VOLUME_FIELD],
+        .dac_volume = bytes[VERSION_FIELD] < DAC_VOLUME_VERSION
+                          ? (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME
+                          : bytes[DAC_VOLUME_FIELD],
+        .orientation = bytes[VERSION_FIELD] < ORIENTATION_VERSION
+                           ? ORIENTATION_LANDSCAPE
+                           : (Orientation)bytes[ORIENTATION_FIELD],
     };
     return true;
 }

@@ -30,6 +30,7 @@
 #include "music_check.h"
 #include "player.h"
 #include "screens/charge_screen.h"
+#include "settings/rocker.h"
 #include "settings_store.h"
 #include "ui/fade.h"
 #include "ui/header.h"
@@ -73,6 +74,7 @@ static const KeyConfig KEY_CONFIG = {
 
 typedef struct AppState {
     KeyTracker keys;
+    bool rocker_swapped[KEY_COUNT];
     FrameStats frame_stats;
     FrameStats update_stats;
     FrameStats draw_stats;
@@ -132,14 +134,23 @@ static Screen *top_screen(void)
     return screen_stack_top(&app.stack);
 }
 
+static Key oriented_key(HalKeyTransition transition)
+{
+    if (transition.pressed) {
+        app.rocker_swapped[transition.key] = rocker_swapped_in(app.settings.settings.orientation);
+    }
+    return rocker_key(transition.key, app.rocker_swapped[transition.key]);
+}
+
 static void read_input(void)
 {
     HalKeyTransition transition;
     while (hal_input_next_transition(&transition)) {
+        Key key = oriented_key(transition);
         if (transition.pressed) {
-            key_tracker_key_down(&app.keys, transition.key, transition.time_ms);
+            key_tracker_key_down(&app.keys, key, transition.time_ms);
         } else {
-            key_tracker_key_up(&app.keys, transition.key, transition.time_ms);
+            key_tracker_key_up(&app.keys, key, transition.time_ms);
         }
     }
 }

@@ -55,6 +55,7 @@ foreach(playback_test play_queue resume_state up_next bookmarks spoken)
 endforeach()
 
 echo_add_unit_test(NAME test_settings SOURCES settings/test_settings.c LIBRARIES echo_settings)
+echo_add_unit_test(NAME test_rocker SOURCES settings/test_rocker.c LIBRARIES echo_settings)
 echo_add_unit_test(NAME test_equalizer
     SOURCES dsp/test_equalizer.c
     LIBRARIES echo_dsp $<$<PLATFORM_ID:Linux>:m>

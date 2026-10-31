@@ -31,11 +31,18 @@ typedef enum UsbMode {
     USB_MODE_DAC
 } UsbMode;
 
+typedef enum Orientation {
+    ORIENTATION_LANDSCAPE,
+    ORIENTATION_PORTRAIT,
+    ORIENTATION_PORTRAIT_FLIPPED
+} Orientation;
+
 enum {
     GAIN_LEVEL_COUNT = GAIN_HIGH + 1,
     OUTPUT_JACK_COUNT = OUTPUT_BALANCED + 1,
     START_SCREEN_COUNT = START_COVER_FLOW + 1,
     USB_MODE_COUNT = USB_MODE_DAC + 1,
+    ORIENTATION_COUNT = ORIENTATION_PORTRAIT_FLIPPED + 1,
     SETTINGS_BRIGHTNESS_MIN = 1,
     SETTINGS_BRIGHTNESS_MAX = 10,
     SETTINGS_VOLUME_MAX = 50,
@@ -58,6 +65,7 @@ typedef struct Settings {
     uint8_t auto_off;
     UsbMode usb_mode;
     uint8_t dac_volume;
+    Orientation orientation;
 } Settings;
 
 Settings settings_defaults(void);
