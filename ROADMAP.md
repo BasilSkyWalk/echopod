@@ -4,7 +4,7 @@ Status: `device` (works on the player) · `sim` (works in the simulator only) ·
 
 ## Where it stands
 
-Version 0.7.1 fixes a first start that stayed black with FAT32 cards; 0.7.0 added an equalizer (FiiO's presets and a 7-band Custom EQ) and ALAC, AAC and Opus playback; 0.6.0 made Bluetooth connect within seconds and added Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
+Version 0.8.0 adds portrait mode (Settings → Orientation); 0.7.1 fixed a first start that stayed black with FAT32 cards; 0.7.0 added an equalizer (FiiO's presets and a 7-band Custom EQ) and ALAC, AAC and Opus playback; 0.6.0 made Bluetooth connect within seconds and added Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
 
 ## Features
 
@@ -24,7 +24,8 @@ Version 0.7.1 fixes a first start that stayed black with FAT32 cards; 0.7.0 adde
 | Audiobooks and podcasts | device | `Audiobooks` and `Podcasts` folders on Home, kept out of Music; a bookmark per book and episode, in-order play, hold vol± jumps 30 s / 15 s (shelves checked on the player, bookmarks and jumps in the simulator) |
 | Library and covers built on a computer | device | echo-sync, one file for Windows, macOS and Linux, writes `library.db`, `covers.bin` and the scan fingerprint so the player doesn't rescan; 1,563 tracks in 2 min on Windows (macOS and Linux untested on a card) |
 | Screen-off controls | device | Pause, volume and track skip with the screen off |
-| Settings | device | Shuffle, repeat, sleep timer, screen timeout, auto off, brightness, gain, output, start screen, USB mode |
+| Portrait mode | device | Settings → Orientation: Portrait or Portrait, flipped, with portrait layouts for Home, Now Playing, Cover Flow, the Custom EQ and lists; the volume rocker turns with the screen |
+| Settings | device | Shuffle, repeat, equalizer, sleep timer, screen timeout, auto off, brightness, orientation, gain, output, start screen, USB mode |
 | Battery and power | device | Battery level, charging, charge screen, low-battery shutdown, auto off |
 | Bluetooth headphones | device | Pair, remember up to six, auto-reconnect, switch and disconnect; headphone controls; tested with OnePlus Buds 3 |
 | USB mass storage | device | Internal storage and the SD card, read/write, at high speed; SD card reads at about 3.9 MB/s |

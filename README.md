@@ -8,6 +8,21 @@ Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has 
 
 The hardware knowledge it relies on comes largely from the [ReChord](https://github.com/brnomt/ReChord) project's research (`docs/hardware.md`, `CREDITS.md`).
 
+## What it does
+
+- **Plays** FLAC, ALAC, MP3, AAC, Opus and WAV, from 44.1 to 192 kHz with 24-bit output, gapless.
+- **Cover Flow**, with every album and a Random album tile, and **Now Playing** with the cover, progress and seeking.
+- **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **echo-sync**.
+- **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.
+- **Equalizer:** FiiO's presets and a 7-band Custom EQ.
+- **Portrait mode:** Settings → Orientation turns the screen upright either way, with layouts made for it. The volume rocker turns with it.
+- **Audiobooks and podcasts** on their own shelves, with a bookmark for each.
+- **Bluetooth headphones:** pairing, up to six remembered, reconnecting by itself.
+- **USB:** both drives as mass storage, or the player as a USB DAC.
+- **Everyday controls:** pause, volume and skip with the screen off, a sleep timer, auto off and a charge screen.
+- **Chinese, Japanese and Korean** names.
+- **Updates itself** from a file copy, and goes back to FiiO's firmware the same way.
+
 ## Build and run the simulator (macOS)
 
 ```sh

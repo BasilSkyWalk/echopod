@@ -1,5 +1,15 @@
 # EchoPod release notes
 
+## 0.8.0
+
+### New
+
+- **Portrait mode.** Settings → Orientation → Portrait or Portrait, flipped turns the screen upright straight away, and the player starts that way next time. Home shows the album art under the menu, Now Playing puts the cover above the track, Cover Flow scrolls albums from top to bottom, the Custom EQ shows its seven bands as rows, and lists show 11 rows. The volume rocker turns with the screen, so the button on top moves up through lists; in Portrait (not flipped) it also turns the volume down.
+
+### When you update
+
+- Your library, settings, equalizer and Bluetooth headphones stay as they are. Orientation starts on Landscape.
+
 ## 0.7.1
 
 ### Fixed

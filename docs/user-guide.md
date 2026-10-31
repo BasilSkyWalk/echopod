@@ -138,6 +138,12 @@ With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
 
+## Portrait mode
+
+Settings → Orientation has Landscape, Portrait and Portrait, flipped. The screen turns as soon as you pick, and the player starts the same way next time. Pick whichever portrait way round puts the buttons where you like them.
+
+In portrait, Home shows the album art under the menu, Now Playing puts the cover above the track, Cover Flow scrolls albums from top to bottom, and the Custom EQ shows its bands as rows. The volume rocker turns with the screen, so the button on top moves up through lists. In Portrait (not flipped) that same button also turns the volume down.
+
 ## Equalizer
 
 Open it from Settings → Equalizer, or hold ≡ on Now Playing.
