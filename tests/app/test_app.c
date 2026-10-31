@@ -25,8 +25,8 @@ enum {
     KEY_HOLD_MS = 30,
     FULL_FRAME_PIXELS = HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT,
     HOME_DIAGNOSTICS_INDEX = 2,
-    DIAGNOSTICS_FRAME_TIME_INDEX = 3,
-    DIAGNOSTICS_FIRMWARE_INDEX = 4,
+    DIAGNOSTICS_FRAME_TIME_INDEX = 1,
+    DIAGNOSTICS_FIRMWARE_INDEX = 2,
     MUSIC_ARTISTS_INDEX = 1,
     MUSIC_ALBUMS_INDEX = 3,
     MUSIC_FOLDERS_INDEX = 5,
@@ -54,18 +54,10 @@ enum {
     SHORT_TIMEOUT_MS = 10000,
     IDLE_MS = 20000,
     DIAGNOSTICS_KEY_TEST_INDEX = 0,
-    DIAGNOSTICS_CPU_CLOCK_INDEX = 5,
-    DIAGNOSTICS_STOPWATCH_INDEX = 6,
-    DIAGNOSTICS_TEST_TONE_INDEX = 7,
-    DIAGNOSTICS_DMA_TONE_INDEX = 8,
-    DIAGNOSTICS_ACCEL_INDEX = 24,
-    DIAGNOSTICS_HIGH_RATE_TONE_INDEX = 25,
-    DIAGNOSTICS_WATCHDOG_TEST_INDEX = 26,
-    DIAGNOSTICS_TONE_176_INDEX = 27,
-    DIAGNOSTICS_LOOP_CYCLES_INDEX = 11,
-    DIAGNOSTICS_CORE1_INDEX = 12,
-    DIAGNOSTICS_STALL_TEST_INDEX = 19,
-    DIAGNOSTICS_POWER_TAPS_INDEX = 20,
+    DIAGNOSTICS_CPU_CLOCK_INDEX = 3,
+    DIAGNOSTICS_CORE1_INDEX = 4,
+    DIAGNOSTICS_POWER_TAPS_INDEX = 11,
+    DIAGNOSTICS_ACCEL_INDEX = 14,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 600,
@@ -1767,34 +1759,6 @@ static void the_cpu_clock_cycles_through_24_96_and_200_mhz(void)
     CHECK_EQUAL(200, hal_system_clock_mhz());
 }
 
-static void the_test_tone_plays_once_per_press(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_TEST_TONE_INDEX);
-    CHECK_EQUAL(0, fake_hal_test_tone_count());
-    tap(KEY_PLAY);
-    CHECK_EQUAL(1, fake_hal_test_tone_count());
-    CHECK(title_is("Diagnostics"));
-}
-
-static void the_stall_test_row_freezes_the_main_loop_on_purpose(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_STALL_TEST_INDEX);
-    CHECK_EQUAL(0, fake_hal_stall_test_count());
-    tap(KEY_PLAY);
-    CHECK_EQUAL(1, fake_hal_stall_test_count());
-}
-
-static void the_watchdog_test_row_stops_everything_on_purpose(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_WATCHDOG_TEST_INDEX);
-    CHECK_EQUAL(0, fake_hal_watchdog_test_count());
-    tap(KEY_PLAY);
-    CHECK_EQUAL(1, fake_hal_watchdog_test_count());
-}
-
 static void ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off(void)
 {
     start_app();
@@ -1805,58 +1769,6 @@ static void ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off
     hold_power();
     wait_ms(GOODBYE_MS);
     CHECK_EQUAL(1, fake_hal_power_off_count());
-}
-
-static void the_dma_tone_starts_and_stops_from_one_row(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_DMA_TONE_INDEX);
-    CHECK(!hal_audio_dma_tone_status().running);
-    tap(KEY_PLAY);
-    CHECK(hal_audio_dma_tone_status().running);
-    tap(KEY_PLAY);
-    CHECK(!hal_audio_dma_tone_status().running);
-    CHECK(title_is("Diagnostics"));
-}
-
-static void the_high_rate_tone_plays_at_192_khz(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_HIGH_RATE_TONE_INDEX);
-    tap(KEY_PLAY);
-    CHECK(hal_audio_dma_tone_status().running);
-    CHECK_EQUAL(192000u, fake_hal_dma_tone_rate());
-    tap(KEY_PLAY);
-    CHECK(!hal_audio_dma_tone_status().running);
-}
-
-static void the_176_khz_tone_plays_at_176_4_khz(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_TONE_176_INDEX);
-    tap(KEY_PLAY);
-    CHECK(hal_audio_dma_tone_status().running);
-    CHECK_EQUAL(176400u, fake_hal_dma_tone_rate());
-    tap(KEY_PLAY);
-    CHECK(!hal_audio_dma_tone_status().running);
-}
-
-static void the_dma_tone_plays_at_44_1_khz(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_DMA_TONE_INDEX);
-    tap(KEY_PLAY);
-    CHECK_EQUAL(44100u, fake_hal_dma_tone_rate());
-}
-
-static void the_loop_benchmark_runs_once_per_press(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_LOOP_CYCLES_INDEX);
-    CHECK_EQUAL(0, fake_hal_loop_bench_count());
-    tap(KEY_PLAY);
-    CHECK_EQUAL(1, fake_hal_loop_bench_count());
-    CHECK(title_is("Diagnostics"));
 }
 
 static void the_core_1_test_runs_once_per_press(void)
@@ -1887,19 +1799,6 @@ static void a_clock_that_does_not_lock_stays_where_it_was(void)
     tap(KEY_PLAY);
     CHECK_EQUAL(200, hal_system_clock_mhz());
     CHECK(title_is("Diagnostics"));
-}
-
-static void the_stopwatch_stays_open_after_waking(void)
-{
-    start_app_with_library();
-    play_first_album_track();
-    hold_back();
-    open_diagnostics_row(DIAGNOSTICS_STOPWATCH_INDEX);
-    tap(KEY_PLAY);
-    CHECK(title_is("Stopwatch"));
-    tap(KEY_POWER);
-    tap(KEY_POWER);
-    CHECK(title_is("Stopwatch"));
 }
 
 static void menu_opens_now_playing_from_anywhere_while_playing(void)
@@ -1961,19 +1860,10 @@ int main(void)
         TEST_CASE(waking_the_screen_shows_now_playing_while_playing),
         TEST_CASE(waking_while_paused_keeps_the_screen),
         TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
-        TEST_CASE(the_test_tone_plays_once_per_press),
-        TEST_CASE(the_dma_tone_starts_and_stops_from_one_row),
-        TEST_CASE(the_high_rate_tone_plays_at_192_khz),
-        TEST_CASE(the_176_khz_tone_plays_at_176_4_khz),
-        TEST_CASE(the_dma_tone_plays_at_44_1_khz),
-        TEST_CASE(the_stall_test_row_freezes_the_main_loop_on_purpose),
-        TEST_CASE(the_watchdog_test_row_stops_everything_on_purpose),
         TEST_CASE(ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off),
-        TEST_CASE(the_loop_benchmark_runs_once_per_press),
         TEST_CASE(the_core_1_test_runs_once_per_press),
         TEST_CASE(the_accelerator_test_runs_once_per_press),
         TEST_CASE(a_clock_that_does_not_lock_stays_where_it_was),
-        TEST_CASE(the_stopwatch_stays_open_after_waking),
         TEST_CASE(menu_does_nothing_while_nothing_plays),
         TEST_CASE(now_playing_shows_the_album_cover),
         TEST_CASE(now_playing_without_a_cover_keeps_the_text_layout),

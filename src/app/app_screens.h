@@ -14,9 +14,7 @@
 #include "screens/bluetooth_screen.h"
 #include "screens/cover_flow_screen.h"
 #include "screens/equalizer_screen.h"
-#include "screens/font_sample_screen.h"
 #include "screens/now_playing_screen.h"
-#include "screens/stopwatch_screen.h"
 #include "screens/test_pattern_screen.h"
 #include "screens/up_next_screen.h"
 #include "settings/settings.h"
@@ -30,14 +28,9 @@ enum {
     HOME_ITEM_COUNT = 6,
     SHELF_COUNT = 2,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 32,
+    DIAGNOSTICS_ITEM_COUNT = 16,
     START_PATH_CAPACITY = 2
 };
-
-typedef struct HighRamOption {
-    bool run;
-    HalHighRamTest test;
-} HighRamOption;
 
 typedef struct AppOptions {
     bool show_frame_time;
@@ -48,16 +41,6 @@ typedef struct ClockOption {
     bool failed;
 } ClockOption;
 
-typedef struct ToneOption {
-    bool tried;
-    HalToneResult result;
-} ToneOption;
-
-typedef struct LoopOption {
-    bool run;
-    HalLoopCycles cycles;
-} LoopOption;
-
 typedef struct Core1Option {
     bool run;
     HalCore1Test test;
@@ -67,13 +50,6 @@ typedef struct Core1AccelOption {
     bool run;
     HalCore1Accel result;
 } Core1AccelOption;
-
-typedef struct DmaToneOption {
-    uint32_t sample_rate;
-    bool tried;
-    bool stopped;
-    HalToneResult result;
-} DmaToneOption;
 
 typedef struct BrowseEntry {
     BrowsePool *pool;
@@ -91,7 +67,6 @@ typedef struct AppScreens {
     MenuScreen music;
     SettingsScreens settings;
     MenuScreen diagnostics;
-    MenuScreen long_names;
     MessageScreen no_library;
     BrowsePool browse;
     NowPlayingScreen now_playing;
@@ -100,23 +75,15 @@ typedef struct AppScreens {
     BrowseEntry browse_entries[MUSIC_ITEM_COUNT];
     BrowseEntry shelf_entries[SHELF_COUNT];
     TestPatternScreen test_pattern;
-    FontSampleScreen font_sample;
-    StopwatchScreen stopwatch;
     BluetoothScreen bluetooth;
     EqualizerScreen equalizer;
     ClockOption clock;
-    ToneOption tone;
-    DmaToneOption dma_tone;
-    DmaToneOption high_rate_tone;
-    DmaToneOption tone_176;
-    LoopOption loop;
     Core1Option core1;
     Core1AccelOption core1_accel;
     MenuItem home_items[HOME_ITEM_COUNT];
     HomeArt home_art;
     MenuItem music_items[MUSIC_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];
-    HighRamOption high_ram;
 } AppScreens;
 
 typedef struct AppScreensContext {
