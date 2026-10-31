@@ -9,7 +9,7 @@
 #include "ui/theme.h"
 
 enum {
-    UP_NEXT_ROWS = 12,
+    UP_NEXT_ROWS = 11,
     UP_NEXT_LABEL_CAPACITY = 128,
     UP_NEXT_DETAIL_CAPACITY = 64,
     UP_NEXT_QUEUE_ROWS = 500

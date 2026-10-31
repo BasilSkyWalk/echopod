@@ -26,7 +26,7 @@ enum {
     RESET_LOW_MS = 150,
     RESET_SETTLE_MS = 30,
     RESET_READY_MS = 120,
-    CLEAR_ROWS = 10,
+    CLEAR_ROWS = 2,
     PWM_GATE = 0x90,
     PWM_RESET = 0x17,
     PWM_RESET_MS = 1

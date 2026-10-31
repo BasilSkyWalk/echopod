@@ -54,6 +54,7 @@ DATA_BASE = 0x03004000
 DATA_LIMIT = 0x0304C000
 ENTRY_VECTOR_SIZE = 8
 MAX_DATA_SIZE = 180
+LOADED_LIMIT = 437600
 DATE_OFFSET = 0x00
 BRAND_OFFSET = 0x10
 BUILD_TAG_OFFSET = 0x30
@@ -293,6 +294,10 @@ def check_firmware(firmware):
         raise ImageError(f"code is {len(code)} bytes and would reach {CODE_LIMIT:#010x}")
     if DATA_BASE + len(data) + firmware.bss_size > DATA_LIMIT:
         raise ImageError(f".data and .bss would pass {DATA_LIMIT:#010x}")
+    loaded = len(code) + len(data) + firmware.bss_size
+    if loaded > LOADED_LIMIT:
+        raise ImageError(f"code, .data and .bss come to {loaded:,} bytes; "
+                         f"only up to {LOADED_LIMIT:,} is proven to start")
 
 
 def text_field(text, name):

@@ -244,6 +244,14 @@ class FirmwareRulesTest(unittest.TestCase):
     def test_data_and_bss_beyond_0x0304c000_are_refused(self):
         self.assert_refused(firmware(bss_size=0x48000))
 
+    def test_code_data_and_bss_past_the_proven_total_are_refused(self):
+        self.assert_refused(firmware(code_tail=b"\x00" * 150000, bss_size=288000))
+
+    def test_code_data_and_bss_at_the_proven_total_are_accepted(self):
+        code = 150000
+        bss = make_image.LOADED_LIMIT - 256 - code - 8
+        self.assertEqual(IMAGE_SIZE, len(build(firmware(code_tail=b"\x00" * code, bss_size=bss))))
+
     def test_unaligned_code_is_refused(self):
         self.assert_refused(firmware(code_tail=b"\x00" * 3))
 
