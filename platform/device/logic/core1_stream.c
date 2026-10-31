@@ -10,6 +10,7 @@ enum {
     MP3_OUTPUT_BITS = 24,
     OPUS_OUTPUT_BITS = 16,
     OPUS_FRAME_SAMPLES = 960,
+    EQUALIZED_BITS = 24,
     MILLISECONDS_PER_SECOND = 1000
 };
 
@@ -108,6 +109,54 @@ static void count_wall(Core1Stream *stream)
     }
 }
 
+void core1_stream_set_equalizer(Core1Stream *stream, Equalizer *equalizer,
+                                volatile Core1EqualizerShare *share)
+{
+    equalizer_init(equalizer);
+    stream->equalizer = equalizer;
+    stream->share = share;
+    stream->share_version = 0;
+}
+
+static void follow_share(Core1Stream *stream)
+{
+    uint32_t version = stream->share->version;
+    if (version == stream->share_version) {
+        return;
+    }
+    observe();
+    EqualizerCurve curve = stream->share->curve;
+    stream->share_version = version;
+    equalizer_set_curve(stream->equalizer, &curve);
+}
+
+static void widen(int32_t *samples, uint32_t count, uint32_t shift)
+{
+    for (uint32_t index = 0; index < count; index++) {
+        samples[index] = samples[index] * (1 << shift);
+    }
+}
+
+static uint32_t equalize_slot(Core1Stream *stream, uint32_t slot, uint32_t samples)
+{
+    if (stream->equalizer == NULL || stream->share->enabled == 0) {
+        return 0;
+    }
+    follow_share(stream);
+    uint32_t bits = stream->region.control->bits_per_sample;
+    if (!equalizer_active(stream->equalizer) || bits == 0 || bits > EQUALIZED_BITS) {
+        return 0;
+    }
+    int32_t *left = stream->region.samples[slot][0];
+    int32_t *right = stream->channels > 1 ? stream->region.samples[slot][1] : NULL;
+    widen(left, samples, EQUALIZED_BITS - bits);
+    if (right != NULL) {
+        widen(right, samples, EQUALIZED_BITS - bits);
+    }
+    equalizer_process_block(stream->equalizer, (EqualizerBlock){left, right, samples, 1});
+    return 1;
+}
+
 void core1_stream_set_decoder(Core1Stream *stream, uint32_t codec, Core1Decoder decoder)
 {
     if (codec < STREAM_CODECS) {
@@ -168,6 +217,9 @@ static void adopt(Core1Stream *stream, uint32_t generation)
     stream->slot = 0;
     stream->finished = false;
     stream->starved = false;
+    if (stream->equalizer != NULL) {
+        equalizer_set_rate(stream->equalizer, info.sample_rate);
+    }
     FlacInput input = {
         .read = read_ring, .context = stream, .size = stream->end_offset - stream->start_offset};
     uint32_t codec = control->codec;
@@ -201,6 +253,7 @@ static void fill_slot(Core1Stream *stream, Core1DecodeResult result, const Core1
     uint32_t outcome = AUDIO_FRAME_ERROR;
     if (result == CORE1_DECODED) {
         copy_channels(stream, stream->slot, block);
+        slot->equalized = equalize_slot(stream, stream->slot, block->samples);
         slot->first_sample = block->first_sample;
         slot->samples = block->samples;
         control->released = stream->start_offset + block->position;
@@ -208,6 +261,7 @@ static void fill_slot(Core1Stream *stream, Core1DecodeResult result, const Core1
     } else {
         slot->first_sample = 0;
         slot->samples = 0;
+        slot->equalized = 0;
         outcome = result == CORE1_FINISHED ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
         stream->finished = true;
     }
@@ -253,7 +307,9 @@ bool core1_stream_step(Core1Stream *stream)
         stream->starved = false;
         return false;
     }
+    started = tick_now(stream);
     fill_slot(stream, result, &block);
+    stream->busy_ticks += (tick_now(stream) - started) & stream->tick_mask;
     return true;
 }
 
@@ -411,7 +467,8 @@ static AudioFrameResult next_frame(void *context, AudioFrame *frame)
             .right = channels[source->channels > 1 ? 1 : 0] + skip,
             .first_sample = from - source->lead_trim,
             .samples = end - from,
-            .bits = source->bits_per_sample,
+            .bits = slot->equalized != 0 ? EQUALIZED_BITS : source->bits_per_sample,
+            .equalized = slot->equalized != 0,
         };
         return AUDIO_FRAME_READY;
     }

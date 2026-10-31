@@ -86,10 +86,10 @@ static void the_seek_target_stays_inside_the_track(void)
     CHECK_EQUAL(200000, now_playing_scrub_target(198000, 200000, NOW_PLAYING_SCRUB_FAST_STEP_MS));
 }
 
-static void menu_opens_up_next(void)
+static void menu_opens_up_next_and_holding_it_opens_the_equalizer(void)
 {
     CHECK_EQUAL(NOW_PLAYING_UP_NEXT, command(KEY_MENU, KEY_GESTURE_PRESS));
-    CHECK_EQUAL(NOW_PLAYING_NONE, command(KEY_MENU, KEY_GESTURE_LONG_PRESS));
+    CHECK_EQUAL(NOW_PLAYING_EQUALIZER, command(KEY_MENU, KEY_GESTURE_LONG_PRESS));
 }
 
 static void back_leaves_and_a_long_back_goes_home(void)
@@ -212,7 +212,7 @@ int main(void)
         TEST_CASE(while_seeking_volume_keys_move_the_target),
         TEST_CASE(while_seeking_play_commits_and_back_cancels),
         TEST_CASE(the_seek_target_stays_inside_the_track),
-        TEST_CASE(menu_opens_up_next),
+        TEST_CASE(menu_opens_up_next_and_holding_it_opens_the_equalizer),
         TEST_CASE(back_leaves_and_a_long_back_goes_home),
         TEST_CASE(power_is_left_to_the_system),
         TEST_CASE(volume_changes_show_the_volume_bar),

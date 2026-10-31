@@ -33,6 +33,8 @@ typedef struct FakeAudio {
     uint8_t volume;
     HalAudioGain gain;
     HalAudioOutput output;
+    EqualizerCurve equalizer;
+    int equalizer_changes;
     int refused_plays;
     HalAudioJack jack;
     HalAudioRefusal refusal;
@@ -473,6 +475,22 @@ void hal_audio_set_gain(HalAudioGain gain)
 void hal_audio_set_output(HalAudioOutput output)
 {
     fake.audio.output = output;
+}
+
+void hal_audio_set_equalizer(const EqualizerCurve *curve)
+{
+    fake.audio.equalizer = *curve;
+    fake.audio.equalizer_changes++;
+}
+
+EqualizerCurve fake_hal_equalizer(void)
+{
+    return fake.audio.equalizer;
+}
+
+int fake_hal_equalizer_changes(void)
+{
+    return fake.audio.equalizer_changes;
 }
 
 int fake_hal_audio_gain(void)

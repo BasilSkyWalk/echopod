@@ -199,6 +199,74 @@ static bool plays_exactly(const char *name, int channels)
     return ok;
 }
 
+static Equalizer core1_equalizer;
+static Core1EqualizerShare share;
+
+static EqualizerCurve two_bands(int8_t low_gain, int8_t high_gain)
+{
+    EqualizerCurve curve = {.band_count = 2};
+    curve.bands[0] = (EqualizerBand){.frequency_hz = 160, .gain_db = low_gain, .q_tenths = 10};
+    curve.bands[1] = (EqualizerBand){.frequency_hz = 2500, .gain_db = high_gain, .q_tenths = 10};
+    return curve;
+}
+
+static void share_curve(EqualizerCurve curve, bool enabled)
+{
+    share.curve = curve;
+    share.enabled = enabled ? 1u : 0u;
+    share.version++;
+}
+
+static bool equalized_frames_match(Fixture *pcm, Equalizer *reference, const AudioFrame *frame)
+{
+    bool ok = frame->equalized && frame->bits == 24;
+    for (uint32_t sample = 0; ok && sample < frame->samples; sample++) {
+        uint32_t index = 2 * (frame->first_sample + sample);
+        int32_t pair[2] = {expected_at(pcm, index) * 256, expected_at(pcm, index + 1) * 256};
+        equalizer_process(reference, pair, 1);
+        ok = frame->left[sample] == pair[0] && frame->right[sample] == pair[1];
+    }
+    return ok;
+}
+
+static void core_1_equalizes_exactly_like_the_main_core(void)
+{
+    start(BIG_RING_BYTES);
+    core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
+    share_curve(two_bands(6, -4), true);
+    Equalizer reference;
+    equalizer_init(&reference);
+    equalizer_set_rate(&reference, 44100);
+    EqualizerCurve curve = two_bands(6, -4);
+    equalizer_set_curve(&reference, &curve);
+    Fixture pcm = load("lpc_16_44k_stereo", "pcm");
+    AudioTrackInfo info;
+    bool ok = pcm.size > 0 && interface.open(interface.context, "lpc_16_44k_stereo", 0, &info);
+    AudioFrame frame;
+    int frames = 0;
+    while (ok && next_frame(&frame) == AUDIO_FRAME_READY) {
+        ok = equalized_frames_match(&pcm, &reference, &frame);
+        interface.release(interface.context);
+        frames++;
+    }
+    interface.close(interface.context);
+    free(pcm.bytes);
+    CHECK(ok);
+    CHECK(frames > 1);
+}
+
+static void core_1_leaves_the_audio_alone_unless_asked(void)
+{
+    start(BIG_RING_BYTES);
+    core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
+    share_curve(two_bands(6, -4), false);
+    CHECK(plays_exactly("lpc_16_44k_stereo", 2));
+    start(BIG_RING_BYTES);
+    core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
+    share_curve(two_bands(0, 0), true);
+    CHECK(plays_exactly("lpc_16_44k_stereo", 2));
+}
+
 static bool streams_exactly(const char *name, int channels, uint32_t ring_bytes)
 {
     start(ring_bytes);
@@ -741,6 +809,8 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(a_24_bit_96k_track_streams_through_core_1_exactly),
         TEST_CASE(a_16_bit_track_streams_through_core_1_exactly),
+        TEST_CASE(core_1_equalizes_exactly_like_the_main_core),
+        TEST_CASE(core_1_leaves_the_audio_alone_unless_asked),
         TEST_CASE(a_mono_track_plays_its_channel_on_both_sides),
         TEST_CASE(a_ring_smaller_than_the_track_wraps_and_stays_exact),
         TEST_CASE(core_1_waits_while_its_slots_are_full),

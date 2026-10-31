@@ -3,6 +3,7 @@
 
 #include "board.h"
 #include "device/core1_control.h"
+#include "device/core1_stream.h"
 #include "device/image_crc.h"
 #include "emmc.h"
 #include "hal/clock.h"
@@ -33,6 +34,9 @@ static uint32_t accel_classes;
 
 static HalCore1Accel run_accel_test(void);
 static Core1Program streaming_program;
+static uint32_t streaming_divider;
+static EqualizerCurve equalizer_curve;
+static uint32_t equalizer_version;
 
 static uint32_t bus_read(void *context, uint32_t address)
 {
@@ -134,15 +138,50 @@ static Core1Result place_program(Core1Program program)
     return CORE1_OK;
 }
 
+static bool equalizer_moved(void)
+{
+    for (int band = 0; band < equalizer_curve.band_count; band++) {
+        if (equalizer_curve.bands[band].gain_db != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool equalizing(Core1Program program)
+{
+    return program == CORE1_PROGRAM_FLAC && equalizer_moved();
+}
+
 static uint32_t stream_divider(Core1Program program, uint32_t pll_mhz)
 {
-    bool heavy = program == CORE1_PROGRAM_AAC || program == CORE1_PROGRAM_OPUS;
+    bool heavy =
+        program == CORE1_PROGRAM_AAC || program == CORE1_PROGRAM_OPUS || equalizing(program);
     return heavy && pll_mhz <= FULL_SPEED_MHZ ? 1 : core1_divider_for(pll_mhz);
+}
+
+static void share_equalizer(bool enabled)
+{
+    volatile Core1EqualizerShare *share =
+        (volatile Core1EqualizerShare *)(uintptr_t)CORE1_SHARED_EQUALIZER;
+    share->curve = equalizer_curve;
+    share->enabled = enabled ? 1u : 0u;
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+    share->version = ++equalizer_version;
+}
+
+void board_core1_set_equalizer(const EqualizerCurve *curve)
+{
+    equalizer_curve = *curve;
+    if (streaming && streaming_program == CORE1_PROGRAM_FLAC) {
+        share_equalizer(streaming_divider == 1);
+    }
 }
 
 bool board_core1_start_stream(Core1Program program)
 {
-    if (streaming && streaming_program == program) {
+    if (streaming && streaming_program == program &&
+        streaming_divider == stream_divider(program, hal_system_clock_mhz())) {
         return true;
     }
     board_core1_stop();
@@ -162,6 +201,7 @@ bool board_core1_start_stream(Core1Program program)
     if (result == CORE1_OK) {
         register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_STREAM);
         register_write(CORE1_SHARED_ACCEL_CLASSES, accel_classes);
+        share_equalizer(equalizing(program) && divider == 1);
         result = core1_run(&BUS, REPLY_TIMEOUT_MS);
     }
     board_start_record_step_done();
@@ -171,6 +211,7 @@ bool board_core1_start_stream(Core1Program program)
     }
     streaming = true;
     streaming_program = program;
+    streaming_divider = divider;
     return true;
 }
 

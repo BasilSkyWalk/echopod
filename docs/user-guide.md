@@ -130,13 +130,23 @@ The computer picks each album's cover the way the player does: the picture insid
 |---|---|---|
 | Volume up / down | Next / previous item; hold to scroll faster | Volume; hold Vol+ for the next track, Vol− for the previous one (in audiobooks and podcasts: 30 s forward, 15 s back) |
 | Play | Select; a song plays the list from that song. Hold on an album for Favorites, hold on a song for Play Next / Add to Up Next | Play / pause; hold to seek |
-| Menu | | Opens Up Next |
+| Menu | | Opens Up Next; hold for the Equalizer |
 | Back | Back; hold to go home | Back; hold to go home |
 | Power | Screen off or on; hold 2 s to turn off | Same |
 
 With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks (or jumps 30 s / 15 s in audiobooks and podcasts).
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
+
+## Equalizer
+
+Open it from Settings → Equalizer, or hold ≡ on Now Playing.
+
+- **Presets:** Off, Retro, Bass, Heavy, Pop, Jazz and Unique, the same ones FiiO's firmware has. Moving through the list plays each one, so you can hear them as you go. ↩ or ▶ keeps the one you're on.
+- **Custom:** press ▶ on Custom to open a 7-band equalizer (63 Hz, 160 Hz, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz and 16 kHz). Vol+ and Vol− move between the bands. Press ▶ to grab the highlighted band (its column turns blue); Vol+ and Vol− then raise and lower it by 1 dB (hold to keep going), from −12 to +12 dB. Press ▶ or ↩ to let go and pick another band. Hold ▶ to set a band back to 0 dB, and press ↩ with no band grabbed to leave. Changes play straight away; they reach your ears after a fraction of a second, because the player keeps that much music ready ahead.
+- When a band is boosted, the player lowers the overall level by the largest boost (shown as "Preamp") so loud music doesn't distort. Turn the volume up a little to make up for it.
+
+The player remembers the equalizer you used last, including your Custom bands, in `/.echo/equalizer.bin`. The equalizer also applies to Bluetooth headphones. For FLAC and ALAC the second processor does the equalizing and runs at full speed while the equalizer is on, which costs a little battery; if you switch the equalizer on or off in the middle of a FLAC track, that change of processor happens from the next track. It's off for 176.4 and 192 kHz tracks (the screen says so) and in USB DAC mode.
 
 ## Charging
 

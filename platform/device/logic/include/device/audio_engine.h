@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "codec/flac.h"
+#include "dsp/equalizer.h"
 
 enum {
     AUDIO_ENGINE_PATH_CAPACITY = 256,
@@ -30,6 +31,7 @@ typedef struct AudioFrame {
     uint32_t first_sample;
     uint32_t samples;
     uint8_t bits;
+    bool equalized;
 } AudioFrame;
 
 typedef enum AudioCodec {
@@ -118,12 +120,14 @@ typedef struct AudioEngine {
     uint32_t next_token;
     char next_path[AUDIO_ENGINE_PATH_CAPACITY];
     uint32_t gain;
+    Equalizer equalizer;
     AudioEngineStats stats;
     AudioRefusal refusal;
 } AudioEngine;
 
 void audio_engine_init(AudioEngine *engine, AudioEngineConfig config);
 void audio_engine_set_volume(AudioEngine *engine, uint8_t level);
+void audio_engine_set_equalizer(AudioEngine *engine, const EqualizerCurve *curve);
 bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms, uint32_t token);
 const char *audio_engine_current_path(const AudioEngine *engine);
 void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token);

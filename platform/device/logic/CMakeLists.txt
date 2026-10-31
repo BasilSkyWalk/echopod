@@ -116,14 +116,20 @@ add_library(echo_device_logic STATIC
 )
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
+        audio_math.c
+        battery_gauge.c
         bt_module.c
         core1_control.c
         dac_sequence.c
         emmc_layout.c
         exfat_create.c
         fat_create.c
+        fat_layout.c
+        flac_source.c
         fat_reserve.c
         image_crc.c
+        mp3_probe.c
+        msc.c
         panic_text.c
         sd_card.c
         start_record.c

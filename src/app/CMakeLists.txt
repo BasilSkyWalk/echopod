@@ -12,6 +12,7 @@ add_library(echo_app STATIC
     diagnostics_rows.c
     $<IF:$<BOOL:${ECHO_RELEASE}>,diagnostics_menu_release.c,diagnostics_menu.c>
     draw_profile.c
+    equalizer_store.c
     frame_overlay.c
     home_art.c
     library_rescan.c
@@ -24,6 +25,7 @@ add_library(echo_app STATIC
     screens/bluetooth_screen.c
     screens/charge_screen.c
     screens/cover_flow_screen.c
+    screens/equalizer_screen.c
     screens/font_sample_screen.c
     screens/now_playing_screen.c
     screens/up_next_screen.c
@@ -32,6 +34,6 @@ add_library(echo_app STATIC
 )
 target_include_directories(echo_app PUBLIC include PRIVATE .)
 target_link_libraries(echo_app
-    PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_settings echo_hal
+    PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_settings echo_sound echo_hal
     PRIVATE echo_options echo_compact
 )

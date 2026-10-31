@@ -143,12 +143,23 @@ set_source_files_properties(board/libc.c board/startup.c PROPERTIES
 )
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
+        board/audio.c
         board/bluetooth.c
+        board/clock_switch.c
+        board/core1.c
+        board/dac.c
+        board/dmac.c
+        board/emmc.c
         board/glyphs.c
         board/high_ram.c
+        board/input.c
+        board/jack.c
+        board/main.c
         board/overlay.c
         board/panic.c
+        board/power.c
         board/start_info.c
+        board/storage.c
         board/system.c
         board/update.c
         board/usb_dac_session.c

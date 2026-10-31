@@ -28,6 +28,7 @@ typedef struct StreamSlot {
     uint32_t result;
     uint32_t first_sample;
     uint32_t samples;
+    uint32_t equalized;
 } StreamSlot;
 
 typedef struct StreamControl {
@@ -49,6 +50,12 @@ typedef struct StreamControl {
     uint32_t ring_bytes;
     StreamSlot slots[STREAM_SLOTS];
 } StreamControl;
+
+typedef struct Core1EqualizerShare {
+    uint32_t version;
+    uint32_t enabled;
+    EqualizerCurve curve;
+} Core1EqualizerShare;
 
 typedef struct StreamRegion {
     volatile StreamControl *control;
@@ -103,6 +110,9 @@ typedef struct Core1Stream {
     uint32_t last_tick;
     uint32_t busy_ticks;
     uint32_t wall_ticks;
+    Equalizer *equalizer;
+    volatile Core1EqualizerShare *share;
+    uint32_t share_version;
     bool finished;
     bool starved;
 } Core1Stream;
@@ -111,6 +121,8 @@ void core1_stream_init(Core1Stream *stream, StreamRegion region, Core1Decoder de
 void core1_stream_set_decoder(Core1Stream *stream, uint32_t codec, Core1Decoder decoder);
 void core1_stream_set_clock(Core1Stream *stream, uint32_t (*ticks)(void), uint32_t mask,
                             uint32_t window);
+void core1_stream_set_equalizer(Core1Stream *stream, Equalizer *equalizer,
+                                volatile Core1EqualizerShare *share);
 bool core1_stream_step(Core1Stream *stream);
 
 typedef struct Core1Source {

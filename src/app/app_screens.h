@@ -13,6 +13,7 @@
 #include "player.h"
 #include "screens/bluetooth_screen.h"
 #include "screens/cover_flow_screen.h"
+#include "screens/equalizer_screen.h"
 #include "screens/font_sample_screen.h"
 #include "screens/now_playing_screen.h"
 #include "screens/stopwatch_screen.h"
@@ -102,6 +103,7 @@ typedef struct AppScreens {
     FontSampleScreen font_sample;
     StopwatchScreen stopwatch;
     BluetoothScreen bluetooth;
+    EqualizerScreen equalizer;
     ClockOption clock;
     ToneOption tone;
     DmaToneOption dma_tone;
@@ -130,6 +132,7 @@ typedef struct AppScreensContext {
     bool *rescan_requested;
     SpokenStore *spoken;
     BluetoothLink *bluetooth;
+    EqualizerStore *equalizer;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);

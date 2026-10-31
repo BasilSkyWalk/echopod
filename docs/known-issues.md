@@ -44,7 +44,8 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 
 ## Not there yet
 
-- No EQ, ReplayGain or lyrics.
+- No ReplayGain or lyrics.
+- The equalizer is off for 176.4 and 192 kHz tracks and in USB DAC mode. Turning it on or off while a FLAC or ALAC track plays takes effect on the second core from the next track; until then the main core does the work, so on 88.2/96 kHz tracks the screen can be less smooth for the rest of that track.
 - Bluetooth has been tested with one pair of headphones (OnePlus Buds 3). While music goes to Bluetooth the player can't read the headphone jack: pause, plug wired headphones in and press Play to switch.
 - The 4.4 mm balanced output works (reported by a tester). Settings → Output can't switch sound between the jacks: both are driven by the same DACs, so it only picks the volume table (see `docs/user-guide.md`).
 - Audiobooks and podcasts: the shelves, covers and keeping them out of Music are checked on a player; bookmarks, in-order play and the 30 s / 15 s jumps so far only in the simulator. There's no playback speed control.

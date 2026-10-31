@@ -5,6 +5,7 @@
 #include "core/power_policy.h"
 #include "player.h"
 #include "screens/bluetooth_screen.h"
+#include "screens/equalizer_screen.h"
 #include "settings_store.h"
 #include "ui/choice_screen.h"
 #include "ui/menu_screen.h"
@@ -14,8 +15,9 @@
 enum {
     SETTINGS_CHOICE_COUNT = 10,
     SETTINGS_BLUETOOTH_ITEM = 2,
-    SETTINGS_RESCAN_ITEM = 10,
-    SETTINGS_ITEM_COUNT = SETTINGS_CHOICE_COUNT + 2
+    SETTINGS_EQUALIZER_ITEM = 3,
+    SETTINGS_RESCAN_ITEM = 11,
+    SETTINGS_ITEM_COUNT = SETTINGS_CHOICE_COUNT + 3
 };
 
 typedef struct SettingsContext {
@@ -25,6 +27,7 @@ typedef struct SettingsContext {
     Toast *toast;
     bool *rescan_requested;
     BluetoothScreen *bluetooth;
+    EqualizerScreen *equalizer;
     int sleep_option;
 } SettingsContext;
 

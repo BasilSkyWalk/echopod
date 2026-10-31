@@ -14,6 +14,7 @@
 #include "cover_cache.h"
 #include "default_theme.h"
 #include "draw_profile.h"
+#include "equalizer_store.h"
 #include "favorites_store.h"
 #include "frame_overlay.h"
 #include "gfx/frame_diff.h"
@@ -81,6 +82,7 @@ typedef struct AppState {
     LibraryStore library;
     Player player;
     SettingsStore settings;
+    EqualizerStore equalizer;
     FavoritesStore favorites;
     SpokenStore spoken;
     CoverCache covers;
@@ -185,6 +187,7 @@ static void save_settings(void)
 {
     settings_store_capture(&app.settings, player_status(&app.player));
     settings_store_save(&app.settings);
+    equalizer_store_save(&app.equalizer);
 }
 
 static void save_session(void)
@@ -608,6 +611,7 @@ static void start_hardware(uint32_t now_ms)
     power_policy_init(&app.power, settings_screen_timeout_ms(&app.settings.settings), now_ms);
     power_policy_set_auto_off(&app.power, settings_auto_off_ms(&app.settings.settings), now_ms);
     settings_store_apply_hardware(&app.settings.settings);
+    equalizer_store_apply(&app.equalizer);
     set_display(true);
 }
 
@@ -635,6 +639,7 @@ static void start_screens(uint32_t now_ms)
         .covers = &app.covers,
         .rescan_requested = &app.rescan_requested,
         .bluetooth = &app.bluetooth,
+        .equalizer = &app.equalizer,
     };
     Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);
@@ -675,6 +680,7 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare();
     settings_store_load(&app.settings);
+    equalizer_store_load(&app.equalizer);
     start_playback();
     start_hardware(now_ms);
     bluetooth_link_start(&app.bluetooth, &app.toast, now_ms);

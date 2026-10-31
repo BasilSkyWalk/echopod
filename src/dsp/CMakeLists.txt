@@ -1,0 +1,7 @@
+add_library(echo_dsp STATIC equalizer.c equalizer_design.c)
+target_include_directories(echo_dsp PUBLIC include)
+target_link_libraries(echo_dsp PRIVATE echo_options)
+if(CMAKE_CROSSCOMPILING)
+    set_source_files_properties(equalizer_design.c PROPERTIES COMPILE_OPTIONS -Os)
+    set_source_files_properties(equalizer.c PROPERTIES COMPILE_OPTIONS -fno-move-loop-invariants)
+endif()

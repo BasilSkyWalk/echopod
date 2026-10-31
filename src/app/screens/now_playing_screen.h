@@ -31,7 +31,8 @@ typedef enum NowPlayingCommand {
     NOW_PLAYING_SCRUB_BACK_FAST,
     NOW_PLAYING_SCRUB_COMMIT,
     NOW_PLAYING_SCRUB_CANCEL,
-    NOW_PLAYING_UP_NEXT
+    NOW_PLAYING_UP_NEXT,
+    NOW_PLAYING_EQUALIZER
 } NowPlayingCommand;
 
 enum {
@@ -56,6 +57,7 @@ typedef struct NowPlayingConfig {
     const Theme *theme;
     CoverCache *covers;
     Screen *up_next;
+    Screen *equalizer;
 } NowPlayingConfig;
 
 typedef struct NowPlayingScreen {

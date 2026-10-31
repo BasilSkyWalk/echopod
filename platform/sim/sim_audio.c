@@ -19,6 +19,7 @@ enum {
 };
 
 static const float DECIBELS_PER_FACTOR_OF_TEN = 20.0f;
+static const float SAMPLE_SCALE = 8388607.0f;
 
 typedef struct SimTrack {
     SimDecoder decoder;
@@ -38,10 +39,12 @@ typedef struct SimAudio {
     float gain;
     HalAudioGain analog_gain;
     HalAudioOutput output;
+    Equalizer equalizer;
 } SimAudio;
 
 static SimAudio audio;
 static float chunk[CHUNK_FRAMES * STEREO];
+static int32_t fixed_chunk[CHUNK_FRAMES * STEREO];
 
 static void lock(void)
 {
@@ -116,6 +119,29 @@ static bool switch_to_next(void)
     return true;
 }
 
+static int32_t to_fixed(float sample)
+{
+    float scaled = sample * SAMPLE_SCALE;
+    return scaled >= SAMPLE_SCALE    ? (int32_t)SAMPLE_SCALE
+           : scaled <= -SAMPLE_SCALE ? -(int32_t)SAMPLE_SCALE
+                                     : (int32_t)scaled;
+}
+
+static void equalize_chunk(uint64_t frames, uint32_t rate)
+{
+    equalizer_set_rate(&audio.equalizer, rate);
+    if (!equalizer_active(&audio.equalizer)) {
+        return;
+    }
+    for (uint64_t sample = 0; sample < frames * STEREO; sample++) {
+        fixed_chunk[sample] = to_fixed(chunk[sample]);
+    }
+    equalizer_process(&audio.equalizer, fixed_chunk, (uint32_t)frames);
+    for (uint64_t sample = 0; sample < frames * STEREO; sample++) {
+        chunk[sample] = (float)fixed_chunk[sample] / SAMPLE_SCALE;
+    }
+}
+
 static bool decode_chunk(void)
 {
     SimTrack *track = current_track();
@@ -126,6 +152,7 @@ static bool decode_chunk(void)
     if (frames == 0) {
         return switch_to_next();
     }
+    equalize_chunk(frames, track->decoder.sample_rate);
     for (uint64_t sample = 0; sample < frames * STEREO; sample++) {
         chunk[sample] *= audio.gain;
     }
@@ -290,6 +317,13 @@ void hal_audio_set_gain(HalAudioGain gain)
 {
     lock();
     audio.analog_gain = gain;
+    unlock();
+}
+
+void hal_audio_set_equalizer(const EqualizerCurve *curve)
+{
+    lock();
+    equalizer_set_curve(&audio.equalizer, curve);
     unlock();
 }
 

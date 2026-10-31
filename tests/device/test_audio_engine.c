@@ -86,6 +86,7 @@ typedef struct ScriptedSource {
     int releases;
     int closes;
     uint32_t rate;
+    bool equalized;
 } ScriptedSource;
 
 static ScriptedSource scripted;
@@ -116,7 +117,8 @@ static AudioFrameResult scripted_next(void *context, AudioFrame *frame)
                           .right = source_state->right,
                           .first_sample = 0,
                           .samples = 16,
-                          .bits = 16};
+                          .bits = 16,
+                          .equalized = source_state->equalized};
     return AUDIO_FRAME_READY;
 }
 
@@ -199,6 +201,38 @@ static void playing_fills_the_ring_with_the_track(void)
     CHECK_EQUAL(AUDIO_ENGINE_PLAYING, status.state);
     CHECK_EQUAL(7u, status.token);
     CHECK_EQUAL(0u, status.position_ms);
+}
+
+static void use_a_cut_at_one_kilohertz(void)
+{
+    EqualizerCurve curve = {.band_count = 1};
+    curve.bands[0] = (EqualizerBand){.frequency_hz = 1000, .gain_db = -6, .q_tenths = 10};
+    audio_engine_set_equalizer(&engine, &curve);
+}
+
+static void the_equalizer_shapes_what_the_main_core_decodes(void)
+{
+    start_scripted_engine(0, 1);
+    use_a_cut_at_one_kilohertz();
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    pump_until_full(0);
+    bool changed = false;
+    for (uint32_t frame = 0; frame < 16; frame++) {
+        changed = changed || !frame_is(frame, scripted.left[frame], scripted.right[frame], 16);
+    }
+    CHECK(changed);
+}
+
+static void frames_core_1_already_equalized_pass_straight_through(void)
+{
+    start_scripted_engine(0, 1);
+    scripted.equalized = true;
+    use_a_cut_at_one_kilohertz();
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    pump_until_full(0);
+    for (uint32_t frame = 0; frame < 16; frame++) {
+        CHECK(frame_is(frame, scripted.left[frame], scripted.right[frame], 16));
+    }
 }
 
 static void the_position_follows_what_the_dma_consumed(void)
@@ -483,6 +517,8 @@ int main(void)
         TEST_CASE(the_dma_overtaking_the_decoder_counts_an_underrun),
         TEST_CASE(every_decoded_frame_is_counted),
         TEST_CASE(playing_fills_the_ring_with_the_track),
+        TEST_CASE(the_equalizer_shapes_what_the_main_core_decodes),
+        TEST_CASE(frames_core_1_already_equalized_pass_straight_through),
         TEST_CASE(the_position_follows_what_the_dma_consumed),
         TEST_CASE(twenty_four_bit_audio_reaches_the_ring_exactly),
         TEST_CASE(the_end_of_a_track_without_a_next_one_stops_and_goes_silent),

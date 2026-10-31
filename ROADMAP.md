@@ -52,7 +52,8 @@ Version 0.6.0 makes Bluetooth connect within seconds and adds Random album and a
 
 | Item | Status |
 |---|---|
-| Parametric EQ | todo |
+| Equalizer: stock presets and 7-band Custom | done |
+| Parametric EQ (free frequency and width per band) | todo |
 | ReplayGain | todo |
 | Lyrics (`.lrc`) | todo |
 | ALAC playback | done |

@@ -64,6 +64,7 @@ static bool resume_after_clock_change;
 static bool paused_before_clock_change;
 static uint32_t position_before_clock_change;
 static AudioEngine engine;
+static EqualizerCurve equalizer_curve;
 static DmaItem items[RING_BLOCKS];
 static HalFile file;
 static bool engine_ready;
@@ -284,6 +285,7 @@ static void ensure_engine(void)
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
     audio_engine_init(
         &engine, (AudioEngineConfig){.source = source, .ring = ring(), .ring_words = RING_WORDS});
+    audio_engine_set_equalizer(&engine, &equalizer_curve);
     engine_ready = true;
 }
 
@@ -510,6 +512,15 @@ void hal_audio_set_output(HalAudioOutput output)
 {
     output_setting = output;
     apply_volume();
+}
+
+void hal_audio_set_equalizer(const EqualizerCurve *curve)
+{
+    equalizer_curve = *curve;
+    board_core1_set_equalizer(curve);
+    if (engine_ready) {
+        audio_engine_set_equalizer(&engine, &equalizer_curve);
+    }
 }
 
 static HalAudioState state_of(AudioEngineState state)

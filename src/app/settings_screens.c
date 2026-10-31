@@ -264,9 +264,15 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
                                                          .context = context.bluetooth,
                                                          .value = bluetooth_screen_summary,
                                                          .opens = true};
+    screens->items[SETTINGS_EQUALIZER_ITEM] = (MenuItem){.label = "Equalizer",
+                                                         .select = equalizer_screen_open,
+                                                         .context = context.equalizer,
+                                                         .value = equalizer_screen_summary,
+                                                         .opens = true};
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
         int item = index < SETTINGS_BLUETOOTH_ITEM ? index : index + 1;
+        item = item < SETTINGS_EQUALIZER_ITEM ? item : item + 1;
         item = item < SETTINGS_RESCAN_ITEM ? item : item + 1;
         screens->items[item] = (MenuItem){.label = CHOICES[index].title,
                                           .select = open_choice,

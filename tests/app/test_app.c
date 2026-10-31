@@ -33,12 +33,13 @@ enum {
     HOME_SETTINGS_INDEX = 1,
     HOME_NOW_PLAYING_INDEX = 3,
     SETTINGS_REPEAT_INDEX = 1,
-    SETTINGS_SLEEP_INDEX = 3,
-    SETTINGS_TIMEOUT_INDEX = 5,
-    SETTINGS_BRIGHTNESS_INDEX = 6,
-    SETTINGS_GAIN_INDEX = 7,
-    SETTINGS_START_INDEX = 9,
-    SETTINGS_RESCAN_INDEX = 10,
+    SETTINGS_EQUALIZER_INDEX = 3,
+    SETTINGS_SLEEP_INDEX = 4,
+    SETTINGS_TIMEOUT_INDEX = 6,
+    SETTINGS_BRIGHTNESS_INDEX = 7,
+    SETTINGS_GAIN_INDEX = 8,
+    SETTINGS_START_INDEX = 10,
+    SETTINGS_RESCAN_INDEX = 11,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -545,6 +546,18 @@ static void brightness_is_applied_and_saved(void)
     CHECK_EQUAL(settings_defaults().brightness + 1, settings.brightness);
 }
 
+static void the_equalizer_opens_from_settings_and_is_applied(void)
+{
+    start_app_with_library();
+    CHECK_EQUAL(0, fake_hal_equalizer().band_count);
+    open_setting(SETTINGS_EQUALIZER_INDEX);
+    CHECK(title_is("Equalizer"));
+    move_down(2);
+    CHECK_EQUAL(2, fake_hal_equalizer().band_count);
+    tap(KEY_BACK);
+    CHECK(title_is("Settings"));
+}
+
 static void gain_is_applied(void)
 {
     start_app_with_library();
@@ -867,6 +880,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/scan.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/upnext.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/bluetooth.bin"));
+    CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/equalizer.bin"));
     step();
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
     CHECK(toast_is("Library: 0 tracks"));
@@ -875,7 +889,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(11, fake_hal_reserve_count());
+    CHECK_EQUAL(12, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -1861,6 +1875,7 @@ int main(void)
         TEST_CASE(home_art_keeps_the_playing_album),
         TEST_CASE(settings_choose_shuffle_and_repeat),
         TEST_CASE(brightness_is_applied_and_saved),
+        TEST_CASE(the_equalizer_opens_from_settings_and_is_applied),
         TEST_CASE(gain_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),
         TEST_CASE(a_new_screen_slides_in_from_the_right),

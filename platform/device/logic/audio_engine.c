@@ -11,7 +11,8 @@ enum {
     SAMPLE_MAX = 8388607,
     SAMPLE_MIN = -8388608,
     MILLISECONDS_PER_SECOND = 1000,
-    STEP_GAIN_Q16 = 58409
+    STEP_GAIN_Q16 = 58409,
+    CHUNK_FRAMES = 32
 };
 
 static const uint32_t SUPPORTED_RATES[] = {44100, 48000, 88200, 96000, 176400, 192000};
@@ -52,6 +53,17 @@ void audio_engine_set_volume(AudioEngine *engine, uint8_t level)
         gain = (uint32_t)(((uint64_t)gain * STEP_GAIN_Q16 + UNITY_GAIN / 2) >> GAIN_SHIFT);
     }
     engine->gain = gain;
+}
+
+void audio_engine_set_equalizer(AudioEngine *engine, const EqualizerCurve *curve)
+{
+    equalizer_set_curve(&engine->equalizer, curve);
+}
+
+static void use_output_rate(AudioEngine *engine)
+{
+    engine->output_rate = engine->decode_rate;
+    equalizer_set_rate(&engine->equalizer, engine->output_rate);
 }
 
 static void release_frame(AudioEngine *engine)
@@ -138,7 +150,7 @@ static bool start_track(AudioEngine *engine, const char *path, uint32_t start_ms
         engine->segment_count = 1;
         return false;
     }
-    engine->output_rate = engine->decode_rate;
+    use_output_rate(engine);
     push_segment(engine, path, token, 0, start_ms);
     engine->state = AUDIO_ENGINE_PLAYING;
     return true;
@@ -236,17 +248,70 @@ static void write_frame(AudioEngine *engine, int32_t left, int32_t right)
     engine->produced++;
 }
 
+static int32_t clamped(int32_t sample)
+{
+    return sample > SAMPLE_MAX ? SAMPLE_MAX : sample < SAMPLE_MIN ? SAMPLE_MIN : sample;
+}
+
+static void widen_chunk(const int32_t *source, int32_t *chunk, uint32_t count, int shift)
+{
+    for (uint32_t index = 0; index < count; index++) {
+        chunk[WORDS_PER_FRAME * index] = clamped(source[index] * (1 << shift));
+    }
+}
+
+static void scale_chunk(const AudioEngine *engine, const int32_t *source, int32_t *chunk,
+                        uint32_t count)
+{
+    for (uint32_t index = 0; index < count; index++) {
+        chunk[WORDS_PER_FRAME * index] = to_output(source[index], engine->frame.bits, engine->gain);
+    }
+}
+
+static void convert_chunk(const AudioEngine *engine, int32_t *chunk, uint32_t count)
+{
+    const int32_t *left = engine->frame.left + engine->pending_offset;
+    const int32_t *right = engine->frame.right + engine->pending_offset;
+    int bits = engine->frame.bits;
+    if (engine->gain == UNITY_GAIN && bits <= OUTPUT_BITS) {
+        widen_chunk(left, chunk, count, OUTPUT_BITS - bits);
+        widen_chunk(right, chunk + 1, count, OUTPUT_BITS - bits);
+        return;
+    }
+    scale_chunk(engine, left, chunk, count);
+    scale_chunk(engine, right, chunk + 1, count);
+}
+
+static void write_chunk(AudioEngine *engine, const int32_t *chunk, uint32_t count)
+{
+    uint32_t frames = ring_frames(engine);
+    uint32_t slot = engine->produced % frames;
+    for (uint32_t index = 0; index < count; index++) {
+        uint32_t *words = &engine->config.ring[WORDS_PER_FRAME * slot];
+        words[0] = output_word(chunk[WORDS_PER_FRAME * index]);
+        words[1] = output_word(chunk[WORDS_PER_FRAME * index + 1]);
+        slot = slot + 1 == frames ? 0 : slot + 1;
+    }
+    engine->produced += count;
+}
+
+static uint32_t smaller(uint32_t first, uint32_t second)
+{
+    return first < second ? first : second;
+}
+
 static void copy_pending(AudioEngine *engine)
 {
-    const int32_t *left = engine->frame.left;
-    const int32_t *right = engine->frame.right;
-    int bits = engine->frame.bits;
+    int32_t chunk[WORDS_PER_FRAME * CHUNK_FRAMES];
     while (engine->pending_frames > 0 && free_space(engine) > 0) {
-        uint32_t index = engine->pending_offset;
-        write_frame(engine, to_output(left[index], bits, engine->gain),
-                    to_output(right[index], bits, engine->gain));
-        engine->pending_offset++;
-        engine->pending_frames--;
+        uint32_t count = smaller(smaller(engine->pending_frames, free_space(engine)), CHUNK_FRAMES);
+        convert_chunk(engine, chunk, count);
+        if (equalizer_active(&engine->equalizer) && !engine->frame.equalized) {
+            equalizer_process(&engine->equalizer, chunk, count);
+        }
+        write_chunk(engine, chunk, count);
+        engine->pending_offset += count;
+        engine->pending_frames -= count;
     }
     if (engine->pending_frames == 0) {
         release_frame(engine);
@@ -367,7 +432,7 @@ void audio_engine_restart(AudioEngine *engine)
         return;
     }
     reset_positions(engine);
-    engine->output_rate = engine->decode_rate;
+    use_output_rate(engine);
     push_segment(engine, engine->next_path, engine->next_token, 0, 0);
 }
 
