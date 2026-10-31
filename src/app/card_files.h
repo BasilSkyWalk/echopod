@@ -7,4 +7,4 @@ typedef struct CardFilesReport {
     bool card_full;
 } CardFilesReport;
 
-CardFilesReport card_files_prepare(void);
+CardFilesReport card_files_prepare(void (*creating)(void));

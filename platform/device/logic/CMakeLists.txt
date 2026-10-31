@@ -122,9 +122,11 @@ if(CMAKE_CROSSCOMPILING)
         core1_control.c
         dac_sequence.c
         emmc_layout.c
+        exfat.c
         exfat_create.c
         fat_create.c
         fat_layout.c
+        fat_names.c
         flac_source.c
         fat_reserve.c
         image_crc.c

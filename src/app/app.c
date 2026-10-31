@@ -659,6 +659,11 @@ static void report_card_files(CardFilesReport files, uint32_t now_ms)
     }
 }
 
+static void show_card_setup(void)
+{
+    app_show_notice("EchoPod", "Setting up the card...");
+}
+
 void app_start(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
@@ -678,7 +683,7 @@ void app_start(void)
     app.battery_check_ms = now_ms;
     app.splash = (Fade){.active = false};
     app.now_ms = now_ms;
-    CardFilesReport files = card_files_prepare();
+    CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
     equalizer_store_load(&app.equalizer);
     start_playback();

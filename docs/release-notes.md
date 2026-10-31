@@ -1,5 +1,11 @@
 # EchoPod release notes
 
+## Unreleased
+
+### Fixed
+
+- **The first start with a FAT32 card no longer looks frozen.** With a FAT32 microSD card full of music, the first start after installing could stay on a black screen for minutes while the player set up its files on the card, so it looked like it wouldn't boot. It now finds the free space on the card in one pass instead of one pass per file, and shows "Setting up the card..." while it works. exFAT cards weren't affected.
+
 ## 0.7.0
 
 ### New

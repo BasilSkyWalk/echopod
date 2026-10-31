@@ -261,6 +261,46 @@ static void check_few_writes(const char *name)
     sparse_card_free(&card->sparse);
 }
 
+static const char *const NEW_FILES[] = {"/new/one.bin",  "/new/two.bin",  "/new/three.bin",
+                                        "/new/four.bin", "/new/five.bin", "/new/six.bin"};
+
+static uint32_t fill_half_and_remount(Card *card)
+{
+    uint32_t cluster_bytes = (uint32_t)SECTOR_SIZE << card->volume.cluster_shift;
+    uint32_t clusters = card->volume.cluster_count / 2;
+    CHECK_EQUAL(FAT_RESERVE_CREATED,
+                fat_reserve(&card->volume, "/filler.bin", clusters * cluster_bytes));
+    remount(card);
+    return clusters * 4 / SECTOR_SIZE;
+}
+
+static uint32_t reads_for_new_files(Card *card)
+{
+    uint32_t before = card->sparse.calls;
+    for (size_t index = 0; index < sizeof NEW_FILES / sizeof NEW_FILES[0]; index++) {
+        uint32_t size = index == 2 ? 1024u * 1024 : 4096;
+        CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, NEW_FILES[index], size));
+    }
+    return card->sparse.calls - before;
+}
+
+static void a_full_fat32_card_is_scanned_at_most_once_for_new_files(void)
+{
+    Card *card = mounted("fat32_mbr");
+    uint32_t used_fat_sectors = fill_half_and_remount(card);
+    uint32_t with_hint = reads_for_new_files(card);
+    sparse_card_free(&card->sparse);
+    card = mounted("fat32_mbr");
+    fill_half_and_remount(card);
+    card->volume.info_sector = 0;
+    uint32_t without_hint = reads_for_new_files(card);
+    CHECK(with_hint < used_fat_sectors / 4);
+    CHECK(without_hint < used_fat_sectors / 2);
+    check_cleared_file(card, "/new/three.bin", 1024u * 1024);
+    check_cleared_file(card, "/new/six.bin", 4096);
+    sparse_card_free(&card->sparse);
+}
+
 static void reserving_32_megabytes_takes_few_writes(void)
 {
     check_few_writes("fat32_mbr");
@@ -288,6 +328,7 @@ int main(void)
         TEST_CASE(long_names_with_the_same_start_get_distinct_short_names),
         TEST_CASE(lower_case_short_names_keep_their_case),
         TEST_CASE(reserving_32_megabytes_takes_few_writes),
+        TEST_CASE(a_full_fat32_card_is_scanned_at_most_once_for_new_files),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

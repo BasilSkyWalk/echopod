@@ -51,6 +51,7 @@ typedef struct FatVolume {
     uint32_t data_start;
     uint32_t cluster_count;
     uint32_t cluster_shift;
+    uint32_t free_hint;
     uint32_t cache_lba;
     uint32_t cache_count;
     uint32_t cache_index;

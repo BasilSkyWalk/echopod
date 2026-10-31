@@ -80,13 +80,14 @@ static bool read_fat_sectors(FatVolume *volume, uint32_t sector_index)
     return fat_read_run(volume, volume->fat_start + sector_index, count);
 }
 
-static FatReserveResult find_free_run(FatVolume *volume, uint32_t needed, uint32_t *first)
+static FatReserveResult scan_free_run(FatVolume *volume, uint32_t from, uint32_t needed,
+                                      uint32_t *first)
 {
     uint32_t per_sector = entries_per_fat_sector(volume);
     uint32_t end = volume->cluster_count + FIRST_CLUSTER;
     uint32_t run = 0;
-    for (uint32_t cluster = FIRST_CLUSTER; cluster < end; cluster++) {
-        if ((cluster == FIRST_CLUSTER || cluster % per_sector == 0) &&
+    for (uint32_t cluster = from; cluster < end; cluster++) {
+        if ((cluster == from || cluster % per_sector == 0) &&
             !read_fat_sectors(volume, cluster / per_sector)) {
             return FAT_RESERVE_FAILED;
         }
@@ -97,6 +98,40 @@ static FatReserveResult find_free_run(FatVolume *volume, uint32_t needed, uint32
         }
     }
     return FAT_RESERVE_NO_SPACE;
+}
+
+static uint32_t info_next_free(FatVolume *volume)
+{
+    if (volume->info_sector == 0 || !fat_read_sector(volume, volume->info_sector)) {
+        return 0;
+    }
+    const uint8_t *sector = fat_cached_sector(volume);
+    bool valid = fat_le32(sector) == INFO_LEAD_SIGNATURE &&
+                 fat_le32(sector + INFO_STRUCT_OFFSET) == INFO_STRUCT_SIGNATURE;
+    return valid ? fat_le32(sector + INFO_NEXT_OFFSET) : 0;
+}
+
+static uint32_t search_start(FatVolume *volume)
+{
+    if (volume->free_hint == 0) {
+        volume->free_hint = info_next_free(volume);
+    }
+    uint32_t end = volume->cluster_count + FIRST_CLUSTER;
+    return volume->free_hint > FIRST_CLUSTER && volume->free_hint < end ? volume->free_hint
+                                                                        : FIRST_CLUSTER;
+}
+
+static FatReserveResult find_free_run(FatVolume *volume, uint32_t needed, uint32_t *first)
+{
+    uint32_t from = search_start(volume);
+    FatReserveResult result = scan_free_run(volume, from, needed, first);
+    if (result == FAT_RESERVE_NO_SPACE && from != FIRST_CLUSTER) {
+        result = scan_free_run(volume, FIRST_CLUSTER, needed, first);
+    }
+    if (result == FAT_RESERVE_CREATED) {
+        volume->free_hint = *first + needed;
+    }
+    return result;
 }
 
 static uint32_t chain_value(const FatVolume *volume, uint32_t cluster, uint32_t last)

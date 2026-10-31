@@ -36,11 +36,15 @@ static const CardFile CARD_FILES[] = {
     {BLUETOOTH_STORE_PATH, SMALL_FILE_BYTES},   {EQUALIZER_STORE_PATH, SMALL_FILE_BYTES},
 };
 
-CardFilesReport card_files_prepare(void)
+CardFilesReport card_files_prepare(void (*creating)(void))
 {
     CardFilesReport report = {.library_created = false, .card_full = false};
     for (size_t index = 0; index < sizeof CARD_FILES / sizeof CARD_FILES[0]; index++) {
         HalReserveResult result = hal_file_reserve(CARD_FILES[index].path, CARD_FILES[index].size);
+        if (result == HAL_RESERVE_CREATED && creating != NULL) {
+            creating();
+            creating = NULL;
+        }
         report.card_full |= result == HAL_RESERVE_NO_SPACE;
         report.library_created |=
             result == HAL_RESERVE_CREATED && CARD_FILES[index].path == LIBRARY_STORE_PATH;
