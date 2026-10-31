@@ -8,9 +8,9 @@ add_library(echo_sim_codecs STATIC sim_codecs.c)
 target_include_directories(echo_sim_codecs SYSTEM PUBLIC ${PROJECT_SOURCE_DIR}/third_party/dr_libs)
 target_compile_options(echo_sim_codecs PRIVATE -w)
 
-add_library(echo_sim_decoder STATIC sim_decoder.c)
+add_library(echo_sim_decoder STATIC sim_decoder.c sim_mp4.c sim_opus.c)
 target_include_directories(echo_sim_decoder PUBLIC .)
-target_link_libraries(echo_sim_decoder PUBLIC echo_hal echo_sim_codecs PRIVATE echo_core echo_options)
+target_link_libraries(echo_sim_decoder PUBLIC echo_hal echo_codec echo_faad2 echo_opus echo_sim_codecs PRIVATE echo_core echo_options)
 
 string(REPLACE ";" "|" ECHO_GLYPH_FACE_PATHS "${ECHO_GLYPH_FACE_FILES}")
 add_library(echo_sim_glyphs STATIC sim_glyphs.c)

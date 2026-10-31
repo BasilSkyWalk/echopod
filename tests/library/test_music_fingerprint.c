@@ -166,8 +166,9 @@ static void files_the_library_ignores_do_not_count(void)
 
 static void every_format_the_library_reads_counts(void)
 {
-    static const char *const NAMES[] = {"a.flac", "a.ogg", "a.mp3", "a.m4a",  "a.wav", "a.wma",
-                                        "a.ape",  "a.dsf", "a.dff", "A.FLAC", "b.m3u", "b.M3U8"};
+    static const char *const NAMES[] = {"a.flac", "a.ogg", "a.opus", "a.mp3", "a.m4a",
+                                        "a.wav",  "a.wma", "a.ape",  "a.dsf", "a.dff",
+                                        "A.FLAC", "b.m3u", "b.M3U8"};
     for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
         music_card();
         MusicFingerprint before = fingerprint();

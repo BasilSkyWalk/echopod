@@ -272,11 +272,12 @@ static void the_frame_overlay_shows_the_audio_numbers(void)
     HalAudioStats stats = {.buffered_ms = 340,
                            .underruns = 2,
                            .output_underruns = 7,
+                           .core1_load = 83,
                            .decode_total_us = 100000,
                            .busy_us = 640000,
                            .elapsed_us = 1000000};
     frame_overlay_format_audio(stats, text, sizeof text);
-    CHECK(strcmp("b340 x2 o7 L64%", text) == 0);
+    CHECK(strcmp("b340 x2 o7 L64% c83%", text) == 0);
 }
 
 static void the_frame_overlay_shows_average_and_longest_block_times(void)
@@ -297,7 +298,7 @@ static void the_frame_overlay_shows_zero_before_any_block(void)
     frame_overlay_format_block_times((HalAudioStats){0}, text, sizeof text);
     CHECK(strcmp("d0/0 c0/0", text) == 0);
     frame_overlay_format_audio((HalAudioStats){0}, text, sizeof text);
-    CHECK(strcmp("b0 x0 o0 L0%", text) == 0);
+    CHECK(strcmp("b0 x0 o0 L0% c0%", text) == 0);
 }
 
 static void open_music_entry(int index)

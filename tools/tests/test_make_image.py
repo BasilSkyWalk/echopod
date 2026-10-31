@@ -489,6 +489,41 @@ class Core1ModuleTest(unittest.TestCase):
         self.assertEqual(program, image[start:start + len(program)])
         self.assertEqual([], make_image.validate_image(image))
 
+    def test_the_aac_program_sits_between_the_flac_slot_and_the_glyph_table(self):
+        program = bytes(range(250)) * 7
+        image = build(core1_aac=program, core1_flac=b"3" * 300)
+        offset = make_image.CORE1_AAC_OFFSET
+        self.assertGreaterEqual(offset, make_image.CORE1_FLAC_OFFSET +
+                                make_image.CORE1_MODULE_HEADER_SIZE +
+                                make_image.CORE1_MODULE_CAPACITY)
+        self.assertEqual(0, offset % 512)
+        self.assertEqual(make_image.GLYPH_TABLE_OFFSET,
+                         offset + make_image.CORE1_MODULE_HEADER_SIZE + make_image.CORE1_AAC_CAPACITY)
+        self.assertEqual(b"EC1M", image[offset:offset + 4])
+        self.assertEqual(len(program), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(program), word(image, offset + 8))
+        start = offset + make_image.CORE1_MODULE_HEADER_SIZE
+        self.assertEqual(program, image[start:start + len(program)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_an_aac_program_that_reaches_the_glyph_table_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(core1_aac=bytes(make_image.CORE1_AAC_CAPACITY + 1))
+
+    def test_the_opus_program_sits_between_the_overlay_and_the_mp3_slot(self):
+        program = bytes(range(240)) * 9
+        image = build(core1_opus=program, core1_mp3=bytes(300))
+        offset = make_image.CORE1_OPUS_OFFSET
+        self.assertGreaterEqual(offset, make_image.OVERLAY_OFFSET + make_image.OVERLAY_CAPACITY)
+        self.assertLessEqual(offset + make_image.CORE1_MODULE_HEADER_SIZE +
+                             make_image.CORE1_MODULE_CAPACITY, make_image.CORE1_MP3_OFFSET)
+        self.assertEqual(0, offset % 512)
+        self.assertEqual(b"EC1M", image[offset:offset + 4])
+        self.assertEqual(len(program), word(image, offset + 4))
+        start = offset + make_image.CORE1_MODULE_HEADER_SIZE
+        self.assertEqual(program, image[start:start + len(program)])
+        self.assertEqual([], make_image.validate_image(image))
+
     def test_no_program_leaves_the_space_empty(self):
         offset = make_image.CORE1_MP3_OFFSET
         self.assertEqual(bytes(16), build()[offset:offset + 16])
@@ -522,6 +557,9 @@ class GlyphFaceTest(unittest.TestCase):
                  (make_image.CORE1_MP3_OFFSET, make_image.CORE1_MP3_OFFSET + 512 +
                   make_image.CORE1_MODULE_CAPACITY),
                  (make_image.CORE1_FLAC_OFFSET, make_image.CORE1_FLAC_OFFSET + 512 +
+                  make_image.CORE1_MODULE_CAPACITY),
+                 (make_image.CORE1_AAC_OFFSET, make_image.GLYPH_TABLE_OFFSET),
+                 (make_image.CORE1_OPUS_OFFSET, make_image.CORE1_OPUS_OFFSET + 512 +
                   make_image.CORE1_MODULE_CAPACITY),
                  (make_image.GLYPH_TABLE_OFFSET, make_image.GLYPH_TABLE_OFFSET + 512),
                  (make_image.FW_SIZE, make_image.IMAGE_SIZE),

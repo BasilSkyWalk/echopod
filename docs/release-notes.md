@@ -1,5 +1,13 @@
 # EchoPod release notes
 
+## Unreleased
+
+### New
+
+- **ALAC (Apple Lossless) plays.** `.m4a` files in Apple Lossless now play, at 16, 20 or 24 bits, mono or stereo, at the same rates as FLAC (44.1 to 192 kHz), with seeking and gapless playback. Now Playing shows ALAC with the bit depth and rate.
+- **AAC plays.** `.m4a` files in AAC (the kind iTunes and most phones make) now play, mono or stereo, with seeking and gapless playback (the encoder's lead-in is trimmed). Now Playing shows AAC with the bitrate. HE-AAC files (often used for podcasts and radio) still say they aren't supported. AAC and Opus run the second core at full speed, so they may use a little more battery than FLAC or MP3.
+- **Opus plays.** `.opus` files now show up in the library (with their tags and length) and play, mono or stereo, with seeking that lands on the exact spot and gapless playback. Now Playing shows Opus with the bitrate. Rescan the library (Settings → Rescan library) or run echo-sync again to see Opus files you already have.
+
 ## 0.6.0
 
 ### New

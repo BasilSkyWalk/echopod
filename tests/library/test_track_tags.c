@@ -22,6 +22,7 @@ typedef struct Expected {
 static const Expected TAGGED[] = {
     {"tagged.flac", TAG_FORMAT_FLAC, "Post-Rock", 1000, TAG_PICTURE_RAW},
     {"tagged.ogg", TAG_FORMAT_OGG, "Post-Rock", 1001, TAG_PICTURE_BASE64_FLAC_BLOCK},
+    {"../opus/tagged.opus", TAG_FORMAT_OGG, "Post-Rock", 1000, TAG_PICTURE_BASE64_FLAC_BLOCK},
     {"id3v24.mp3", TAG_FORMAT_MP3, "Post-Rock", 1045, TAG_PICTURE_RAW},
     {"id3v23_vbr.mp3", TAG_FORMAT_MP3, "Rock", 1032, TAG_PICTURE_RAW},
     {"aac.m4a", TAG_FORMAT_MP4, "Post-Rock", 1023, TAG_PICTURE_RAW},
@@ -152,9 +153,11 @@ static void a_truncated_file_fails_cleanly(void)
 }
 
 static const char *const ALL_FIXTURES[] = {
-    "tagged.flac", "tagged.ogg", "id3v24.mp3",    "id3v23_vbr.mp3", "id3v1_no_xing.mp3",
-    "aac.m4a",     "alac.m4a",   "tagged.wav",    "tagged.wma",     "tagged.ape",
-    "tagged.dsf",  "tagged.dff", "untagged.flac",
+    "tagged.flac", "tagged.ogg",     "../opus/tagged.opus",
+    "id3v24.mp3",  "id3v23_vbr.mp3", "id3v1_no_xing.mp3",
+    "aac.m4a",     "alac.m4a",       "tagged.wav",
+    "tagged.wma",  "tagged.ape",     "tagged.dsf",
+    "tagged.dff",  "untagged.flac",
 };
 
 static void damaged_files_never_read_outside_the_file(void)

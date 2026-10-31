@@ -5,7 +5,7 @@
 #include "ui/label.h"
 
 enum {
-    OVERLAY_WIDTH = 120,
+    OVERLAY_WIDTH = 168,
     OVERLAY_LINE_HEIGHT = 18,
     OVERLAY_LINES = 4,
     OVERLAY_HEIGHT = OVERLAY_LINE_HEIGHT * OVERLAY_LINES,
@@ -69,6 +69,8 @@ void frame_overlay_format_audio(HalAudioStats stats, char *text, size_t capacity
     string_builder_append_unsigned(&builder, stats.output_underruns);
     string_builder_append(&builder, " L");
     string_builder_append_unsigned(&builder, share_percent(stats.busy_us, stats.elapsed_us));
+    string_builder_append(&builder, "% c");
+    string_builder_append_unsigned(&builder, stats.core1_load);
     string_builder_append(&builder, "%");
 }
 

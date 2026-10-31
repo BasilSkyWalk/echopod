@@ -35,7 +35,7 @@ EXPECTED = {
 
 class TrackTagsTest(unittest.TestCase):
     def test_every_stock_format_is_listed(self):
-        for suffix in (".flac", ".ogg", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf", ".dff"):
+        for suffix in (".flac", ".ogg", ".opus", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf", ".dff"):
             self.assertIn(suffix, library_index.AUDIO_SUFFIXES)
 
     def test_each_format_reads_its_tags_and_duration(self):

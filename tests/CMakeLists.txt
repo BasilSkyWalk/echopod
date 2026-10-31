@@ -214,6 +214,21 @@ echo_add_unit_test(NAME test_flac
     LIBRARIES echo_codec
 )
 target_compile_definitions(test_flac PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_alac
+    SOURCES codec/test_alac.c
+    LIBRARIES echo_codec
+)
+target_compile_definitions(test_alac PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_mp4
+    SOURCES codec/test_mp4.c
+    LIBRARIES echo_codec
+)
+target_compile_definitions(test_mp4 PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_ogg
+    SOURCES codec/test_ogg.c
+    LIBRARIES echo_codec
+)
+target_compile_definitions(test_ogg PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_flac_bits
     SOURCES codec/test_flac_bits.c
     LIBRARIES echo_codec

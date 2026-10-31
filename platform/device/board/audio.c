@@ -3,6 +3,8 @@
 #include <stdint.h>
 
 #include "board.h"
+#include "codec/mp4.h"
+#include "codec/ogg.h"
 #include "core/format.h"
 #include "core1_region.h"
 #include "dac.h"
@@ -41,6 +43,9 @@ typedef enum SourceKind {
     SOURCE_FLAC,
     SOURCE_WAV,
     SOURCE_MP3,
+    SOURCE_ALAC,
+    SOURCE_AAC,
+    SOURCE_OPUS,
     SOURCE_UNKNOWN
 } SourceKind;
 
@@ -150,6 +155,21 @@ static SourceKind kind_of(const char *path)
     }
     uint8_t magic[SNIFF_BYTES] = {0};
     bool read = input.size >= SNIFF_BYTES && input.read(input.context, 0, magic, sizeof magic);
+    if (read && mp4_signature(magic)) {
+        Mp4Track track;
+        bool probed = mp4_probe(input, &track);
+        close_file(NULL);
+        if (probed && track.codec == MP4_CODEC_ALAC) {
+            return SOURCE_ALAC;
+        }
+        return probed && track.object_type == MP4_OBJECT_AAC_LC ? SOURCE_AAC : SOURCE_UNKNOWN;
+    }
+    if (read && ogg_signature(magic)) {
+        OggOpusInfo opus;
+        bool probed = ogg_opus_probe(input, &opus);
+        close_file(NULL);
+        return probed ? SOURCE_OPUS : SOURCE_UNKNOWN;
+    }
     close_file(NULL);
     if (!read || tag_is(magic, "fLaC")) {
         return SOURCE_FLAC;
@@ -160,6 +180,17 @@ static SourceKind kind_of(const char *path)
     return mp3_signature(magic) ? SOURCE_MP3 : SOURCE_UNKNOWN;
 }
 
+static Core1Program program_for(SourceKind kind)
+{
+    if (kind == SOURCE_MP3) {
+        return CORE1_PROGRAM_MP3;
+    }
+    if (kind == SOURCE_OPUS) {
+        return CORE1_PROGRAM_OPUS;
+    }
+    return kind == SOURCE_AAC ? CORE1_PROGRAM_AAC : CORE1_PROGRAM_FLAC;
+}
+
 static AudioSource chosen_source(void)
 {
     if (source_kind == SOURCE_WAV) {
@@ -167,6 +198,12 @@ static AudioSource chosen_source(void)
     }
     if (source_kind == SOURCE_MP3) {
         return core1_source_mp3_interface(&core1_source);
+    }
+    if (source_kind == SOURCE_ALAC || source_kind == SOURCE_AAC) {
+        return core1_source_mp4_interface(&core1_source);
+    }
+    if (source_kind == SOURCE_OPUS) {
+        return core1_source_ogg_interface(&core1_source);
     }
     return using_core1 ? core1_source_interface(&core1_source)
                        : flac_source_interface(&software_source);
@@ -199,8 +236,8 @@ static bool open_chosen(void *context, const char *path, uint32_t start_ms, Audi
     if (source_kind == SOURCE_FLAC) {
         using_core1 = board_core1_start_stream(CORE1_PROGRAM_FLAC);
     }
-    if (source_kind == SOURCE_MP3) {
-        using_core1 = board_core1_start_stream(CORE1_PROGRAM_MP3);
+    if (source_kind != SOURCE_FLAC && source_kind != SOURCE_WAV) {
+        using_core1 = board_core1_start_stream(program_for(source_kind));
         if (!using_core1) {
             return false;
         }
@@ -495,6 +532,12 @@ static HalAudioCodec codec_of(AudioCodec codec)
         return HAL_AUDIO_CODEC_WAV;
     case AUDIO_CODEC_MP3:
         return HAL_AUDIO_CODEC_MP3;
+    case AUDIO_CODEC_ALAC:
+        return HAL_AUDIO_CODEC_ALAC;
+    case AUDIO_CODEC_AAC:
+        return HAL_AUDIO_CODEC_AAC;
+    case AUDIO_CODEC_OPUS:
+        return HAL_AUDIO_CODEC_OPUS;
     case AUDIO_CODEC_FLAC:
         break;
     }
@@ -623,6 +666,7 @@ HalAudioStats hal_audio_stats(void)
         return result;
     }
     result.underruns = audio_engine_stats(&engine).underruns;
+    result.core1_load = using_core1 ? core1_region().control->load_percent : 0;
     result.elapsed_us = hal_clock_microseconds() - output_started_us;
     uint32_t rate = audio_engine_rate(&engine);
     if (rate > 0) {

@@ -34,6 +34,12 @@ static SimCodec codec_for(const char *path)
     if (has_extension(path, ".wav")) {
         return SIM_CODEC_WAV;
     }
+    if (has_extension(path, ".m4a")) {
+        return SIM_CODEC_MP4;
+    }
+    if (has_extension(path, ".opus")) {
+        return SIM_CODEC_OPUS;
+    }
     return SIM_CODEC_NONE;
 }
 
@@ -83,6 +89,32 @@ static bool open_wav(SimDecoder *decoder, const char *path)
     return true;
 }
 
+static bool open_mp4(SimDecoder *decoder, const char *path)
+{
+    if (!sim_mp4_open(&decoder->mp4, path)) {
+        return false;
+    }
+    decoder->sample_rate = decoder->mp4.track.sample_rate;
+    decoder->channels = decoder->mp4.track.channels;
+    decoder->bits_per_sample = decoder->mp4.track.bits_per_sample;
+    decoder->audio_bytes = decoder->mp4.stream.data_bytes;
+    decoder->total_frames = sim_mp4_playable(&decoder->mp4);
+    return true;
+}
+
+static bool open_opus(SimDecoder *decoder, const char *path)
+{
+    if (!sim_opus_open(&decoder->opus, path)) {
+        return false;
+    }
+    decoder->sample_rate = OGG_OPUS_RATE;
+    decoder->channels = decoder->opus.info.channels;
+    decoder->bits_per_sample = 0;
+    decoder->audio_bytes = decoder->opus.file_size - decoder->opus.info.audio_start;
+    decoder->total_frames = sim_opus_playable(&decoder->opus);
+    return true;
+}
+
 static bool open_codec(SimDecoder *decoder, const char *path)
 {
     switch (decoder->codec) {
@@ -92,6 +124,10 @@ static bool open_codec(SimDecoder *decoder, const char *path)
         return open_mp3(decoder, path);
     case SIM_CODEC_WAV:
         return open_wav(decoder, path);
+    case SIM_CODEC_MP4:
+        return open_mp4(decoder, path);
+    case SIM_CODEC_OPUS:
+        return open_opus(decoder, path);
     case SIM_CODEC_NONE:
         return false;
     }
@@ -123,6 +159,10 @@ static uint64_t read_native(SimDecoder *decoder, uint64_t count)
         return drmp3_read_pcm_frames_f32(&decoder->mp3, count, native_samples);
     case SIM_CODEC_WAV:
         return drwav_read_pcm_frames_f32(&decoder->wav, count, native_samples);
+    case SIM_CODEC_MP4:
+        return sim_mp4_read(&decoder->mp4, native_samples, count, decoder->channels);
+    case SIM_CODEC_OPUS:
+        return sim_opus_read(&decoder->opus, native_samples, count, decoder->channels);
     case SIM_CODEC_NONE:
         return 0;
     }
@@ -156,6 +196,12 @@ bool sim_decoder_seek(SimDecoder *decoder, uint64_t frame)
     case SIM_CODEC_WAV:
         sought = drwav_seek_to_pcm_frame(&decoder->wav, frame);
         break;
+    case SIM_CODEC_MP4:
+        sought = sim_mp4_seek(&decoder->mp4, frame);
+        break;
+    case SIM_CODEC_OPUS:
+        sought = sim_opus_seek(&decoder->opus, frame);
+        break;
     case SIM_CODEC_NONE:
         break;
     }
@@ -178,6 +224,12 @@ void sim_decoder_close(SimDecoder *decoder)
     case SIM_CODEC_WAV:
         drwav_uninit(&decoder->wav);
         break;
+    case SIM_CODEC_MP4:
+        sim_mp4_close(&decoder->mp4);
+        break;
+    case SIM_CODEC_OPUS:
+        sim_opus_close(&decoder->opus);
+        break;
     case SIM_CODEC_NONE:
         break;
     }
@@ -193,10 +245,18 @@ static HalAudioCodec hal_codec(SimCodec codec)
         return HAL_AUDIO_CODEC_MP3;
     case SIM_CODEC_WAV:
         return HAL_AUDIO_CODEC_WAV;
+    case SIM_CODEC_OPUS:
+        return HAL_AUDIO_CODEC_OPUS;
     case SIM_CODEC_NONE:
+    case SIM_CODEC_MP4:
         return HAL_AUDIO_CODEC_UNKNOWN;
     }
     return HAL_AUDIO_CODEC_UNKNOWN;
+}
+
+static HalAudioCodec mp4_codec(const SimDecoder *decoder)
+{
+    return decoder->mp4.track.codec == MP4_CODEC_AAC ? HAL_AUDIO_CODEC_AAC : HAL_AUDIO_CODEC_ALAC;
 }
 
 HalAudioFormat sim_decoder_format(const SimDecoder *decoder)
@@ -205,7 +265,7 @@ HalAudioFormat sim_decoder_format(const SimDecoder *decoder)
         return (HalAudioFormat){.codec = HAL_AUDIO_CODEC_UNKNOWN};
     }
     return (HalAudioFormat){
-        .codec = hal_codec(decoder->codec),
+        .codec = decoder->codec == SIM_CODEC_MP4 ? mp4_codec(decoder) : hal_codec(decoder->codec),
         .sample_rate = decoder->sample_rate,
         .bits_per_sample = (uint8_t)decoder->bits_per_sample,
         .channels = (uint8_t)decoder->channels,

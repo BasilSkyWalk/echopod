@@ -7,12 +7,16 @@
 #include "dr_mp3.h"
 #include "dr_wav.h"
 #include "hal/audio.h"
+#include "sim_mp4.h"
+#include "sim_opus.h"
 
 typedef enum SimCodec {
     SIM_CODEC_NONE,
     SIM_CODEC_FLAC,
     SIM_CODEC_MP3,
-    SIM_CODEC_WAV
+    SIM_CODEC_WAV,
+    SIM_CODEC_MP4,
+    SIM_CODEC_OPUS
 } SimCodec;
 
 typedef struct SimDecoder {
@@ -20,6 +24,8 @@ typedef struct SimDecoder {
     drflac *flac;
     drmp3 mp3;
     drwav wav;
+    SimMp4 mp4;
+    SimOpus opus;
     uint32_t sample_rate;
     uint32_t channels;
     uint32_t bits_per_sample;

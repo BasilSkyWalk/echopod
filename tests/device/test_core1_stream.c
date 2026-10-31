@@ -4,12 +4,17 @@
 #include <string.h>
 
 #include "check.h"
+#include "device/core1_aac.h"
+#include "device/core1_alac.h"
+#include "device/core1_control.h"
 #include "device/core1_mp3.h"
+#include "device/core1_opus.h"
 #include "device/core1_stream.h"
 #include "device/mp3_probe.h"
 
 enum {
     BIG_RING_BYTES = 64 * 1024,
+    FULL_RING_BYTES = CORE1_STREAM_RING_BYTES,
     SMALL_RING_BYTES = 24 * 1024,
     FILL_BUDGET = 4096,
     MAX_ROUNDS = 100000
@@ -22,13 +27,20 @@ typedef struct Fixture {
 
 static StreamControl control;
 static int32_t samples[STREAM_SLOTS][FLAC_MAX_CHANNELS][FLAC_MAX_BLOCK];
-static uint8_t ring[BIG_RING_BYTES];
+static uint8_t ring[FULL_RING_BYTES];
 static FlacDecoder core0_decoder;
 static FlacDecoder core1_decoder;
 static Core1Flac core1_flac;
 static Mp3Decoder mp3_decoder;
 static Mp3Decoder reference_decoder;
 static Core1Mp3 core1_mp3;
+static AlacDecoder alac_decoder;
+static Core1Alac core1_alac;
+static Core1Aac core1_aac;
+static Core1Opus core1_opus;
+static uint8_t opus_state[32 * 1024] __attribute__((aligned(8)));
+static uint8_t opus_packet[CORE1_OPUS_PACKET_BYTES];
+static int16_t opus_output[CORE1_OPUS_MAX_FRAME * FLAC_MAX_CHANNELS];
 static Core1Source source;
 static Core1Stream stream;
 static AudioSource interface;
@@ -38,8 +50,15 @@ static int close_count;
 static Fixture load(const char *name, const char *extension)
 {
     char path[512];
-    if (strncmp(name, "mp3/", 4) == 0) {
+    if (strncmp(name, "opus/", 5) == 0) {
+        const char *suffix = strcmp(extension, "flac") == 0 ? "opus" : extension;
+        snprintf(path, sizeof path, "%s/%s.%s", ECHO_FIXTURE_DIR, name, suffix);
+    } else if (strncmp(name, "mp3/", 4) == 0) {
         snprintf(path, sizeof path, "%s/%s.mp3", ECHO_FIXTURE_DIR, name);
+    } else if (strncmp(name, "alac/", 5) == 0 || strncmp(name, "tags/", 5) == 0 ||
+               strncmp(name, "aac/", 4) == 0) {
+        const char *suffix = strcmp(extension, "flac") == 0 ? "m4a" : extension;
+        snprintf(path, sizeof path, "%s/%s.%s", ECHO_FIXTURE_DIR, name, suffix);
     } else {
         snprintf(path, sizeof path, "%s/flac/%s.%s", ECHO_FIXTURE_DIR, name, extension);
     }
@@ -108,6 +127,21 @@ static void start(uint32_t ring_bytes)
     start_with(ring_bytes, false);
 }
 
+static void start_mp4(uint32_t ring_bytes)
+{
+    start_with(ring_bytes, false);
+    core1_stream_set_decoder(&stream, STREAM_CODEC_ALAC,
+                             core1_alac_decoder(&core1_alac, &alac_decoder));
+    interface = core1_source_mp4_interface(&source);
+}
+
+static void start_aac(uint32_t ring_bytes)
+{
+    start_mp4(ring_bytes);
+    core1_aac_close(&core1_aac);
+    core1_stream_set_decoder(&stream, STREAM_CODEC_AAC, core1_aac_decoder(&core1_aac, NULL));
+}
+
 static AudioFrameResult next_frame(AudioFrame *frame)
 {
     for (int round = 0; round < MAX_ROUNDS; round++) {
@@ -145,9 +179,8 @@ static bool frame_matches(const Fixture *pcm, const AudioFrame *frame, int chann
     return true;
 }
 
-static bool streams_exactly(const char *name, int channels, uint32_t ring_bytes)
+static bool plays_exactly(const char *name, int channels)
 {
-    start(ring_bytes);
     Fixture pcm = load(name, "pcm");
     AudioTrackInfo info;
     bool ok = pcm.size > 0 && interface.open(interface.context, name, 0, &info);
@@ -164,6 +197,18 @@ static bool streams_exactly(const char *name, int channels, uint32_t ring_bytes)
     interface.close(interface.context);
     free(pcm.bytes);
     return ok;
+}
+
+static bool streams_exactly(const char *name, int channels, uint32_t ring_bytes)
+{
+    start(ring_bytes);
+    return plays_exactly(name, channels);
+}
+
+static bool alac_streams_exactly(const char *name, int channels, uint32_t ring_bytes)
+{
+    start_mp4(ring_bytes);
+    return plays_exactly(name, channels);
 }
 
 static void a_24_bit_96k_track_streams_through_core_1_exactly(void)
@@ -437,6 +482,260 @@ static void a_file_that_is_not_mp3_is_refused(void)
     CHECK_EQUAL(1, close_count);
 }
 
+static void an_alac_track_streams_through_core_1_exactly(void)
+{
+    CHECK(alac_streams_exactly("alac/stereo_24_96k", 2, BIG_RING_BYTES));
+    CHECK(alac_streams_exactly("alac/stereo_16_44k", 2, SMALL_RING_BYTES));
+    CHECK(control.released > SMALL_RING_BYTES);
+    CHECK(alac_streams_exactly("alac/noise_16", 2, SMALL_RING_BYTES));
+    CHECK(alac_streams_exactly("alac/mono_16_22k", 1, SMALL_RING_BYTES));
+}
+
+static void an_alac_track_describes_its_stream(void)
+{
+    start_mp4(BIG_RING_BYTES);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "alac/stereo_24_96k", 0, &info));
+    CHECK_EQUAL(AUDIO_CODEC_ALAC, info.codec);
+    CHECK_EQUAL(96000u, info.stream.sample_rate);
+    CHECK_EQUAL(24, info.stream.bits_per_sample);
+    CHECK_EQUAL(2, info.stream.channels);
+    CHECK_EQUAL(9000u, info.stream.total_samples);
+    CHECK(info.audio_bytes > 20000 && info.audio_bytes < opened.size);
+    CHECK_EQUAL(STREAM_CODEC_ALAC, control.codec);
+    interface.close(interface.context);
+}
+
+static void an_alac_track_opened_part_way_starts_on_its_frame(void)
+{
+    start_mp4(SMALL_RING_BYTES);
+    Fixture pcm = load("alac/stereo_16_44k", "pcm");
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "alac/stereo_16_44k", 150, &info));
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    CHECK_EQUAL(4096u, frame.first_sample);
+    CHECK(frame_matches(&pcm, &frame, 2));
+    interface.release(interface.context);
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    CHECK_EQUAL(8192u, frame.first_sample);
+    CHECK_EQUAL(10000u - 8192u, frame.samples);
+    CHECK(frame_matches(&pcm, &frame, 2));
+    interface.release(interface.context);
+    CHECK_EQUAL(AUDIO_FRAME_END, next_frame(&frame));
+    interface.close(interface.context);
+    free(pcm.bytes);
+}
+
+static void flac_and_alac_tracks_take_turns_on_one_program(void)
+{
+    start_mp4(BIG_RING_BYTES);
+    AudioSource mp4 = interface;
+    interface = core1_source_interface(&source);
+    AudioTrackInfo info;
+    AudioFrame frame;
+    CHECK(interface.open(interface.context, "lpc_16_44k_stereo", 0, &info));
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    interface = mp4;
+    CHECK(plays_exactly("alac/mono_24_48k", 1));
+    interface = core1_source_interface(&source);
+    CHECK(plays_exactly("lpc_16_44k_stereo", 2));
+}
+
+static void a_program_without_the_codec_reports_an_error(void)
+{
+    start_mp4(BIG_RING_BYTES);
+    AudioTrackInfo info;
+    AudioFrame frame;
+    CHECK(interface.open(interface.context, "tags/aac", 0, &info));
+    CHECK_EQUAL(AUDIO_CODEC_AAC, info.codec);
+    CHECK_EQUAL(STREAM_CODEC_AAC, control.codec);
+    CHECK_EQUAL(AUDIO_FRAME_ERROR, next_frame(&frame));
+    interface.close(interface.context);
+}
+
+static void start_opus(uint32_t ring_bytes)
+{
+    start_with(ring_bytes, false);
+    Core1OpusMemory memory = {opus_state, sizeof opus_state, opus_packet, opus_output};
+    core1_stream_set_decoder(&stream, STREAM_CODEC_OPUS, core1_opus_decoder(&core1_opus, memory));
+    interface = core1_source_ogg_interface(&source);
+}
+
+static bool opus_close(const Fixture *pcm, const AudioFrame *frame, int channels, int tolerance)
+{
+    for (uint32_t sample = 0; sample < frame->samples; sample++) {
+        uint32_t index = (frame->first_sample + sample) * (uint32_t)channels;
+        if (2 * (index + (uint32_t)channels) > pcm->size) {
+            return false;
+        }
+        int16_t left = 0;
+        int16_t right = 0;
+        memcpy(&left, pcm->bytes + 2 * index, sizeof left);
+        memcpy(&right, pcm->bytes + 2 * (index + (uint32_t)(channels - 1)), sizeof right);
+        if (abs(frame->left[sample] - left) > tolerance ||
+            abs(frame->right[sample] - right) > tolerance) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool opus_plays_closely(const char *name, int channels, uint32_t ring_bytes,
+                               uint32_t start_ms, uint32_t *first)
+{
+    start_opus(ring_bytes);
+    Fixture pcm = load(name, "pcm");
+    AudioTrackInfo info;
+    bool ok = pcm.size > 0 && interface.open(interface.context, name, start_ms, &info) &&
+              info.codec == AUDIO_CODEC_OPUS && control.codec == STREAM_CODEC_OPUS;
+    uint32_t next_sample = UINT32_MAX;
+    AudioFrame frame;
+    AudioFrameResult result = AUDIO_FRAME_READY;
+    while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
+        if (next_sample == UINT32_MAX) {
+            *first = frame.first_sample;
+            next_sample = frame.first_sample;
+        }
+        ok = frame.first_sample == next_sample && frame.bits == 16 &&
+             opus_close(&pcm, &frame, channels, start_ms == 0 ? 16 : 96);
+        next_sample += frame.samples;
+        interface.release(interface.context);
+    }
+    ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples &&
+         info.stream.total_samples == pcm.size / 2 / (uint32_t)channels;
+    interface.close(interface.context);
+    free(pcm.bytes);
+    return ok;
+}
+
+static void an_opus_track_streams_through_core_1_like_libopus_decodes_it(void)
+{
+    uint32_t first = 0;
+    CHECK(opus_plays_closely("opus/stereo_small_pages", 2, BIG_RING_BYTES, 0, &first));
+    CHECK_EQUAL(0u, first);
+    CHECK(opus_plays_closely("opus/mono_60ms_speech", 1, BIG_RING_BYTES, 0, &first));
+    CHECK(opus_plays_closely("opus/stereo_low_rate", 2, BIG_RING_BYTES, 0, &first));
+    CHECK(opus_plays_closely("opus/stereo_high_rate", 2, BIG_RING_BYTES, 0, &first));
+    CHECK(opus_plays_closely("opus/stereo_small_pages", 2, 4096, 0, &first));
+    CHECK(control.released > 4096);
+}
+
+static void an_opus_track_opened_part_way_starts_on_the_sample(void)
+{
+    uint32_t first = 0;
+    CHECK(opus_plays_closely("opus/stereo_small_pages", 2, BIG_RING_BYTES, 250, &first));
+    CHECK_EQUAL(12000u, first);
+    CHECK(opus_plays_closely("opus/mono_60ms_speech", 1, SMALL_RING_BYTES, 100, &first));
+    CHECK_EQUAL(4800u, first);
+}
+
+static void opus_leaves_the_top_of_the_ring_to_its_decoder(void)
+{
+    uint32_t first = 0;
+    CHECK(opus_plays_closely("opus/stereo_high_rate", 2, FULL_RING_BYTES, 0, &first));
+    CHECK_EQUAL(CORE1_OPUS_RING_BYTES, control.ring_bytes);
+    CHECK_EQUAL(CORE1_OPUS_RING_BYTES, stream.region.ring_bytes);
+    interface = core1_source_interface(&source);
+    CHECK(plays_exactly("lpc_16_44k_stereo", 2));
+    CHECK_EQUAL(FULL_RING_BYTES, control.ring_bytes);
+    CHECK_EQUAL(FULL_RING_BYTES, stream.region.ring_bytes);
+}
+
+static void an_opus_track_describes_its_stream(void)
+{
+    start_opus(BIG_RING_BYTES);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "opus/stereo_small_pages", 0, &info));
+    CHECK_EQUAL(AUDIO_CODEC_OPUS, info.codec);
+    CHECK_EQUAL(48000u, info.stream.sample_rate);
+    CHECK_EQUAL(0, info.stream.bits_per_sample);
+    CHECK_EQUAL(2, info.stream.channels);
+    CHECK_EQUAL(19200u, info.stream.total_samples);
+    CHECK(info.audio_bytes > 5000 && info.audio_bytes < opened.size);
+    interface.close(interface.context);
+    CHECK(core1_opus_decoder_bytes() <= sizeof opus_state);
+}
+
+static bool close_to_reference(const Fixture *pcm, const AudioFrame *frame, int channels)
+{
+    for (uint32_t sample = 0; sample < frame->samples; sample++) {
+        uint32_t index = (frame->first_sample + sample) * (uint32_t)channels;
+        if (2 * (index + (uint32_t)channels) > pcm->size) {
+            return false;
+        }
+        int16_t left = 0;
+        int16_t right = 0;
+        memcpy(&left, pcm->bytes + 2 * index, sizeof left);
+        memcpy(&right, pcm->bytes + 2 * (index + (uint32_t)(channels - 1)), sizeof right);
+        if (abs(frame->left[sample] / 256 - left) > 2 ||
+            abs(frame->right[sample] / 256 - right) > 2) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool aac_plays_closely(const char *name, int channels, uint32_t ring_bytes,
+                              uint32_t start_ms, uint32_t *first)
+{
+    start_aac(ring_bytes);
+    Fixture pcm = load(name, "pcm");
+    AudioTrackInfo info;
+    bool ok = pcm.size > 0 && interface.open(interface.context, name, start_ms, &info) &&
+              info.codec == AUDIO_CODEC_AAC && control.codec == STREAM_CODEC_AAC;
+    uint32_t target = (uint32_t)((uint64_t)start_ms * info.stream.sample_rate / 1000);
+    uint32_t next_sample = UINT32_MAX;
+    AudioFrame frame;
+    AudioFrameResult result = AUDIO_FRAME_READY;
+    while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
+        if (next_sample == UINT32_MAX) {
+            *first = frame.first_sample;
+            ok = frame.first_sample <= target && target < frame.first_sample + frame.samples;
+            next_sample = frame.first_sample;
+        }
+        ok = ok && frame.first_sample == next_sample && frame.bits == 24 &&
+             close_to_reference(&pcm, &frame, channels);
+        next_sample += frame.samples;
+        interface.release(interface.context);
+    }
+    ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples;
+    interface.close(interface.context);
+    free(pcm.bytes);
+    return ok;
+}
+
+static void an_aac_track_streams_through_core_1_like_ffmpeg_decodes_it(void)
+{
+    uint32_t first = 0;
+    CHECK(aac_plays_closely("aac/stereo_44k", 2, BIG_RING_BYTES, 0, &first));
+    CHECK_EQUAL(0u, first);
+    CHECK(aac_plays_closely("aac/mono_48k", 1, BIG_RING_BYTES, 0, &first));
+    CHECK(aac_plays_closely("aac/stereo_96k_faststart", 2, 1024, 0, &first));
+    CHECK(control.released > 1024);
+}
+
+static void an_aac_track_opened_part_way_starts_on_the_frame_with_the_target(void)
+{
+    uint32_t first = 0;
+    CHECK(aac_plays_closely("aac/stereo_44k", 2, BIG_RING_BYTES, 100, &first));
+    CHECK_EQUAL(4096u, first);
+}
+
+static void an_aac_track_describes_its_stream(void)
+{
+    start_aac(BIG_RING_BYTES);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "aac/stereo_44k", 0, &info));
+    CHECK_EQUAL(AUDIO_CODEC_AAC, info.codec);
+    CHECK_EQUAL(44100u, info.stream.sample_rate);
+    CHECK_EQUAL(0, info.stream.bits_per_sample);
+    CHECK_EQUAL(12000u, info.stream.total_samples);
+    CHECK_EQUAL(1024, info.stream.max_block);
+    CHECK(info.audio_bytes > 3000 && info.audio_bytes < opened.size);
+    interface.close(interface.context);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -455,8 +754,21 @@ int main(void)
         TEST_CASE(an_mp3_describes_its_stream),
         TEST_CASE(an_mp3_opened_part_way_starts_counting_from_there),
         TEST_CASE(a_file_that_is_not_mp3_is_refused),
+        TEST_CASE(an_alac_track_streams_through_core_1_exactly),
+        TEST_CASE(an_alac_track_describes_its_stream),
+        TEST_CASE(an_alac_track_opened_part_way_starts_on_its_frame),
+        TEST_CASE(flac_and_alac_tracks_take_turns_on_one_program),
+        TEST_CASE(a_program_without_the_codec_reports_an_error),
+        TEST_CASE(an_aac_track_streams_through_core_1_like_ffmpeg_decodes_it),
+        TEST_CASE(an_aac_track_opened_part_way_starts_on_the_frame_with_the_target),
+        TEST_CASE(an_aac_track_describes_its_stream),
+        TEST_CASE(an_opus_track_streams_through_core_1_like_libopus_decodes_it),
+        TEST_CASE(an_opus_track_opened_part_way_starts_on_the_sample),
+        TEST_CASE(an_opus_track_describes_its_stream),
+        TEST_CASE(opus_leaves_the_top_of_the_ring_to_its_decoder),
     };
     int failures = test_run_all(cases, TEST_CASE_COUNT(cases));
+    core1_aac_close(&core1_aac);
     free(opened.bytes);
     return failures;
 }

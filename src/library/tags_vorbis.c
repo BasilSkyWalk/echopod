@@ -13,7 +13,10 @@ enum {
     OGG_HEADER_SIZE = 27,
     OGG_SEARCH_CHUNK = 512,
     OGG_SEARCH_LIMIT = 65536,
-    VORBIS_PACKET_PREFIX = 7
+    VORBIS_PACKET_PREFIX = 7,
+    OPUS_PACKET_PREFIX = 8,
+    OPUS_RATE = 48000,
+    OPUS_PRE_SKIP_AT = 10
 };
 
 typedef struct VorbisKey {
@@ -343,24 +346,37 @@ bool tags_read_ogg(TagReader *reader)
     OggPage first;
     uint8_t identification[16];
     if (!read_page(reader, 0, &first) || first.body_length < sizeof identification ||
-        !tag_read(reader, first.header_length, identification, sizeof identification) ||
-        identification[0] != 1 || !tag_same_text((const char *)identification + 1, 6, "vorbis")) {
+        !tag_read(reader, first.header_length, identification, sizeof identification)) {
         return false;
     }
-    uint32_t rate = tag_le32(identification + 12);
+    bool opus = tag_same_text((const char *)identification, OPUS_PACKET_PREFIX, "OpusHead");
+    bool vorbis =
+        identification[0] == 1 && tag_same_text((const char *)identification + 1, 6, "vorbis");
+    if (!opus && !vorbis) {
+        return false;
+    }
+    uint32_t rate = opus ? OPUS_RATE : tag_le32(identification + 12);
+    uint64_t pre_skip = opus ? (uint64_t)identification[OPUS_PRE_SKIP_AT] |
+                                   (uint64_t)identification[OPUS_PRE_SKIP_AT + 1] << 8
+                             : 0;
     OggStream stream = {.reader = reader, .page_start = 0};
     if (!read_page(reader, first.header_length + first.body_length, &stream.page)) {
         return false;
     }
     ByteSource source = {.read = read_stream_bytes, .context = &stream};
-    uint8_t prefix[VORBIS_PACKET_PREFIX];
-    if (source_read(source, 0, prefix, sizeof prefix) && prefix[0] == 3 &&
+    uint8_t prefix[OPUS_PACKET_PREFIX];
+    if (opus && source_read(source, 0, prefix, sizeof prefix) &&
+        tag_same_text((const char *)prefix, OPUS_PACKET_PREFIX, "OpusTags")) {
+        tags_read_vorbis_comment(reader, source, OPUS_PACKET_PREFIX, UINT32_MAX);
+    }
+    if (vorbis && source_read(source, 0, prefix, VORBIS_PACKET_PREFIX) && prefix[0] == 3 &&
         tag_same_text((const char *)prefix + 1, 6, "vorbis")) {
         tags_read_vorbis_comment(reader, source, VORBIS_PACKET_PREFIX, UINT32_MAX);
     }
     uint64_t granule = 0;
-    if (rate > 0 && last_page_granule(reader, &granule) && granule != UINT64_MAX) {
-        tag_set_duration(reader, (double)granule / (double)rate);
+    if (rate > 0 && last_page_granule(reader, &granule) && granule != UINT64_MAX &&
+        granule >= pre_skip) {
+        tag_set_duration(reader, (double)(granule - pre_skip) / (double)rate);
     }
     return true;
 }

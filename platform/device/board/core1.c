@@ -11,6 +11,7 @@
 
 enum {
     LOWEST_PLL_MHZ = 96,
+    FULL_SPEED_MHZ = 200,
     CORE1_RAM_BYTES = 0x60000,
     STAGING_WORDS = 1024,
     WORD_BYTES = 4,
@@ -19,6 +20,8 @@ enum {
     SECTOR_BYTES = 512,
     MP3_PROGRAM_OFFSET = 0x240000,
     FLAC_PROGRAM_OFFSET = 0x280000,
+    AAC_PROGRAM_OFFSET = 0x2A0200,
+    OPUS_PROGRAM_OFFSET = 0x218000,
     PROGRAM_MAGIC = 0x4D314345,
     STAGING_SECTORS = STAGING_WORDS * WORD_BYTES / SECTOR_BYTES
 };
@@ -105,7 +108,14 @@ static Core1Result place_program(Core1Program program)
     if (hal_system_restart_pending() || !emmc_start(&info)) {
         return CORE1_NO_REPLY;
     }
-    uint32_t offset = program == CORE1_PROGRAM_MP3 ? MP3_PROGRAM_OFFSET : FLAC_PROGRAM_OFFSET;
+    uint32_t offset = FLAC_PROGRAM_OFFSET;
+    if (program == CORE1_PROGRAM_MP3) {
+        offset = MP3_PROGRAM_OFFSET;
+    } else if (program == CORE1_PROGRAM_AAC) {
+        offset = AAC_PROGRAM_OFFSET;
+    } else if (program == CORE1_PROGRAM_OPUS) {
+        offset = OPUS_PROGRAM_OFFSET;
+    }
     uint32_t header_sector = info.layout.slot_1 + offset / SECTOR_BYTES;
     if (!emmc_read(NULL, header_sector, 1, staging)) {
         return CORE1_NO_REPLY;
@@ -124,6 +134,12 @@ static Core1Result place_program(Core1Program program)
     return CORE1_OK;
 }
 
+static uint32_t stream_divider(Core1Program program, uint32_t pll_mhz)
+{
+    bool heavy = program == CORE1_PROGRAM_AAC || program == CORE1_PROGRAM_OPUS;
+    return heavy && pll_mhz <= FULL_SPEED_MHZ ? 1 : core1_divider_for(pll_mhz);
+}
+
 bool board_core1_start_stream(Core1Program program)
 {
     if (streaming && streaming_program == program) {
@@ -138,7 +154,7 @@ bool board_core1_start_stream(Core1Program program)
         return false;
     }
     board_start_record_step(HAL_START_STEP_CORE1_START);
-    uint32_t divider = core1_divider_for(pll_mhz);
+    uint32_t divider = stream_divider(program, pll_mhz);
     Core1Result result = core1_power_up(&BUS, pll_mhz, divider);
     if (result == CORE1_OK) {
         result = place_program(program);

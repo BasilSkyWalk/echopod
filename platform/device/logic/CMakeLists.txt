@@ -24,6 +24,48 @@ if(CMAKE_CROSSCOMPILING)
     target_include_directories(echo_libmad SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
 endif()
 
+set(ECHO_FAAD2_DIR ${PROJECT_SOURCE_DIR}/third_party/faad2)
+file(GLOB ECHO_FAAD2_SOURCES ${ECHO_FAAD2_DIR}/libfaad/*.c)
+add_library(echo_faad2 STATIC ${ECHO_FAAD2_SOURCES})
+target_include_directories(echo_faad2 SYSTEM
+    PUBLIC ${ECHO_FAAD2_DIR}/include
+    PRIVATE ${ECHO_FAAD2_DIR}/libfaad
+)
+target_compile_definitions(echo_faad2 PRIVATE
+    FIXED_POINT LC_ONLY_DECODER DISABLE_SBR NDEBUG PACKAGE_VERSION="2.11.4"
+)
+target_compile_options(echo_faad2 PRIVATE -w)
+set_target_properties(echo_faad2 PROPERTIES C_EXTENSIONS ON)
+if(CMAKE_CROSSCOMPILING)
+    target_compile_definitions(echo_faad2 PRIVATE abs=__builtin_abs)
+    target_compile_options(echo_faad2 PRIVATE -O2)
+    target_include_directories(echo_faad2 SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
+endif()
+
+set(ECHO_OPUS_DIR ${PROJECT_SOURCE_DIR}/third_party/opus)
+file(GLOB ECHO_OPUS_SOURCES ${ECHO_OPUS_DIR}/celt/*.c ${ECHO_OPUS_DIR}/silk/*.c)
+add_library(echo_opus STATIC
+    ${ECHO_OPUS_SOURCES}
+    ${ECHO_OPUS_DIR}/src/opus.c
+    ${ECHO_OPUS_DIR}/src/opus_decoder.c
+    ${ECHO_OPUS_DIR}/src/extensions.c
+)
+target_include_directories(echo_opus SYSTEM
+    PUBLIC ${ECHO_OPUS_DIR}/include
+    PRIVATE ${ECHO_OPUS_DIR} ${ECHO_OPUS_DIR}/celt ${ECHO_OPUS_DIR}/silk ${ECHO_OPUS_DIR}/silk/fixed
+        ${ECHO_OPUS_DIR}/src
+)
+target_compile_definitions(echo_opus PRIVATE
+    FIXED_POINT DISABLE_FLOAT_API OPUS_BUILD USE_ALLOCA NDEBUG PACKAGE_VERSION="1.6.1"
+)
+target_compile_options(echo_opus PRIVATE -w)
+set_target_properties(echo_opus PROPERTIES C_EXTENSIONS ON)
+if(CMAKE_CROSSCOMPILING)
+    target_compile_definitions(echo_opus PRIVATE alloca=__builtin_alloca abs=__builtin_abs)
+    target_compile_options(echo_opus PRIVATE -O2)
+    target_include_directories(echo_opus SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
+endif()
+
 add_library(echo_device_logic STATIC
     audio_engine.c
     audio_math.c
@@ -32,8 +74,11 @@ add_library(echo_device_logic STATIC
     watchdog.c
     bt_module.c
     card_write.c
+    core1_aac.c
+    core1_alac.c
     core1_control.c
     core1_mp3.c
+    core1_opus.c
     core1_stream.c
     dac_sequence.c
     flac_source.c
@@ -90,6 +135,6 @@ if(CMAKE_CROSSCOMPILING)
 endif()
 target_include_directories(echo_device_logic PUBLIC include)
 target_link_libraries(echo_device_logic
-    PUBLIC echo_core echo_hal echo_codec echo_libmad
+    PUBLIC echo_core echo_hal echo_codec echo_libmad echo_faad2 echo_opus
     PRIVATE echo_options
 )

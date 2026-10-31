@@ -46,7 +46,10 @@ typedef enum HalAudioCodec {
     HAL_AUDIO_CODEC_UNKNOWN,
     HAL_AUDIO_CODEC_FLAC,
     HAL_AUDIO_CODEC_MP3,
-    HAL_AUDIO_CODEC_WAV
+    HAL_AUDIO_CODEC_WAV,
+    HAL_AUDIO_CODEC_ALAC,
+    HAL_AUDIO_CODEC_AAC,
+    HAL_AUDIO_CODEC_OPUS
 } HalAudioCodec;
 
 typedef struct HalAudioFormat {
@@ -70,6 +73,7 @@ typedef struct HalAudioStats {
     uint32_t buffered_ms;
     uint32_t underruns;
     uint32_t output_underruns;
+    uint32_t core1_load;
     uint32_t blocks;
     uint32_t decode_us;
     uint32_t decode_max_us;

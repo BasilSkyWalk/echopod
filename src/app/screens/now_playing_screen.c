@@ -51,6 +51,12 @@ const char *now_playing_codec_name(HalAudioCodec codec)
         return "MP3";
     case HAL_AUDIO_CODEC_WAV:
         return "WAV";
+    case HAL_AUDIO_CODEC_ALAC:
+        return "ALAC";
+    case HAL_AUDIO_CODEC_AAC:
+        return "AAC";
+    case HAL_AUDIO_CODEC_OPUS:
+        return "Opus";
     case HAL_AUDIO_CODEC_UNKNOWN:
         return "";
     }

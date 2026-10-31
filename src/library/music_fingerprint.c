@@ -6,8 +6,8 @@
 
 #define SECOND_SEED (HASH_START ^ UINT32_C(0x5BD1E995))
 
-static const char *const LIBRARY_SUFFIXES[] = {".flac", ".ogg", ".mp3", ".m4a", ".wav", ".wma",
-                                               ".ape",  ".dsf", ".dff", ".m3u", ".m3u8"};
+static const char *const LIBRARY_SUFFIXES[] = {".flac", ".ogg", ".opus", ".mp3", ".m4a", ".wav",
+                                               ".wma",  ".ape", ".dsf",  ".dff", ".m3u", ".m3u8"};
 static const char *const ART_STEMS[] = {"cover", "folder", "front", "albumart"};
 static const char *const ART_SUFFIXES[] = {".jpg", ".jpeg", ".png"};
 static const char SYSTEM_FOLDER[] = "System Volume Information";

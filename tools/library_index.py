@@ -19,7 +19,8 @@ MAX_U32 = 0xFFFFFFFF
 UNKNOWN_ARTIST = "Unknown Artist"
 UNKNOWN_ALBUM = "Unknown Album"
 UNKNOWN_GENRE = "Unknown Genre"
-AUDIO_SUFFIXES = {".flac", ".ogg", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf", ".dff"}
+AUDIO_SUFFIXES = {".flac", ".ogg", ".opus", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf",
+                  ".dff"}
 PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
 URL_MARKER = "://"
 SPOKEN_FOLDERS = {b"audiobooks", b"audiobook", b"podcasts", b"podcast"}

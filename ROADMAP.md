@@ -55,4 +55,8 @@ Version 0.6.0 makes Bluetooth connect within seconds and adds Random album and a
 | Parametric EQ | todo |
 | ReplayGain | todo |
 | Lyrics (`.lrc`) | todo |
-| ALAC and APE playback | todo |
+| ALAC playback | done |
+| AAC playback | done |
+| HE-AAC playback | todo |
+| Opus playback | done |
+| APE playback | todo |

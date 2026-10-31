@@ -4,7 +4,7 @@ A short map of the hardware EchoPod drives, for reading the code in `platform/de
 
 ## Chip and memory
 
-- Rockchip RKnano with two Cortex-M3 cores. Core 0 runs EchoPod; core 1 runs a decoder program (FLAC or MP3) loaded on demand.
+- Rockchip RKnano with two Cortex-M3 cores. Core 0 runs EchoPod; core 1 runs a decoder program (FLAC and ALAC, MP3, AAC, or Opus) loaded on demand.
 - Core 0 data RAM: `0x03004000`–`0x0304C000`. Code runs from `0x03050000` (about 157 KB).
 - High RAM: `0x0307A000`–`0x0309EFFF` (148 KB). The library rescan code is loaded here when it runs.
 - Core 1 RAM: `0x01000000`–`0x0105FFFF` (384 KB). It also serves as scratch memory for the rescan while playback is stopped.

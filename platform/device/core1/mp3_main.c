@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "core1_region.h"
+#include "core1_ticks.h"
 #include "device/core1_control.h"
 #include "device/core1_mp3.h"
 #include "registers.h"
@@ -21,6 +22,8 @@ void core1_main(void)
         return;
     }
     core1_stream_init(&stream, core1_region(), core1_mp3_decoder(&mp3, &decoder));
+    core1_ticks_start();
+    core1_ticks_measure(&stream);
     for (;;) {
         core1_stream_step(&stream);
     }

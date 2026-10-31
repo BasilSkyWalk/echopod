@@ -10,9 +10,10 @@ typedef struct FormatName {
 } FormatName;
 
 static const FormatName FORMATS[] = {
-    {"flac", TAG_FORMAT_FLAC}, {"ogg", TAG_FORMAT_OGG}, {"mp3", TAG_FORMAT_MP3},
-    {"m4a", TAG_FORMAT_MP4},   {"wav", TAG_FORMAT_WAV}, {"wma", TAG_FORMAT_WMA},
-    {"ape", TAG_FORMAT_APE},   {"dsf", TAG_FORMAT_DSF}, {"dff", TAG_FORMAT_DFF},
+    {"flac", TAG_FORMAT_FLAC}, {"ogg", TAG_FORMAT_OGG}, {"opus", TAG_FORMAT_OGG},
+    {"mp3", TAG_FORMAT_MP3},   {"m4a", TAG_FORMAT_MP4}, {"wav", TAG_FORMAT_WAV},
+    {"wma", TAG_FORMAT_WMA},   {"ape", TAG_FORMAT_APE}, {"dsf", TAG_FORMAT_DSF},
+    {"dff", TAG_FORMAT_DFF},
 };
 
 static char lower(char character)

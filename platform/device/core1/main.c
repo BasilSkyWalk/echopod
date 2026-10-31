@@ -1,8 +1,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "codec/alac.h"
 #include "codec/flac.h"
 #include "core1_region.h"
+#include "core1_ticks.h"
+#include "device/core1_alac.h"
 #include "device/core1_control.h"
 #include "device/flac_accel.h"
 #include "device/tick_clock.h"
@@ -14,8 +17,14 @@
 
 void core1_main(void);
 
-static FlacDecoder decoder;
+static union {
+    FlacDecoder flac;
+    AlacDecoder alac;
+} decoders;
 static Core1Flac flac;
+static Core1Alac alac;
+static Core1Decoder flac_stream;
+static FlacLpcHook lpc_hook;
 static AccelHook accel_hook;
 static Core1Stream stream;
 static uint32_t input_bytes;
@@ -116,7 +125,22 @@ static void use_accelerator(uint32_t classes)
     accel_hook = (AccelHook){.bus = &ACCEL_BUS,
                              .narrow = (classes & CORE1_ACCEL_NARROW) != 0,
                              .wide = (classes & CORE1_ACCEL_WIDE) != 0};
-    flac_set_lpc_hook(&decoder, flac_accel_hook(&accel_hook));
+    lpc_hook = flac_accel_hook(&accel_hook);
+    flac_set_lpc_hook(&decoders.flac, lpc_hook);
+}
+
+static void start_flac(void *context, FlacInput input, FlacInfo info, uint32_t first_sample,
+                       const bool *starved)
+{
+    (void)context;
+    flac_set_lpc_hook(&decoders.flac, lpc_hook);
+    flac_stream.start(flac_stream.context, input, info, first_sample, starved);
+}
+
+static Core1DecodeResult decode_flac(void *context, Core1Block *block)
+{
+    (void)context;
+    return flac_stream.decode(flac_stream.context, block);
 }
 
 static void run_decode_test(void)
@@ -126,7 +150,8 @@ static void run_decode_test(void)
     if (input_bytes > CORE1_INPUT_BYTES) {
         input_bytes = CORE1_INPUT_BYTES;
     }
-    flac_start(&decoder, (FlacInput){.read = read_input, .context = NULL, .size = input_bytes},
+    flac_start(&decoders.flac,
+               (FlacInput){.read = read_input, .context = NULL, .size = input_bytes},
                shared_info());
     uint32_t blocks = 0;
     uint32_t total = 0;
@@ -134,7 +159,7 @@ static void run_decode_test(void)
     FlacResult result = FLAC_OK;
     for (;;) {
         uint32_t start = register_read(SYSTICK_CURRENT);
-        result = flac_decode_frame(&decoder);
+        result = flac_decode_frame(&decoders.flac);
         uint32_t ticks = ticks_since(start);
         if (result != FLAC_OK) {
             break;
@@ -170,7 +195,10 @@ void core1_main(void)
         return;
     }
     use_accelerator(register_read(CORE1_SHARED_ACCEL_CLASSES));
-    core1_stream_init(&stream, core1_region(), core1_flac_decoder(&flac, &decoder));
+    flac_stream = core1_flac_decoder(&flac, &decoders.flac);
+    core1_stream_init(&stream, core1_region(), (Core1Decoder){start_flac, decode_flac, NULL});
+    core1_stream_set_decoder(&stream, STREAM_CODEC_ALAC, core1_alac_decoder(&alac, &decoders.alac));
+    core1_ticks_measure(&stream);
     for (;;) {
         core1_stream_step(&stream);
     }
