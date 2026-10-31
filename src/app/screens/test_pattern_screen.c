@@ -149,7 +149,7 @@ Screen *test_pattern_screen_init(TestPatternScreen *pattern)
 {
     *pattern = (TestPatternScreen){0};
     pattern->screen = (Screen){
-        .title = "Key test",
+        .title = "按键测试",
         .context = pattern,
         .full_screen = true,
         .stays_on_wake = true,

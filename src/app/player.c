@@ -628,15 +628,15 @@ void player_refusal_text(HalAudioRefusal refusal, char *text, size_t capacity)
         char rate[16];
         format_sample_rate(refusal.sample_rate, rate, sizeof rate);
         string_builder_append(&builder, rate);
-        string_builder_append(&builder, " isn't supported yet");
+        string_builder_append(&builder, " 暂不支持");
         return;
     }
     case HAL_AUDIO_PROBLEM_FORMAT:
-        string_builder_append(&builder, "This file type isn't supported yet");
+        string_builder_append(&builder, "暂不支持这种文件格式");
         return;
     case HAL_AUDIO_PROBLEM_UNREADABLE:
     case HAL_AUDIO_PROBLEM_NONE:
         break;
     }
-    string_builder_append(&builder, "Couldn't read the track");
+    string_builder_append(&builder, "无法读取这首歌");
 }

@@ -53,8 +53,8 @@ static void run_usb_session(void)
     raise_clock_for_usb();
     UsbSessionEnd end = usb_session_run();
     if (end == USB_SESSION_UNPLUGGED && hal_system_usb_last().left_mounted != 0) {
-        app_show_notice("Unplugged before ejecting",
-                        "Recent changes may be lost. Eject the drives before unplugging.");
+        app_show_notice("拔线前未弹出磁盘",
+                        "近期写入可能丢失。拔线前请先弹出磁盘。");
         board_wait_for_key();
     }
     if (end == USB_SESSION_EJECTED || end == USB_SESSION_UNPLUGGED) {
@@ -150,7 +150,7 @@ static void switch_off_when_empty(uint32_t boot_millivolts)
     if (!battery_boot_cutoff(boot_millivolts, usb_vbus_present())) {
         return;
     }
-    app_show_notice("Battery low", "Charge the player to turn it on");
+    app_show_notice("电量低", "电量不足，请充电后再开机");
     board_delay_ms(EMPTY_NOTICE_MS);
     hal_power_off();
 }

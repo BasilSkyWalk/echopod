@@ -11,8 +11,8 @@ enum {
     DETAIL_MAX_WIDTH = 110
 };
 
-static const char TITLE[] = "Up Next";
-static const char EMPTY_MESSAGE[] = "Nothing is playing";
+static const char TITLE[] = "待播列表";
+static const char EMPTY_MESSAGE[] = "没有正在播放的内容";
 
 typedef enum RowKind {
     ROW_PLAYING,
@@ -103,7 +103,7 @@ static bool track_at(const UpNextScreen *up_next, int index, QueueWalk *walk, ui
 
 static const char *state_text(const Player *player)
 {
-    return player->state == PLAYER_PLAYING ? "Playing" : "Paused";
+    return player->state == PLAYER_PLAYING ? "正在播放" : "已暂停";
 }
 
 static void load_row(UpNextScreen *up_next, int row, int index, QueueWalk *walk)

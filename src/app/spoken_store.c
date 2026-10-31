@@ -204,9 +204,6 @@ static void append_count(StringBuilder *builder, uint32_t count, const char *nou
     string_builder_append_unsigned(builder, count);
     string_builder_append_char(builder, ' ');
     string_builder_append(builder, noun);
-    if (count != 1) {
-        string_builder_append_char(builder, 's');
-    }
 }
 
 static bool describe_folder(const SpokenStore *store, SpokenRow row, StringBuilder *builder)
@@ -216,15 +213,15 @@ static bool describe_folder(const SpokenStore *store, SpokenRow row, StringBuild
     if (!library_read_folder(store->library, row.item.index, &folder) || folder.track_count == 0) {
         return false;
     }
-    const char *noun = row.shelf == SPOKEN_PODCAST ? "episode" : "chapter";
+    const char *noun = row.shelf == SPOKEN_PODCAST ? "集" : "章";
     if (row.shelf != SPOKEN_AUDIOBOOK || !spoken_store_book(store, row.item.index, &bookmark)) {
         append_count(builder, folder.track_count, noun);
     } else if (bookmark_finished(bookmark)) {
-        string_builder_append(builder, "Finished");
+        string_builder_append(builder, "已完成");
     } else {
-        string_builder_append(builder, "Chapter ");
+        string_builder_append(builder, "第 ");
         string_builder_append_unsigned(builder, (uint32_t)bookmark.chapter + 1u);
-        string_builder_append(builder, " of ");
+        string_builder_append(builder, " / ");
         string_builder_append_unsigned(builder, folder.track_count);
     }
     return true;
@@ -239,7 +236,7 @@ static bool describe_track(const SpokenStore *store, SpokenRow row, StringBuilde
         return false;
     }
     if (bookmark_finished(bookmark)) {
-        string_builder_append(builder, "Played");
+        string_builder_append(builder, "已播放");
         return true;
     }
     if (bookmark.position_ms == 0 || bookmark.position_ms >= record.duration_ms) {
@@ -248,7 +245,7 @@ static bool describe_track(const SpokenStore *store, SpokenRow row, StringBuilde
     char left[TIME_CAPACITY];
     format_duration(record.duration_ms - bookmark.position_ms, left, sizeof left);
     string_builder_append(builder, left);
-    string_builder_append(builder, " left");
+    string_builder_append(builder, " 剩余");
     return true;
 }
 

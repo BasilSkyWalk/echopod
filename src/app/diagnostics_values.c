@@ -6,17 +6,17 @@ const char *diagnostics_tone_result_text(HalToneResult result)
 {
     switch (result) {
     case HAL_TONE_PLAYED:
-        return "Played";
+        return "已播放";
     case HAL_TONE_NO_DAC:
-        return "No DAC";
+        return "无 DAC";
     case HAL_TONE_SETUP_FAILED:
-        return "Setup failed";
+        return "初始化失败";
     case HAL_TONE_NOT_READY:
-        return "Not ready";
+        return "未就绪";
     case HAL_TONE_STALLED:
-        return "I2S stalled";
+        return "I2S 卡住";
     case HAL_TONE_NO_DMAC:
-        return "No DMAC";
+        return "无 DMAC";
     }
     return "";
 }
@@ -56,7 +56,7 @@ void diagnostics_usb_registers_text(bool captured, uint32_t first, uint32_t seco
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!captured) {
-        string_builder_append(&builder, "Plug in USB first");
+        string_builder_append(&builder, "请先插上 USB");
         return;
     }
     append_hex(&builder, first, 8);
@@ -73,19 +73,19 @@ void diagnostics_usb_last_text(HalUsbLast last, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (last.end == HAL_USB_END_NONE) {
-        string_builder_append(&builder, "No session yet");
+        string_builder_append(&builder, "尚无会话");
         return;
     }
     if (last.end == HAL_USB_END_NO_HOST) {
-        string_builder_append(&builder, "No computer");
+        string_builder_append(&builder, "无电脑");
         return;
     }
     if (last.end == HAL_USB_END_EJECTED) {
-        string_builder_append(&builder, "Ejected W");
+        string_builder_append(&builder, "弹出 W");
     } else {
-        string_builder_append(&builder, "Unplugged ");
+        string_builder_append(&builder, "已拔出 ");
         string_builder_append_unsigned(&builder, drives_in(last.left_mounted));
-        string_builder_append(&builder, " up W");
+        string_builder_append(&builder, " 启动 W");
     }
     string_builder_append_unsigned(&builder, last.internal_written);
     string_builder_append_char(&builder, '/');
@@ -107,11 +107,11 @@ void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
         return;
     }
     if (view.status.running) {
-        string_builder_append(&builder, "Playing ");
+        string_builder_append(&builder, "播放中 ");
         string_builder_append_unsigned(&builder, view.status.position);
         return;
     }
-    string_builder_append(&builder, view.stopped ? "Stopped" : "Ended");
+    string_builder_append(&builder, view.stopped ? "已停止" : "已结束");
 }
 
 void diagnostics_boot_pll_text(HalBootClocks clocks, char *text, size_t capacity)
@@ -141,7 +141,7 @@ void diagnostics_clock_text(uint32_t mhz, bool failed, char *text, size_t capaci
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (failed) {
-        string_builder_append(&builder, "No lock");
+        string_builder_append(&builder, "未锁定");
         return;
     }
     string_builder_append_unsigned(&builder, mhz);
@@ -173,19 +173,19 @@ static const char *core1_failure_text(HalCore1Status status)
     case HAL_CORE1_RAN:
         return "";
     case HAL_CORE1_UNAVAILABLE:
-        return "Not here";
+        return "不存在";
     case HAL_CORE1_NEEDS_PLL:
-        return "Needs 96+ MHz";
+        return "需要 96+ MHz";
     case HAL_CORE1_NO_POWER:
-        return "No power";
+        return "无电源";
     case HAL_CORE1_NO_REPLY:
-        return "No reply";
+        return "无响应";
     case HAL_CORE1_BAD_REPLY:
-        return "Bad reply";
+        return "响应异常";
     case HAL_CORE1_NO_STOP:
-        return "No stop";
+        return "无法停止";
     case HAL_CORE1_BUSY:
-        return "Busy with music";
+        return "正在播放音乐";
     }
     return "";
 }
@@ -193,21 +193,21 @@ static const char *core1_failure_text(HalCore1Status status)
 static const char *step_name(HalStartStep step, bool finished)
 {
     static const char *const OPEN_NAMES[HAL_START_STEP_COUNT] = {"",
-                                                                 "backlight on",
-                                                                 "backlight off",
-                                                                 "clock switch",
-                                                                 "core 1 start",
-                                                                 "core 1 stop",
-                                                                 "card write",
-                                                                 "watchdog test"};
+                                                                 "背光开",
+                                                                 "背光关",
+                                                                 "切换时钟",
+                                                                 "Core 1 启动",
+                                                                 "Core 1 停止",
+                                                                 "写卡",
+                                                                 "看门狗测试"};
     static const char *const DONE_NAMES[HAL_START_STEP_COUNT] = {"",
-                                                                 "Backlight on",
-                                                                 "Backlight off",
-                                                                 "Clock switch",
-                                                                 "Core 1 start",
-                                                                 "Core 1 stop",
-                                                                 "Card write",
-                                                                 "Watchdog test"};
+                                                                 "背光开",
+                                                                 "背光关",
+                                                                 "切换时钟",
+                                                                 "Core 1 启动",
+                                                                 "Core 1 停止",
+                                                                 "写卡",
+                                                                 "看门狗测试"};
     return finished ? DONE_NAMES[step] : OPEN_NAMES[step];
 }
 
@@ -216,14 +216,14 @@ void diagnostics_last_step_text(HalStartInfo info, char *text, size_t capacity)
     StringBuilder builder = string_builder_make(text, capacity);
     if (!info.warm || info.last_step == HAL_START_STEP_NONE ||
         info.last_step >= HAL_START_STEP_COUNT) {
-        string_builder_append(&builder, "None");
+        string_builder_append(&builder, "无");
         return;
     }
     if (!info.last_step_finished) {
-        string_builder_append(&builder, "In ");
+        string_builder_append(&builder, "输入 ");
     }
     string_builder_append(&builder, step_name(info.last_step, info.last_step_finished));
-    string_builder_append(&builder, " at ");
+    string_builder_append(&builder, " 于 ");
     string_builder_append_unsigned(&builder, info.last_step_ms / 1000u);
     string_builder_append(&builder, " s");
 }
@@ -232,7 +232,7 @@ void diagnostics_last_battery_text(HalStartInfo info, char *text, size_t capacit
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!info.warm || info.last_millivolts == 0) {
-        string_builder_append(&builder, "No reading");
+        string_builder_append(&builder, "无读数");
         return;
     }
     string_builder_append_unsigned(&builder, info.last_millivolts);
@@ -273,12 +273,12 @@ void diagnostics_core1_accel_text(bool run, HalCore1Accel result, char *text, si
         return;
     }
     if (result.timed_out) {
-        string_builder_append(&builder, "Timeout at t");
+        string_builder_append(&builder, "超时于 t");
         string_builder_append_unsigned(&builder, result.failed_vector);
         return;
     }
-    string_builder_append(&builder, result.narrow_ok ? "N ok" : "N no");
-    string_builder_append(&builder, result.wide_ok ? " W ok" : " W no");
+    string_builder_append(&builder, result.narrow_ok ? "N 正常" : "N 异常");
+    string_builder_append(&builder, result.wide_ok ? " W 正常" : " W 异常");
     if (result.failed_vector > 0) {
         string_builder_append(&builder, " t");
         string_builder_append_unsigned(&builder, result.failed_vector);
@@ -297,13 +297,13 @@ void diagnostics_battery_text(HalBattery battery, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!battery.known) {
-        string_builder_append(&builder, "No reading");
+        string_builder_append(&builder, "无读数");
         return;
     }
     string_builder_append_unsigned(&builder, battery.millivolts);
     string_builder_append(&builder, " mV");
     if (battery.usb_power) {
-        string_builder_append(&builder, battery.charging ? " charging" : " full");
+        string_builder_append(&builder, battery.charging ? " 充电中" : " 已充满");
     }
 }
 
@@ -312,8 +312,8 @@ void diagnostics_boot_hold_text(HalPowerHold hold, char *text, size_t capacity)
     StringBuilder builder = string_builder_make(text, capacity);
     string_builder_append(&builder, "fn");
     string_builder_append_unsigned(&builder, hold.function);
-    string_builder_append(&builder, hold.output ? " output" : " input");
-    string_builder_append(&builder, hold.high ? " high" : " low");
+    string_builder_append(&builder, hold.output ? " 输出" : " 输入");
+    string_builder_append(&builder, hold.high ? " 高" : " 低");
     if (hold.usb_power) {
         string_builder_append(&builder, " · USB");
     }
@@ -326,21 +326,21 @@ void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!info.warm) {
-        string_builder_append(&builder, "Cold start");
+        string_builder_append(&builder, "冷启动");
         return;
     }
     if (info.fault_status != 0 || info.hard_fault_status != 0) {
-        string_builder_append(&builder, "Fault at ");
+        string_builder_append(&builder, "故障于 ");
         append_hex(&builder, info.fault_pc, 8);
         return;
     }
     string_builder_append_char(&builder, '#');
     string_builder_append_unsigned(&builder, info.starts);
     if (info.previous_power_off) {
-        string_builder_append(&builder, " after power-off");
+        string_builder_append(&builder, " 关机后");
         return;
     }
-    string_builder_append(&builder, " reset after ");
+    string_builder_append(&builder, " 重启于 ");
     string_builder_append_unsigned(&builder, info.previous_uptime_ms / 1000u);
     string_builder_append(&builder, " s");
 }
@@ -353,19 +353,19 @@ void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t
     }
     switch (test.status) {
     case HAL_HIGH_RAM_OK:
-        string_builder_append(&builder, "OK ");
+        string_builder_append(&builder, "正常 ");
         string_builder_append_unsigned(&builder, test.size / 1024u);
-        string_builder_append(&builder, " KB, call works");
+        string_builder_append(&builder, " KB，调用正常");
         return;
     case HAL_HIGH_RAM_UNAVAILABLE:
-        string_builder_append(&builder, "Not on this player");
+        string_builder_append(&builder, "本机不支持");
         return;
     case HAL_HIGH_RAM_BAD_MEMORY:
-        string_builder_append(&builder, "Bad at ");
+        string_builder_append(&builder, "异常于 ");
         append_hex(&builder, test.bad_address, 8);
         return;
     case HAL_HIGH_RAM_BAD_CALL:
-        string_builder_append(&builder, "Call gave ");
+        string_builder_append(&builder, "返回 ");
         append_hex(&builder, test.call_result, 8);
         return;
     }
@@ -374,10 +374,10 @@ void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t
 void diagnostics_jack_pin_text(HalJackPin pin, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
-    string_builder_append(&builder, pin.high ? "high, boot fn" : "low, boot fn");
+    string_builder_append(&builder, pin.high ? "高，启动" : "低，启动");
     string_builder_append_unsigned(&builder, pin.boot_function);
-    string_builder_append(&builder, pin.boot_output ? " out" : " in");
+    string_builder_append(&builder, pin.boot_output ? " 输出" : " 输入");
     if (pin.pull) {
-        string_builder_append(&builder, " pull");
+        string_builder_append(&builder, " 上拉");
     }
 }

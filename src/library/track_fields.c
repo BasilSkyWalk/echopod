@@ -9,9 +9,9 @@ enum {
     YEAR_DIGITS = 4
 };
 
-static const char UNKNOWN_ARTIST[] = "Unknown Artist";
-static const char UNKNOWN_ALBUM[] = "Unknown Album";
-static const char UNKNOWN_GENRE[] = "Unknown Genre";
+static const char UNKNOWN_ARTIST[] = "未知艺术家";
+static const char UNKNOWN_ALBUM[] = "未知专辑";
+static const char UNKNOWN_GENRE[] = "未知流派";
 
 static bool is_digit(char character)
 {

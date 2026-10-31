@@ -42,7 +42,7 @@ static void show_percent(uint32_t percent)
 {
     char text[MESSAGE_CAPACITY];
     StringBuilder builder = string_builder_make(text, sizeof text);
-    string_builder_append(&builder, "Don't unplug or turn off. ");
+    string_builder_append(&builder, "请勿拔线或关机。");
     string_builder_append_unsigned(&builder, percent);
     string_builder_append_char(&builder, '%');
     app_show_notice(install_title, text);
@@ -88,15 +88,15 @@ static bool open_update(UpdateStorage *storage)
 
 static void install(const UpdateFile *update, const UpdateStorage *storage, bool stock)
 {
-    install_title = stock ? "Installing FiiO firmware" : "Installing update";
+    install_title = stock ? "正在安装 FiiO 固件" : "正在安装更新";
     last_percent = 0;
     show_percent(0);
     flash_rewritten = true;
     if (updater_install(update, storage, (UpdateProgress){report, NULL})) {
-        app_show_notice(stock ? "FiiO firmware installed" : "Update installed",
-                        "Unplug USB, then hold Power to turn off and on again.");
+        app_show_notice(stock ? "FiiO 固件已安装" : "更新已安装",
+                        "拔掉 USB 线，长按电源键关机再开机。");
     } else {
-        app_show_notice("Update failed", "Copy the file again and retry before turning off.");
+        app_show_notice("更新失败", "请重新复制文件后再试，不要关机。");
     }
     board_wait_for_key();
 }
@@ -111,17 +111,17 @@ void update_after_usb(void)
     const char *name = update_path + 1;
     char text[MESSAGE_CAPACITY];
     StringBuilder builder = string_builder_make(text, sizeof text);
-    string_builder_append(&builder, "Checking ");
+    string_builder_append(&builder, "正在检查 ");
     string_builder_append(&builder, name);
-    app_show_notice("Update", text);
+    app_show_notice("更新", text);
     UpdateCheck check = updater_check(&update, &storage);
     if (check == UPDATE_VALID || check == UPDATE_STOCK) {
         install(&update, &storage, check == UPDATE_STOCK);
     } else if (check == UPDATE_INVALID) {
         builder = string_builder_make(text, sizeof text);
         string_builder_append(&builder, name);
-        string_builder_append(&builder, " isn't a valid image for this player.");
-        app_show_notice("Update not installed", text);
+        string_builder_append(&builder, " 不是本机可用的固件。");
+        app_show_notice("更新未安装", text);
         board_wait_for_key();
     }
 }

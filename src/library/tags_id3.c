@@ -203,7 +203,7 @@ static const char *genre_for_id(const char *id, uint32_t length)
     if (tag_same_text(id, length, "CR")) {
         return "Cover";
     }
-    return tag_same_text(id, length, "RX") ? "Remix" : "Unknown";
+    return tag_same_text(id, length, "RX") ? "Remix" : "未知";
 }
 
 static uint32_t length_of(const char *text)

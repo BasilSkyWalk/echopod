@@ -28,15 +28,15 @@ enum {
 };
 
 static const MusicEntry MUSIC_ENTRIES[MUSIC_ITEM_COUNT] = {
-    {"Cover Flow", MUSIC_COVER_FLOW, BROWSE_ALBUMS},
-    {"Artists", MUSIC_LIBRARY, BROWSE_ARTISTS},
-    {"Album Artists", MUSIC_LIBRARY, BROWSE_ALBUM_ARTISTS},
-    {"Albums", MUSIC_LIBRARY, BROWSE_ALBUMS},
-    {"Genres", MUSIC_LIBRARY, BROWSE_GENRES},
-    {"Folders", MUSIC_LIBRARY, BROWSE_FOLDER},
-    {"All Songs", MUSIC_LIBRARY, BROWSE_ALL_SONGS},
-    {"Playlists", MUSIC_LIBRARY, BROWSE_PLAYLISTS},
-    {"Favorites", MUSIC_FAVORITES, BROWSE_ALBUMS},
+    {"封面浏览", MUSIC_COVER_FLOW, BROWSE_ALBUMS},
+    {"艺术家", MUSIC_LIBRARY, BROWSE_ARTISTS},
+    {"专辑艺术家", MUSIC_LIBRARY, BROWSE_ALBUM_ARTISTS},
+    {"专辑", MUSIC_LIBRARY, BROWSE_ALBUMS},
+    {"流派", MUSIC_LIBRARY, BROWSE_GENRES},
+    {"文件夹", MUSIC_LIBRARY, BROWSE_FOLDER},
+    {"全部歌曲", MUSIC_LIBRARY, BROWSE_ALL_SONGS},
+    {"播放列表", MUSIC_LIBRARY, BROWSE_PLAYLISTS},
+    {"收藏", MUSIC_FAVORITES, BROWSE_ALBUMS},
 };
 
 static bool player_has_track(const void *context)
@@ -127,7 +127,7 @@ static void build_music(AppScreens *screens, AppScreensContext context)
     for (int index = 0; index < MUSIC_ITEM_COUNT; index++) {
         screens->music_items[index] = music_item(screens, context.store, index);
     }
-    app_screens_build_menu(&screens->music, "Music", screens->music_items, MUSIC_ITEM_COUNT,
+    app_screens_build_menu(&screens->music, "音乐", screens->music_items, MUSIC_ITEM_COUNT,
                            context.theme);
 }
 
@@ -164,7 +164,7 @@ static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, Spoke
         .present = context.store->available &&
                    spoken_shelf_folder(&context.store->library, shelf, &folder),
     };
-    return (MenuItem){.label = shelf == SPOKEN_PODCAST ? "Podcasts" : "Audiobooks",
+    return (MenuItem){.label = shelf == SPOKEN_PODCAST ? "播客" : "有声书",
                       .select = open_browse,
                       .context = entry,
                       .opens = true,
@@ -175,12 +175,12 @@ static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, Spoke
 static void build_home(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
-    screens->home_items[0] = app_screens_open_item("Music", &screens->music.screen);
+    screens->home_items[0] = app_screens_open_item("音乐", &screens->music.screen);
     screens->home_items[1] = shelf_item(screens, context, SPOKEN_AUDIOBOOK);
     screens->home_items[2] = shelf_item(screens, context, SPOKEN_PODCAST);
-    screens->home_items[3] = app_screens_open_item("Settings", &screens->settings.menu.screen);
-    screens->home_items[4] = app_screens_open_item("Diagnostics", &screens->diagnostics.screen);
-    screens->home_items[5] = app_screens_open_item("Now Playing", &screens->now_playing.screen);
+    screens->home_items[3] = app_screens_open_item("设置", &screens->settings.menu.screen);
+    screens->home_items[4] = app_screens_open_item("诊断", &screens->diagnostics.screen);
+    screens->home_items[5] = app_screens_open_item("正在播放", &screens->now_playing.screen);
     screens->home_items[5].shown = player_has_track;
     screens->home_items[5].shown_context = context.player;
     home_art_init(&screens->home_art, context.covers, context.store, context.player, theme);
@@ -200,7 +200,7 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
     MessageConfig no_library = {
-        .title = "No library", .message = "Run the PC indexer to build one", .theme = theme};
+        .title = "没有曲库", .message = "请用电脑上的索引工具生成", .theme = theme};
     UpNextConfig up_next = {
         .library = &context.store->library, .theme = theme, .player = context.player};
     NowPlayingConfig now_playing = {.player = context.player,

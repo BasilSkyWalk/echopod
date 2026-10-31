@@ -8,31 +8,31 @@ enum {
     MILLISECONDS_PER_MINUTE = 60000
 };
 
-static const char *const SHUFFLE_OPTIONS[SHUFFLE_MODE_COUNT] = {"Off", "Songs", "Albums"};
-static const char *const REPEAT_OPTIONS[REPEAT_MODE_COUNT] = {"Off", "One", "All"};
+static const char *const SHUFFLE_OPTIONS[SHUFFLE_MODE_COUNT] = {"关闭", "歌曲", "专辑"};
+static const char *const REPEAT_OPTIONS[REPEAT_MODE_COUNT] = {"关闭", "单曲", "全部"};
 static const char *const SLEEP_OPTIONS[SLEEP_TIMER_OPTION_COUNT] = {
-    "Off", "15 min", "30 min", "45 min", "60 min", "90 min", "120 min"};
+    "关闭", "15 分钟", "30 分钟", "45 分钟", "60 分钟", "90 分钟", "120 分钟"};
 static const char *const SLEEP_MESSAGES[SLEEP_TIMER_OPTION_COUNT] = {
-    "Sleep timer off",       "Turning off in 15 min", "Turning off in 30 min",
-    "Turning off in 45 min", "Turning off in 60 min", "Turning off in 90 min",
-    "Turning off in 120 min"};
-static const char *const AUTO_OFF_OPTIONS[AUTO_OFF_OPTION_COUNT] = {"Off", "1 min", "5 min",
-                                                                    "10 min"};
+    "睡眠定时已关闭",       "15 分钟后关机", "30 分钟后关机",
+    "45 分钟后关机", "60 分钟后关机", "90 分钟后关机",
+    "120 分钟后关机"};
+static const char *const AUTO_OFF_OPTIONS[AUTO_OFF_OPTION_COUNT] = {"关闭", "1 分钟", "5 分钟",
+                                                                    "10 分钟"};
 static const char *const TIMEOUT_OPTIONS[SCREEN_TIMEOUT_OPTION_COUNT] = {
-    "10 s", "20 s", "30 s", "1 min", "2 min", "5 min", "Never"};
+    "10 秒", "20 秒", "30 秒", "1 分钟", "2 分钟", "5 分钟", "永不"};
 static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2", "3", "4", "5",
                                                                        "6", "7", "8", "9", "10"};
-static const char *const ORIENTATION_OPTIONS[ORIENTATION_COUNT] = {"Landscape", "Portrait",
-                                                                   "Portrait, flipped"};
-static const char *const GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {"Low", "High"};
-static const char *const OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {"Auto", "3.5 mm", "4.4 mm"};
+static const char *const ORIENTATION_OPTIONS[ORIENTATION_COUNT] = {"横屏", "竖屏",
+                                                               "竖屏（翻转）"};
+static const char *const GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {"低", "高"};
+static const char *const OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {"自动", "3.5 mm", "4.4 mm"};
 static const char *const OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
-    "Volume follows the plugged jack", "Using 3.5 mm volume levels", "Using 4.4 mm volume levels"};
+    "音量跟随所插的接口", "使用 3.5 mm 音量", "使用 4.4 mm 音量"};
 static const char *const START_OPTIONS[START_SCREEN_COUNT] = {
-    "Main menu", "Now Playing", "Albums", "Artists", "Favorites", "Playlists", "Cover Flow"};
-static const char *const USB_MODE_OPTIONS[USB_MODE_COUNT] = {"Storage", "DAC"};
-static const char *const USB_MODE_MESSAGES[USB_MODE_COUNT] = {"USB shows the player's drives",
-                                                              "USB plays the computer's sound"};
+    "主菜单", "正在播放", "专辑", "艺术家", "收藏", "播放列表", "封面浏览"};
+static const char *const USB_MODE_OPTIONS[USB_MODE_COUNT] = {"存储", "DAC"};
+static const char *const USB_MODE_MESSAGES[USB_MODE_COUNT] = {"USB 显示播放器存储",
+                                                              "USB 播放电脑声音"};
 
 static const Settings *settings_of(const void *context)
 {
@@ -50,7 +50,7 @@ static void save(SettingsContext *context)
 {
     settings_store_capture(context->store, player_status(context->player));
     if (!settings_store_save(context->store)) {
-        toast_show(context->toast, "Could not save settings", hal_clock_milliseconds());
+        toast_show(context->toast, "无法保存设置", hal_clock_milliseconds());
     }
 }
 
@@ -185,7 +185,7 @@ static const char *describe_output(int current)
     if (current != OUTPUT_AUTO || jack == HAL_AUDIO_JACK_NONE) {
         return OUTPUT_OPTIONS[current];
     }
-    return jack == HAL_AUDIO_JACK_BALANCED ? "Auto (4.4 mm)" : "Auto (3.5 mm)";
+    return jack == HAL_AUDIO_JACK_BALANCED ? "自动（4.4 mm）" : "自动（3.5 mm）";
 }
 
 static int current_start(const void *context)
@@ -213,20 +213,20 @@ static void choose_usb_mode(void *context, int index)
 }
 
 static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
-    {"Shuffle", SHUFFLE_OPTIONS, SHUFFLE_MODE_COUNT, current_shuffle, choose_shuffle, NULL},
-    {"Repeat", REPEAT_OPTIONS, REPEAT_MODE_COUNT, current_repeat, choose_repeat, NULL},
-    {"Sleep timer", SLEEP_OPTIONS, SLEEP_TIMER_OPTION_COUNT, current_sleep, choose_sleep, NULL},
-    {"Auto off", AUTO_OFF_OPTIONS, AUTO_OFF_OPTION_COUNT, current_auto_off, choose_auto_off, NULL},
-    {"Screen timeout", TIMEOUT_OPTIONS, SCREEN_TIMEOUT_OPTION_COUNT, current_timeout,
+    {"随机播放", SHUFFLE_OPTIONS, SHUFFLE_MODE_COUNT, current_shuffle, choose_shuffle, NULL},
+    {"循环播放", REPEAT_OPTIONS, REPEAT_MODE_COUNT, current_repeat, choose_repeat, NULL},
+    {"睡眠定时", SLEEP_OPTIONS, SLEEP_TIMER_OPTION_COUNT, current_sleep, choose_sleep, NULL},
+    {"自动关机", AUTO_OFF_OPTIONS, AUTO_OFF_OPTION_COUNT, current_auto_off, choose_auto_off, NULL},
+    {"熄屏时间", TIMEOUT_OPTIONS, SCREEN_TIMEOUT_OPTION_COUNT, current_timeout,
      choose_timeout, NULL},
-    {"Brightness", BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,
+    {"亮度", BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,
      choose_brightness, NULL},
-    {"Orientation", ORIENTATION_OPTIONS, ORIENTATION_COUNT, current_orientation, choose_orientation,
+    {"方向", ORIENTATION_OPTIONS, ORIENTATION_COUNT, current_orientation, choose_orientation,
      NULL},
-    {"Gain", GAIN_OPTIONS, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
-    {"Output", OUTPUT_OPTIONS, OUTPUT_JACK_COUNT, current_output, choose_output, describe_output},
-    {"Start screen", START_OPTIONS, START_SCREEN_COUNT, current_start, choose_start, NULL},
-    {"USB mode", USB_MODE_OPTIONS, USB_MODE_COUNT, current_usb_mode, choose_usb_mode, NULL},
+    {"增益", GAIN_OPTIONS, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
+    {"输出", OUTPUT_OPTIONS, OUTPUT_JACK_COUNT, current_output, choose_output, describe_output},
+    {"启动页面", START_OPTIONS, START_SCREEN_COUNT, current_start, choose_start, NULL},
+    {"USB 模式", USB_MODE_OPTIONS, USB_MODE_COUNT, current_usb_mode, choose_usb_mode, NULL},
 };
 
 static ScreenAction open_choice(void *context)
@@ -273,13 +273,13 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
     screens->context = context;
     screens->theme = theme;
     screens->items[SETTINGS_RESCAN_ITEM] = (MenuItem){
-        .label = "Rescan library", .select = request_rescan, .context = &screens->context};
-    screens->items[SETTINGS_BLUETOOTH_ITEM] = (MenuItem){.label = "Bluetooth",
+        .label = "重新扫描曲库", .select = request_rescan, .context = &screens->context};
+    screens->items[SETTINGS_BLUETOOTH_ITEM] = (MenuItem){.label = "蓝牙",
                                                          .select = bluetooth_screen_open,
                                                          .context = context.bluetooth,
                                                          .value = bluetooth_screen_summary,
                                                          .opens = true};
-    screens->items[SETTINGS_EQUALIZER_ITEM] = (MenuItem){.label = "Equalizer",
+    screens->items[SETTINGS_EQUALIZER_ITEM] = (MenuItem){.label = "均衡器",
                                                          .select = equalizer_screen_open,
                                                          .context = context.equalizer,
                                                          .value = equalizer_screen_summary,
@@ -295,7 +295,7 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
                                           .value = choice_value,
                                           .opens = true};
     }
-    MenuConfig menu = {.title = "Settings",
+    MenuConfig menu = {.title = "设置",
                        .items = screens->items,
                        .item_count = SETTINGS_ITEM_COUNT,
                        .theme = theme};

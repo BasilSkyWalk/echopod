@@ -275,25 +275,25 @@ static const char *error_text(ScanResult result)
     case SCAN_OK:
         return "";
     case SCAN_NO_MUSIC_ROOT:
-        return "No music found on the card";
+        return "卡上没有找到音乐";
     case SCAN_OUT_OF_MEMORY:
-        return "Library too big for the player's memory";
+        return "曲库超出播放器内存";
     case SCAN_TOO_MANY:
-        return "Too many tracks for the player";
+        return "歌曲数量超出上限";
     case SCAN_NO_SCRATCH:
-        return "Couldn't free memory for the scan";
+        return "无法为扫描释放内存";
     case SCAN_FOLDER_TOO_BIG:
-        return "A folder holds too many files";
+        return "某个文件夹内文件过多";
     case SCAN_PATH_TOO_LONG:
-        return "A folder path is too long";
+        return "某个文件夹路径过长";
     case SCAN_WRITE_FAILED:
-        return "Could not write the library";
+        return "无法写入曲库";
     case SCAN_NO_ROOM:
-        return "No room for the library on the card";
+        return "卡上空间不足，无法存放曲库";
     case SCAN_NO_CODE:
-        return "Rescan code missing: reinstall the update";
+        return "缺少扫描组件：请重装更新";
     case SCAN_RESTART_NEEDED:
-        return "Restart the player to finish the update";
+        return "重启播放器完成更新";
     }
     return "";
 }
@@ -304,15 +304,15 @@ const char *library_rescan_message(RescanOutcome outcome, char *text, uint32_t c
         return error_text(outcome.result);
     }
     StringBuilder builder = string_builder_make(text, capacity);
-    string_builder_append(&builder, "Library: ");
+    string_builder_append(&builder, "曲库：");
     string_builder_append_unsigned(&builder, outcome.stats.tracks);
-    string_builder_append(&builder, outcome.stats.tracks == 1 ? " track" : " tracks");
+    string_builder_append(&builder, outcome.stats.tracks == 1 ? " 首" : " 首");
     if (outcome.cover_result != SCAN_OK) {
-        string_builder_append(&builder, ", no covers");
+        string_builder_append(&builder, "，无封面");
     } else if (outcome.covers.albums > 0) {
-        string_builder_append(&builder, ", ");
+        string_builder_append(&builder, "，");
         string_builder_append_unsigned(&builder, outcome.covers.covers);
-        string_builder_append(&builder, outcome.covers.covers == 1 ? " cover" : " covers");
+        string_builder_append(&builder, outcome.covers.covers == 1 ? " 张封面" : " 张封面");
     }
     return text;
 }

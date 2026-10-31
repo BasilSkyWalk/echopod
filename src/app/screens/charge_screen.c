@@ -57,10 +57,10 @@ void charge_screen_text(HalBattery battery, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (battery.usb_power && !battery.charging) {
-        string_builder_append(&builder, "Charged");
+        string_builder_append(&builder, "已充满");
         return;
     }
-    string_builder_append(&builder, "Charging");
+    string_builder_append(&builder, "充电中");
     if (battery.known) {
         string_builder_append_char(&builder, ' ');
         string_builder_append_unsigned(&builder, battery.percent < FULL_PERCENT ? battery.percent
@@ -84,7 +84,7 @@ void charge_screen_draw(Canvas *canvas, const Theme *theme, HalBattery battery)
     TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, line, text), .text = text});
-    static const char HINT[] = "Hold Power to turn on";
+    static const char HINT[] = "长按电源键开机";
     Rect hint = {0, height - HINT_BOTTOM - HINT_HEIGHT, width, HINT_HEIGHT};
     TextStyle small = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
     label_draw(canvas, small,

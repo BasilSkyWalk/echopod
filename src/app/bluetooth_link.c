@@ -241,7 +241,7 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
         link->changed_ms = now_ms;
         link->seen = status->remote;
         remember(link, &status->connected);
-        announce(link, "Connected to ", status->connected.name, now_ms);
+        announce(link, "已连接到 ", status->connected.name, now_ms);
     } else if (!connected && link->connected) {
         link->connected = false;
         if (link->streamed && player->state == PLAYER_PLAYING) {
@@ -253,7 +253,7 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
         if (!link->has_target) {
             link->retried_ms = now_ms;
         }
-        announce(link, "Disconnected from ", link->linked.name, now_ms);
+        announce(link, "已断开与 ", link->linked.name, now_ms);
     }
 }
 
@@ -404,7 +404,7 @@ static void follow_remote(BluetoothLink *link, const HalBluetoothStatus *status,
         player_toggle_pause(player);
         link->player_state = (uint8_t)player->state;
         link->buds_paused = true;
-        announce(link, "Paused by ", link->linked.name, now_ms);
+        announce(link, "暂停来源：", link->linked.name, now_ms);
     }
     if (settled && pressed(remote.plays, seen.plays) > 0 && link->buds_paused &&
         player->state == PLAYER_PAUSED) {
@@ -524,26 +524,26 @@ bool bluetooth_link_nearby(const BluetoothLink *link, int index)
 const char *bluetooth_link_summary(const BluetoothLink *link)
 {
     if (!link->saved.enabled) {
-        return "Off";
+        return "关闭";
     }
     if (link->connected) {
         return link->linked.name;
     }
     if (link->dozing) {
-        return "Not connected";
+        return "未连接";
     }
     HalBluetoothState state = hal_bluetooth_status()->state;
     if (state == HAL_BLUETOOTH_NO_REPLY) {
-        return "Not responding";
+        return "无响应";
     }
     if (bluetooth_link_searching(link)) {
-        return "Searching…";
+        return "正在搜索…";
     }
     if (state == HAL_BLUETOOTH_STARTING) {
-        return "Starting…";
+        return "正在启动…";
     }
     if (connecting(link)) {
-        return "Connecting…";
+        return "正在连接…";
     }
-    return link->saved.count > 0 ? "Not connected" : "On";
+    return link->saved.count > 0 ? "未连接" : "开启";
 }

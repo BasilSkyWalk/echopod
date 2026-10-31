@@ -127,7 +127,7 @@ static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
 static const char SPLASH_TEXT[] = "EchoPod";
 static const char GOODBYE_TEXT[] = "Goodbye";
-static const char BATTERY_LOW_TEXT[] = "Battery low";
+static const char BATTERY_LOW_TEXT[] = "电量低";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_LONG_SIDE];
 
@@ -702,7 +702,7 @@ static void start_screens(uint32_t now_ms)
 static void report_card_files(CardFilesReport files, uint32_t now_ms)
 {
     if (files.card_full) {
-        toast_show(&app.toast, "The card is full", now_ms);
+        toast_show(&app.toast, "存储卡已满", now_ms);
     }
     if (files.library_created) {
         app.rescan_requested = true;
@@ -713,7 +713,7 @@ static void report_card_files(CardFilesReport files, uint32_t now_ms)
 
 static void show_card_setup(void)
 {
-    app_show_notice("EchoPod", "Setting up the card...");
+    app_show_notice("EchoPod", "正在准备存储卡…");
 }
 
 void app_start(void)
@@ -759,8 +759,8 @@ static void show_rescan_progress(uint32_t files, uint32_t tracks)
     static char text[48];
     StringBuilder builder = string_builder_make(text, sizeof text);
     string_builder_append_unsigned(&builder, tracks);
-    string_builder_append(&builder, " tracks so far");
-    app_show_notice("Scanning library", text);
+    string_builder_append(&builder, " 首");
+    app_show_notice("正在扫描曲库", text);
 }
 
 static void show_cover_progress(uint32_t done, uint32_t total)
@@ -774,10 +774,10 @@ static void show_cover_progress(uint32_t done, uint32_t total)
     static char text[48];
     StringBuilder builder = string_builder_make(text, sizeof text);
     string_builder_append_unsigned(&builder, done);
-    string_builder_append(&builder, " of ");
+    string_builder_append(&builder, " / ");
     string_builder_append_unsigned(&builder, total);
-    string_builder_append(&builder, " albums");
-    app_show_notice("Finding covers", text);
+    string_builder_append(&builder, " 张专辑");
+    app_show_notice("正在查找封面", text);
 }
 
 static void explain_refusals(uint32_t now_ms)
@@ -794,7 +794,7 @@ static void explain_refusals(uint32_t now_ms)
 
 static void run_rescan(void)
 {
-    app_show_notice("Scanning library", "Starting...");
+    app_show_notice("正在扫描曲库", "正在启动…");
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
     RescanOutcome outcome = library_rescan_run(progress);
     static char message[48];
@@ -882,7 +882,7 @@ void app_step(void)
         app.music_check_requested = false;
         bool changed = hal_system_restart_pending();
         if (!changed) {
-            app_show_notice("Music", "Checking for changes...");
+            app_show_notice("音乐", "正在检查更改…");
             changed = !music_check_unchanged() || !library_store_open(&app.library);
         }
         if (!changed) {

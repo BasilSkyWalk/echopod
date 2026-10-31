@@ -55,9 +55,9 @@ static const CoverFlowLayout LAYOUT = {
 static const Color BACKDROP = COLOR_RGB(0, 0, 0);
 
 static const char STAR_PREFIX[] = "\xE2\x98\x85 ";
-static const char EMPTY_MESSAGE[] = "Nothing here";
-static const char RANDOM_TITLE[] = "Random album";
-static const char RANDOM_HINT[] = "Play any album";
+static const char EMPTY_MESSAGE[] = "这里还没有内容";
+static const char RANDOM_TITLE[] = "随机专辑";
+static const char RANDOM_HINT[] = "随便播放一张专辑";
 static const Color SHUFFLE_BACKGROUND = COLOR_RGB(44, 46, 58);
 static const Color SHUFFLE_MARK = COLOR_RGB(255, 255, 255);
 
@@ -502,7 +502,7 @@ Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config)
     flow->title[0] = '\0';
     flow->artist[0] = '\0';
     flow->screen = (Screen){
-        .title = "Cover Flow",
+        .title = "封面浏览",
         .context = flow,
         .full_screen = true,
         .paints_every_pixel = true,

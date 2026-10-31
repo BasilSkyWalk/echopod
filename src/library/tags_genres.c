@@ -9,12 +9,12 @@ static const char *const GENRES[] = {
     "Funk",
     "Grunge",
     "Hip-Hop",
-    "Jazz",
+    "爵士",
     "Metal",
     "New Age",
     "Oldies",
     "Other",
-    "Pop",
+    "流行",
     "R&B",
     "Rap",
     "Reggae",
@@ -42,7 +42,7 @@ static const char *const GENRES[] = {
     "Gospel",
     "Noise",
     "Alt. Rock",
-    "Bass",
+    "低音",
     "Soul",
     "Punk",
     "Space",
@@ -77,7 +77,7 @@ static const char *const GENRES[] = {
     "Acid Punk",
     "Acid Jazz",
     "Polka",
-    "Retro",
+    "复古",
     "Musical",
     "Rock & Roll",
     "Hard Rock",
@@ -197,5 +197,5 @@ static const char *const GENRES[] = {
 
 const char *tags_id3_genre(uint32_t index)
 {
-    return index < sizeof GENRES / sizeof GENRES[0] ? GENRES[index] : "Unknown";
+    return index < sizeof GENRES / sizeof GENRES[0] ? GENRES[index] : "未知";
 }

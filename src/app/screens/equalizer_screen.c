@@ -43,20 +43,20 @@ typedef struct HintLines {
     const char *second;
 } HintLines;
 
-static const HintLines PICK_LINES = {"+/-: choose band", "Play: adjust \xC2\xB7 Hold: 0 dB"};
-static const HintLines EDIT_LINES = {"+/-: level", "Play: done \xC2\xB7 Hold: 0 dB"};
-static const HintLines BYPASS_LINES = {"EQ is off for tracks", "above 96 kHz"};
+static const HintLines PICK_LINES = {"+/-：选择频段", "播放：调节 · 长按：0 dB"};
+static const HintLines EDIT_LINES = {"+/-：电平", "播放：完成 · 长按：0 dB"};
+static const HintLines BYPASS_LINES = {"曲目已关闭均衡器", "高于 96 kHz"};
 
 static const char *const PRESET_NAMES[EQUALIZER_PRESET_COUNT] = {
-    "Off", "Retro", "Bass", "Heavy", "Pop", "Jazz", "Unique", "Custom"};
+    "关闭", "复古", "低音", "重低音", "流行", "爵士", "独特", "自定义"};
 static const char *const BAND_LABELS[EQUALIZER_CUSTOM_BANDS] = {"63",   "160",  "400", "1k",
                                                                 "2.5k", "6.3k", "16k"};
 static const char *const BAND_NAMES[EQUALIZER_CUSTOM_BANDS] = {
     "63 Hz", "160 Hz", "400 Hz", "1 kHz", "2.5 kHz", "6.3 kHz", "16 kHz"};
 static const char CHECK_MARK[] = "\xE2\x9C\x93";
-static const char PICK_HINT[] = "+/-: choose band   Play: adjust   Hold Play: 0 dB";
-static const char EDIT_HINT[] = "+/-: level   Play: done   Hold Play: 0 dB";
-static const char BYPASS_HINT[] = "EQ is off for tracks above 96 kHz";
+static const char PICK_HINT[] = "+/-：选频段  Play：调增益  长按 Play：归零";
+static const char EDIT_HINT[] = "+/-：调增益  Play：完成  长按 Play：归零";
+static const char BYPASS_HINT[] = "96 kHz 以上不启用 EQ";
 
 const char *equalizer_screen_preset_name(EqualizerPreset preset)
 {
@@ -77,7 +77,7 @@ static ScreenAction leave(const EqualizerConfig *config, ScreenAction action)
 {
     bool leaving = action.type == SCREEN_ACTION_POP || action.type == SCREEN_ACTION_POP_TO_ROOT;
     if (leaving && !equalizer_store_save(config->store)) {
-        toast_show(config->toast, "Could not save the equalizer", hal_clock_milliseconds());
+        toast_show(config->toast, "均衡器保存失败", hal_clock_milliseconds());
     }
     return action;
 }
@@ -190,7 +190,7 @@ static void describe(EqualizerEditor *editor)
     StringBuilder preamp = string_builder_make(editor->preamp_text, sizeof editor->preamp_text);
     int boost = largest_boost(gains);
     if (boost > 0) {
-        string_builder_append(&preamp, "Preamp ");
+        string_builder_append(&preamp, "预增益 ");
         append_decibels(&preamp, -boost);
     }
 }
@@ -455,7 +455,7 @@ static void init_editor(EqualizerEditor *editor, EqualizerConfig config)
 {
     *editor = (EqualizerEditor){.config = config};
     editor->screen = (Screen){
-        .title = "Custom EQ",
+        .title = "自定义均衡器",
         .context = editor,
         .enter = enter_editor,
         .handle_key = handle_editor_key,
@@ -474,7 +474,7 @@ Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config
                                    .opens = preset_opens};
     list_view_init(&equalizer->list, &equalizer->model, config.theme, 0);
     equalizer->screen = (Screen){
-        .title = "Equalizer",
+        .title = "均衡器",
         .context = equalizer,
         .enter = enter_picker,
         .handle_key = handle_picker_key,

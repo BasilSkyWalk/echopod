@@ -25,7 +25,7 @@ enum {
     VOLUME_REPEAT_MS = 80
 };
 
-static const char TITLE[] = "USB DAC";
+static const char TITLE[] = "DAC 模式";
 
 static UsbPort port;
 static UsbAudio audio;
@@ -76,7 +76,7 @@ bool usb_dac_session_listen(void)
 
 static void append_volume(StringBuilder *line)
 {
-    string_builder_append(line, " \xC2\xB7 Volume ");
+    string_builder_append(line, " · 音量 ");
     string_builder_append_unsigned(line, dac_volume);
 }
 
@@ -98,10 +98,10 @@ static void show_state(void)
     char text[NOTICE_CAPACITY];
     StringBuilder line = string_builder_make(text, sizeof text);
     if (usb_audio_sample_bytes(&audio) == 0) {
-        string_builder_append(&line, "Choose EchoPod as the sound output");
+        string_builder_append(&line, "在电脑上选择 EchoPod 作为音频输出");
         append_volume(&line);
     } else if (open_rate == 0) {
-        string_builder_append(&line, "The audio output didn't start.");
+        string_builder_append(&line, "电脑音频输出没有启动。");
     } else {
         append_format(&line);
     }
@@ -238,7 +238,7 @@ static void start_session(void)
 
 void usb_dac_session_run(void)
 {
-    app_show_notice(TITLE, "Computer found. Starting...");
+    app_show_notice(TITLE, "已连接电脑，正在启动…");
     app_release_audio();
     board_audio_shut_down();
     uint8_t level = board_audio_volume_level();

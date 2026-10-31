@@ -18,7 +18,7 @@ static ScreenAction toggle_frame_time(void *context)
 static const char *frame_time_value(const void *context)
 {
     const AppOptions *options = context;
-    return options->show_frame_time ? "On" : "Off";
+    return options->show_frame_time ? "开启" : "关闭";
 }
 
 static ScreenAction toggle_power_taps(void *context)
@@ -31,7 +31,7 @@ static ScreenAction toggle_power_taps(void *context)
 static const char *power_taps_value(const void *context)
 {
     const AppOptions *options = context;
-    return options->ignore_power_taps ? "Ignored" : "Normal";
+    return options->ignore_power_taps ? "已忽略" : "正常";
 }
 
 static char clock_text[DIAGNOSTICS_VALUE_CAPACITY];
@@ -113,26 +113,26 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
     screens->core1_accel = (Core1AccelOption){.run = false};
     int count = 0;
     items[count++] =
-        app_screens_open_item("Key test", test_pattern_screen_init(&screens->test_pattern));
-    items[count++] = action_item("Frame time", toggle_frame_time, options, frame_time_value);
-    items[count++] = value_item("Firmware", diagnostics_row_firmware);
-    items[count++] = action_item("CPU clock", cycle_clock, &screens->clock, clock_value);
-    items[count++] = action_item("Core 1", run_core1_test, &screens->core1, core1_value);
-    items[count++] = value_item("Battery", diagnostics_row_battery);
-    items[count++] = value_item("Boot hold", boot_hold_value);
-    items[count++] = value_item("Last start", diagnostics_row_start);
-    items[count++] = value_item("Last step", diagnostics_row_last_step);
-    items[count++] = value_item("Last battery", diagnostics_row_last_battery);
-    items[count++] = (MenuItem){.label = "Bluetooth",
+        app_screens_open_item("按键测试", test_pattern_screen_init(&screens->test_pattern));
+    items[count++] = action_item("帧耗时", toggle_frame_time, options, frame_time_value);
+    items[count++] = value_item("固件", diagnostics_row_firmware);
+    items[count++] = action_item("CPU 频率", cycle_clock, &screens->clock, clock_value);
+    items[count++] = action_item("核心 1", run_core1_test, &screens->core1, core1_value);
+    items[count++] = value_item("电池", diagnostics_row_battery);
+    items[count++] = value_item("开机长按", boot_hold_value);
+    items[count++] = value_item("上次启动", diagnostics_row_start);
+    items[count++] = value_item("上次步骤", diagnostics_row_last_step);
+    items[count++] = value_item("上次电量", diagnostics_row_last_battery);
+    items[count++] = (MenuItem){.label = "蓝牙",
                                 .select = bluetooth_screen_open_details,
                                 .context = &screens->bluetooth,
                                 .value = NULL,
                                 .opens = true};
-    items[count++] = action_item("Power taps", toggle_power_taps, options, power_taps_value);
-    items[count++] = value_item("Jack 3.5", diagnostics_row_jack_single_ended);
-    items[count++] = value_item("Jack 4.4", diagnostics_row_jack_balanced);
+    items[count++] = action_item("电源按键", toggle_power_taps, options, power_taps_value);
+    items[count++] = value_item("3.5 接口", diagnostics_row_jack_single_ended);
+    items[count++] = value_item("4.4 接口", diagnostics_row_jack_balanced);
     items[count++] =
-        action_item("LPC accel", run_core1_accel_test, &screens->core1_accel, core1_accel_value);
-    items[count++] = value_item("Last USB", diagnostics_row_usb_last);
-    app_screens_build_menu(&screens->diagnostics, "Diagnostics", items, count, theme);
+        action_item("LPC 加速", run_core1_accel_test, &screens->core1_accel, core1_accel_value);
+    items[count++] = value_item("上次 USB", diagnostics_row_usb_last);
+    app_screens_build_menu(&screens->diagnostics, "诊断", items, count, theme);
 }

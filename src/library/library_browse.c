@@ -369,20 +369,20 @@ bool browse_title(const Library *library, BrowseQuery query, char *buffer, size_
 {
     switch (query.kind) {
     case BROWSE_ARTISTS:
-        return fixed_title("Artists", buffer, capacity);
+        return fixed_title("艺术家", buffer, capacity);
     case BROWSE_ALBUM_ARTISTS:
-        return fixed_title("Album Artists", buffer, capacity);
+        return fixed_title("专辑艺术家", buffer, capacity);
     case BROWSE_GENRES:
-        return fixed_title("Genres", buffer, capacity);
+        return fixed_title("流派", buffer, capacity);
     case BROWSE_ALBUMS:
-        return fixed_title("Albums", buffer, capacity);
+        return fixed_title("专辑", buffer, capacity);
     case BROWSE_ALL_SONGS:
-        return fixed_title("All Songs", buffer, capacity);
+        return fixed_title("全部歌曲", buffer, capacity);
     case BROWSE_PLAYLISTS:
-        return fixed_title("Playlists", buffer, capacity);
+        return fixed_title("播放列表", buffer, capacity);
     case BROWSE_FOLDER:
         if (query.subject == ROOT_FOLDER) {
-            return fixed_title("Folders", buffer, capacity);
+            return fixed_title("文件夹", buffer, capacity);
         }
         return subject_title(library, query, buffer, capacity);
     case BROWSE_GROUP_ALBUMS:

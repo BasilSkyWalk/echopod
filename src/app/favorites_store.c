@@ -55,15 +55,15 @@ FavoriteResult favorites_store_toggle_album(FavoritesStore *store, uint16_t albu
 const char *favorites_store_message(FavoriteResult result)
 {
     if (!result.saved) {
-        return "Could not save favorites";
+        return "无法保存收藏";
     }
     switch (result.change) {
     case FAVORITE_ADDED:
-        return "Added to Favorites";
+        return "已加入收藏";
     case FAVORITE_REMOVED:
-        return "Removed from Favorites";
+        return "已取消收藏";
     case FAVORITE_FULL:
-        return "Favorites are full";
+        return "收藏已满";
     }
     return "";
 }

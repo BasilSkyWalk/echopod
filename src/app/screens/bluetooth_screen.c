@@ -78,11 +78,11 @@ static const char *row_label(const void *context, int index)
     const BluetoothScreen *bluetooth = context;
     switch (row_kind(bluetooth, index)) {
     case ROW_POWER:
-        return "Bluetooth";
+        return "蓝牙";
     case ROW_KNOWN:
         return bluetooth->link->saved.devices[index - 1].name;
     case ROW_SEARCH:
-        return "Pair new device";
+        return "配对新设备";
     default:
         return nearby_device(bluetooth, index)->name;
     }
@@ -92,13 +92,13 @@ static const char *known_value(const BluetoothScreen *bluetooth, int index)
 {
     switch (bluetooth_link_device_state(bluetooth->link, index)) {
     case BLUETOOTH_DEVICE_PLAYING:
-        return "Playing";
+        return "正在播放";
     case BLUETOOTH_DEVICE_CONNECTED:
-        return "Connected";
+        return "已连接";
     case BLUETOOTH_DEVICE_CONNECTING:
-        return "Connecting…";
+        return "正在连接…";
     default:
-        return bluetooth_link_nearby(bluetooth->link, index) ? "Nearby" : NULL;
+        return bluetooth_link_nearby(bluetooth->link, index) ? "附近设备" : NULL;
     }
 }
 
@@ -114,7 +114,7 @@ static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
     }
     const BluetoothLink *link = bluetooth->link;
     bool trying = link->attempting || link->has_target || link->paired_seen;
-    return trying ? "Connecting…" : "Didn't connect";
+    return trying ? "正在连接…" : "连接失败";
 }
 
 static const char *row_value(const void *context, int index)
@@ -122,11 +122,11 @@ static const char *row_value(const void *context, int index)
     const BluetoothScreen *bluetooth = context;
     switch (row_kind(bluetooth, index)) {
     case ROW_POWER:
-        return enabled(bluetooth) ? "On" : "Off";
+        return enabled(bluetooth) ? "开启" : "关闭";
     case ROW_KNOWN:
         return known_value(bluetooth, index - 1);
     case ROW_SEARCH:
-        return scanning(bluetooth) ? "Searching…" : NULL;
+        return scanning(bluetooth) ? "正在搜索…" : NULL;
     default:
         return nearby_value(bluetooth, index);
     }
@@ -151,11 +151,11 @@ static const char *known_hint(const BluetoothScreen *bluetooth, int index)
     switch (bluetooth_link_device_state(bluetooth->link, index)) {
     case BLUETOOTH_DEVICE_PLAYING:
     case BLUETOOTH_DEVICE_CONNECTED:
-        return "Play disconnects · hold Play forgets";
+        return "播放键断开 · 长按忘记";
     case BLUETOOTH_DEVICE_CONNECTING:
-        return "Connecting… hold Play to forget";
+        return "正在连接… 长按播放键忘记";
     default:
-        return "Play connects · hold Play forgets";
+        return "播放键连接 · 长按忘记";
     }
 }
 
@@ -164,14 +164,14 @@ static const char *hint(const BluetoothScreen *bluetooth)
     int selected = bluetooth->list.selected;
     switch (row_kind(bluetooth, selected)) {
     case ROW_POWER:
-        return enabled(bluetooth) ? "Play turns Bluetooth off" : "Play turns Bluetooth on";
+        return enabled(bluetooth) ? "播放键关闭蓝牙" : "播放键开启蓝牙";
     case ROW_KNOWN:
         return known_hint(bluetooth, selected - 1);
     case ROW_SEARCH:
-        return scanning(bluetooth) ? "Searching… put headphones in pairing mode"
-                                   : "Play searches for new headphones";
+        return scanning(bluetooth) ? "正在搜索… 耳机进入配对模式"
+                                   : "播放键搜索新耳机";
     default:
-        return "Play pairs with this device";
+        return "播放键与此设备配对";
     }
 }
 
@@ -179,19 +179,19 @@ static const char *state_text(HalBluetoothState state)
 {
     switch (state) {
     case HAL_BLUETOOTH_STARTING:
-        return "Starting";
+        return "正在启动";
     case HAL_BLUETOOTH_NO_REPLY:
-        return "No reply";
+        return "无响应";
     case HAL_BLUETOOTH_READY:
-        return "Ready";
+        return "就绪";
     case HAL_BLUETOOTH_SCANNING:
-        return "Scanning";
+        return "扫描中";
     case HAL_BLUETOOTH_CONNECTING:
-        return "Connecting";
+        return "连接中";
     case HAL_BLUETOOTH_CONNECTED:
-        return "Connected";
+        return "已连接";
     default:
-        return "Off";
+        return "关闭";
     }
 }
 
@@ -201,7 +201,7 @@ static void write_state(const HalBluetoothStatus *status, char *text)
     string_builder_append(&builder, state_text(status->state));
     if (status->streaming) {
         string_builder_append(&builder, SEPARATOR);
-        string_builder_append(&builder, "Streaming");
+        string_builder_append(&builder, "传输中");
     }
     if (status->version != '\0') {
         string_builder_append(&builder, SEPARATOR);
@@ -210,12 +210,12 @@ static void write_state(const HalBluetoothStatus *status, char *text)
     }
     if (status->link_status != '\0') {
         string_builder_append(&builder, SEPARATOR);
-        string_builder_append(&builder, "status ");
+        string_builder_append(&builder, "状态 ");
         string_builder_append_char(&builder, status->link_status);
     }
     if (status->pairing == HAL_BLUETOOTH_PAIRING_FAILED) {
         string_builder_append(&builder, SEPARATOR);
-        string_builder_append(&builder, "Pairing failed");
+        string_builder_append(&builder, "配对失败");
     }
 }
 
@@ -226,7 +226,7 @@ static void write_link(const HalBluetoothLink *link, char *text)
     string_builder_append_unsigned(&builder, link->received);
     string_builder_append(&builder, SEPARATOR);
     string_builder_append_unsigned(&builder, link->frames);
-    string_builder_append(&builder, " frames");
+    string_builder_append(&builder, " 帧");
     string_builder_append(&builder, SEPARATOR);
     string_builder_append(&builder, "OE ");
     string_builder_append_unsigned(&builder, link->overruns);
@@ -241,7 +241,7 @@ static void write_events(const HalBluetoothLink *link, char *text, uint8_t first
 {
     StringBuilder builder = string_builder_make(text, BLUETOOTH_SCREEN_LINE_CAPACITY);
     if (first == 0) {
-        string_builder_append(&builder, link->event_count == 0 ? "Msgs none" : "Msgs");
+        string_builder_append(&builder, link->event_count == 0 ? "无消息" : "消息");
     }
     uint8_t last = first + BLUETOOTH_SCREEN_EVENTS_PER_LINE;
     if (last > link->event_count) {
@@ -394,7 +394,7 @@ Screen *bluetooth_screen_init(BluetoothScreen *bluetooth, BluetoothLink *link, c
         .context = bluetooth, .count = row_count, .label = row_label, .detail = row_value};
     list_view_init(&bluetooth->list, &bluetooth->model, theme, 0);
     bluetooth->screen = (Screen){
-        .title = "Bluetooth",
+        .title = "蓝牙",
         .stays_on_wake = true,
         .context = bluetooth,
         .enter = enter,

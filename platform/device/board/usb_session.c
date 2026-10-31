@@ -201,7 +201,7 @@ void usb_session_stop_listening(void)
 
 UsbSessionEnd usb_session_run(void)
 {
-    app_show_notice("USB", "Computer found. Starting...");
+    app_show_notice("USB", "已连接电脑，正在启动…");
     prepare_luns();
     app_release_audio();
     board_audio_shut_down();
@@ -209,8 +209,8 @@ UsbSessionEnd usb_session_run(void)
     UsbSessionEnd end = USB_SESSION_NO_HOST;
     if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
         usb_fallback_start(&fallback, port.high_speed_allowed, hal_clock_milliseconds());
-        app_show_notice("USB", card_present ? "Connected. Eject both drives to finish."
-                                            : "Connected. Eject the drive to finish.");
+        app_show_notice("USB", card_present ? "已连接。弹出两个磁盘后再拔线。"
+                                            : "已连接。弹出磁盘后再拔线。");
         end = serve();
     }
     usb_session_stop_listening();

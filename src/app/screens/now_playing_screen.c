@@ -56,9 +56,9 @@ typedef struct Layout {
 
 static const char SEPARATOR[] = " \xC2\xB7 ";
 
-static const char NOTHING_PLAYING[] = "Nothing playing";
-static const char *const SHUFFLE_TEXT[SHUFFLE_MODE_COUNT] = {"", "Shuffle Songs", "Shuffle Albums"};
-static const char *const REPEAT_TEXT[REPEAT_MODE_COUNT] = {"", "Repeat One", "Repeat All"};
+static const char NOTHING_PLAYING[] = "无正在播放";
+static const char *const SHUFFLE_TEXT[SHUFFLE_MODE_COUNT] = {"", "随机歌曲", "随机专辑"};
+static const char *const REPEAT_TEXT[REPEAT_MODE_COUNT] = {"", "单曲循环", "全部循环"};
 
 const char *now_playing_codec_name(HalAudioCodec codec)
 {
@@ -89,7 +89,7 @@ void now_playing_stream_text(HalAudioFormat format, char *buffer, size_t capacit
     }
     if (format.bits_per_sample > 0) {
         string_builder_append_unsigned(&builder, format.bits_per_sample);
-        string_builder_append(&builder, "-bit");
+        string_builder_append(&builder, " 位");
         string_builder_append(&builder, SEPARATOR);
     }
     char rate[RATE_CAPACITY];
@@ -114,7 +114,7 @@ void now_playing_detail_text(const PlayerStatus *status, char *buffer, size_t ca
         string_builder_append(&builder, SEPARATOR);
     }
     string_builder_append_unsigned(&builder, status->place.number);
-    string_builder_append(&builder, " of ");
+    string_builder_append(&builder, " / ");
     string_builder_append_unsigned(&builder, status->place.total);
 }
 
@@ -546,7 +546,7 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
     format_duration(remaining_ms, remaining + 1, sizeof remaining - 1);
     if (showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME)) {
         StringBuilder label = string_builder_make(elapsed, sizeof elapsed);
-        string_builder_append(&label, "Volume");
+        string_builder_append(&label, "音量");
         StringBuilder level = string_builder_make(remaining, sizeof remaining);
         string_builder_append_unsigned(&level, now_playing->status.volume);
     }
@@ -618,7 +618,7 @@ static void draw_details(const NowPlayingScreen *now_playing, Canvas *canvas)
     modes_text(&now_playing->status, modes, sizeof modes);
     if (now_playing->scrubbing) {
         StringBuilder seeking = string_builder_make(modes, sizeof modes);
-        string_builder_append(&seeking, "Seeking \xC2\xB7 Play to jump");
+        string_builder_append(&seeking, "跳转中 · Play 确认");
     }
     label_draw(
         canvas, style,
@@ -702,7 +702,7 @@ Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig 
     now_playing->feedback_started_ms = 0;
     now_playing->status = (PlayerStatus){.state = PLAYER_IDLE};
     now_playing->screen = (Screen){
-        .title = "Now Playing",
+        .title = "正在播放",
         .context = now_playing,
         .hold_volume_keys = true,
         .enter = enter,
