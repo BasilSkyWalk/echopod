@@ -33,8 +33,26 @@ enum {
     BADGE_ICON_SIZE = 18,
     STATUS_CAPACITY = 64,
     BITRATE_CAPACITY = 24,
-    RATE_CAPACITY = 16
+    RATE_CAPACITY = 16,
+    PORTRAIT_COVER_GAP = 12,
+    PORTRAIT_TEXT_GAP = 10,
+    PORTRAIT_FORMAT_GAP = 4,
+    PORTRAIT_BOTTOM_MARGIN = 2,
+    PORTRAIT_PROGRESS_GAP = 3,
+    TIMES_GAP = TIMES_TOP - PROGRESS_TOP - PROGRESS_HEIGHT
 };
+
+typedef struct Layout {
+    int cover_left;
+    int cover_top;
+    int title_top;
+    int format_top;
+    int detail_top;
+    int modes_top;
+    int progress_top;
+    int times_top;
+    bool centered;
+} Layout;
 
 static const char SEPARATOR[] = " \xC2\xB7 ";
 
@@ -380,11 +398,54 @@ static bool current_cover(const NowPlayingScreen *now_playing, Image *image)
            cover_cache_full(covers, now_playing->album_index, image) == COVER_LOADED;
 }
 
+static Layout layout_of(const NowPlayingScreen *now_playing)
+{
+    const Theme *theme = now_playing->config.theme;
+    if (!theme_is_portrait(theme)) {
+        return (Layout){
+            theme->metrics.padding, COVER_TOP, TITLE_TOP, FORMAT_TOP, DETAIL_TOP, MODES_TOP,
+            PROGRESS_TOP,           TIMES_TOP, false};
+    }
+    Image ignored;
+    int cover_top = theme->metrics.header_height + PORTRAIT_COVER_GAP;
+    int title_top = cover_top + COVER_FULL_SIZE + PORTRAIT_TEXT_GAP;
+    if (!current_cover(now_playing, &ignored)) {
+        title_top = cover_top + (COVER_FULL_SIZE + PORTRAIT_TEXT_GAP) / 2;
+    }
+    int times_top = theme->metrics.screen_height - SMALL_LINE_HEIGHT - PORTRAIT_BOTTOM_MARGIN;
+    int progress_top = times_top - TIMES_GAP - PROGRESS_HEIGHT;
+    int modes_top = progress_top - PORTRAIT_PROGRESS_GAP - SMALL_LINE_HEIGHT;
+    return (Layout){
+        .cover_left = (theme->metrics.screen_width - COVER_FULL_SIZE) / 2,
+        .cover_top = cover_top,
+        .title_top = title_top,
+        .format_top = title_top + 3 * TEXT_LINE_HEIGHT + PORTRAIT_FORMAT_GAP,
+        .detail_top = modes_top - SMALL_LINE_HEIGHT,
+        .modes_top = modes_top,
+        .progress_top = progress_top,
+        .times_top = times_top,
+        .centered = true,
+    };
+}
+
 static int text_left(const NowPlayingScreen *now_playing)
 {
     Image ignored;
     int padding = now_playing->config.theme->metrics.padding;
-    return current_cover(now_playing, &ignored) ? padding + COVER_FULL_SIZE + COVER_GAP : padding;
+    if (theme_is_portrait(now_playing->config.theme) || !current_cover(now_playing, &ignored)) {
+        return padding;
+    }
+    return padding + COVER_FULL_SIZE + COVER_GAP;
+}
+
+static Label centered_if(bool centered, const Font *font, Label label)
+{
+    int width = text_width(font, label.text);
+    if (centered && width < label.area.width) {
+        label.area.x += (label.area.width - width) / 2;
+        label.area.width = width;
+    }
+    return label;
 }
 
 static Rect column_area(const NowPlayingScreen *now_playing, int top, int height)
@@ -400,10 +461,10 @@ static void draw_cover(const NowPlayingScreen *now_playing, Canvas *canvas)
     if (!current_cover(now_playing, &cover)) {
         return;
     }
-    int left = now_playing->config.theme->metrics.padding;
-    image_draw_quad(
-        canvas, cover,
-        (Quad){left, COVER_FULL_SIZE, COVER_TOP, COVER_FULL_SIZE, COVER_TOP, COVER_FULL_SIZE});
+    Layout layout = layout_of(now_playing);
+    image_draw_quad(canvas, cover,
+                    (Quad){layout.cover_left, COVER_FULL_SIZE, layout.cover_top, COVER_FULL_SIZE,
+                           layout.cover_top, COVER_FULL_SIZE});
 }
 
 static Rect line_area(const Theme *theme, int top, int height)
@@ -417,7 +478,7 @@ static void draw_text_line(const NowPlayingScreen *now_playing, Canvas *canvas, 
 {
     int width = text_width(style.font, label.text);
     if (width <= label.area.width) {
-        label_draw(canvas, style, label);
+        label_draw(canvas, style, centered_if(layout_of(now_playing).centered, style.font, label));
         return;
     }
     MarqueeTiming timing = now_playing->config.theme->marquee;
@@ -432,16 +493,18 @@ static void draw_track_text(const NowPlayingScreen *now_playing, Canvas *canvas)
     TextStyle title = {.font = theme->fonts.title, .color = theme->colors.text};
     TextStyle artist = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
     TextStyle album = {.font = theme->fonts.body, .color = theme->colors.text_tertiary};
-    draw_text_line(
-        now_playing, canvas,
-        (Label){column_area(now_playing, TITLE_TOP, TEXT_LINE_HEIGHT), now_playing->title}, title);
-    draw_text_line(
-        now_playing, canvas,
-        (Label){column_area(now_playing, ARTIST_TOP, TEXT_LINE_HEIGHT), now_playing->artist},
-        artist);
-    draw_text_line(
-        now_playing, canvas,
-        (Label){column_area(now_playing, ALBUM_TOP, TEXT_LINE_HEIGHT), now_playing->album}, album);
+    int top = layout_of(now_playing).title_top;
+    draw_text_line(now_playing, canvas,
+                   (Label){column_area(now_playing, top, TEXT_LINE_HEIGHT), now_playing->title},
+                   title);
+    draw_text_line(now_playing, canvas,
+                   (Label){column_area(now_playing, top + ARTIST_TOP - TITLE_TOP, TEXT_LINE_HEIGHT),
+                           now_playing->artist},
+                   artist);
+    draw_text_line(now_playing, canvas,
+                   (Label){column_area(now_playing, top + ALBUM_TOP - TITLE_TOP, TEXT_LINE_HEIGHT),
+                           now_playing->album},
+                   album);
 }
 
 static uint32_t shown_position(const NowPlayingScreen *now_playing)
@@ -453,7 +516,7 @@ static uint32_t shown_position(const NowPlayingScreen *now_playing)
 static void draw_progress(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
-    Rect bar = line_area(theme, PROGRESS_TOP, PROGRESS_HEIGHT);
+    Rect bar = line_area(theme, layout_of(now_playing).progress_top, PROGRESS_HEIGHT);
     bool volume = showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME);
     int filled = volume ? now_playing_volume_width(now_playing->status.volume, bar.width)
                         : now_playing_progress_width(shown_position(now_playing),
@@ -487,7 +550,7 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
         StringBuilder level = string_builder_make(remaining, sizeof remaining);
         string_builder_append_unsigned(&level, now_playing->status.volume);
     }
-    Rect area = line_area(theme, TIMES_TOP, SMALL_LINE_HEIGHT);
+    Rect area = line_area(theme, layout_of(now_playing).times_top, SMALL_LINE_HEIGHT);
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
     label_draw(canvas, style, (Label){.area = area, .text = elapsed});
     draw_right_aligned(canvas, style, area, remaining);
@@ -522,14 +585,19 @@ static void draw_format(const NowPlayingScreen *now_playing, Canvas *canvas)
         return;
     }
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
-    Rect row = column_area(now_playing, FORMAT_TOP, SMALL_LINE_HEIGHT);
+    Rect row = column_area(now_playing, layout_of(now_playing).format_top, SMALL_LINE_HEIGHT);
     int codec_width = text_width(style.font, codec) + 2 * CODEC_PADDING;
+    char stream[STATUS_CAPACITY];
+    now_playing_stream_text(format, stream, sizeof stream);
+    int total = codec_width + CODEC_GAP + text_width(style.font, stream);
+    if (layout_of(now_playing).centered && total < row.width) {
+        row.x += (row.width - total) / 2;
+        row.width = total;
+    }
     Rect badge = {row.x, row.y, codec_width, row.height};
     draw_outline(canvas, badge, theme->colors.text_secondary);
     Rect codec_text = label_centered_area(style.font, badge, codec);
     label_draw(canvas, style, (Label){.area = codec_text, .text = codec});
-    char stream[STATUS_CAPACITY];
-    now_playing_stream_text(format, stream, sizeof stream);
     int stream_left = badge.x + badge.width + CODEC_GAP;
     Rect stream_area = {stream_left, row.y, row.x + row.width - stream_left, row.height};
     label_draw(canvas, style, (Label){.area = stream_area, .text = stream});
@@ -539,18 +607,23 @@ static void draw_details(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
     TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    Layout layout = layout_of(now_playing);
     char detail[STATUS_CAPACITY];
     now_playing_detail_text(&now_playing->status, detail, sizeof detail);
     label_draw(canvas, style,
-               (Label){column_area(now_playing, DETAIL_TOP, SMALL_LINE_HEIGHT), detail});
+               centered_if(layout.centered, style.font,
+                           (Label){column_area(now_playing, layout.detail_top, SMALL_LINE_HEIGHT),
+                                   detail}));
     char modes[STATUS_CAPACITY];
     modes_text(&now_playing->status, modes, sizeof modes);
     if (now_playing->scrubbing) {
         StringBuilder seeking = string_builder_make(modes, sizeof modes);
         string_builder_append(&seeking, "Seeking \xC2\xB7 Play to jump");
     }
-    label_draw(canvas, style,
-               (Label){column_area(now_playing, MODES_TOP, SMALL_LINE_HEIGHT), modes});
+    label_draw(
+        canvas, style,
+        centered_if(layout.centered, style.font,
+                    (Label){column_area(now_playing, layout.modes_top, SMALL_LINE_HEIGHT), modes}));
 }
 
 static void draw_badge_icon(Canvas *canvas, NowPlayingFeedback feedback, Rect area, Color color)
@@ -582,8 +655,9 @@ static void draw_badge(const NowPlayingScreen *now_playing, Canvas *canvas)
         return;
     }
     const Theme *theme = now_playing->config.theme;
-    int center_x = theme->metrics.padding + COVER_FULL_SIZE / 2;
-    int center_y = COVER_TOP + COVER_FULL_SIZE / 2;
+    Layout layout = layout_of(now_playing);
+    int center_x = layout.cover_left + COVER_FULL_SIZE / 2;
+    int center_y = layout.cover_top + COVER_FULL_SIZE / 2;
     Rect badge = {center_x - BADGE_SIZE / 2, center_y - BADGE_SIZE / 2, BADGE_SIZE, BADGE_SIZE};
     Rect icon = {center_x - BADGE_ICON_SIZE / 2, center_y - BADGE_ICON_SIZE / 2, BADGE_ICON_SIZE,
                  BADGE_ICON_SIZE};

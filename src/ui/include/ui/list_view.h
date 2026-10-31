@@ -39,6 +39,8 @@ typedef struct ListView {
 } ListView;
 
 void list_view_init(ListView *view, const ListModel *model, const Theme *theme, uint32_t now_ms);
+int list_view_rows(const ListView *view);
+int list_view_top(const ListView *view);
 void list_view_move(ListView *view, int delta, bool wrap, uint32_t now_ms);
 void list_view_start_scroll(ListView *view, int direction, uint32_t now_ms);
 void list_view_keep_scrolling(ListView *view, int direction, uint32_t now_ms);

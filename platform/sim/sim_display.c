@@ -6,13 +6,16 @@
 
 enum {
     BITS_PER_PIXEL = 16,
-    PANEL_ROW_BYTES = HAL_DISPLAY_WIDTH * 2,
+    PANEL_ROW_BYTES = HAL_DISPLAY_LONG_SIDE * 2,
     FULL_INTENSITY = 255,
     DIMMEST_LEVEL_OFFSET = 2
 };
 
 typedef struct SimDisplay {
-    uint16_t panel[HAL_DISPLAY_HEIGHT][HAL_DISPLAY_WIDTH];
+    uint16_t panel[HAL_DISPLAY_LONG_SIDE][HAL_DISPLAY_LONG_SIDE];
+    int width;
+    int height;
+    int scale;
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture;
@@ -20,20 +23,35 @@ typedef struct SimDisplay {
     uint8_t brightness;
 } SimDisplay;
 
-static SimDisplay display = {.powered = true, .brightness = HAL_DISPLAY_BRIGHTNESS_MAX};
+static SimDisplay display = {.width = HAL_DISPLAY_WIDTH,
+                             .height = HAL_DISPLAY_HEIGHT,
+                             .scale = 1,
+                             .powered = true,
+                             .brightness = HAL_DISPLAY_BRIGHTNESS_MAX};
 
 static bool area_fits_panel(int x, int y, int width, int height)
 {
-    return x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= HAL_DISPLAY_WIDTH &&
-           y + height <= HAL_DISPLAY_HEIGHT;
+    return x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= display.width &&
+           y + height <= display.height;
+}
+
+static bool make_texture(void)
+{
+    if (display.texture != NULL) {
+        SDL_DestroyTexture(display.texture);
+    }
+    display.texture = SDL_CreateTexture(display.renderer, SDL_PIXELFORMAT_RGB565,
+                                        SDL_TEXTUREACCESS_STREAMING, display.width, display.height);
+    return display.texture != NULL;
 }
 
 bool sim_display_open(int scale)
 {
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+    display.scale = scale;
     display.window =
         SDL_CreateWindow("EchoPod", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                         HAL_DISPLAY_WIDTH * scale, HAL_DISPLAY_HEIGHT * scale, SDL_WINDOW_SHOWN);
+                         display.width * scale, display.height * scale, SDL_WINDOW_SHOWN);
     if (display.window == NULL) {
         return false;
     }
@@ -41,10 +59,7 @@ bool sim_display_open(int scale)
     if (display.renderer == NULL) {
         return false;
     }
-    display.texture =
-        SDL_CreateTexture(display.renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING,
-                          HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT);
-    return display.texture != NULL;
+    return make_texture();
 }
 
 void sim_display_close(void)
@@ -58,7 +73,11 @@ void sim_display_close(void)
     if (display.window != NULL) {
         SDL_DestroyWindow(display.window);
     }
-    display = (SimDisplay){.powered = true, .brightness = HAL_DISPLAY_BRIGHTNESS_MAX};
+    display = (SimDisplay){.width = HAL_DISPLAY_WIDTH,
+                           .height = HAL_DISPLAY_HEIGHT,
+                           .scale = 1,
+                           .powered = true,
+                           .brightness = HAL_DISPLAY_BRIGHTNESS_MAX};
 }
 
 void sim_display_set_title(const char *title)
@@ -71,7 +90,7 @@ void sim_display_set_title(const char *title)
 bool sim_display_save_bmp(const char *path)
 {
     SDL_Surface *frame =
-        SDL_CreateRGBSurfaceWithFormatFrom(display.panel, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT,
+        SDL_CreateRGBSurfaceWithFormatFrom(display.panel, display.width, display.height,
                                            BITS_PER_PIXEL, PANEL_ROW_BYTES, SDL_PIXELFORMAT_RGB565);
     if (frame == NULL) {
         return false;
@@ -84,6 +103,23 @@ bool sim_display_save_bmp(const char *path)
     bool saved = SDL_SaveBMP(converted, path) == 0;
     SDL_FreeSurface(converted);
     return saved;
+}
+
+void hal_display_set_rotation(HalDisplayRotation rotation)
+{
+    bool landscape = rotation == HAL_DISPLAY_LANDSCAPE;
+    int width = landscape ? HAL_DISPLAY_LONG_SIDE : HAL_DISPLAY_SHORT_SIDE;
+    int height = landscape ? HAL_DISPLAY_SHORT_SIDE : HAL_DISPLAY_LONG_SIDE;
+    if (width == display.width && height == display.height) {
+        return;
+    }
+    display.width = width;
+    display.height = height;
+    SDL_memset(display.panel, 0, sizeof display.panel);
+    if (display.window != NULL) {
+        SDL_SetWindowSize(display.window, width * display.scale, height * display.scale);
+        make_texture();
+    }
 }
 
 void hal_display_write(int x, int y, int width, int height, const uint16_t *pixels)

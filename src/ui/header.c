@@ -12,8 +12,9 @@ void header_draw(Canvas *canvas, const Theme *theme, const char *title)
     Rect divider = {area.x, area.y + area.height - DIVIDER_HEIGHT, area.width, DIVIDER_HEIGHT};
     int inset = theme->metrics.header_inset > theme->metrics.padding ? theme->metrics.header_inset
                                                                      : theme->metrics.padding;
-    Rect title_bounds = {area.x + inset, area.y, area.width - 2 * inset,
-                         area.height - DIVIDER_HEIGHT};
+    Rect title_row = theme_title_area(theme);
+    Rect title_bounds = {title_row.x + inset, title_row.y, title_row.width - 2 * inset,
+                         title_row.height - DIVIDER_HEIGHT};
     TextStyle style = {.font = theme->fonts.title, .color = theme->colors.header_text};
     Rect body = {area.x, area.y, area.width, area.height - DIVIDER_HEIGHT};
     canvas_fill_gradient(canvas, body, theme->colors.header_top, theme->colors.header_background);

@@ -21,7 +21,20 @@ enum {
     FLOOR_LEVEL = 16,
     RANDOM_POSITION = 0,
     SHUFFLE_SIZE = 48,
-    SHUFFLE_STROKE = 4
+    SHUFFLE_STROKE = 4,
+    STACK_TITLE_TOP = 272,
+    STACK_ARTIST_TOP = 294,
+    STACK_FLOOR_TOP = 266
+};
+
+static const CoverStackLayout STACK = {
+    .center_x = 85,
+    .center_top = 84,
+    .center_size = COVER_FULL_SIZE,
+    .side_offset = 77,
+    .side_spacing = 30,
+    .side_width = 100,
+    .side_height = 30,
 };
 
 static const CoverFlowLayout LAYOUT = {
@@ -379,10 +392,16 @@ static bool cover_image(const CoverFlowScreen *flow, int position, Image *image)
 static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position)
 {
     int32_t relative = (int32_t)position * COVER_FLOW_ONE - flow->position;
-    Quad quad = cover_flow_quad(&LAYOUT, relative);
+    bool stacked = theme_is_portrait(flow->config.theme);
+    Quad quad =
+        stacked ? cover_flow_stacked_quad(&STACK, relative) : cover_flow_quad(&LAYOUT, relative);
     QuadLight light = cover_flow_light(&LAYOUT, relative);
     if (light.left == 0 && light.right == 0) {
         return;
+    }
+    if (stacked) {
+        uint16_t near = light.left > light.right ? light.left : light.right;
+        light = (QuadLight){near, near};
     }
     Image image;
     if (cover_image(flow, position, &image)) {
@@ -390,6 +409,9 @@ static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position
         image_draw_quad_lit(canvas, image, quad, light);
         uint32_t reflection_us = hal_clock_microseconds();
         draw_profile_add(DRAW_PART_COVERS, reflection_us - started_us);
+        if (stacked) {
+            return;
+        }
         QuadLight reflected = {(uint16_t)(light.left * REFLECTION_LIGHT / COLOR_LIGHT_FULL),
                                (uint16_t)(light.right * REFLECTION_LIGHT / COLOR_LIGHT_FULL)};
         image_draw_reflection(canvas, image, quad, reflected, REFLECTION_ROWS);
@@ -420,8 +442,11 @@ static void draw_text(const CoverFlowScreen *flow, Canvas *canvas)
     int width = theme->metrics.screen_width - 2 * padding;
     TextStyle title = {.font = theme->fonts.title, .color = theme->colors.text};
     TextStyle artist = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
-    draw_line(flow, canvas, (Label){{padding, TITLE_TOP, width, LINE_HEIGHT}, flow->title}, title);
-    draw_line(flow, canvas, (Label){{padding, ARTIST_TOP, width, LINE_HEIGHT}, flow->artist},
+    bool stacked = theme_is_portrait(theme);
+    int title_top = stacked ? STACK_TITLE_TOP : TITLE_TOP;
+    int artist_top = stacked ? STACK_ARTIST_TOP : ARTIST_TOP;
+    draw_line(flow, canvas, (Label){{padding, title_top, width, LINE_HEIGHT}, flow->title}, title);
+    draw_line(flow, canvas, (Label){{padding, artist_top, width, LINE_HEIGHT}, flow->artist},
               artist);
 }
 
@@ -435,7 +460,7 @@ static void draw_empty(const Theme *theme, Canvas *canvas)
 
 static void draw_backdrop(const Theme *theme, Canvas *canvas)
 {
-    int floor = LAYOUT.center_top + LAYOUT.center_size;
+    int floor = theme_is_portrait(theme) ? STACK_FLOOR_TOP : LAYOUT.center_top + LAYOUT.center_size;
     int height = theme->metrics.screen_height;
     canvas_fill_rect(canvas, (Rect){0, 0, theme->metrics.screen_width, floor}, BACKDROP);
     for (int y = floor; y < height; y++) {

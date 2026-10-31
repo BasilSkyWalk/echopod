@@ -133,11 +133,11 @@ static void load_row(UpNextScreen *up_next, int row, int index, QueueWalk *walk)
 
 static void refresh_rows(UpNextScreen *up_next)
 {
-    if (up_next->rows_first == up_next->list.top) {
+    int top = list_view_top(&up_next->list);
+    int count = min_of(min_of(list_view_rows(&up_next->list), UP_NEXT_ROWS), up_next->count - top);
+    if (up_next->rows_first == top && up_next->rows_count >= count) {
         return;
     }
-    int top = up_next->list.top;
-    int count = min_of(min_of(up_next->list.visible_rows, UP_NEXT_ROWS), up_next->count - top);
     QueueWalk walk = start_walk(up_next->config.player);
     for (int row = 0; row < count; row++) {
         load_row(up_next, row, top + row, &walk);

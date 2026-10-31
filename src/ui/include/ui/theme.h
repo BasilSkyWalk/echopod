@@ -41,6 +41,7 @@ typedef struct ThemeMetrics {
     int scrollbar_inset;
     int detail_gap;
     int status_icon_size;
+    int status_height;
 } ThemeMetrics;
 
 typedef struct Theme {
@@ -53,3 +54,5 @@ typedef struct Theme {
 Rect theme_header_area(const Theme *theme);
 Rect theme_content_area(const Theme *theme);
 int theme_visible_rows(const Theme *theme);
+bool theme_is_portrait(const Theme *theme);
+Rect theme_title_area(const Theme *theme);

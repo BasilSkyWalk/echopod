@@ -7,8 +7,11 @@ enum {
     SLEEP_OUT_DELAY_MS = 120,
     COMMAND_COLUMNS = 0x2A,
     COMMAND_ROWS = 0x2B,
-    COMMAND_WRITE = 0x2C
+    COMMAND_WRITE = 0x2C,
+    COMMAND_MEMORY_ACCESS = 0x36
 };
+
+static const uint8_t MEMORY_ACCESS_FOR[PANEL_ROTATION_COUNT] = {0x60, 0xC0, 0x00};
 
 static const uint8_t VARIANT_B_STEPS[] = {
     0x11, 0,    0x36, 1,    0x60, 0x3A, 1,    0x05, 0xA4, 2,    0x44, 0x44, 0xB2, 5,
@@ -60,10 +63,21 @@ static void send_range(const PanelBus *bus, uint8_t command, int first, int last
     bus->data(bus->context, (uint8_t)last);
 }
 
+void panel_set_rotation(const PanelBus *bus, PanelRotation rotation)
+{
+    if (rotation >= PANEL_ROTATION_COUNT) {
+        rotation = PANEL_LANDSCAPE;
+    }
+    bus->command(bus->context, COMMAND_MEMORY_ACCESS);
+    bus->data(bus->context, MEMORY_ACCESS_FOR[rotation]);
+}
+
 void panel_begin_write(const PanelBus *bus, PanelWindow window)
 {
-    int first_row = window.y + PANEL_FIRST_VISIBLE_ROW;
-    send_range(bus, COMMAND_COLUMNS, window.x, window.x + window.width - 1);
+    bool landscape = window.rotation == PANEL_LANDSCAPE;
+    int first_column = window.x + (landscape ? 0 : PANEL_FIRST_VISIBLE_ROW);
+    int first_row = window.y + (landscape ? PANEL_FIRST_VISIBLE_ROW : 0);
+    send_range(bus, COMMAND_COLUMNS, first_column, first_column + window.width - 1);
     send_range(bus, COMMAND_ROWS, first_row, first_row + window.height - 1);
     bus->command(bus->context, COMMAND_WRITE);
 }

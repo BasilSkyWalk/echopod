@@ -36,6 +36,7 @@ static const GpioPin BACKLIGHT = {2, 4};
 static const GpioPin PANEL_RESET = {2, 15};
 
 static uint32_t port_shadow;
+static PanelRotation rotation;
 static uint8_t brightness;
 static bool backlight_on;
 static bool pwm_running;
@@ -248,9 +249,15 @@ void board_display_start(void)
     board_display_clear();
 }
 
+void hal_display_set_rotation(HalDisplayRotation turned)
+{
+    rotation = (PanelRotation)turned;
+    panel_set_rotation(&BUS, rotation);
+}
+
 void hal_display_write(int x, int y, int width, int height, const uint16_t *pixels)
 {
-    panel_begin_write(&BUS, (PanelWindow){x, y, width, height});
+    panel_begin_write(&BUS, (PanelWindow){x, y, width, height, rotation});
     bus_pixels(NULL, pixels, (uint32_t)(width * height));
 }
 

@@ -189,6 +189,7 @@ static void build_home(AppScreens *screens, AppScreensContext context)
                        .item_count = HOME_ITEM_COUNT,
                        .theme = theme,
                        .panel = {.width = HOME_ART_WIDTH,
+                                 .min_height = HOME_ART_MIN_HEIGHT,
                                  .update = home_art_update,
                                  .draw = home_art_draw,
                                  .context = &screens->home_art}};

@@ -16,11 +16,15 @@ enum {
 
 static const Color OVERLAY_TEXT = COLOR_RGB(124, 252, 0);
 
-Rect frame_overlay_area(void)
+Rect frame_overlay_area(const Theme *theme)
 {
-    return (Rect){HAL_DISPLAY_WIDTH - OVERLAY_WIDTH - OVERLAY_MARGIN,
-                  HAL_DISPLAY_HEIGHT - OVERLAY_HEIGHT - OVERLAY_MARGIN, OVERLAY_WIDTH,
-                  OVERLAY_HEIGHT};
+    int width = theme->metrics.screen_width;
+    int height = theme->metrics.screen_height;
+    int left = width - OVERLAY_WIDTH - OVERLAY_MARGIN;
+    if (left < 0) {
+        left = (width - OVERLAY_WIDTH) / 2;
+    }
+    return (Rect){left, height - OVERLAY_HEIGHT - OVERLAY_MARGIN, OVERLAY_WIDTH, OVERLAY_HEIGHT};
 }
 
 Color frame_overlay_background(void)
@@ -100,7 +104,7 @@ static void draw_line(Canvas *canvas, const Theme *theme, Rect area, const char 
 void frame_overlay_draw(Canvas *canvas, const Theme *theme, FrameBreakdown breakdown,
                         HalAudioStats stats)
 {
-    Rect area = frame_overlay_area();
+    Rect area = frame_overlay_area(theme);
     if (rect_is_empty(rect_intersection(area, canvas->clip))) {
         return;
     }

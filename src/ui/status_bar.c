@@ -17,7 +17,9 @@ enum {
 
 static int icon_top(const Theme *theme)
 {
-    return (theme->metrics.header_height - theme->metrics.status_icon_size) / 2;
+    int band = theme->metrics.status_height > 0 ? theme->metrics.status_height
+                                                : theme->metrics.header_height;
+    return (band - theme->metrics.status_icon_size) / 2;
 }
 
 static int nub_width(int size)

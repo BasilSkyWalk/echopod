@@ -175,7 +175,7 @@ static bool title_is(const char *expected)
 
 static bool overlay_visible(void)
 {
-    Rect area = frame_overlay_area();
+    Rect area = frame_overlay_area(&DEFAULT_THEME);
     return fake_hal_pixel(area.x, area.y) == frame_overlay_background();
 }
 
@@ -626,6 +626,56 @@ static void the_other_portrait_and_landscape_keep_the_rocker(void)
     tap(KEY_VOLUME_UP);
     tap(KEY_PLAY);
     CHECK(title_is("Gain"));
+}
+
+static bool drew_the_bottom_of_a_portrait_screen(void)
+{
+    return fake_hal_pixel(HAL_DISPLAY_SHORT_SIDE / 2, HAL_DISPLAY_LONG_SIDE - 4) ==
+           DEFAULT_THEME.colors.background;
+}
+
+static void choosing_portrait_turns_the_screen(void)
+{
+    start_app_with_library();
+    CHECK_EQUAL(HAL_DISPLAY_LANDSCAPE, fake_hal_display_rotation());
+    choose_orientation(ORIENTATION_PORTRAIT);
+    step();
+    CHECK_EQUAL(HAL_DISPLAY_PORTRAIT, fake_hal_display_rotation());
+    CHECK(drew_the_bottom_of_a_portrait_screen());
+}
+
+static void the_flipped_portrait_turns_the_panel_the_other_way(void)
+{
+    start_app_with_library();
+    choose_orientation(ORIENTATION_PORTRAIT_FLIPPED);
+    step();
+    CHECK_EQUAL(HAL_DISPLAY_PORTRAIT_FLIPPED, fake_hal_display_rotation());
+}
+
+static void the_screen_starts_in_the_saved_orientation(void)
+{
+    start_app_with_library();
+    choose_orientation(ORIENTATION_PORTRAIT);
+    restart_app();
+    step();
+    CHECK_EQUAL(HAL_DISPLAY_PORTRAIT, fake_hal_display_rotation());
+    CHECK(drew_the_bottom_of_a_portrait_screen());
+}
+
+static void choosing_landscape_again_turns_the_screen_back(void)
+{
+    start_app_with_library();
+    Orientation keeping = swapping_portrait() == ORIENTATION_PORTRAIT ? ORIENTATION_PORTRAIT_FLIPPED
+                                                                      : ORIENTATION_PORTRAIT;
+    choose_orientation(keeping);
+    step();
+    tap(KEY_PLAY);
+    CHECK(title_is("Orientation"));
+    move_up((int)keeping);
+    tap(KEY_PLAY);
+    step();
+    CHECK_EQUAL(HAL_DISPLAY_LANDSCAPE, fake_hal_display_rotation());
+    CHECK(title_is("Settings"));
 }
 
 static void the_rocker_stays_turned_around_after_a_restart(void)
@@ -1943,6 +1993,10 @@ int main(void)
         TEST_CASE(a_swapping_portrait_turns_the_rocker_around_in_lists),
         TEST_CASE(the_other_portrait_and_landscape_keep_the_rocker),
         TEST_CASE(the_rocker_stays_turned_around_after_a_restart),
+        TEST_CASE(choosing_portrait_turns_the_screen),
+        TEST_CASE(the_flipped_portrait_turns_the_panel_the_other_way),
+        TEST_CASE(the_screen_starts_in_the_saved_orientation),
+        TEST_CASE(choosing_landscape_again_turns_the_screen_back),
         TEST_CASE(a_new_screen_slides_in_from_the_right),
         TEST_CASE(going_back_slides_the_screen_out_to_the_right),
         TEST_CASE(waking_draws_a_frame_before_the_backlight_comes_on),

@@ -63,7 +63,8 @@ static uint32_t large_size;
 
 typedef struct FakeHal {
     const char *version;
-    uint16_t panel[HAL_DISPLAY_HEIGHT][HAL_DISPLAY_WIDTH];
+    uint16_t panel[HAL_DISPLAY_LONG_SIDE][HAL_DISPLAY_LONG_SIDE];
+    HalDisplayRotation rotation;
     long pixels_written;
     int present_count;
     bool display_on;
@@ -197,6 +198,16 @@ long fake_hal_pixels_written(void)
 int fake_hal_present_count(void)
 {
     return fake.present_count;
+}
+
+void hal_display_set_rotation(HalDisplayRotation rotation)
+{
+    fake.rotation = rotation;
+}
+
+HalDisplayRotation fake_hal_display_rotation(void)
+{
+    return fake.rotation;
 }
 
 void hal_display_write(int x, int y, int width, int height, const uint16_t *pixels)

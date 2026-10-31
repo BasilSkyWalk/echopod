@@ -116,7 +116,7 @@ static void a_window_maps_visible_rows_to_panel_rows_from_35(void)
     };
     Recorder recorder;
     PanelBus bus = recording_bus(&recorder);
-    panel_begin_write(&bus, (PanelWindow){0, 0, 320, 170});
+    panel_begin_write(&bus, (PanelWindow){0, 0, 320, 170, PANEL_LANDSCAPE});
     check_log(&recorder, expected, (int)(sizeof expected / sizeof expected[0]));
 }
 
@@ -128,7 +128,31 @@ static void a_partial_window_sets_its_columns_and_rows(void)
     };
     Recorder recorder;
     PanelBus bus = recording_bus(&recorder);
-    panel_begin_write(&bus, (PanelWindow){10, 34, 256, 34});
+    panel_begin_write(&bus, (PanelWindow){10, 34, 256, 34, PANEL_LANDSCAPE});
+    check_log(&recorder, expected, (int)(sizeof expected / sizeof expected[0]));
+}
+
+static void each_rotation_sets_its_memory_access_mode(void)
+{
+    static const uint8_t modes[PANEL_ROTATION_COUNT] = {0x60, 0xC0, 0x00};
+    for (int rotation = 0; rotation < PANEL_ROTATION_COUNT; rotation++) {
+        Entry expected[] = {C(0x36), D(modes[rotation])};
+        Recorder recorder;
+        PanelBus bus = recording_bus(&recorder);
+        panel_set_rotation(&bus, (PanelRotation)rotation);
+        check_log(&recorder, expected, 2);
+    }
+}
+
+static void a_portrait_window_maps_visible_columns_from_35(void)
+{
+    static const Entry expected[] = {
+        C(0x2A), D(0x00), D(0x23), D(0x00), D(0xCC), C(0x2B),
+        D(0x00), D(0x00), D(0x01), D(0x3F), C(0x2C),
+    };
+    Recorder recorder;
+    PanelBus bus = recording_bus(&recorder);
+    panel_begin_write(&bus, (PanelWindow){0, 0, 170, 320, PANEL_PORTRAIT_FLIPPED});
     check_log(&recorder, expected, (int)(sizeof expected / sizeof expected[0]));
 }
 
@@ -170,6 +194,8 @@ int main(void)
         TEST_CASE(variant_a_sends_its_init_stream),
         TEST_CASE(a_window_maps_visible_rows_to_panel_rows_from_35),
         TEST_CASE(a_partial_window_sets_its_columns_and_rows),
+        TEST_CASE(each_rotation_sets_its_memory_access_mode),
+        TEST_CASE(a_portrait_window_maps_visible_columns_from_35),
         TEST_CASE(pixels_are_sent_high_byte_first),
         TEST_CASE(a_bus_word_puts_the_byte_on_bits_16_to_23),
         TEST_CASE(a_data_byte_sets_dc_on_bit_25),

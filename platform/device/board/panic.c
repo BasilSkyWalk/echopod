@@ -77,6 +77,7 @@ static void draw_run_line(void)
 static void start_screen(const char *title)
 {
     usb_silence_audio();
+    hal_display_set_rotation(HAL_DISPLAY_LANDSCAPE);
     board_display_clear();
     board_backlight_full();
     line = 0;

@@ -44,3 +44,21 @@ const Theme DEFAULT_THEME = {
         },
     .marquee = {.pause_ms = 1200, .speed_px_per_s = 40, .gap_px = 32},
 };
+
+enum {
+    PORTRAIT_STATUS_HEIGHT = 16,
+    PORTRAIT_TITLE_HEIGHT = 24
+};
+
+Theme default_theme_for(bool portrait)
+{
+    Theme theme = DEFAULT_THEME;
+    if (portrait) {
+        theme.metrics.screen_width = HAL_DISPLAY_SHORT_SIDE;
+        theme.metrics.screen_height = HAL_DISPLAY_LONG_SIDE;
+        theme.metrics.status_height = PORTRAIT_STATUS_HEIGHT;
+        theme.metrics.header_height = PORTRAIT_STATUS_HEIGHT + PORTRAIT_TITLE_HEIGHT;
+        theme.metrics.header_inset = theme.metrics.padding;
+    }
+    return theme;
+}

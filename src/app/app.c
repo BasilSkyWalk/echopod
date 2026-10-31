@@ -75,6 +75,8 @@ static const KeyConfig KEY_CONFIG = {
 typedef struct AppState {
     KeyTracker keys;
     bool rocker_swapped[KEY_COUNT];
+    Theme theme;
+    Orientation shown_orientation;
     FrameStats frame_stats;
     FrameStats update_stats;
     FrameStats draw_stats;
@@ -127,11 +129,51 @@ static const char SPLASH_TEXT[] = "EchoPod";
 static const char GOODBYE_TEXT[] = "Goodbye";
 static const char BATTERY_LOW_TEXT[] = "Battery low";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
-static uint32_t row_hashes[HAL_DISPLAY_HEIGHT];
+static uint32_t row_hashes[HAL_DISPLAY_LONG_SIDE];
 
 static Screen *top_screen(void)
 {
     return screen_stack_top(&app.stack);
+}
+
+static const Theme *current_theme(void)
+{
+    return app.theme.metrics.screen_width > 0 ? &app.theme : &DEFAULT_THEME;
+}
+
+static Rect whole_screen(void)
+{
+    const ThemeMetrics *metrics = &current_theme()->metrics;
+    return (Rect){0, 0, metrics->screen_width, metrics->screen_height};
+}
+
+static HalDisplayRotation rotation_for(Orientation orientation)
+{
+    switch (orientation) {
+    case ORIENTATION_PORTRAIT:
+        return HAL_DISPLAY_PORTRAIT;
+    case ORIENTATION_PORTRAIT_FLIPPED:
+        return HAL_DISPLAY_PORTRAIT_FLIPPED;
+    case ORIENTATION_LANDSCAPE:
+        return HAL_DISPLAY_LANDSCAPE;
+    }
+    return HAL_DISPLAY_LANDSCAPE;
+}
+
+static void apply_orientation(void)
+{
+    Orientation orientation = app.settings.settings.orientation;
+    app.shown_orientation = orientation;
+    app.theme = default_theme_for(orientation != ORIENTATION_LANDSCAPE);
+    hal_display_set_rotation(rotation_for(orientation));
+    frame_diff_init(&app.frame_diff, row_hashes, app.theme.metrics.screen_height);
+}
+
+static void follow_orientation(void)
+{
+    if (app.settings.settings.orientation != app.shown_orientation) {
+        apply_orientation();
+    }
 }
 
 static Key oriented_key(HalKeyTransition transition)
@@ -445,8 +487,8 @@ static void update_screen(uint32_t now_ms)
 
 static void draw_fade(Canvas *canvas, const Fade *fade, const char *text)
 {
-    const Theme *theme = &DEFAULT_THEME;
-    Rect screen = {0, 0, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT};
+    const Theme *theme = current_theme();
+    Rect screen = whole_screen();
     Color color =
         color_blend(theme->colors.background, theme->colors.text, fade_alpha(fade, app.now_ms));
     TextStyle style = {.font = theme->fonts.title, .color = color};
@@ -477,12 +519,11 @@ static void draw_shifted(Screen *screen, Canvas *canvas, int x, Rect area)
 
 static void draw_slide(Canvas *canvas, Screen *arriving)
 {
-    const Theme *theme = &DEFAULT_THEME;
+    const Theme *theme = current_theme();
     Screen *leaving = app.leaving;
     bool whole = arriving->full_screen || leaving->full_screen;
-    Rect area =
-        whole ? (Rect){0, 0, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT} : theme_content_area(theme);
-    int width = HAL_DISPLAY_WIDTH;
+    Rect area = whole ? whole_screen() : theme_content_area(theme);
+    int width = theme->metrics.screen_width;
     draw_shifted(leaving, canvas, slide_leaving_x(&app.slide, app.now_ms, width), area);
     draw_shifted(arriving, canvas, slide_arriving_x(&app.slide, app.now_ms, width), area);
     if (!whole) {
@@ -504,9 +545,9 @@ static void draw_frame(void *context, Canvas *canvas)
         screen->draw(screen->context, canvas);
     }
     if (!screen->full_screen) {
-        status_bar_draw(canvas, &DEFAULT_THEME, state->status_bar);
+        status_bar_draw(canvas, current_theme(), state->status_bar);
     }
-    toast_draw(&state->toast, canvas, &DEFAULT_THEME);
+    toast_draw(&state->toast, canvas, current_theme());
     if (state->options.show_frame_time) {
         FrameBreakdown breakdown = {
             .total_us = frame_stats_average_us(&state->frame_stats),
@@ -514,7 +555,7 @@ static void draw_frame(void *context, Canvas *canvas)
             .draw_us = frame_stats_average_us(&state->draw_stats),
             .send_us = frame_stats_average_us(&state->send_stats),
         };
-        frame_overlay_draw(canvas, &DEFAULT_THEME, breakdown, hal_audio_stats());
+        frame_overlay_draw(canvas, current_theme(), breakdown, hal_audio_stats());
     }
 }
 
@@ -575,10 +616,10 @@ static void render(FrameDrawer drawer, bool drawer_paints_everything)
 {
     StripRenderer renderer = {
         .strip_pixels = strip_pixels,
-        .screen_width = HAL_DISPLAY_WIDTH,
-        .screen_height = HAL_DISPLAY_HEIGHT,
+        .screen_width = current_theme()->metrics.screen_width,
+        .screen_height = current_theme()->metrics.screen_height,
         .strip_height = STRIP_HEIGHT,
-        .background = DEFAULT_THEME.colors.background,
+        .background = current_theme()->colors.background,
         .drawer_paints_everything = drawer_paints_everything,
     };
     FrameSink sink = {.write = write_to_display, .context = NULL};
@@ -639,7 +680,7 @@ static void start_screens(uint32_t now_ms)
 {
     AppScreensContext context = {
         .options = &app.options,
-        .theme = &DEFAULT_THEME,
+        .theme = &app.theme,
         .store = &app.library,
         .player = &app.player,
         .spoken = &app.spoken,
@@ -678,7 +719,6 @@ static void show_card_setup(void)
 void app_start(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
-    frame_diff_init(&app.frame_diff, row_hashes, HAL_DISPLAY_HEIGHT);
     key_tracker_init(&app.keys, &KEY_CONFIG);
     frame_stats_reset(&app.frame_stats);
     frame_stats_reset(&app.update_stats);
@@ -696,6 +736,7 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
+    apply_orientation();
     equalizer_store_load(&app.equalizer);
     start_playback();
     start_hardware(now_ms);
@@ -791,7 +832,7 @@ void app_request_rescan_if_music_changed(void)
 static void draw_charge(void *context, Canvas *canvas)
 {
     (void)context;
-    charge_screen_draw(canvas, &DEFAULT_THEME, app.charge_battery);
+    charge_screen_draw(canvas, current_theme(), app.charge_battery);
 }
 
 static void follow_charge_keys(uint32_t now_ms)
@@ -870,6 +911,7 @@ void app_step(void)
     } else {
         dispatch_key_events(now_ms);
     }
+    follow_orientation();
     if (app.saying_goodbye && fade_finished(&app.goodbye, now_ms)) {
         finish_shut_down();
     }
@@ -903,7 +945,7 @@ bool app_charging(void)
 
 void app_show_notice(const char *title, const char *message)
 {
-    MessageConfig config = {.title = title, .message = message, .theme = &DEFAULT_THEME};
+    MessageConfig config = {.title = title, .message = message, .theme = current_theme()};
     Screen *screen = message_screen_init(&app.notice, config);
     if (!app.display_on) {
         set_display(true);

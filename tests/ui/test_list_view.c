@@ -67,7 +67,7 @@ static void a_new_list_selects_the_first_item(void)
     ListView view = list_of(10);
     CHECK_EQUAL(0, view.selected);
     CHECK_EQUAL(0, view.top);
-    CHECK_EQUAL(TEST_VISIBLE_ROWS, view.visible_rows);
+    CHECK_EQUAL(TEST_VISIBLE_ROWS, list_view_rows(&view));
 }
 
 static void moving_within_the_page_keeps_the_top(void)

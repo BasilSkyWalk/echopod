@@ -23,13 +23,22 @@ typedef struct PanelBus {
     void *context;
 } PanelBus;
 
+typedef enum PanelRotation {
+    PANEL_LANDSCAPE,
+    PANEL_PORTRAIT,
+    PANEL_PORTRAIT_FLIPPED,
+    PANEL_ROTATION_COUNT
+} PanelRotation;
+
 typedef struct PanelWindow {
     int x;
     int y;
     int width;
     int height;
+    PanelRotation rotation;
 } PanelWindow;
 
 void panel_send_init(const PanelBus *bus, PanelVariant variant);
+void panel_set_rotation(const PanelBus *bus, PanelRotation rotation);
 void panel_begin_write(const PanelBus *bus, PanelWindow window);
 uint32_t panel_bus_word(uint32_t shadow, uint8_t value, bool data);

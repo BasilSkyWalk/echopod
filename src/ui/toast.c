@@ -6,6 +6,7 @@
 enum {
     TOAST_HEIGHT = 24,
     TOAST_BOTTOM_MARGIN = 10,
+    TOAST_SIDE_MARGIN = 4,
     BORDER = 1
 };
 
@@ -25,6 +26,8 @@ Rect toast_area(const Toast *toast, const Theme *theme)
 {
     const ThemeMetrics *metrics = &theme->metrics;
     int width = text_width(theme->fonts.body, toast->text) + 2 * metrics->padding;
+    int widest = metrics->screen_width - 2 * TOAST_SIDE_MARGIN;
+    width = width < widest ? width : widest;
     int height = TOAST_HEIGHT < metrics->screen_height ? TOAST_HEIGHT : metrics->screen_height;
     int bottom_margin =
         metrics->screen_height > height + TOAST_BOTTOM_MARGIN ? TOAST_BOTTOM_MARGIN : 0;

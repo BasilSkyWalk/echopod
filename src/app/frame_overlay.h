@@ -19,7 +19,7 @@ typedef struct FrameBreakdown {
     uint32_t send_us;
 } FrameBreakdown;
 
-Rect frame_overlay_area(void);
+Rect frame_overlay_area(const Theme *theme);
 Color frame_overlay_background(void);
 void frame_overlay_format(FrameBreakdown breakdown, char *text, size_t capacity);
 void frame_overlay_format_parts(const uint32_t *parts_us, char *text, size_t capacity);

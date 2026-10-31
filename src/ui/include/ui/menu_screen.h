@@ -19,6 +19,7 @@ typedef struct MenuItem {
 
 typedef struct MenuPanel {
     int width;
+    int min_height;
     void (*update)(void *context, uint32_t now_ms);
     void (*draw)(void *context, Canvas *canvas, Rect area);
     void *context;

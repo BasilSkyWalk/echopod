@@ -58,9 +58,31 @@ static ScreenAction select_item(void *context, int index)
     return item->select != NULL ? item->select(item->context) : screen_action_none();
 }
 
+static bool panel_below(const MenuScreen *menu)
+{
+    const MenuPanel *panel = &menu->config.panel;
+    return panel->width > 0 && panel->draw != NULL && theme_is_portrait(menu->config.theme);
+}
+
+static int rows_above_panel(const MenuScreen *menu)
+{
+    const Theme *theme = menu->config.theme;
+    int room = (theme_content_area(theme).height - menu->config.panel.min_height) /
+               theme->metrics.row_height;
+    int count = item_count(menu);
+    int rows = count < room ? count : room;
+    return rows > 0 ? rows : 1;
+}
+
+static void fit_list(MenuScreen *menu)
+{
+    menu->list.visible_rows = panel_below(menu) ? rows_above_panel(menu) : 0;
+}
+
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     MenuScreen *menu = context;
+    fit_list(menu);
     ListSelection selection = {.select = select_item, .hold = NULL, .context = menu};
     return list_navigation_handle(&menu->list, event, now_ms, selection);
 }
@@ -76,6 +98,7 @@ static void update(void *context, uint32_t now_ms)
 {
     MenuScreen *menu = context;
     menu->now_ms = now_ms;
+    fit_list(menu);
     const MenuPanel *panel = &menu->config.panel;
     if (panel->width > 0 && panel->update != NULL) {
         panel->update(panel->context, now_ms);
@@ -91,6 +114,14 @@ static void draw(void *context, Canvas *canvas)
     header_draw(canvas, theme, menu->config.title);
     if (panel->width <= 0 || panel->draw == NULL) {
         list_view_draw(&menu->list, canvas, content, menu->now_ms);
+        return;
+    }
+    if (panel_below(menu)) {
+        int height = list_view_rows(&menu->list) * theme->metrics.row_height;
+        Rect list = {content.x, content.y, content.width, height};
+        Rect below = {content.x, content.y + height, content.width, content.height - height};
+        list_view_draw(&menu->list, canvas, list, menu->now_ms);
+        panel->draw(panel->context, canvas, below);
         return;
     }
     Rect list = {content.x, content.y, content.width - panel->width, content.height};

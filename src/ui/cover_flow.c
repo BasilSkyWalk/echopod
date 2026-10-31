@@ -58,6 +58,30 @@ Quad cover_flow_quad(const CoverFlowLayout *layout, int32_t relative)
     };
 }
 
+Quad cover_flow_stacked_quad(const CoverStackLayout *layout, int32_t relative)
+{
+    int32_t distance = abs_of(relative);
+    int offset = lerp(0, layout->side_offset, distance);
+    int width = lerp(layout->center_size, layout->side_width, distance);
+    int height = lerp(layout->center_size, layout->side_height, distance);
+    if (distance >= COVER_FLOW_ONE) {
+        int32_t beyond = distance - COVER_FLOW_ONE;
+        offset = layout->side_offset + (int)(layout->side_spacing * beyond / COVER_FLOW_ONE);
+        width = layout->side_width;
+        height = layout->side_height;
+    }
+    int middle = layout->center_top + layout->center_size / 2 + (relative > 0 ? offset : -offset);
+    int top = middle - height / 2;
+    return (Quad){
+        .left = layout->center_x - width / 2,
+        .width = width,
+        .left_top = top,
+        .left_height = height,
+        .right_top = top,
+        .right_height = height,
+    };
+}
+
 static int fade(int light, const CoverFlowLayout *layout, int32_t distance)
 {
     if (distance <= layout->fade_start) {

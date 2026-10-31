@@ -74,10 +74,17 @@ static void forget_rows(BrowseScreen *browse)
     }
 }
 
+static int rows_wanted(const BrowseScreen *browse)
+{
+    int top = list_view_top(&browse->list);
+    return min_of(min_of(list_view_rows(&browse->list), BROWSE_ROWS), (int)browse->count - top);
+}
+
 static bool rows_current(const BrowseScreen *browse)
 {
     const BrowseRows *rows = cached_rows(browse);
-    return rows != NULL && rows->first == browse->list.top;
+    return rows != NULL && rows->first == list_view_top(&browse->list) &&
+           rows->count >= rows_wanted(browse);
 }
 
 static uint32_t source_position(const BrowseScreen *browse, int index)
@@ -149,8 +156,8 @@ static void refresh_rows(BrowseScreen *browse)
     }
     BrowseRows *rows = rows_to_fill(browse);
     rows->level = NO_LEVEL;
-    int top = browse->list.top;
-    int count = min_of(min_of(browse->list.visible_rows, BROWSE_ROWS), (int)browse->count - top);
+    int top = list_view_top(&browse->list);
+    int count = rows_wanted(browse);
     for (int row = 0; row < count; row++) {
         load_row(browse, rows, row, top + row);
     }

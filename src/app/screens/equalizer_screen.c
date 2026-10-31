@@ -25,8 +25,27 @@ enum {
     KNOB_HEIGHT = 4,
     LABEL_TOP = 136,
     HINT_TOP = 152,
-    LINE_HEIGHT = 16
+    LINE_HEIGHT = 16,
+    STACK_INFO_GAP = 4,
+    STACK_ROWS_GAP = 6,
+    STACK_ROW_HEIGHT = 24,
+    STACK_ROW_INSET = 6,
+    STACK_LABEL_WIDTH = 36,
+    STACK_TRACK_HEIGHT = 2,
+    STACK_BAR_HEIGHT = 8,
+    STACK_KNOB_WIDTH = 4,
+    STACK_KNOB_HEIGHT = 16,
+    STACK_HINT_GAP = 8
 };
+
+typedef struct HintLines {
+    const char *first;
+    const char *second;
+} HintLines;
+
+static const HintLines PICK_LINES = {"+/-: choose band", "Play: adjust \xC2\xB7 Hold: 0 dB"};
+static const HintLines EDIT_LINES = {"+/-: level", "Play: done \xC2\xB7 Hold: 0 dB"};
+static const HintLines BYPASS_LINES = {"EQ is off for tracks", "above 96 kHz"};
 
 static const char *const PRESET_NAMES[EQUALIZER_PRESET_COUNT] = {
     "Off", "Retro", "Bass", "Heavy", "Pop", "Jazz", "Unique", "Custom"};
@@ -304,10 +323,115 @@ static void draw_slider(const EqualizerEditor *editor, Canvas *canvas, int band)
                   BAND_LABELS[band]);
 }
 
+typedef struct StackGeometry {
+    int info_top;
+    int rows_top;
+    int slider_left;
+    int slider_width;
+    int zero_x;
+} StackGeometry;
+
+static StackGeometry stack_geometry(const Theme *theme)
+{
+    int info_top = theme->metrics.header_height + STACK_INFO_GAP;
+    int slider_left = STACK_ROW_INSET + STACK_LABEL_WIDTH;
+    int slider_width = theme->metrics.screen_width - slider_left - 2 * STACK_ROW_INSET;
+    return (StackGeometry){
+        .info_top = info_top,
+        .rows_top = info_top + INFO_HEIGHT + LINE_HEIGHT + STACK_ROWS_GAP,
+        .slider_left = slider_left,
+        .slider_width = slider_width,
+        .zero_x = slider_left + slider_width / 2,
+    };
+}
+
+static Rect side_bar_of(int zero_x, int middle, int gain)
+{
+    int end = zero_x + gain * PIXELS_PER_DB;
+    int top = middle - STACK_BAR_HEIGHT / 2;
+    return gain >= 0 ? (Rect){zero_x + 1, top, end - zero_x, STACK_BAR_HEIGHT}
+                     : (Rect){end, top, zero_x - end, STACK_BAR_HEIGHT};
+}
+
+static void draw_stacked_slider(const EqualizerEditor *editor, Canvas *canvas,
+                                StackGeometry geometry, int band)
+{
+    const ThemeColors *colors = &editor->config.theme->colors;
+    bool selected = band == editor->band;
+    int top = geometry.rows_top + band * STACK_ROW_HEIGHT;
+    int middle = top + STACK_ROW_HEIGHT / 2;
+    int gain = gains_of(editor)[band];
+    canvas_fill_rect(canvas,
+                     (Rect){geometry.slider_left, middle - STACK_TRACK_HEIGHT / 2,
+                            geometry.slider_width, STACK_TRACK_HEIGHT},
+                     colors->divider);
+    bool grabbed = selected && editor->editing;
+    canvas_fill_rect(canvas, side_bar_of(geometry.zero_x, middle, gain),
+                     grabbed    ? colors->selection_shine
+                     : selected ? colors->selection_background
+                                : colors->text_tertiary);
+    int knob_x = geometry.zero_x + gain * PIXELS_PER_DB - STACK_KNOB_WIDTH / 2;
+    canvas_fill_rect(
+        canvas, (Rect){knob_x, middle - STACK_KNOB_HEIGHT / 2, STACK_KNOB_WIDTH, STACK_KNOB_HEIGHT},
+        selected ? colors->selection_text : colors->text_secondary);
+    TextStyle label = {.font = editor->config.theme->fonts.small,
+                       .color = selected ? colors->text : colors->text_tertiary};
+    draw_text(
+        canvas, label,
+        (Rect){STACK_ROW_INSET + STACK_ROW_INSET / 2, top, STACK_LABEL_WIDTH, STACK_ROW_HEIGHT},
+        BAND_LABELS[band]);
+}
+
+static HintLines hint_lines(const EqualizerEditor *editor)
+{
+    if (editor->bypassed) {
+        return BYPASS_LINES;
+    }
+    return editor->editing ? EDIT_LINES : PICK_LINES;
+}
+
+static void draw_stacked_editor(const EqualizerEditor *editor, Canvas *canvas)
+{
+    const Theme *theme = editor->config.theme;
+    int width = theme->metrics.screen_width;
+    int padding = theme->metrics.padding;
+    StackGeometry geometry = stack_geometry(theme);
+    header_draw(canvas, theme, editor->screen.title);
+    TextStyle band = {.font = theme->fonts.title,
+                      .color = editor->editing ? theme->colors.selection_top : theme->colors.text};
+    TextStyle preamp = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
+    draw_text(canvas, band, (Rect){padding, geometry.info_top, width - 2 * padding, INFO_HEIGHT},
+              editor->band_text);
+    draw_text(canvas, preamp,
+              (Rect){padding, geometry.info_top + INFO_HEIGHT, width - 2 * padding, LINE_HEIGHT},
+              editor->preamp_text);
+    canvas_fill_rect(canvas,
+                     (Rect){STACK_ROW_INSET, geometry.rows_top + editor->band * STACK_ROW_HEIGHT,
+                            width - 2 * STACK_ROW_INSET, STACK_ROW_HEIGHT},
+                     editor->editing ? theme->colors.selection_background
+                                     : theme->colors.header_top);
+    int rows_height = EQUALIZER_CUSTOM_BANDS * STACK_ROW_HEIGHT;
+    canvas_fill_rect(canvas, (Rect){geometry.zero_x, geometry.rows_top, 1, rows_height},
+                     theme->colors.text_tertiary);
+    for (int index = 0; index < EQUALIZER_CUSTOM_BANDS; index++) {
+        draw_stacked_slider(editor, canvas, geometry, index);
+    }
+    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    HintLines lines = hint_lines(editor);
+    int hint_top = geometry.rows_top + rows_height + STACK_HINT_GAP;
+    draw_centered(canvas, hint, (Rect){0, hint_top, width, LINE_HEIGHT}, lines.first);
+    draw_centered(canvas, hint, (Rect){0, hint_top + LINE_HEIGHT, width, LINE_HEIGHT},
+                  lines.second);
+}
+
 static void draw_editor(void *context, Canvas *canvas)
 {
     const EqualizerEditor *editor = context;
     const Theme *theme = editor->config.theme;
+    if (theme_is_portrait(theme)) {
+        draw_stacked_editor(editor, canvas);
+        return;
+    }
     int width = theme->metrics.screen_width;
     header_draw(canvas, theme, editor->screen.title);
     draw_info(editor, canvas);
