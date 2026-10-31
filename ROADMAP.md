@@ -4,7 +4,7 @@ Status: `device` (works on the player) · `sim` (works in the simulator only) ·
 
 ## Where it stands
 
-Version 0.6.0 makes Bluetooth connect within seconds and adds Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
+Version 0.7.0 adds an equalizer (FiiO's presets and a 7-band Custom EQ) and plays ALAC, AAC and Opus; 0.6.0 made Bluetooth connect within seconds and added Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
 
 ## Features
 
