@@ -4,6 +4,7 @@
 
 #include "app/app.h"
 #include "board.h"
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "device/usb_audio.h"
 #include "device/usb_audio_sink.h"
@@ -18,7 +19,9 @@ enum {
     STREAM_IDLE_MS = 100,
     BACK_HOLD_MS = 1000,
     POLLS_PER_SERVICE = 4,
-    NOTICE_CAPACITY = 64,
+    NOTICE_CAPACITY = 128,
+    NUMBER_CAPACITY = 12,
+    FORMAT_CAPACITY = 16,
     HZ_PER_KHZ = 1000,
     BITS_PER_BYTE = 8,
     VOLUME_REPEAT_DELAY_MS = 400,
@@ -74,23 +77,28 @@ bool usb_dac_session_listen(void)
     return false;
 }
 
-static void append_volume(StringBuilder *line)
+static void volume_text(char *text, size_t capacity)
 {
-    string_builder_append(line, " \xC2\xB7 Volume ");
-    string_builder_append_unsigned(line, dac_volume);
+    StringBuilder number = string_builder_make(text, capacity);
+    string_builder_append_unsigned(&number, dac_volume);
 }
 
 static void append_format(StringBuilder *line)
 {
-    string_builder_append_unsigned(line, audio.rate / HZ_PER_KHZ);
+    char rate[FORMAT_CAPACITY];
+    char bits[NUMBER_CAPACITY];
+    char volume[NUMBER_CAPACITY];
+    StringBuilder rate_builder = string_builder_make(rate, sizeof rate);
+    string_builder_append_unsigned(&rate_builder, audio.rate / HZ_PER_KHZ);
     if (audio.rate % HZ_PER_KHZ != 0) {
-        string_builder_append_char(line, '.');
-        string_builder_append_unsigned(line, audio.rate % HZ_PER_KHZ / 100);
+        string_builder_append_char(&rate_builder, '.');
+        string_builder_append_unsigned(&rate_builder, audio.rate % HZ_PER_KHZ / 100);
     }
-    string_builder_append(line, " kHz ");
-    string_builder_append_unsigned(line, BITS_PER_BYTE * usb_audio_sample_bytes(&audio));
-    string_builder_append(line, "-bit");
-    append_volume(line);
+    StringBuilder bits_builder = string_builder_make(bits, sizeof bits);
+    string_builder_append_unsigned(&bits_builder, BITS_PER_BYTE * usb_audio_sample_bytes(&audio));
+    volume_text(volume, sizeof volume);
+    const char *arguments[] = {rate, bits, volume};
+    i18n_format(line, STR_USB_FORMAT_VOLUME, arguments, 3);
 }
 
 static void show_state(void)
@@ -98,10 +106,12 @@ static void show_state(void)
     char text[NOTICE_CAPACITY];
     StringBuilder line = string_builder_make(text, sizeof text);
     if (usb_audio_sample_bytes(&audio) == 0) {
-        string_builder_append(&line, "Choose EchoPod as the sound output");
-        append_volume(&line);
+        char volume[NUMBER_CAPACITY];
+        volume_text(volume, sizeof volume);
+        const char *arguments[] = {volume};
+        i18n_format(&line, STR_USB_CHOOSE_OUTPUT, arguments, 1);
     } else if (open_rate == 0) {
-        string_builder_append(&line, "The audio output didn't start.");
+        string_builder_append(&line, i18n_text(STR_USB_OUTPUT_FAILED));
     } else {
         append_format(&line);
     }
@@ -238,7 +248,7 @@ static void start_session(void)
 
 void usb_dac_session_run(void)
 {
-    app_show_notice(TITLE, "Computer found. Starting...");
+    app_show_notice(TITLE, i18n_text(STR_USB_COMPUTER_FOUND));
     app_release_audio();
     board_audio_shut_down();
     uint8_t level = board_audio_volume_level();

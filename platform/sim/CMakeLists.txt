@@ -18,6 +18,11 @@ target_include_directories(echo_sim_glyphs PUBLIC .)
 target_compile_definitions(echo_sim_glyphs PRIVATE ECHO_GLYPH_FACE_PATHS="${ECHO_GLYPH_FACE_PATHS}")
 target_link_libraries(echo_sim_glyphs PUBLIC echo_gfx PRIVATE echo_options)
 
+string(REPLACE ";" "|" ECHO_LANGUAGE_PACK_PATHS "${ECHO_LANGUAGE_PACK_FILES}")
+add_library(echo_sim_language STATIC sim_language.c)
+target_compile_definitions(echo_sim_language PRIVATE ECHO_LANGUAGE_PACK_PATHS="${ECHO_LANGUAGE_PACK_PATHS}")
+target_link_libraries(echo_sim_language PUBLIC echo_hal PRIVATE echo_options)
+
 add_library(echo_sim_storage STATIC sim_storage.c)
 target_include_directories(echo_sim_storage PUBLIC .)
 target_link_libraries(echo_sim_storage PUBLIC echo_hal PRIVATE echo_options)
@@ -33,4 +38,4 @@ add_executable(echo_sim
     sim_system.c
 )
 target_compile_definitions(echo_sim PRIVATE SDL_MAIN_HANDLED)
-target_link_libraries(echo_sim PRIVATE echo_app echo_sim_glyphs echo_library_scan echo_sim_options echo_sim_decoder echo_sim_storage echo_options SDL2::SDL2)
+target_link_libraries(echo_sim PRIVATE echo_app echo_sim_glyphs echo_sim_language echo_library_scan echo_sim_options echo_sim_decoder echo_sim_storage echo_options SDL2::SDL2)

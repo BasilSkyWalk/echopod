@@ -1,5 +1,6 @@
 #include "charge_screen.h"
 
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "ui/icons.h"
 #include "ui/label.h"
@@ -18,7 +19,8 @@ enum {
     HINT_BOTTOM = 10,
     HINT_HEIGHT = 16,
     FULL_PERCENT = 100,
-    TEXT_CAPACITY = 24
+    TEXT_CAPACITY = 48,
+    PERCENT_CAPACITY = 8
 };
 
 static void draw_outline(Canvas *canvas, Rect body, Color color)
@@ -57,16 +59,19 @@ void charge_screen_text(HalBattery battery, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (battery.usb_power && !battery.charging) {
-        string_builder_append(&builder, "Charged");
+        string_builder_append(&builder, i18n_text(STR_CHARGE_CHARGED));
         return;
     }
-    string_builder_append(&builder, "Charging");
-    if (battery.known) {
-        string_builder_append_char(&builder, ' ');
-        string_builder_append_unsigned(&builder, battery.percent < FULL_PERCENT ? battery.percent
-                                                                                : FULL_PERCENT);
-        string_builder_append_char(&builder, '%');
+    if (!battery.known) {
+        string_builder_append(&builder, i18n_text(STR_CHARGE_CHARGING));
+        return;
     }
+    char percent[PERCENT_CAPACITY];
+    StringBuilder number = string_builder_make(percent, sizeof percent);
+    string_builder_append_unsigned(&number,
+                                   battery.percent < FULL_PERCENT ? battery.percent : FULL_PERCENT);
+    const char *arguments[] = {percent};
+    i18n_format(&builder, STR_CHARGE_CHARGING_PERCENT, arguments, 1);
 }
 
 void charge_screen_draw(Canvas *canvas, const Theme *theme, HalBattery battery)
@@ -84,9 +89,10 @@ void charge_screen_draw(Canvas *canvas, const Theme *theme, HalBattery battery)
     TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, line, text), .text = text});
-    static const char HINT[] = "Hold Power to turn on";
+    const char *hint_text = i18n_text(STR_CHARGE_HINT);
     Rect hint = {0, height - HINT_BOTTOM - HINT_HEIGHT, width, HINT_HEIGHT};
     TextStyle small = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
-    label_draw(canvas, small,
-               (Label){.area = label_centered_area(small.font, hint, HINT), .text = HINT});
+    label_draw(
+        canvas, small,
+        (Label){.area = label_centered_area(small.font, hint, hint_text), .text = hint_text});
 }

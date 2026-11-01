@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
 #include "hal/clock.h"
@@ -12,6 +13,10 @@
 static const char MUSIC_ROOT[] = "/";
 const char LIBRARY_SCRATCH_PATH[] = "/.echo/build.tmp";
 const char RESCAN_TIMES_PATH[] = "/.echo/rescan_times.bin";
+
+enum {
+    NUMBER_CAPACITY = 12
+};
 
 enum {
     TIME_LIST,
@@ -275,27 +280,50 @@ static const char *error_text(ScanResult result)
     case SCAN_OK:
         return "";
     case SCAN_NO_MUSIC_ROOT:
-        return "No music found on the card";
+        return i18n_text(STR_RESCAN_NO_MUSIC);
     case SCAN_OUT_OF_MEMORY:
-        return "Library too big for the player's memory";
+        return i18n_text(STR_RESCAN_OUT_OF_MEMORY);
     case SCAN_TOO_MANY:
-        return "Too many tracks for the player";
+        return i18n_text(STR_RESCAN_TOO_MANY);
     case SCAN_NO_SCRATCH:
-        return "Couldn't free memory for the scan";
+        return i18n_text(STR_RESCAN_NO_SCRATCH);
     case SCAN_FOLDER_TOO_BIG:
-        return "A folder holds too many files";
+        return i18n_text(STR_RESCAN_FOLDER_TOO_BIG);
     case SCAN_PATH_TOO_LONG:
-        return "A folder path is too long";
+        return i18n_text(STR_RESCAN_PATH_TOO_LONG);
     case SCAN_WRITE_FAILED:
-        return "Could not write the library";
+        return i18n_text(STR_RESCAN_WRITE_FAILED);
     case SCAN_NO_ROOM:
-        return "No room for the library on the card";
+        return i18n_text(STR_RESCAN_NO_ROOM);
     case SCAN_NO_CODE:
-        return "Rescan code missing: reinstall the update";
+        return i18n_text(STR_RESCAN_NO_CODE);
     case SCAN_RESTART_NEEDED:
-        return "Restart the player to finish the update";
+        return i18n_text(STR_RESCAN_RESTART_NEEDED);
     }
     return "";
+}
+
+static void number_text(char *text, size_t capacity, uint32_t value)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append_unsigned(&builder, value);
+}
+
+static StringId library_pattern(RescanOutcome outcome)
+{
+    static const StringId PATTERNS[2][4] = {
+        {STR_RESCAN_LIBRARY_TRACKS, STR_RESCAN_LIBRARY_TRACKS_NO_COVERS,
+         STR_RESCAN_LIBRARY_TRACKS_COVER, STR_RESCAN_LIBRARY_TRACKS_COVERS},
+        {STR_RESCAN_LIBRARY_TRACK, STR_RESCAN_LIBRARY_TRACK_NO_COVERS,
+         STR_RESCAN_LIBRARY_TRACK_COVER, STR_RESCAN_LIBRARY_TRACK_COVERS},
+    };
+    size_t kind = 0;
+    if (outcome.cover_result != SCAN_OK) {
+        kind = 1;
+    } else if (outcome.covers.albums > 0) {
+        kind = outcome.covers.covers == 1 ? 2 : 3;
+    }
+    return PATTERNS[outcome.stats.tracks == 1 ? 1 : 0][kind];
 }
 
 const char *library_rescan_message(RescanOutcome outcome, char *text, uint32_t capacity)
@@ -303,16 +331,12 @@ const char *library_rescan_message(RescanOutcome outcome, char *text, uint32_t c
     if (outcome.result != SCAN_OK) {
         return error_text(outcome.result);
     }
+    char tracks[NUMBER_CAPACITY];
+    char covers[NUMBER_CAPACITY];
+    number_text(tracks, sizeof tracks, outcome.stats.tracks);
+    number_text(covers, sizeof covers, outcome.covers.covers);
+    const char *arguments[] = {tracks, covers};
     StringBuilder builder = string_builder_make(text, capacity);
-    string_builder_append(&builder, "Library: ");
-    string_builder_append_unsigned(&builder, outcome.stats.tracks);
-    string_builder_append(&builder, outcome.stats.tracks == 1 ? " track" : " tracks");
-    if (outcome.cover_result != SCAN_OK) {
-        string_builder_append(&builder, ", no covers");
-    } else if (outcome.covers.albums > 0) {
-        string_builder_append(&builder, ", ");
-        string_builder_append_unsigned(&builder, outcome.covers.covers);
-        string_builder_append(&builder, outcome.covers.covers == 1 ? " cover" : " covers");
-    }
+    i18n_format(&builder, library_pattern(outcome), arguments, 2);
     return text;
 }

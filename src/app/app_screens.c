@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "diagnostics_values.h"
 #include "hal/power.h"
 #include "hal/system.h"
@@ -14,7 +15,7 @@ typedef enum MusicSource {
 } MusicSource;
 
 typedef struct MusicEntry {
-    const char *label;
+    StringId label;
     MusicSource source;
     BrowseKind kind;
 } MusicEntry;
@@ -28,15 +29,15 @@ enum {
 };
 
 static const MusicEntry MUSIC_ENTRIES[MUSIC_ITEM_COUNT] = {
-    {"Cover Flow", MUSIC_COVER_FLOW, BROWSE_ALBUMS},
-    {"Artists", MUSIC_LIBRARY, BROWSE_ARTISTS},
-    {"Album Artists", MUSIC_LIBRARY, BROWSE_ALBUM_ARTISTS},
-    {"Albums", MUSIC_LIBRARY, BROWSE_ALBUMS},
-    {"Genres", MUSIC_LIBRARY, BROWSE_GENRES},
-    {"Folders", MUSIC_LIBRARY, BROWSE_FOLDER},
-    {"All Songs", MUSIC_LIBRARY, BROWSE_ALL_SONGS},
-    {"Playlists", MUSIC_LIBRARY, BROWSE_PLAYLISTS},
-    {"Favorites", MUSIC_FAVORITES, BROWSE_ALBUMS},
+    {STR_MENU_COVER_FLOW, MUSIC_COVER_FLOW, BROWSE_ALBUMS},
+    {STR_MENU_ARTISTS, MUSIC_LIBRARY, BROWSE_ARTISTS},
+    {STR_MENU_ALBUM_ARTISTS, MUSIC_LIBRARY, BROWSE_ALBUM_ARTISTS},
+    {STR_MENU_ALBUMS, MUSIC_LIBRARY, BROWSE_ALBUMS},
+    {STR_MENU_GENRES, MUSIC_LIBRARY, BROWSE_GENRES},
+    {STR_MENU_FOLDERS, MUSIC_LIBRARY, BROWSE_FOLDER},
+    {STR_MENU_ALL_SONGS, MUSIC_LIBRARY, BROWSE_ALL_SONGS},
+    {STR_MENU_PLAYLISTS, MUSIC_LIBRARY, BROWSE_PLAYLISTS},
+    {STR_MENU_FAVORITES, MUSIC_FAVORITES, BROWSE_ALBUMS},
 };
 
 static bool player_has_track(const void *context)
@@ -95,7 +96,7 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
         .shelf = SPOKEN_NONE,
         .present = true,
     };
-    return (MenuItem){.label = entry->label,
+    return (MenuItem){.label = i18n_text(entry->label),
                       .select = open_browse,
                       .context = &screens->browse_entries[index],
                       .value = NULL,
@@ -127,8 +128,8 @@ static void build_music(AppScreens *screens, AppScreensContext context)
     for (int index = 0; index < MUSIC_ITEM_COUNT; index++) {
         screens->music_items[index] = music_item(screens, context.store, index);
     }
-    app_screens_build_menu(&screens->music, "Music", screens->music_items, MUSIC_ITEM_COUNT,
-                           context.theme);
+    app_screens_build_menu(&screens->music, i18n_text(STR_RESCAN_MUSIC_TITLE), screens->music_items,
+                           MUSIC_ITEM_COUNT, context.theme);
 }
 
 static void build_settings(AppScreens *screens, AppScreensContext context)
@@ -164,23 +165,28 @@ static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, Spoke
         .present = context.store->available &&
                    spoken_shelf_folder(&context.store->library, shelf, &folder),
     };
-    return (MenuItem){.label = shelf == SPOKEN_PODCAST ? "Podcasts" : "Audiobooks",
-                      .select = open_browse,
-                      .context = entry,
-                      .opens = true,
-                      .shown = shelf_present,
-                      .shown_context = entry};
+    return (MenuItem){
+        .label = i18n_text(shelf == SPOKEN_PODCAST ? STR_MENU_PODCASTS : STR_MENU_AUDIOBOOKS),
+        .select = open_browse,
+        .context = entry,
+        .opens = true,
+        .shown = shelf_present,
+        .shown_context = entry};
 }
 
 static void build_home(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
-    screens->home_items[0] = app_screens_open_item("Music", &screens->music.screen);
+    screens->home_items[0] =
+        app_screens_open_item(i18n_text(STR_RESCAN_MUSIC_TITLE), &screens->music.screen);
     screens->home_items[1] = shelf_item(screens, context, SPOKEN_AUDIOBOOK);
     screens->home_items[2] = shelf_item(screens, context, SPOKEN_PODCAST);
-    screens->home_items[3] = app_screens_open_item("Settings", &screens->settings.menu.screen);
-    screens->home_items[4] = app_screens_open_item("Diagnostics", &screens->diagnostics.screen);
-    screens->home_items[5] = app_screens_open_item("Now Playing", &screens->now_playing.screen);
+    screens->home_items[3] =
+        app_screens_open_item(i18n_text(STR_MENU_SETTINGS), &screens->settings.menu.screen);
+    screens->home_items[4] =
+        app_screens_open_item(i18n_text(STR_DIAG_TITLE), &screens->diagnostics.screen);
+    screens->home_items[5] =
+        app_screens_open_item(i18n_text(STR_MENU_NOW_PLAYING), &screens->now_playing.screen);
     screens->home_items[5].shown = player_has_track;
     screens->home_items[5].shown_context = context.player;
     home_art_init(&screens->home_art, context.covers, context.store, context.player, theme);
@@ -199,8 +205,9 @@ static void build_home(AppScreens *screens, AppScreensContext context)
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
-    MessageConfig no_library = {
-        .title = "No library", .message = "Run the PC indexer to build one", .theme = theme};
+    MessageConfig no_library = {.title = i18n_text(STR_MENU_NO_LIBRARY),
+                                .message = i18n_text(STR_MENU_NO_LIBRARY_HINT),
+                                .theme = theme};
     UpNextConfig up_next = {
         .library = &context.store->library, .theme = theme, .player = context.player};
     NowPlayingConfig now_playing = {.player = context.player,

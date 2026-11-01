@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -35,32 +36,37 @@ enum {
     STACK_BAR_HEIGHT = 8,
     STACK_KNOB_WIDTH = 4,
     STACK_KNOB_HEIGHT = 16,
-    STACK_HINT_GAP = 8
+    STACK_HINT_GAP = 8,
+    EQ_CUT_CAPACITY = 16
 };
 
 typedef struct HintLines {
-    const char *first;
-    const char *second;
+    StringId first;
+    StringId second;
 } HintLines;
 
-static const HintLines PICK_LINES = {"+/-: choose band", "Play: adjust \xC2\xB7 Hold: 0 dB"};
-static const HintLines EDIT_LINES = {"+/-: level", "Play: done \xC2\xB7 Hold: 0 dB"};
-static const HintLines BYPASS_LINES = {"EQ is off for tracks", "above 96 kHz"};
+static const HintLines PICK_LINES = {STR_SETTINGS_EQ_PICK_LINE_1, STR_SETTINGS_EQ_PICK_LINE_2};
+static const HintLines EDIT_LINES = {STR_SETTINGS_EQ_EDIT_LINE_1, STR_SETTINGS_EQ_EDIT_LINE_2};
+static const HintLines BYPASS_LINES = {STR_SETTINGS_EQ_BYPASS_LINE_1,
+                                       STR_SETTINGS_EQ_BYPASS_LINE_2};
 
-static const char *const PRESET_NAMES[EQUALIZER_PRESET_COUNT] = {
-    "Off", "Retro", "Bass", "Heavy", "Pop", "Jazz", "Unique", "Custom"};
+static const StringId PRESET_NAMES[EQUALIZER_PRESET_COUNT] = {STR_OFF,
+                                                              STR_SETTINGS_EQ_RETRO,
+                                                              STR_SETTINGS_EQ_BASS,
+                                                              STR_SETTINGS_EQ_HEAVY,
+                                                              STR_SETTINGS_EQ_POP,
+                                                              STR_SETTINGS_EQ_JAZZ,
+                                                              STR_SETTINGS_EQ_UNIQUE,
+                                                              STR_SETTINGS_EQ_CUSTOM};
 static const char *const BAND_LABELS[EQUALIZER_CUSTOM_BANDS] = {"63",   "160",  "400", "1k",
                                                                 "2.5k", "6.3k", "16k"};
 static const char *const BAND_NAMES[EQUALIZER_CUSTOM_BANDS] = {
     "63 Hz", "160 Hz", "400 Hz", "1 kHz", "2.5 kHz", "6.3 kHz", "16 kHz"};
 static const char CHECK_MARK[] = "\xE2\x9C\x93";
-static const char PICK_HINT[] = "+/-: choose band   Play: adjust   Hold Play: 0 dB";
-static const char EDIT_HINT[] = "+/-: level   Play: done   Hold Play: 0 dB";
-static const char BYPASS_HINT[] = "EQ is off for tracks above 96 kHz";
 
 const char *equalizer_screen_preset_name(EqualizerPreset preset)
 {
-    return (unsigned)preset < EQUALIZER_PRESET_COUNT ? PRESET_NAMES[preset] : "";
+    return (unsigned)preset < EQUALIZER_PRESET_COUNT ? i18n_text(PRESET_NAMES[preset]) : "";
 }
 
 static EqualizerChoice *choice_of(const EqualizerConfig *config)
@@ -77,7 +83,7 @@ static ScreenAction leave(const EqualizerConfig *config, ScreenAction action)
 {
     bool leaving = action.type == SCREEN_ACTION_POP || action.type == SCREEN_ACTION_POP_TO_ROOT;
     if (leaving && !equalizer_store_save(config->store)) {
-        toast_show(config->toast, "Could not save the equalizer", hal_clock_milliseconds());
+        toast_show(config->toast, i18n_text(STR_SETTINGS_EQ_SAVE_FAILED), hal_clock_milliseconds());
     }
     return action;
 }
@@ -100,7 +106,7 @@ static int preset_count(const void *context)
 static const char *preset_label(const void *context, int index)
 {
     (void)context;
-    return PRESET_NAMES[index];
+    return i18n_text(PRESET_NAMES[index]);
 }
 
 static const char *preset_mark(const void *context, int index)
@@ -139,7 +145,7 @@ static void enter_picker(void *context, uint32_t now_ms)
     equalizer->now_ms = now_ms;
     list_view_select(&equalizer->list, (int)choice_of(&equalizer->config)->preset, now_ms);
     if (above_equalizer_rate()) {
-        toast_show(equalizer->config.toast, BYPASS_HINT, now_ms);
+        toast_show(equalizer->config.toast, i18n_text(STR_SETTINGS_EQ_BYPASS_HINT), now_ms);
     }
 }
 
@@ -190,8 +196,11 @@ static void describe(EqualizerEditor *editor)
     StringBuilder preamp = string_builder_make(editor->preamp_text, sizeof editor->preamp_text);
     int boost = largest_boost(gains);
     if (boost > 0) {
-        string_builder_append(&preamp, "Preamp ");
-        append_decibels(&preamp, -boost);
+        char cut[EQ_CUT_CAPACITY];
+        StringBuilder cut_text = string_builder_make(cut, sizeof cut);
+        append_decibels(&cut_text, -boost);
+        const char *arguments[] = {cut};
+        i18n_format(&preamp, STR_SETTINGS_EQ_PREAMP, arguments, 1);
     }
 }
 
@@ -419,9 +428,9 @@ static void draw_stacked_editor(const EqualizerEditor *editor, Canvas *canvas)
     TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
     HintLines lines = hint_lines(editor);
     int hint_top = geometry.rows_top + rows_height + STACK_HINT_GAP;
-    draw_centered(canvas, hint, (Rect){0, hint_top, width, LINE_HEIGHT}, lines.first);
+    draw_centered(canvas, hint, (Rect){0, hint_top, width, LINE_HEIGHT}, i18n_text(lines.first));
     draw_centered(canvas, hint, (Rect){0, hint_top + LINE_HEIGHT, width, LINE_HEIGHT},
-                  lines.second);
+                  i18n_text(lines.second));
 }
 
 static void draw_editor(void *context, Canvas *canvas)
@@ -446,16 +455,16 @@ static void draw_editor(void *context, Canvas *canvas)
     }
     TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
     draw_centered(canvas, hint, (Rect){0, HINT_TOP, width, LINE_HEIGHT},
-                  editor->bypassed  ? BYPASS_HINT
-                  : editor->editing ? EDIT_HINT
-                                    : PICK_HINT);
+                  i18n_text(editor->bypassed  ? STR_SETTINGS_EQ_BYPASS_HINT
+                            : editor->editing ? STR_SETTINGS_EQ_EDIT_HINT
+                                              : STR_SETTINGS_EQ_PICK_HINT));
 }
 
 static void init_editor(EqualizerEditor *editor, EqualizerConfig config)
 {
     *editor = (EqualizerEditor){.config = config};
     editor->screen = (Screen){
-        .title = "Custom EQ",
+        .title = i18n_text(STR_SETTINGS_EQ_CUSTOM_TITLE),
         .context = editor,
         .enter = enter_editor,
         .handle_key = handle_editor_key,
@@ -474,7 +483,7 @@ Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config
                                    .opens = preset_opens};
     list_view_init(&equalizer->list, &equalizer->model, config.theme, 0);
     equalizer->screen = (Screen){
-        .title = "Equalizer",
+        .title = i18n_text(STR_SETTINGS_EQUALIZER),
         .context = equalizer,
         .enter = enter_picker,
         .handle_key = handle_picker_key,

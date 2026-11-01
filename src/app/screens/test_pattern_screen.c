@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "core/deadline.h"
+#include "core/i18n.h"
 #include "hal/display.h"
 
 enum {
@@ -149,7 +150,7 @@ Screen *test_pattern_screen_init(TestPatternScreen *pattern)
 {
     *pattern = (TestPatternScreen){0};
     pattern->screen = (Screen){
-        .title = "Key test",
+        .title = i18n_text(STR_DIAG_KEY_TEST),
         .context = pattern,
         .full_screen = true,
         .stays_on_wake = true,

@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "board.h"
+#include "core/i18n.h"
 #include "device/battery_gauge.h"
 #include "hal/clock.h"
 #include "hal/power.h"
@@ -53,8 +54,7 @@ static void run_usb_session(void)
     raise_clock_for_usb();
     UsbSessionEnd end = usb_session_run();
     if (end == USB_SESSION_UNPLUGGED && hal_system_usb_last().left_mounted != 0) {
-        app_show_notice("Unplugged before ejecting",
-                        "Recent changes may be lost. Eject the drives before unplugging.");
+        app_show_notice(i18n_text(STR_USB_UNPLUGGED_TITLE), i18n_text(STR_USB_UNPLUGGED_MESSAGE));
         board_wait_for_key();
     }
     if (end == USB_SESSION_EJECTED || end == USB_SESSION_UNPLUGGED) {

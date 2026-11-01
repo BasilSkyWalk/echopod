@@ -13,6 +13,7 @@ add_executable(echo_device
     board/gpio.c
     board/jack.c
     board/high_ram.c
+    board/language.c
     board/input.c
     board/libc.c
     board/loop_bench.c
@@ -154,6 +155,7 @@ if(CMAKE_CROSSCOMPILING)
         board/high_ram.c
         board/input.c
         board/jack.c
+        board/language.c
         board/main.c
         board/overlay.c
         board/panic.c
@@ -189,11 +191,11 @@ target_link_options(echo_rescan_overlay PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_rescan_overlay.map
 )
 
-set(ECHO_FIRMWARE_VERSION "0.8.1" CACHE STRING "major.minor.patch written to the image header")
+set(ECHO_FIRMWARE_VERSION "0.9.0" CACHE STRING "major.minor.patch written to the image header")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
 set(ECHO_GLYPH_FACE_ARGUMENTS "")
-foreach(face_file ${ECHO_GLYPH_FACE_FILES})
+foreach(face_file ${ECHO_GLYPH_FACE_FILES} ${ECHO_LANGUAGE_PACK_FILES})
     list(APPEND ECHO_GLYPH_FACE_ARGUMENTS --glyph-face ${face_file})
 endforeach()
 

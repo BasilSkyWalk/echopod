@@ -1,0 +1,3 @@
+STRING(STR_PLAYER_RATE_UNSUPPORTED, "{0} isn't supported yet")
+STRING(STR_PLAYER_FILE_UNSUPPORTED, "This file type isn't supported yet")
+STRING(STR_PLAYER_UNREADABLE, "Couldn't read the track")

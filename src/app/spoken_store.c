@@ -1,6 +1,7 @@
 #include "spoken_store.h"
 
 #include "core/format.h"
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "hal/storage.h"
 
@@ -199,14 +200,13 @@ uint16_t spoken_store_resume_chapter(const SpokenStore *store, uint16_t folder)
     return 0;
 }
 
-static void append_count(StringBuilder *builder, uint32_t count, const char *noun)
+static void append_count(StringBuilder *builder, uint32_t count, StringId one, StringId many)
 {
-    string_builder_append_unsigned(builder, count);
-    string_builder_append_char(builder, ' ');
-    string_builder_append(builder, noun);
-    if (count != 1) {
-        string_builder_append_char(builder, 's');
-    }
+    char number[TIME_CAPACITY];
+    StringBuilder digits = string_builder_make(number, sizeof number);
+    string_builder_append_unsigned(&digits, count);
+    const char *arguments[] = {number};
+    i18n_format(builder, count == 1 ? one : many, arguments, 1);
 }
 
 static bool describe_folder(const SpokenStore *store, SpokenRow row, StringBuilder *builder)
@@ -216,16 +216,22 @@ static bool describe_folder(const SpokenStore *store, SpokenRow row, StringBuild
     if (!library_read_folder(store->library, row.item.index, &folder) || folder.track_count == 0) {
         return false;
     }
-    const char *noun = row.shelf == SPOKEN_PODCAST ? "episode" : "chapter";
+    bool podcast = row.shelf == SPOKEN_PODCAST;
     if (row.shelf != SPOKEN_AUDIOBOOK || !spoken_store_book(store, row.item.index, &bookmark)) {
-        append_count(builder, folder.track_count, noun);
+        append_count(builder, folder.track_count,
+                     podcast ? STR_MENU_EPISODE_ONE : STR_MENU_CHAPTER_ONE,
+                     podcast ? STR_MENU_EPISODE_MANY : STR_MENU_CHAPTER_MANY);
     } else if (bookmark_finished(bookmark)) {
-        string_builder_append(builder, "Finished");
+        string_builder_append(builder, i18n_text(STR_MENU_FINISHED));
     } else {
-        string_builder_append(builder, "Chapter ");
-        string_builder_append_unsigned(builder, (uint32_t)bookmark.chapter + 1u);
-        string_builder_append(builder, " of ");
-        string_builder_append_unsigned(builder, folder.track_count);
+        char chapter[TIME_CAPACITY];
+        char total[TIME_CAPACITY];
+        StringBuilder chapter_digits = string_builder_make(chapter, sizeof chapter);
+        StringBuilder total_digits = string_builder_make(total, sizeof total);
+        string_builder_append_unsigned(&chapter_digits, (uint32_t)bookmark.chapter + 1u);
+        string_builder_append_unsigned(&total_digits, folder.track_count);
+        const char *arguments[] = {chapter, total};
+        i18n_format(builder, STR_MENU_CHAPTER_PROGRESS, arguments, 2);
     }
     return true;
 }
@@ -239,7 +245,7 @@ static bool describe_track(const SpokenStore *store, SpokenRow row, StringBuilde
         return false;
     }
     if (bookmark_finished(bookmark)) {
-        string_builder_append(builder, "Played");
+        string_builder_append(builder, i18n_text(STR_DIAG_TONE_PLAYED));
         return true;
     }
     if (bookmark.position_ms == 0 || bookmark.position_ms >= record.duration_ms) {
@@ -247,8 +253,8 @@ static bool describe_track(const SpokenStore *store, SpokenRow row, StringBuilde
     }
     char left[TIME_CAPACITY];
     format_duration(record.duration_ms - bookmark.position_ms, left, sizeof left);
-    string_builder_append(builder, left);
-    string_builder_append(builder, " left");
+    const char *arguments[] = {left};
+    i18n_format(builder, STR_MENU_TIME_LEFT, arguments, 1);
     return true;
 }
 

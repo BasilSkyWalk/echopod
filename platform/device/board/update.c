@@ -4,13 +4,15 @@
 
 #include "app/app.h"
 #include "board.h"
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "device/fat.h"
 #include "device/updater.h"
 #include "emmc.h"
 
 enum {
-    MESSAGE_CAPACITY = 64,
+    MESSAGE_CAPACITY = 128,
+    PERCENT_CAPACITY = 8,
     PERCENT_STEP = 5,
     PERCENT = 100,
     HIGHEST_NUMBER = 97,
@@ -42,9 +44,11 @@ static void show_percent(uint32_t percent)
 {
     char text[MESSAGE_CAPACITY];
     StringBuilder builder = string_builder_make(text, sizeof text);
-    string_builder_append(&builder, "Don't unplug or turn off. ");
-    string_builder_append_unsigned(&builder, percent);
-    string_builder_append_char(&builder, '%');
+    char number[PERCENT_CAPACITY];
+    StringBuilder digits = string_builder_make(number, sizeof number);
+    string_builder_append_unsigned(&digits, percent);
+    const char *arguments[] = {number};
+    i18n_format(&builder, STR_UPDATE_DONT_UNPLUG, arguments, 1);
     app_show_notice(install_title, text);
     board_display_service();
 }
@@ -88,15 +92,15 @@ static bool open_update(UpdateStorage *storage)
 
 static void install(const UpdateFile *update, const UpdateStorage *storage, bool stock)
 {
-    install_title = stock ? "Installing FiiO firmware" : "Installing update";
+    install_title = i18n_text(stock ? STR_UPDATE_INSTALLING_FIIO : STR_UPDATE_INSTALLING);
     last_percent = 0;
     show_percent(0);
     flash_rewritten = true;
     if (updater_install(update, storage, (UpdateProgress){report, NULL})) {
-        app_show_notice(stock ? "FiiO firmware installed" : "Update installed",
-                        "Unplug USB, then hold Power to turn off and on again.");
+        app_show_notice(i18n_text(stock ? STR_UPDATE_FIIO_INSTALLED : STR_UPDATE_INSTALLED),
+                        i18n_text(STR_UPDATE_UNPLUG_AND_RESTART));
     } else {
-        app_show_notice("Update failed", "Copy the file again and retry before turning off.");
+        app_show_notice(i18n_text(STR_UPDATE_FAILED), i18n_text(STR_UPDATE_RETRY));
     }
     board_wait_for_key();
 }
@@ -111,17 +115,16 @@ void update_after_usb(void)
     const char *name = update_path + 1;
     char text[MESSAGE_CAPACITY];
     StringBuilder builder = string_builder_make(text, sizeof text);
-    string_builder_append(&builder, "Checking ");
-    string_builder_append(&builder, name);
-    app_show_notice("Update", text);
+    const char *arguments[] = {name};
+    i18n_format(&builder, STR_UPDATE_CHECKING, arguments, 1);
+    app_show_notice(i18n_text(STR_UPDATE_TITLE), text);
     UpdateCheck check = updater_check(&update, &storage);
     if (check == UPDATE_VALID || check == UPDATE_STOCK) {
         install(&update, &storage, check == UPDATE_STOCK);
     } else if (check == UPDATE_INVALID) {
         builder = string_builder_make(text, sizeof text);
-        string_builder_append(&builder, name);
-        string_builder_append(&builder, " isn't a valid image for this player.");
-        app_show_notice("Update not installed", text);
+        i18n_format(&builder, STR_UPDATE_INVALID_IMAGE, arguments, 1);
+        app_show_notice(i18n_text(STR_UPDATE_NOT_INSTALLED), text);
         board_wait_for_key();
     }
 }

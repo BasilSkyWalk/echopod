@@ -3,12 +3,13 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 5,
+    VERSION = 6,
     FIRST_VERSION = 1,
     AUTO_OFF_VERSION = 2,
     USB_MODE_VERSION = 3,
     DAC_VOLUME_VERSION = 4,
     ORIENTATION_VERSION = 5,
+    LANGUAGE_VERSION = 6,
     MAGIC_SIZE = 4,
     VERSION_FIELD = 4,
     BRIGHTNESS_FIELD = 6,
@@ -23,6 +24,7 @@ enum {
     USB_MODE_FIELD = 15,
     DAC_VOLUME_FIELD = 16,
     ORIENTATION_FIELD = 17,
+    LANGUAGE_FIELD = 18,
     CHECKSUM_FIELD = 20,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
@@ -53,6 +55,7 @@ Settings settings_defaults(void)
         .usb_mode = USB_MODE_STORAGE,
         .dac_volume = SETTINGS_DEFAULT_DAC_VOLUME,
         .orientation = ORIENTATION_LANDSCAPE,
+        .language = LANGUAGE_ENGLISH,
     };
 }
 
@@ -120,6 +123,7 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     bytes[USB_MODE_FIELD] = (uint8_t)settings->usb_mode;
     bytes[DAC_VOLUME_FIELD] = settings->dac_volume;
     bytes[ORIENTATION_FIELD] = (uint8_t)settings->orientation;
+    bytes[LANGUAGE_FIELD] = (uint8_t)settings->language;
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
@@ -146,7 +150,8 @@ static bool values_valid(const uint8_t *bytes)
            bytes[AUTO_OFF_FIELD] < AUTO_OFF_OPTION_COUNT &&
            bytes[USB_MODE_FIELD] < USB_MODE_COUNT &&
            bytes[DAC_VOLUME_FIELD] <= SETTINGS_VOLUME_MAX &&
-           bytes[ORIENTATION_FIELD] < ORIENTATION_COUNT;
+           bytes[ORIENTATION_FIELD] < ORIENTATION_COUNT &&
+           (bytes[VERSION_FIELD] < LANGUAGE_VERSION || bytes[LANGUAGE_FIELD] < LANGUAGE_COUNT);
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
@@ -173,6 +178,8 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .orientation = bytes[VERSION_FIELD] < ORIENTATION_VERSION
                            ? ORIENTATION_LANDSCAPE
                            : (Orientation)bytes[ORIENTATION_FIELD],
+        .language = bytes[VERSION_FIELD] < LANGUAGE_VERSION ? LANGUAGE_ENGLISH
+                                                            : (Language)bytes[LANGUAGE_FIELD],
     };
     return true;
 }

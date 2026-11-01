@@ -1,22 +1,27 @@
 #include "diagnostics_values.h"
 
+#include "core/i18n.h"
 #include "core/string_builder.h"
+
+enum {
+    ARGUMENT_CAPACITY = 12
+};
 
 const char *diagnostics_tone_result_text(HalToneResult result)
 {
     switch (result) {
     case HAL_TONE_PLAYED:
-        return "Played";
+        return i18n_text(STR_DIAG_TONE_PLAYED);
     case HAL_TONE_NO_DAC:
-        return "No DAC";
+        return i18n_text(STR_DIAG_TONE_NO_DAC);
     case HAL_TONE_SETUP_FAILED:
-        return "Setup failed";
+        return i18n_text(STR_DIAG_TONE_SETUP_FAILED);
     case HAL_TONE_NOT_READY:
-        return "Not ready";
+        return i18n_text(STR_DIAG_TONE_NOT_READY);
     case HAL_TONE_STALLED:
-        return "I2S stalled";
+        return i18n_text(STR_DIAG_TONE_STALLED);
     case HAL_TONE_NO_DMAC:
-        return "No DMAC";
+        return i18n_text(STR_DIAG_TONE_NO_DMAC);
     }
     return "";
 }
@@ -27,6 +32,18 @@ static void append_hex(StringBuilder *builder, uint32_t value, int digits)
     for (int digit = digits - 1; digit >= 0; digit--) {
         string_builder_append_char(builder, DIGITS[(value >> (4 * digit)) & 0xFu]);
     }
+}
+
+static void number_text(char *text, size_t capacity, uint32_t value)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append_unsigned(&builder, value);
+}
+
+static void hex_text(char *text, size_t capacity, uint32_t value, int digits)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    append_hex(&builder, value, digits);
 }
 
 void diagnostics_tone_text(HalToneResult result, HalToneDetail detail, char *text, size_t capacity)
@@ -56,7 +73,7 @@ void diagnostics_usb_registers_text(bool captured, uint32_t first, uint32_t seco
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!captured) {
-        string_builder_append(&builder, "Plug in USB first");
+        string_builder_append(&builder, i18n_text(STR_DIAG_PLUG_IN_USB));
         return;
     }
     append_hex(&builder, first, 8);
@@ -73,23 +90,26 @@ void diagnostics_usb_last_text(HalUsbLast last, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (last.end == HAL_USB_END_NONE) {
-        string_builder_append(&builder, "No session yet");
+        string_builder_append(&builder, i18n_text(STR_DIAG_USB_NO_SESSION));
         return;
     }
     if (last.end == HAL_USB_END_NO_HOST) {
-        string_builder_append(&builder, "No computer");
+        string_builder_append(&builder, i18n_text(STR_DIAG_USB_NO_COMPUTER));
         return;
     }
+    char internal[ARGUMENT_CAPACITY];
+    char card[ARGUMENT_CAPACITY];
+    number_text(internal, sizeof internal, last.internal_written);
+    number_text(card, sizeof card, last.card_written);
     if (last.end == HAL_USB_END_EJECTED) {
-        string_builder_append(&builder, "Ejected W");
+        const char *arguments[] = {internal, card};
+        i18n_format(&builder, STR_DIAG_USB_EJECTED, arguments, 2);
     } else {
-        string_builder_append(&builder, "Unplugged ");
-        string_builder_append_unsigned(&builder, drives_in(last.left_mounted));
-        string_builder_append(&builder, " up W");
+        char drives[ARGUMENT_CAPACITY];
+        number_text(drives, sizeof drives, drives_in(last.left_mounted));
+        const char *arguments[] = {drives, internal, card};
+        i18n_format(&builder, STR_DIAG_USB_UNPLUGGED, arguments, 3);
     }
-    string_builder_append_unsigned(&builder, last.internal_written);
-    string_builder_append_char(&builder, '/');
-    string_builder_append_unsigned(&builder, last.card_written);
     if (last.writes_after_eject > 0) {
         string_builder_append(&builder, " A");
         string_builder_append_unsigned(&builder, last.writes_after_eject);
@@ -107,11 +127,14 @@ void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
         return;
     }
     if (view.status.running) {
-        string_builder_append(&builder, "Playing ");
-        string_builder_append_unsigned(&builder, view.status.position);
+        char position[ARGUMENT_CAPACITY];
+        number_text(position, sizeof position, view.status.position);
+        const char *arguments[] = {position};
+        i18n_format(&builder, STR_DIAG_TONE_PLAYING, arguments, 1);
         return;
     }
-    string_builder_append(&builder, view.stopped ? "Stopped" : "Ended");
+    string_builder_append(&builder,
+                          i18n_text(view.stopped ? STR_DIAG_TONE_STOPPED : STR_DIAG_TONE_ENDED));
 }
 
 void diagnostics_boot_pll_text(HalBootClocks clocks, char *text, size_t capacity)
@@ -141,7 +164,7 @@ void diagnostics_clock_text(uint32_t mhz, bool failed, char *text, size_t capaci
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (failed) {
-        string_builder_append(&builder, "No lock");
+        string_builder_append(&builder, i18n_text(STR_DIAG_NO_LOCK));
         return;
     }
     string_builder_append_unsigned(&builder, mhz);
@@ -173,42 +196,45 @@ static const char *core1_failure_text(HalCore1Status status)
     case HAL_CORE1_RAN:
         return "";
     case HAL_CORE1_UNAVAILABLE:
-        return "Not here";
+        return i18n_text(STR_DIAG_CORE1_NOT_HERE);
     case HAL_CORE1_NEEDS_PLL:
-        return "Needs 96+ MHz";
+        return i18n_text(STR_DIAG_CORE1_NEEDS_PLL);
     case HAL_CORE1_NO_POWER:
-        return "No power";
+        return i18n_text(STR_DIAG_CORE1_NO_POWER);
     case HAL_CORE1_NO_REPLY:
-        return "No reply";
+        return i18n_text(STR_DIAG_NO_REPLY);
     case HAL_CORE1_BAD_REPLY:
-        return "Bad reply";
+        return i18n_text(STR_DIAG_CORE1_BAD_REPLY);
     case HAL_CORE1_NO_STOP:
-        return "No stop";
+        return i18n_text(STR_DIAG_CORE1_NO_STOP);
     case HAL_CORE1_BUSY:
-        return "Busy with music";
+        return i18n_text(STR_DIAG_CORE1_BUSY);
     }
     return "";
 }
 
 static const char *step_name(HalStartStep step, bool finished)
 {
-    static const char *const OPEN_NAMES[HAL_START_STEP_COUNT] = {"",
-                                                                 "backlight on",
-                                                                 "backlight off",
-                                                                 "clock switch",
-                                                                 "core 1 start",
-                                                                 "core 1 stop",
-                                                                 "card write",
-                                                                 "watchdog test"};
-    static const char *const DONE_NAMES[HAL_START_STEP_COUNT] = {"",
-                                                                 "Backlight on",
-                                                                 "Backlight off",
-                                                                 "Clock switch",
-                                                                 "Core 1 start",
-                                                                 "Core 1 stop",
-                                                                 "Card write",
-                                                                 "Watchdog test"};
-    return finished ? DONE_NAMES[step] : OPEN_NAMES[step];
+    static const StringId OPEN_NAMES[HAL_START_STEP_COUNT] = {STR_DIAG_NONE,
+                                                              STR_DIAG_STEP_BACKLIGHT_ON_OPEN,
+                                                              STR_DIAG_STEP_BACKLIGHT_OFF_OPEN,
+                                                              STR_DIAG_STEP_CLOCK_SWITCH_OPEN,
+                                                              STR_DIAG_STEP_CORE1_START_OPEN,
+                                                              STR_DIAG_STEP_CORE1_STOP_OPEN,
+                                                              STR_DIAG_STEP_CARD_WRITE_OPEN,
+                                                              STR_DIAG_STEP_WATCHDOG_OPEN};
+    static const StringId DONE_NAMES[HAL_START_STEP_COUNT] = {STR_DIAG_NONE,
+                                                              STR_DIAG_STEP_BACKLIGHT_ON_DONE,
+                                                              STR_DIAG_STEP_BACKLIGHT_OFF_DONE,
+                                                              STR_DIAG_STEP_CLOCK_SWITCH_DONE,
+                                                              STR_DIAG_STEP_CORE1_START_DONE,
+                                                              STR_DIAG_STEP_CORE1_STOP_DONE,
+                                                              STR_DIAG_STEP_CARD_WRITE_DONE,
+                                                              STR_DIAG_STEP_WATCHDOG_DONE};
+    if (step == HAL_START_STEP_NONE) {
+        return "";
+    }
+    return i18n_text(finished ? DONE_NAMES[step] : OPEN_NAMES[step]);
 }
 
 void diagnostics_last_step_text(HalStartInfo info, char *text, size_t capacity)
@@ -216,23 +242,21 @@ void diagnostics_last_step_text(HalStartInfo info, char *text, size_t capacity)
     StringBuilder builder = string_builder_make(text, capacity);
     if (!info.warm || info.last_step == HAL_START_STEP_NONE ||
         info.last_step >= HAL_START_STEP_COUNT) {
-        string_builder_append(&builder, "None");
+        string_builder_append(&builder, i18n_text(STR_DIAG_NONE));
         return;
     }
-    if (!info.last_step_finished) {
-        string_builder_append(&builder, "In ");
-    }
-    string_builder_append(&builder, step_name(info.last_step, info.last_step_finished));
-    string_builder_append(&builder, " at ");
-    string_builder_append_unsigned(&builder, info.last_step_ms / 1000u);
-    string_builder_append(&builder, " s");
+    char seconds[ARGUMENT_CAPACITY];
+    number_text(seconds, sizeof seconds, info.last_step_ms / 1000u);
+    const char *arguments[] = {step_name(info.last_step, info.last_step_finished), seconds};
+    i18n_format(&builder, info.last_step_finished ? STR_DIAG_STEP_FINISHED : STR_DIAG_STEP_IN,
+                arguments, 2);
 }
 
 void diagnostics_last_battery_text(HalStartInfo info, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!info.warm || info.last_millivolts == 0) {
-        string_builder_append(&builder, "No reading");
+        string_builder_append(&builder, i18n_text(STR_DIAG_NO_READING));
         return;
     }
     string_builder_append_unsigned(&builder, info.last_millivolts);
@@ -273,8 +297,10 @@ void diagnostics_core1_accel_text(bool run, HalCore1Accel result, char *text, si
         return;
     }
     if (result.timed_out) {
-        string_builder_append(&builder, "Timeout at t");
-        string_builder_append_unsigned(&builder, result.failed_vector);
+        char vector[ARGUMENT_CAPACITY];
+        number_text(vector, sizeof vector, result.failed_vector);
+        const char *arguments[] = {vector};
+        i18n_format(&builder, STR_DIAG_CORE1_TIMEOUT, arguments, 1);
         return;
     }
     string_builder_append(&builder, result.narrow_ok ? "N ok" : "N no");
@@ -297,14 +323,19 @@ void diagnostics_battery_text(HalBattery battery, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!battery.known) {
-        string_builder_append(&builder, "No reading");
+        string_builder_append(&builder, i18n_text(STR_DIAG_NO_READING));
+        return;
+    }
+    if (battery.usb_power) {
+        char millivolts[ARGUMENT_CAPACITY];
+        number_text(millivolts, sizeof millivolts, battery.millivolts);
+        const char *arguments[] = {millivolts};
+        i18n_format(&builder, battery.charging ? STR_DIAG_BATTERY_CHARGING : STR_DIAG_BATTERY_FULL,
+                    arguments, 1);
         return;
     }
     string_builder_append_unsigned(&builder, battery.millivolts);
     string_builder_append(&builder, " mV");
-    if (battery.usb_power) {
-        string_builder_append(&builder, battery.charging ? " charging" : " full");
-    }
 }
 
 void diagnostics_boot_hold_text(HalPowerHold hold, char *text, size_t capacity)
@@ -326,23 +357,25 @@ void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     if (!info.warm) {
-        string_builder_append(&builder, "Cold start");
+        string_builder_append(&builder, i18n_text(STR_DIAG_COLD_START));
         return;
     }
     if (info.fault_status != 0 || info.hard_fault_status != 0) {
-        string_builder_append(&builder, "Fault at ");
-        append_hex(&builder, info.fault_pc, 8);
+        char address[ARGUMENT_CAPACITY];
+        hex_text(address, sizeof address, info.fault_pc, 8);
+        const char *arguments[] = {address};
+        i18n_format(&builder, STR_DIAG_FAULT_AT, arguments, 1);
         return;
     }
-    string_builder_append_char(&builder, '#');
-    string_builder_append_unsigned(&builder, info.starts);
-    if (info.previous_power_off) {
-        string_builder_append(&builder, " after power-off");
-        return;
-    }
-    string_builder_append(&builder, " reset after ");
-    string_builder_append_unsigned(&builder, info.previous_uptime_ms / 1000u);
-    string_builder_append(&builder, " s");
+    char starts[ARGUMENT_CAPACITY];
+    char seconds[ARGUMENT_CAPACITY];
+    number_text(starts, sizeof starts, info.starts);
+    number_text(seconds, sizeof seconds, info.previous_uptime_ms / 1000u);
+    const char *arguments[] = {starts, seconds};
+    i18n_format(&builder,
+                info.previous_power_off ? STR_DIAG_START_AFTER_POWER_OFF
+                                        : STR_DIAG_START_RESET_AFTER,
+                arguments, 2);
 }
 
 void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t capacity)
@@ -351,22 +384,23 @@ void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t
     if (!run) {
         return;
     }
+    char argument[ARGUMENT_CAPACITY];
+    const char *arguments[] = {argument};
     switch (test.status) {
     case HAL_HIGH_RAM_OK:
-        string_builder_append(&builder, "OK ");
-        string_builder_append_unsigned(&builder, test.size / 1024u);
-        string_builder_append(&builder, " KB, call works");
+        number_text(argument, sizeof argument, test.size / 1024u);
+        i18n_format(&builder, STR_DIAG_RAM_OK, arguments, 1);
         return;
     case HAL_HIGH_RAM_UNAVAILABLE:
-        string_builder_append(&builder, "Not on this player");
+        string_builder_append(&builder, i18n_text(STR_DIAG_RAM_UNAVAILABLE));
         return;
     case HAL_HIGH_RAM_BAD_MEMORY:
-        string_builder_append(&builder, "Bad at ");
-        append_hex(&builder, test.bad_address, 8);
+        hex_text(argument, sizeof argument, test.bad_address, 8);
+        i18n_format(&builder, STR_DIAG_RAM_BAD_AT, arguments, 1);
         return;
     case HAL_HIGH_RAM_BAD_CALL:
-        string_builder_append(&builder, "Call gave ");
-        append_hex(&builder, test.call_result, 8);
+        hex_text(argument, sizeof argument, test.call_result, 8);
+        i18n_format(&builder, STR_DIAG_RAM_CALL_GAVE, arguments, 1);
         return;
     }
 }

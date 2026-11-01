@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "hal/audio.h"
 
@@ -38,13 +39,11 @@ static int find_known(const BluetoothLink *link, const HalBluetoothDevice *devic
     return -1;
 }
 
-static void announce(BluetoothLink *link, const char *text, const char *name, uint32_t now_ms)
+static void announce(BluetoothLink *link, StringId pattern, const char *name, uint32_t now_ms)
 {
     StringBuilder builder = string_builder_make(link->toast_text, BLUETOOTH_LINK_TOAST_CAPACITY);
-    string_builder_append(&builder, text);
-    if (name != NULL) {
-        string_builder_append(&builder, name);
-    }
+    const char *arguments[] = {name};
+    i18n_format(&builder, pattern, arguments, 1);
     if (link->toast != NULL) {
         toast_show(link->toast, link->toast_text, now_ms);
     }
@@ -241,7 +240,7 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
         link->changed_ms = now_ms;
         link->seen = status->remote;
         remember(link, &status->connected);
-        announce(link, "Connected to ", status->connected.name, now_ms);
+        announce(link, STR_BT_CONNECTED_TO, status->connected.name, now_ms);
     } else if (!connected && link->connected) {
         link->connected = false;
         if (link->streamed && player->state == PLAYER_PLAYING) {
@@ -253,7 +252,7 @@ static void follow_connection(BluetoothLink *link, const HalBluetoothStatus *sta
         if (!link->has_target) {
             link->retried_ms = now_ms;
         }
-        announce(link, "Disconnected from ", link->linked.name, now_ms);
+        announce(link, STR_BT_DISCONNECTED_FROM, link->linked.name, now_ms);
     }
 }
 
@@ -404,7 +403,7 @@ static void follow_remote(BluetoothLink *link, const HalBluetoothStatus *status,
         player_toggle_pause(player);
         link->player_state = (uint8_t)player->state;
         link->buds_paused = true;
-        announce(link, "Paused by ", link->linked.name, now_ms);
+        announce(link, STR_BT_PAUSED_BY, link->linked.name, now_ms);
     }
     if (settled && pressed(remote.plays, seen.plays) > 0 && link->buds_paused &&
         player->state == PLAYER_PAUSED) {
@@ -524,26 +523,26 @@ bool bluetooth_link_nearby(const BluetoothLink *link, int index)
 const char *bluetooth_link_summary(const BluetoothLink *link)
 {
     if (!link->saved.enabled) {
-        return "Off";
+        return i18n_text(STR_OFF);
     }
     if (link->connected) {
         return link->linked.name;
     }
     if (link->dozing) {
-        return "Not connected";
+        return i18n_text(STR_BT_NOT_CONNECTED);
     }
     HalBluetoothState state = hal_bluetooth_status()->state;
     if (state == HAL_BLUETOOTH_NO_REPLY) {
-        return "Not responding";
+        return i18n_text(STR_BT_NOT_RESPONDING);
     }
     if (bluetooth_link_searching(link)) {
-        return "Searching…";
+        return i18n_text(STR_BT_SEARCHING_DOTS);
     }
     if (state == HAL_BLUETOOTH_STARTING) {
-        return "Starting…";
+        return i18n_text(STR_BT_STARTING_DOTS);
     }
     if (connecting(link)) {
-        return "Connecting…";
+        return i18n_text(STR_BT_CONNECTING_DOTS);
     }
-    return link->saved.count > 0 ? "Not connected" : "On";
+    return i18n_text(link->saved.count > 0 ? STR_BT_NOT_CONNECTED : STR_ON);
 }

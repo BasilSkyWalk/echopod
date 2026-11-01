@@ -1,5 +1,7 @@
 #include "core/string_builder.h"
 
+#include "core/utf8.h"
+
 enum {
     MAX_DECIMAL_DIGITS = 10,
     DECIMAL_BASE = 10
@@ -27,6 +29,10 @@ void string_builder_append(StringBuilder *builder, const char *text)
 {
     for (const char *cursor = text; *cursor != '\0'; cursor++) {
         string_builder_append_char(builder, *cursor);
+    }
+    if (builder->overflowed && builder->capacity > 0) {
+        builder->length = utf8_complete_length(builder->buffer, builder->length);
+        builder->buffer[builder->length] = '\0';
     }
 }
 

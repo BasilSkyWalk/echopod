@@ -43,10 +43,14 @@ class CharacterSetTest(unittest.TestCase):
                 self.assertIn(ord(character), wanted, character)
             self.assertLess(len(wanted), 13000)
 
-    def test_the_latin1_faces_hold_the_accented_letters(self):
+    def test_the_inter_faces_hold_latin_greek_cyrillic_and_vietnamese_letters(self):
         config = json.loads((ASSETS_DIRECTORY / "glyph_pack.json").read_text())
         for face in config["faces"][2:]:
-            self.assertEqual(set(range(160, 256)), glyph_pack.face_characters(config, face))
+            wanted = glyph_pack.face_characters(config, face)
+            self.assertTrue(set(range(160, 256)) <= wanted)
+            for character in "ĄęŁőŞğÇșțƠưЖжЯёΩλẠệ":
+                self.assertIn(ord(character), wanted, character)
+            self.assertLess(max(wanted), 0x2E80)
 
     def test_faces_are_numbered_from_one_in_config_order(self):
         config = {"faces": [{"name": "a"}, {"name": "b"}]}

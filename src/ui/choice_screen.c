@@ -16,6 +16,9 @@ static int option_count(const void *context)
 static const char *option_label(const void *context, int index)
 {
     const ChoiceScreen *choice = context;
+    if (choice->config.option_ids != NULL) {
+        return i18n_text(choice->config.option_ids[index]);
+    }
     return choice->config.options[index];
 }
 

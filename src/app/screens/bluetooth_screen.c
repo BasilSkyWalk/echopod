@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "ui/header.h"
 #include "ui/label.h"
@@ -78,11 +79,11 @@ static const char *row_label(const void *context, int index)
     const BluetoothScreen *bluetooth = context;
     switch (row_kind(bluetooth, index)) {
     case ROW_POWER:
-        return "Bluetooth";
+        return i18n_text(STR_BT_TITLE);
     case ROW_KNOWN:
         return bluetooth->link->saved.devices[index - 1].name;
     case ROW_SEARCH:
-        return "Pair new device";
+        return i18n_text(STR_BT_PAIR_NEW_DEVICE);
     default:
         return nearby_device(bluetooth, index)->name;
     }
@@ -92,13 +93,13 @@ static const char *known_value(const BluetoothScreen *bluetooth, int index)
 {
     switch (bluetooth_link_device_state(bluetooth->link, index)) {
     case BLUETOOTH_DEVICE_PLAYING:
-        return "Playing";
+        return i18n_text(STR_BT_PLAYING);
     case BLUETOOTH_DEVICE_CONNECTED:
-        return "Connected";
+        return i18n_text(STR_BT_CONNECTED);
     case BLUETOOTH_DEVICE_CONNECTING:
-        return "Connecting…";
+        return i18n_text(STR_BT_CONNECTING_DOTS);
     default:
-        return bluetooth_link_nearby(bluetooth->link, index) ? "Nearby" : NULL;
+        return bluetooth_link_nearby(bluetooth->link, index) ? i18n_text(STR_BT_NEARBY) : NULL;
     }
 }
 
@@ -114,7 +115,7 @@ static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
     }
     const BluetoothLink *link = bluetooth->link;
     bool trying = link->attempting || link->has_target || link->paired_seen;
-    return trying ? "Connecting…" : "Didn't connect";
+    return i18n_text(trying ? STR_BT_CONNECTING_DOTS : STR_BT_DIDNT_CONNECT);
 }
 
 static const char *row_value(const void *context, int index)
@@ -122,11 +123,11 @@ static const char *row_value(const void *context, int index)
     const BluetoothScreen *bluetooth = context;
     switch (row_kind(bluetooth, index)) {
     case ROW_POWER:
-        return enabled(bluetooth) ? "On" : "Off";
+        return i18n_text(enabled(bluetooth) ? STR_ON : STR_OFF);
     case ROW_KNOWN:
         return known_value(bluetooth, index - 1);
     case ROW_SEARCH:
-        return scanning(bluetooth) ? "Searching…" : NULL;
+        return scanning(bluetooth) ? i18n_text(STR_BT_SEARCHING_DOTS) : NULL;
     default:
         return nearby_value(bluetooth, index);
     }
@@ -151,11 +152,11 @@ static const char *known_hint(const BluetoothScreen *bluetooth, int index)
     switch (bluetooth_link_device_state(bluetooth->link, index)) {
     case BLUETOOTH_DEVICE_PLAYING:
     case BLUETOOTH_DEVICE_CONNECTED:
-        return "Play disconnects · hold Play forgets";
+        return i18n_text(STR_BT_HINT_PLAY_DISCONNECTS);
     case BLUETOOTH_DEVICE_CONNECTING:
-        return "Connecting… hold Play to forget";
+        return i18n_text(STR_BT_HINT_CONNECTING_FORGET);
     default:
-        return "Play connects · hold Play forgets";
+        return i18n_text(STR_BT_HINT_PLAY_CONNECTS);
     }
 }
 
@@ -164,14 +165,13 @@ static const char *hint(const BluetoothScreen *bluetooth)
     int selected = bluetooth->list.selected;
     switch (row_kind(bluetooth, selected)) {
     case ROW_POWER:
-        return enabled(bluetooth) ? "Play turns Bluetooth off" : "Play turns Bluetooth on";
+        return i18n_text(enabled(bluetooth) ? STR_BT_HINT_TURN_OFF : STR_BT_HINT_TURN_ON);
     case ROW_KNOWN:
         return known_hint(bluetooth, selected - 1);
     case ROW_SEARCH:
-        return scanning(bluetooth) ? "Searching… put headphones in pairing mode"
-                                   : "Play searches for new headphones";
+        return i18n_text(scanning(bluetooth) ? STR_BT_HINT_SEARCHING : STR_BT_HINT_SEARCH);
     default:
-        return "Play pairs with this device";
+        return i18n_text(STR_BT_HINT_PAIR);
     }
 }
 
@@ -179,19 +179,19 @@ static const char *state_text(HalBluetoothState state)
 {
     switch (state) {
     case HAL_BLUETOOTH_STARTING:
-        return "Starting";
+        return i18n_text(STR_BT_STATE_STARTING);
     case HAL_BLUETOOTH_NO_REPLY:
-        return "No reply";
+        return i18n_text(STR_DIAG_NO_REPLY);
     case HAL_BLUETOOTH_READY:
-        return "Ready";
+        return i18n_text(STR_BT_STATE_READY);
     case HAL_BLUETOOTH_SCANNING:
-        return "Scanning";
+        return i18n_text(STR_BT_STATE_SCANNING);
     case HAL_BLUETOOTH_CONNECTING:
-        return "Connecting";
+        return i18n_text(STR_BT_STATE_CONNECTING);
     case HAL_BLUETOOTH_CONNECTED:
-        return "Connected";
+        return i18n_text(STR_BT_CONNECTED);
     default:
-        return "Off";
+        return i18n_text(STR_OFF);
     }
 }
 
@@ -201,7 +201,7 @@ static void write_state(const HalBluetoothStatus *status, char *text)
     string_builder_append(&builder, state_text(status->state));
     if (status->streaming) {
         string_builder_append(&builder, SEPARATOR);
-        string_builder_append(&builder, "Streaming");
+        string_builder_append(&builder, i18n_text(STR_BT_STREAMING));
     }
     if (status->version != '\0') {
         string_builder_append(&builder, SEPARATOR);
@@ -215,7 +215,7 @@ static void write_state(const HalBluetoothStatus *status, char *text)
     }
     if (status->pairing == HAL_BLUETOOTH_PAIRING_FAILED) {
         string_builder_append(&builder, SEPARATOR);
-        string_builder_append(&builder, "Pairing failed");
+        string_builder_append(&builder, i18n_text(STR_BT_PAIRING_FAILED));
     }
 }
 
@@ -394,7 +394,7 @@ Screen *bluetooth_screen_init(BluetoothScreen *bluetooth, BluetoothLink *link, c
         .context = bluetooth, .count = row_count, .label = row_label, .detail = row_value};
     list_view_init(&bluetooth->list, &bluetooth->model, theme, 0);
     bluetooth->screen = (Screen){
-        .title = "Bluetooth",
+        .title = i18n_text(STR_BT_TITLE),
         .stays_on_wake = true,
         .context = bluetooth,
         .enter = enter,

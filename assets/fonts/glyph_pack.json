@@ -16,19 +16,19 @@
       "name": "inter_regular_12_latin1",
       "file": "inter/Inter-Regular.ttf",
       "size": 12,
-      "ranges": [[160, 255]]
+      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929]]
     },
     {
       "name": "inter_regular_16_latin1",
       "file": "inter/Inter-Regular.ttf",
       "size": 16,
-      "ranges": [[160, 255]]
+      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929]]
     },
     {
       "name": "inter_semibold_16_latin1",
       "file": "inter/Inter-SemiBold.ttf",
       "size": 16,
-      "ranges": [[160, 255]]
+      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929]]
     }
   ],
   "character_sets": {

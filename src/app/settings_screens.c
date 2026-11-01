@@ -1,5 +1,6 @@
 #include "settings_screens.h"
 
+#include "core/i18n.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
 
@@ -8,31 +9,46 @@ enum {
     MILLISECONDS_PER_MINUTE = 60000
 };
 
-static const char *const SHUFFLE_OPTIONS[SHUFFLE_MODE_COUNT] = {"Off", "Songs", "Albums"};
-static const char *const REPEAT_OPTIONS[REPEAT_MODE_COUNT] = {"Off", "One", "All"};
-static const char *const SLEEP_OPTIONS[SLEEP_TIMER_OPTION_COUNT] = {
-    "Off", "15 min", "30 min", "45 min", "60 min", "90 min", "120 min"};
-static const char *const SLEEP_MESSAGES[SLEEP_TIMER_OPTION_COUNT] = {
-    "Sleep timer off",       "Turning off in 15 min", "Turning off in 30 min",
-    "Turning off in 45 min", "Turning off in 60 min", "Turning off in 90 min",
-    "Turning off in 120 min"};
-static const char *const AUTO_OFF_OPTIONS[AUTO_OFF_OPTION_COUNT] = {"Off", "1 min", "5 min",
-                                                                    "10 min"};
-static const char *const TIMEOUT_OPTIONS[SCREEN_TIMEOUT_OPTION_COUNT] = {
-    "10 s", "20 s", "30 s", "1 min", "2 min", "5 min", "Never"};
+static const StringId SHUFFLE_OPTIONS[SHUFFLE_MODE_COUNT] = {STR_OFF, STR_SETTINGS_SONGS,
+                                                             STR_MENU_ALBUMS};
+static const StringId REPEAT_OPTIONS[REPEAT_MODE_COUNT] = {STR_OFF, STR_SETTINGS_ONE,
+                                                           STR_SETTINGS_ALL};
+static const StringId SLEEP_OPTIONS[SLEEP_TIMER_OPTION_COUNT] = {STR_OFF,
+                                                                 STR_SETTINGS_MINUTES_15,
+                                                                 STR_SETTINGS_MINUTES_30,
+                                                                 STR_SETTINGS_MINUTES_45,
+                                                                 STR_SETTINGS_MINUTES_60,
+                                                                 STR_SETTINGS_MINUTES_90,
+                                                                 STR_SETTINGS_MINUTES_120};
+static const StringId SLEEP_MESSAGES[SLEEP_TIMER_OPTION_COUNT] = {
+    STR_SETTINGS_SLEEP_OFF,   STR_SETTINGS_SLEEP_IN_15, STR_SETTINGS_SLEEP_IN_30,
+    STR_SETTINGS_SLEEP_IN_45, STR_SETTINGS_SLEEP_IN_60, STR_SETTINGS_SLEEP_IN_90,
+    STR_SETTINGS_SLEEP_IN_120};
+static const StringId AUTO_OFF_OPTIONS[AUTO_OFF_OPTION_COUNT] = {
+    STR_OFF, STR_SETTINGS_MINUTES_1, STR_SETTINGS_MINUTES_5, STR_SETTINGS_MINUTES_10};
+static const StringId TIMEOUT_OPTIONS[SCREEN_TIMEOUT_OPTION_COUNT] = {
+    STR_SETTINGS_SECONDS_10, STR_SETTINGS_SECONDS_20, STR_SETTINGS_SECONDS_30,
+    STR_SETTINGS_MINUTES_1,  STR_SETTINGS_MINUTES_2,  STR_SETTINGS_MINUTES_5,
+    STR_SETTINGS_NEVER};
 static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2", "3", "4", "5",
                                                                        "6", "7", "8", "9", "10"};
-static const char *const ORIENTATION_OPTIONS[ORIENTATION_COUNT] = {"Landscape", "Portrait",
-                                                                   "Portrait, flipped"};
-static const char *const GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {"Low", "High"};
-static const char *const OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {"Auto", "3.5 mm", "4.4 mm"};
-static const char *const OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
-    "Volume follows the plugged jack", "Using 3.5 mm volume levels", "Using 4.4 mm volume levels"};
-static const char *const START_OPTIONS[START_SCREEN_COUNT] = {
-    "Main menu", "Now Playing", "Albums", "Artists", "Favorites", "Playlists", "Cover Flow"};
-static const char *const USB_MODE_OPTIONS[USB_MODE_COUNT] = {"Storage", "DAC"};
-static const char *const USB_MODE_MESSAGES[USB_MODE_COUNT] = {"USB shows the player's drives",
-                                                              "USB plays the computer's sound"};
+static const StringId ORIENTATION_OPTIONS[ORIENTATION_COUNT] = {
+    STR_SETTINGS_LANDSCAPE, STR_SETTINGS_PORTRAIT, STR_SETTINGS_PORTRAIT_FLIPPED};
+static const StringId GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {STR_SETTINGS_LOW, STR_SETTINGS_HIGH};
+static const StringId OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {STR_SETTINGS_AUTO, STR_SETTINGS_JACK_35,
+                                                           STR_SETTINGS_JACK_44};
+static const StringId OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
+    STR_SETTINGS_OUTPUT_FOLLOWS, STR_SETTINGS_OUTPUT_USING_35, STR_SETTINGS_OUTPUT_USING_44};
+static const StringId START_OPTIONS[START_SCREEN_COUNT] = {
+    STR_SETTINGS_MAIN_MENU, STR_MENU_NOW_PLAYING, STR_MENU_ALBUMS,    STR_MENU_ARTISTS,
+    STR_MENU_FAVORITES,     STR_MENU_PLAYLISTS,   STR_MENU_COVER_FLOW};
+static const StringId LANGUAGE_OPTIONS[LANGUAGE_COUNT] = {
+    STR_LANGUAGE_EN, STR_LANGUAGE_ZH, STR_LANGUAGE_JA, STR_LANGUAGE_KO, STR_LANGUAGE_DE,
+    STR_LANGUAGE_FR, STR_LANGUAGE_ES, STR_LANGUAGE_IT, STR_LANGUAGE_PT, STR_LANGUAGE_NL,
+    STR_LANGUAGE_SV, STR_LANGUAGE_DA, STR_LANGUAGE_NO, STR_LANGUAGE_FI};
+static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
+static const StringId USB_MODE_MESSAGES[USB_MODE_COUNT] = {STR_SETTINGS_USB_DRIVES,
+                                                           STR_SETTINGS_USB_SOUND};
 
 static const Settings *settings_of(const void *context)
 {
@@ -50,7 +66,7 @@ static void save(SettingsContext *context)
 {
     settings_store_capture(context->store, player_status(context->player));
     if (!settings_store_save(context->store)) {
-        toast_show(context->toast, "Could not save settings", hal_clock_milliseconds());
+        toast_show(context->toast, i18n_text(STR_SETTINGS_SAVE_FAILED), hal_clock_milliseconds());
     }
 }
 
@@ -103,7 +119,7 @@ static void choose_sleep(void *context, int index)
     } else {
         power_policy_start_sleep_timer(settings->power, minutes * MILLISECONDS_PER_MINUTE, now_ms);
     }
-    toast_show(settings->toast, SLEEP_MESSAGES[index], now_ms);
+    toast_show(settings->toast, i18n_text(SLEEP_MESSAGES[index]), now_ms);
 }
 
 static int current_timeout(const void *context)
@@ -176,16 +192,16 @@ static void choose_output(void *context, int index)
     SettingsContext *settings = context;
     editable_settings(context)->output = (OutputJack)index;
     apply_and_save(context);
-    toast_show(settings->toast, OUTPUT_MESSAGES[index], hal_clock_milliseconds());
+    toast_show(settings->toast, i18n_text(OUTPUT_MESSAGES[index]), hal_clock_milliseconds());
 }
 
 static const char *describe_output(int current)
 {
     HalAudioJack jack = hal_audio_jack();
     if (current != OUTPUT_AUTO || jack == HAL_AUDIO_JACK_NONE) {
-        return OUTPUT_OPTIONS[current];
+        return i18n_text(OUTPUT_OPTIONS[current]);
     }
-    return jack == HAL_AUDIO_JACK_BALANCED ? "Auto (4.4 mm)" : "Auto (3.5 mm)";
+    return i18n_text(jack == HAL_AUDIO_JACK_BALANCED ? STR_SETTINGS_AUTO_44 : STR_SETTINGS_AUTO_35);
 }
 
 static int current_start(const void *context)
@@ -209,24 +225,46 @@ static void choose_usb_mode(void *context, int index)
     SettingsContext *settings = context;
     editable_settings(context)->usb_mode = (UsbMode)index;
     apply_and_save(context);
-    toast_show(settings->toast, USB_MODE_MESSAGES[index], hal_clock_milliseconds());
+    toast_show(settings->toast, i18n_text(USB_MODE_MESSAGES[index]), hal_clock_milliseconds());
+}
+
+static int current_language(const void *context)
+{
+    return (int)settings_of(context)->language;
+}
+
+static void choose_language(void *context, int index)
+{
+    SettingsContext *settings = context;
+    editable_settings(context)->language = (Language)index;
+    save(context);
+    toast_show(settings->toast, i18n_text(STR_LANGUAGE_RESTART), hal_clock_milliseconds());
 }
 
 static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
-    {"Shuffle", SHUFFLE_OPTIONS, SHUFFLE_MODE_COUNT, current_shuffle, choose_shuffle, NULL},
-    {"Repeat", REPEAT_OPTIONS, REPEAT_MODE_COUNT, current_repeat, choose_repeat, NULL},
-    {"Sleep timer", SLEEP_OPTIONS, SLEEP_TIMER_OPTION_COUNT, current_sleep, choose_sleep, NULL},
-    {"Auto off", AUTO_OFF_OPTIONS, AUTO_OFF_OPTION_COUNT, current_auto_off, choose_auto_off, NULL},
-    {"Screen timeout", TIMEOUT_OPTIONS, SCREEN_TIMEOUT_OPTION_COUNT, current_timeout,
-     choose_timeout, NULL},
-    {"Brightness", BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,
-     choose_brightness, NULL},
-    {"Orientation", ORIENTATION_OPTIONS, ORIENTATION_COUNT, current_orientation, choose_orientation,
+    {STR_SETTINGS_SHUFFLE, SHUFFLE_OPTIONS, NULL, SHUFFLE_MODE_COUNT, current_shuffle,
+     choose_shuffle, NULL},
+    {STR_SETTINGS_REPEAT, REPEAT_OPTIONS, NULL, REPEAT_MODE_COUNT, current_repeat, choose_repeat,
      NULL},
-    {"Gain", GAIN_OPTIONS, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
-    {"Output", OUTPUT_OPTIONS, OUTPUT_JACK_COUNT, current_output, choose_output, describe_output},
-    {"Start screen", START_OPTIONS, START_SCREEN_COUNT, current_start, choose_start, NULL},
-    {"USB mode", USB_MODE_OPTIONS, USB_MODE_COUNT, current_usb_mode, choose_usb_mode, NULL},
+    {STR_SETTINGS_SLEEP_TIMER, SLEEP_OPTIONS, NULL, SLEEP_TIMER_OPTION_COUNT, current_sleep,
+     choose_sleep, NULL},
+    {STR_SETTINGS_AUTO_OFF, AUTO_OFF_OPTIONS, NULL, AUTO_OFF_OPTION_COUNT, current_auto_off,
+     choose_auto_off, NULL},
+    {STR_SETTINGS_SCREEN_TIMEOUT, TIMEOUT_OPTIONS, NULL, SCREEN_TIMEOUT_OPTION_COUNT,
+     current_timeout, choose_timeout, NULL},
+    {STR_SETTINGS_BRIGHTNESS, NULL, BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,
+     choose_brightness, NULL},
+    {STR_SETTINGS_ORIENTATION, ORIENTATION_OPTIONS, NULL, ORIENTATION_COUNT, current_orientation,
+     choose_orientation, NULL},
+    {STR_SETTINGS_GAIN, GAIN_OPTIONS, NULL, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
+    {STR_SETTINGS_OUTPUT, OUTPUT_OPTIONS, NULL, OUTPUT_JACK_COUNT, current_output, choose_output,
+     describe_output},
+    {STR_SETTINGS_START_SCREEN, START_OPTIONS, NULL, START_SCREEN_COUNT, current_start,
+     choose_start, NULL},
+    {STR_SETTINGS_USB_MODE, USB_MODE_OPTIONS, NULL, USB_MODE_COUNT, current_usb_mode,
+     choose_usb_mode, NULL},
+    {STR_LANGUAGE_TITLE, LANGUAGE_OPTIONS, NULL, LANGUAGE_COUNT, current_language, choose_language,
+     NULL},
 };
 
 static ScreenAction open_choice(void *context)
@@ -235,8 +273,9 @@ static ScreenAction open_choice(void *context)
     SettingsScreens *screens = entry->owner;
     const SettingChoice *choice = entry->choice;
     ChoiceConfig config = {
-        .title = choice->title,
-        .options = choice->options,
+        .title = i18n_text(choice->title),
+        .options = choice->plain_options,
+        .option_ids = choice->options,
         .option_count = choice->option_count,
         .current = choice->current,
         .choose = choice->choose,
@@ -256,7 +295,10 @@ static const char *choice_value(const void *context)
     if (entry->choice->describe != NULL) {
         return entry->choice->describe(current);
     }
-    return entry->choice->options[current];
+    if (entry->choice->options != NULL) {
+        return i18n_text(entry->choice->options[current]);
+    }
+    return entry->choice->plain_options[current];
 }
 
 static ScreenAction request_rescan(void *context)
@@ -272,14 +314,15 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
 {
     screens->context = context;
     screens->theme = theme;
-    screens->items[SETTINGS_RESCAN_ITEM] = (MenuItem){
-        .label = "Rescan library", .select = request_rescan, .context = &screens->context};
-    screens->items[SETTINGS_BLUETOOTH_ITEM] = (MenuItem){.label = "Bluetooth",
+    screens->items[SETTINGS_RESCAN_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_RESCAN),
+                                                      .select = request_rescan,
+                                                      .context = &screens->context};
+    screens->items[SETTINGS_BLUETOOTH_ITEM] = (MenuItem){.label = i18n_text(STR_BT_TITLE),
                                                          .select = bluetooth_screen_open,
                                                          .context = context.bluetooth,
                                                          .value = bluetooth_screen_summary,
                                                          .opens = true};
-    screens->items[SETTINGS_EQUALIZER_ITEM] = (MenuItem){.label = "Equalizer",
+    screens->items[SETTINGS_EQUALIZER_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_EQUALIZER),
                                                          .select = equalizer_screen_open,
                                                          .context = context.equalizer,
                                                          .value = equalizer_screen_summary,
@@ -289,13 +332,13 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
         int item = index < SETTINGS_BLUETOOTH_ITEM ? index : index + 1;
         item = item < SETTINGS_EQUALIZER_ITEM ? item : item + 1;
         item = item < SETTINGS_RESCAN_ITEM ? item : item + 1;
-        screens->items[item] = (MenuItem){.label = CHOICES[index].title,
+        screens->items[item] = (MenuItem){.label = i18n_text(CHOICES[index].title),
                                           .select = open_choice,
                                           .context = &screens->entries[index],
                                           .value = choice_value,
                                           .opens = true};
     }
-    MenuConfig menu = {.title = "Settings",
+    MenuConfig menu = {.title = i18n_text(STR_MENU_SETTINGS),
                        .items = screens->items,
                        .item_count = SETTINGS_ITEM_COUNT,
                        .theme = theme};

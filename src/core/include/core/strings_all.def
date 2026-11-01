@@ -1,0 +1,7 @@
+#include "core/strings_common.def"
+#include "core/strings_menu.def"
+#include "core/strings_settings.def"
+#include "core/strings_player.def"
+#include "core/strings_system.def"
+#include "core/strings_library.def"
+#include "core/strings_language.def"

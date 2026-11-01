@@ -9,6 +9,7 @@ enum {
     USB_MODE_FIELD = 15,
     DAC_VOLUME_FIELD = 16,
     ORIENTATION_FIELD = 17,
+    LANGUAGE_FIELD = 18,
     CHECKSUM_FIELD = 20,
     NEVER_OPTION = 6
 };
@@ -28,6 +29,7 @@ static Settings custom_settings(void)
     settings.usb_mode = USB_MODE_DAC;
     settings.dac_volume = 37;
     settings.orientation = ORIENTATION_PORTRAIT_FLIPPED;
+    settings.language = LANGUAGE_KOREAN;
     return settings;
 }
 
@@ -98,7 +100,7 @@ static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(v
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(5, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(6, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
     CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
 }
@@ -138,6 +140,38 @@ static void a_version_four_file_ignores_whatever_sits_in_the_orientation_byte(vo
     Settings decoded;
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
     CHECK_EQUAL(ORIENTATION_LANDSCAPE, decoded.orientation);
+}
+
+static void the_language_is_saved_at_byte_eighteen(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(LANGUAGE_KOREAN, bytes[LANGUAGE_FIELD]);
+}
+
+static void a_version_five_file_loads_in_english(void)
+{
+    Settings settings = custom_settings();
+    Settings decoded;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 5;
+    bytes[LANGUAGE_FIELD] = LANGUAGE_COUNT;
+    rewrite_checksum(bytes);
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(LANGUAGE_ENGLISH, decoded.language);
+    CHECK_EQUAL(settings.orientation, decoded.orientation);
+}
+
+static void an_unknown_language_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[LANGUAGE_FIELD] = LANGUAGE_COUNT;
+    rewrite_checksum(bytes);
+    CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
 
 static void an_unknown_orientation_is_rejected(void)
@@ -189,7 +223,7 @@ static void a_newer_version_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 6;
+    bytes[VERSION_FIELD] = 7;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -230,6 +264,7 @@ static void settings_survive_a_round_trip(void)
     CHECK_EQUAL(original.usb_mode, decoded.usb_mode);
     CHECK_EQUAL(original.dac_volume, decoded.dac_volume);
     CHECK_EQUAL(original.orientation, decoded.orientation);
+    CHECK_EQUAL(original.language, decoded.language);
 }
 
 static void a_corrupted_file_is_rejected(void)
@@ -271,6 +306,9 @@ int main(void)
         TEST_CASE(the_orientation_is_saved_at_byte_seventeen),
         TEST_CASE(a_version_four_file_keeps_its_values_and_loads_in_landscape),
         TEST_CASE(a_version_four_file_ignores_whatever_sits_in_the_orientation_byte),
+        TEST_CASE(the_language_is_saved_at_byte_eighteen),
+        TEST_CASE(a_version_five_file_loads_in_english),
+        TEST_CASE(an_unknown_language_is_rejected),
         TEST_CASE(an_unknown_orientation_is_rejected),
         TEST_CASE(a_newer_version_is_rejected),
     };

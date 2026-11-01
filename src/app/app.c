@@ -7,6 +7,7 @@
 #include "bluetooth_link.h"
 #include "card_files.h"
 #include "core/deadline.h"
+#include "core/i18n.h"
 #include "core/key_tracker.h"
 #include "core/low_battery.h"
 #include "core/power_policy.h"
@@ -24,6 +25,7 @@
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
+#include "hal/language.h"
 #include "hal/power.h"
 #include "library_rescan.h"
 #include "library_store.h"
@@ -46,7 +48,10 @@ enum {
     RESCAN_PROGRESS_MS = 250,
     BATTERY_CHECK_MS = 250,
     CHARGE_LIT_MS = 5000,
-    IDLE_RENDER_MS = 100
+    IDLE_RENDER_MS = 100,
+    NUMBER_CAPACITY = 12,
+    PROGRESS_TEXT_CAPACITY = 64,
+    MESSAGE_TEXT_CAPACITY = 64
 };
 
 static const KeyConfig KEY_CONFIG = {
@@ -133,7 +138,6 @@ static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
 static const char SPLASH_TEXT[] = "EchoPod";
 static const char GOODBYE_TEXT[] = "Goodbye";
-static const char BATTERY_LOW_TEXT[] = "Battery low";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_LONG_SIDE];
 
@@ -469,7 +473,7 @@ static void keep_awake_while_busy(uint32_t now_ms)
 static void update_power(uint32_t now_ms)
 {
     if (!app.saying_goodbye && battery_empty(now_ms)) {
-        shut_down(BATTERY_LOW_TEXT);
+        shut_down(i18n_text(STR_BOOT_BATTERY_LOW));
         return;
     }
     keep_awake_while_busy(now_ms);
@@ -724,7 +728,7 @@ static void start_screens(uint32_t now_ms)
 static void report_card_files(CardFilesReport files, uint32_t now_ms)
 {
     if (files.card_full) {
-        toast_show(&app.toast, "The card is full", now_ms);
+        toast_show(&app.toast, i18n_text(STR_BOOT_CARD_FULL), now_ms);
     }
     if (files.library_created) {
         app.rescan_requested = true;
@@ -735,12 +739,22 @@ static void report_card_files(CardFilesReport files, uint32_t now_ms)
 
 static void show_card_setup(void)
 {
-    app_show_notice("EchoPod", "Setting up the card...");
+    app_show_notice("EchoPod", i18n_text(STR_BOOT_CARD_SETUP));
+}
+
+static void apply_language(Language language)
+{
+    const uint8_t *pack;
+    uint32_t size;
+    if (!hal_language_pack((uint32_t)language, &pack, &size) || !i18n_attach(pack, size)) {
+        i18n_detach();
+    }
 }
 
 void app_start(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
+    apply_language(LANGUAGE_ENGLISH);
     key_tracker_init(&app.keys, &KEY_CONFIG);
     frame_stats_reset(&app.frame_stats);
     frame_stats_reset(&app.update_stats);
@@ -761,6 +775,7 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
+    apply_language(app.settings.settings.language);
     apply_orientation();
     equalizer_store_load(&app.equalizer);
     start_playback();
@@ -773,6 +788,12 @@ void app_start(void)
     }
 }
 
+static void number_text(char *text, size_t capacity, uint32_t value)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append_unsigned(&builder, value);
+}
+
 static void show_rescan_progress(uint32_t files, uint32_t tracks)
 {
     static uint32_t shown_ms;
@@ -781,11 +802,13 @@ static void show_rescan_progress(uint32_t files, uint32_t tracks)
         return;
     }
     shown_ms = now_ms;
-    static char text[48];
+    static char text[PROGRESS_TEXT_CAPACITY];
+    char count[NUMBER_CAPACITY];
+    number_text(count, sizeof count, tracks);
+    const char *arguments[] = {count};
     StringBuilder builder = string_builder_make(text, sizeof text);
-    string_builder_append_unsigned(&builder, tracks);
-    string_builder_append(&builder, " tracks so far");
-    app_show_notice("Scanning library", text);
+    i18n_format(&builder, STR_RESCAN_TRACKS_SO_FAR, arguments, 1);
+    app_show_notice(i18n_text(STR_RESCAN_TITLE), text);
 }
 
 static void show_cover_progress(uint32_t done, uint32_t total)
@@ -796,18 +819,20 @@ static void show_cover_progress(uint32_t done, uint32_t total)
         return;
     }
     shown_ms = now_ms;
-    static char text[48];
+    static char text[PROGRESS_TEXT_CAPACITY];
+    char finished[NUMBER_CAPACITY];
+    char albums[NUMBER_CAPACITY];
+    number_text(finished, sizeof finished, done);
+    number_text(albums, sizeof albums, total);
+    const char *arguments[] = {finished, albums};
     StringBuilder builder = string_builder_make(text, sizeof text);
-    string_builder_append_unsigned(&builder, done);
-    string_builder_append(&builder, " of ");
-    string_builder_append_unsigned(&builder, total);
-    string_builder_append(&builder, " albums");
-    app_show_notice("Finding covers", text);
+    i18n_format(&builder, STR_RESCAN_ALBUMS_PROGRESS, arguments, 2);
+    app_show_notice(i18n_text(STR_RESCAN_COVERS_TITLE), text);
 }
 
 static void explain_refusals(uint32_t now_ms)
 {
-    static char text[48];
+    static char text[MESSAGE_TEXT_CAPACITY];
     uint32_t count = app.player.refusal_count;
     bool fresh = count > app.shown_refusals;
     app.shown_refusals = count;
@@ -819,10 +844,10 @@ static void explain_refusals(uint32_t now_ms)
 
 static void run_rescan(void)
 {
-    app_show_notice("Scanning library", "Starting...");
+    app_show_notice(i18n_text(STR_RESCAN_TITLE), i18n_text(STR_RESCAN_STARTING));
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
     RescanOutcome outcome = library_rescan_run(progress);
-    static char message[48];
+    static char message[MESSAGE_TEXT_CAPACITY];
     const char *text = library_rescan_message(outcome, message, sizeof message);
     if (outcome.result == SCAN_OK) {
         music_check_remember(music_check_fingerprint());
@@ -909,7 +934,7 @@ void app_step(void)
         app.music_check_requested = false;
         bool changed = hal_system_restart_pending();
         if (!changed) {
-            app_show_notice("Music", "Checking for changes...");
+            app_show_notice(i18n_text(STR_RESCAN_MUSIC_TITLE), i18n_text(STR_RESCAN_CHECKING));
             changed = !music_check_unchanged() || !library_store_open(&app.library);
         }
         if (!changed) {

@@ -7,6 +7,7 @@
 #include "hal/clock.h"
 #include "hal/display.h"
 #include "hal/input.h"
+#include "hal/language.h"
 #include "hal/power.h"
 #include "hal/storage.h"
 #include "library/library_scan.h"
@@ -1078,6 +1079,33 @@ void fake_hal_set_restart_pending(bool pending)
 bool hal_system_restart_pending(void)
 {
     return fake.restart_pending;
+}
+
+static const uint8_t *language_pack;
+static uint32_t language_pack_size;
+static uint32_t language_requested;
+
+void fake_hal_set_language_pack(const uint8_t *pack, uint32_t size)
+{
+    language_pack = pack;
+    language_pack_size = size;
+    language_requested = 0;
+}
+
+uint32_t fake_hal_language_requested(void)
+{
+    return language_requested;
+}
+
+bool hal_language_pack(uint32_t language, const uint8_t **pack, uint32_t *size)
+{
+    language_requested = language;
+    if (language_pack == NULL) {
+        return false;
+    }
+    *pack = language_pack;
+    *size = language_pack_size;
+    return true;
 }
 
 const void *hal_system_load_rescan_code(void)

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "core/i18n.h"
 #include "ui/list_view.h"
 #include "ui/screen.h"
 #include "ui/theme.h"
@@ -9,6 +10,7 @@
 typedef struct ChoiceConfig {
     const char *title;
     const char *const *options;
+    const StringId *option_ids;
     int option_count;
     int (*current)(const void *context);
     void (*choose)(void *context, int index);

@@ -15,7 +15,8 @@ enum {
     SECTOR_BYTES = 512,
     SECTOR_WORDS = SECTOR_BYTES / 4,
     GLYPH_RAM_BYTES = 0xD000,
-    CACHE_WORDS = (GLYPH_RAM_BYTES - 2 * SECTOR_BYTES) / 4
+    CACHE_WORDS = (GLYPH_RAM_BYTES - 2 * SECTOR_BYTES) / 4,
+    MAX_ENTRIES = (SECTOR_BYTES - 8) / 8
 };
 
 static uint32_t table[SECTOR_WORDS] __attribute__((section(".glyph_ram")));
@@ -24,6 +25,7 @@ static uint32_t cache[CACHE_WORDS] __attribute__((section(".glyph_ram")));
 static uint32_t sector_lba;
 static uint32_t slot_1;
 static uint32_t face_count;
+static uint32_t entry_count;
 
 static bool read_sector(uint32_t lba)
 {
@@ -68,11 +70,22 @@ static bool read_face(void *context, uint32_t face, uint32_t offset, void *buffe
     return true;
 }
 
+bool board_glyphs_entry(uint32_t entry, uint32_t *offset, uint32_t *size)
+{
+    if (entry >= entry_count) {
+        return false;
+    }
+    *offset = table[2 + 2 * entry];
+    *size = table[3 + 2 * entry];
+    return true;
+}
+
 void board_glyphs_start(void)
 {
     EmmcInfo info;
     font_pack_detach();
     face_count = 0;
+    entry_count = 0;
     sector_lba = NO_SECTOR;
     if (!emmc_start(&info) ||
         !emmc_read(NULL, info.layout.slot_1 + GLYPH_TABLE_OFFSET / SECTOR_BYTES, 1, table) ||
@@ -80,6 +93,7 @@ void board_glyphs_start(void)
         return;
     }
     slot_1 = info.layout.slot_1;
+    entry_count = table[1] < MAX_ENTRIES ? table[1] : MAX_ENTRIES;
     face_count = table[1] < FONT_PACK_FACES ? table[1] : FONT_PACK_FACES;
     font_pack_attach((FontPackReader){read_face, NULL}, cache, sizeof cache);
 }

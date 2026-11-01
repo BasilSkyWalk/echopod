@@ -42,6 +42,7 @@ enum {
     SETTINGS_GAIN_INDEX = 9,
     SETTINGS_START_INDEX = 11,
     SETTINGS_RESCAN_INDEX = 12,
+    SETTINGS_LANGUAGE_INDEX = 14,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -652,6 +653,27 @@ static void the_screen_starts_in_the_saved_orientation(void)
     step();
     CHECK_EQUAL(HAL_DISPLAY_PORTRAIT, fake_hal_display_rotation());
     CHECK(drew_the_bottom_of_a_portrait_screen());
+}
+
+static bool toast_is(const char *expected);
+
+static void the_chosen_language_is_loaded_when_the_app_starts_again(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_LANGUAGE_INDEX);
+    CHECK(title_is("Language"));
+    move_down((int)LANGUAGE_GERMAN);
+    tap(KEY_PLAY);
+    CHECK(toast_is("Restart to apply"));
+    restart_app();
+    CHECK_EQUAL(LANGUAGE_GERMAN, fake_hal_language_requested());
+}
+
+static void english_is_requested_before_the_saved_language_is_known(void)
+{
+    start_app_with_library();
+    restart_app();
+    CHECK_EQUAL(LANGUAGE_ENGLISH, fake_hal_language_requested());
 }
 
 static void choosing_landscape_again_turns_the_screen_back(void)
@@ -1928,6 +1950,8 @@ int main(void)
         TEST_CASE(choosing_portrait_turns_the_screen),
         TEST_CASE(the_flipped_portrait_turns_the_panel_the_other_way),
         TEST_CASE(the_screen_starts_in_the_saved_orientation),
+        TEST_CASE(the_chosen_language_is_loaded_when_the_app_starts_again),
+        TEST_CASE(english_is_requested_before_the_saved_language_is_known),
         TEST_CASE(choosing_landscape_again_turns_the_screen_back),
         TEST_CASE(a_new_screen_slides_in_from_the_right),
         TEST_CASE(going_back_slides_the_screen_out_to_the_right),

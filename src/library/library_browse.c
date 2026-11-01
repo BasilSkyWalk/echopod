@@ -1,6 +1,7 @@
 #include "library/library_browse.h"
 
 #include "core/format.h"
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "core/utf8.h"
 
@@ -331,10 +332,10 @@ bool browse_item_text(const Library *library, BrowseQuery query, BrowseItem item
     return false;
 }
 
-static bool fixed_title(const char *title, char *buffer, size_t capacity)
+static bool fixed_title(StringId title, char *buffer, size_t capacity)
 {
     StringBuilder builder = string_builder_make(buffer, capacity);
-    string_builder_append(&builder, title);
+    string_builder_append(&builder, i18n_text(title));
     return true;
 }
 
@@ -369,20 +370,20 @@ bool browse_title(const Library *library, BrowseQuery query, char *buffer, size_
 {
     switch (query.kind) {
     case BROWSE_ARTISTS:
-        return fixed_title("Artists", buffer, capacity);
+        return fixed_title(STR_MENU_ARTISTS, buffer, capacity);
     case BROWSE_ALBUM_ARTISTS:
-        return fixed_title("Album Artists", buffer, capacity);
+        return fixed_title(STR_MENU_ALBUM_ARTISTS, buffer, capacity);
     case BROWSE_GENRES:
-        return fixed_title("Genres", buffer, capacity);
+        return fixed_title(STR_MENU_GENRES, buffer, capacity);
     case BROWSE_ALBUMS:
-        return fixed_title("Albums", buffer, capacity);
+        return fixed_title(STR_MENU_ALBUMS, buffer, capacity);
     case BROWSE_ALL_SONGS:
-        return fixed_title("All Songs", buffer, capacity);
+        return fixed_title(STR_MENU_ALL_SONGS, buffer, capacity);
     case BROWSE_PLAYLISTS:
-        return fixed_title("Playlists", buffer, capacity);
+        return fixed_title(STR_MENU_PLAYLISTS, buffer, capacity);
     case BROWSE_FOLDER:
         if (query.subject == ROOT_FOLDER) {
-            return fixed_title("Folders", buffer, capacity);
+            return fixed_title(STR_MENU_FOLDERS, buffer, capacity);
         }
         return subject_title(library, query, buffer, capacity);
     case BROWSE_GROUP_ALBUMS:

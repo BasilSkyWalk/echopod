@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "core/i18n.h"
 #include "core/power_policy.h"
 #include "player.h"
 #include "screens/bluetooth_screen.h"
@@ -13,7 +14,7 @@
 #include "ui/toast.h"
 
 enum {
-    SETTINGS_CHOICE_COUNT = 11,
+    SETTINGS_CHOICE_COUNT = 12,
     SETTINGS_BLUETOOTH_ITEM = 2,
     SETTINGS_EQUALIZER_ITEM = 3,
     SETTINGS_RESCAN_ITEM = 12,
@@ -32,8 +33,9 @@ typedef struct SettingsContext {
 } SettingsContext;
 
 typedef struct SettingChoice {
-    const char *title;
-    const char *const *options;
+    StringId title;
+    const StringId *options;
+    const char *const *plain_options;
     int option_count;
     int (*current)(const void *context);
     void (*choose)(void *context, int index);

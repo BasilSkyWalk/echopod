@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "core/random.h"
 #include "core/string_builder.h"
 #include "draw_profile.h"
@@ -55,9 +56,6 @@ static const CoverFlowLayout LAYOUT = {
 static const Color BACKDROP = COLOR_RGB(0, 0, 0);
 
 static const char STAR_PREFIX[] = "\xE2\x98\x85 ";
-static const char EMPTY_MESSAGE[] = "Nothing here";
-static const char RANDOM_TITLE[] = "Random album";
-static const char RANDOM_HINT[] = "Play any album";
 static const Color SHUFFLE_BACKGROUND = COLOR_RGB(44, 46, 58);
 static const Color SHUFFLE_MARK = COLOR_RGB(255, 255, 255);
 
@@ -223,9 +221,9 @@ static void refresh_text(CoverFlowScreen *flow, bool force)
     }
     if (center == RANDOM_POSITION) {
         StringBuilder title = string_builder_make(flow->title, sizeof flow->title);
-        string_builder_append(&title, RANDOM_TITLE);
+        string_builder_append(&title, i18n_text(STR_MENU_RANDOM_ALBUM));
         StringBuilder hint = string_builder_make(flow->artist, sizeof flow->artist);
-        string_builder_append(&hint, RANDOM_HINT);
+        string_builder_append(&hint, i18n_text(STR_MENU_PLAY_ANY_ALBUM));
     } else {
         load_text(flow, album_of(flow, center));
     }
@@ -454,8 +452,8 @@ static void draw_empty(const Theme *theme, Canvas *canvas)
 {
     TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
     Rect screen = {0, 0, theme->metrics.screen_width, theme->metrics.screen_height};
-    label_draw(canvas, style,
-               (Label){label_centered_area(style.font, screen, EMPTY_MESSAGE), EMPTY_MESSAGE});
+    const char *message = i18n_text(STR_MENU_NOTHING_HERE);
+    label_draw(canvas, style, (Label){label_centered_area(style.font, screen, message), message});
 }
 
 static void draw_backdrop(const Theme *theme, Canvas *canvas)
@@ -502,7 +500,7 @@ Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config)
     flow->title[0] = '\0';
     flow->artist[0] = '\0';
     flow->screen = (Screen){
-        .title = "Cover Flow",
+        .title = i18n_text(STR_MENU_COVER_FLOW),
         .context = flow,
         .full_screen = true,
         .paints_every_pixel = true,

@@ -4,6 +4,7 @@
 
 #include "app/app.h"
 #include "board.h"
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "device/block_device.h"
 #include "device/usb_fallback.h"
@@ -201,7 +202,7 @@ void usb_session_stop_listening(void)
 
 UsbSessionEnd usb_session_run(void)
 {
-    app_show_notice("USB", "Computer found. Starting...");
+    app_show_notice("USB", i18n_text(STR_USB_COMPUTER_FOUND));
     prepare_luns();
     app_release_audio();
     board_audio_shut_down();
@@ -209,8 +210,8 @@ UsbSessionEnd usb_session_run(void)
     UsbSessionEnd end = USB_SESSION_NO_HOST;
     if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
         usb_fallback_start(&fallback, port.high_speed_allowed, hal_clock_milliseconds());
-        app_show_notice("USB", card_present ? "Connected. Eject both drives to finish."
-                                            : "Connected. Eject the drive to finish.");
+        app_show_notice("USB", i18n_text(card_present ? STR_USB_CONNECTED_EJECT_BOTH
+                                                      : STR_USB_CONNECTED_EJECT_ONE));
         end = serve();
     }
     usb_session_stop_listening();

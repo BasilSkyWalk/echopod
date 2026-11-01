@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/navigation.h"
@@ -84,7 +85,7 @@ Screen *font_sample_screen_init(FontSampleScreen *sample, const Theme *theme)
 {
     *sample = (FontSampleScreen){.theme = theme};
     sample->screen = (Screen){
-        .title = "Fonts",
+        .title = i18n_text(STR_MENU_FONTS),
         .stays_on_wake = true,
         .context = sample,
         .enter = NULL,

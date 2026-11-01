@@ -17,6 +17,10 @@ echo_add_unit_test(NAME test_deadline SOURCES core/test_deadline.c LIBRARIES ech
 echo_add_unit_test(NAME test_frame_stats SOURCES core/test_frame_stats.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_key_tracker SOURCES core/test_key_tracker.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_utf8 SOURCES core/test_utf8.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_i18n SOURCES core/test_i18n.c LIBRARIES echo_core)
+string(REPLACE ";" "|" ECHO_LANGUAGE_PACK_PATHS "${ECHO_LANGUAGE_PACK_FILES}")
+echo_add_unit_test(NAME test_language_packs SOURCES core/test_language_packs.c LIBRARIES echo_core echo_settings)
+target_compile_definitions(test_language_packs PRIVATE ECHO_LANGUAGE_PACK_PATHS="${ECHO_LANGUAGE_PACK_PATHS}")
 echo_add_unit_test(NAME test_string_builder SOURCES core/test_string_builder.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_format SOURCES core/test_format.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_random SOURCES core/test_random.c LIBRARIES echo_core)
@@ -423,6 +427,13 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/glyph_pack.py
             --config ${PROJECT_SOURCE_DIR}/assets/fonts/glyph_pack.json
             --output ${PROJECT_SOURCE_DIR}/src/fonts/packs
+            --check
+    )
+    add_test(NAME language_packs_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/lang_pack.py
+            --catalogue ${PROJECT_SOURCE_DIR}/src/core/include/core
+            --languages ${PROJECT_SOURCE_DIR}/assets/lang
+            --output ${PROJECT_SOURCE_DIR}/src/lang/packs
             --check
     )
     add_test(NAME cover_fixture_up_to_date

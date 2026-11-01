@@ -49,6 +49,15 @@ static void a_number_that_does_not_fit_is_cut_like_text(void)
     CHECK(builder.overflowed);
 }
 
+static void overflow_never_leaves_half_a_character(void)
+{
+    char buffer[SMALL];
+    StringBuilder builder = string_builder_make(buffer, sizeof buffer);
+    string_builder_append(&builder, "ab\xE6\x9B\xB2\xE7\x9B\xAE");
+    CHECK(strcmp("ab\xE6\x9B\xB2", buffer) == 0);
+    CHECK(builder.overflowed);
+}
+
 static void a_fresh_builder_holds_an_empty_string(void)
 {
     char buffer[SMALL] = "junk";
@@ -64,6 +73,7 @@ int main(void)
         TEST_CASE(unsigned_values_are_written_in_decimal),
         TEST_CASE(overflow_keeps_the_longest_prefix_that_fits),
         TEST_CASE(a_number_that_does_not_fit_is_cut_like_text),
+        TEST_CASE(overflow_never_leaves_half_a_character),
         TEST_CASE(a_fresh_builder_holds_an_empty_string),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -15,13 +16,6 @@ enum {
     NO_LEVEL = -1
 };
 
-static const char EMPTY_MESSAGE[] = "Nothing here";
-static const char NO_FAVORITES_MESSAGE[] = "Hold Play on an album to add it";
-static const char NO_BOOKS_MESSAGE[] = "Put books in an Audiobooks folder";
-static const char NO_SHOWS_MESSAGE[] = "Put shows in a Podcasts folder";
-static const char FAVORITES_TITLE[] = "Favorites";
-static const char AUDIOBOOKS_TITLE[] = "Audiobooks";
-static const char PODCASTS_TITLE[] = "Podcasts";
 static const char STAR[] = "\xE2\x98\x85";
 
 static int min_of(int first, int second)
@@ -425,15 +419,15 @@ static const char *up_next_message(PlayerUpNextResult result, bool next)
 {
     switch (result) {
     case PLAYER_UP_NEXT_ADDED:
-        return next ? "Playing next" : "Added to Up Next";
+        return i18n_text(next ? STR_MENU_PLAYING_NEXT : STR_MENU_ADDED_TO_UP_NEXT);
     case PLAYER_UP_NEXT_STARTED:
-        return "Playing";
+        return i18n_text(STR_BT_PLAYING);
     case PLAYER_UP_NEXT_FULL:
-        return "Up Next is full";
+        return i18n_text(STR_MENU_UP_NEXT_FULL);
     case PLAYER_UP_NEXT_FAILED:
         break;
     }
-    return "Couldn't play the song";
+    return i18n_text(STR_MENU_COULDNT_PLAY);
 }
 
 static ScreenAction queue_song(BrowsePool *pool, bool next)
@@ -466,9 +460,11 @@ static ScreenAction open_song_actions(BrowseScreen *browse, int index, uint16_t 
     actions->now_ms = browse->now_ms;
     StringBuilder title = string_builder_make(actions->title, sizeof actions->title);
     string_builder_append(&title, row_label(browse, index));
-    actions->items[0] = (MenuItem){.label = "Play Next", .select = play_song_next, .context = pool};
-    actions->items[1] =
-        (MenuItem){.label = "Add to Up Next", .select = add_song_to_up_next, .context = pool};
+    actions->items[0] = (MenuItem){
+        .label = i18n_text(STR_MENU_PLAY_NEXT), .select = play_song_next, .context = pool};
+    actions->items[1] = (MenuItem){.label = i18n_text(STR_MENU_ADD_TO_UP_NEXT),
+                                   .select = add_song_to_up_next,
+                                   .context = pool};
     MenuConfig config = {.title = actions->title,
                          .items = actions->items,
                          .item_count = SONG_ACTION_COUNT,
@@ -530,12 +526,12 @@ static void draw_empty(Canvas *canvas, const Theme *theme, Rect content, const c
 static const char *empty_message(const BrowseScreen *browse)
 {
     if (browse->favorites_only) {
-        return NO_FAVORITES_MESSAGE;
+        return i18n_text(STR_MENU_NO_FAVORITES);
     }
     if (browse->shelf_root) {
-        return browse->shelf == SPOKEN_PODCAST ? NO_SHOWS_MESSAGE : NO_BOOKS_MESSAGE;
+        return i18n_text(browse->shelf == SPOKEN_PODCAST ? STR_MENU_NO_SHOWS : STR_MENU_NO_BOOKS);
     }
-    return EMPTY_MESSAGE;
+    return i18n_text(STR_MENU_NOTHING_HERE);
 }
 
 static void draw(void *context, Canvas *canvas)
@@ -604,7 +600,7 @@ Screen *browse_pool_open_favorites(BrowsePool *pool, int level)
     }
     BrowseScreen *browse = &pool->screens[level];
     StringBuilder title = string_builder_make(browse->title, sizeof browse->title);
-    string_builder_append(&title, FAVORITES_TITLE);
+    string_builder_append(&title, i18n_text(STR_MENU_FAVORITES));
     browse->favorites_only = true;
     browse->model.section = NULL;
     collect_favorites(browse);
@@ -632,7 +628,8 @@ Screen *browse_pool_open_shelf(BrowsePool *pool, int level, SpokenKind shelf)
     }
     BrowseScreen *browse = &pool->screens[level];
     StringBuilder title = string_builder_make(browse->title, sizeof browse->title);
-    string_builder_append(&title, shelf == SPOKEN_PODCAST ? PODCASTS_TITLE : AUDIOBOOKS_TITLE);
+    string_builder_append(
+        &title, i18n_text(shelf == SPOKEN_PODCAST ? STR_MENU_PODCASTS : STR_MENU_AUDIOBOOKS));
     browse->shelf = shelf;
     browse->shelf_root = true;
     browse->count = found ? browse->count : 0;

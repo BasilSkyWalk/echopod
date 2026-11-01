@@ -1,6 +1,7 @@
 #include "stopwatch_screen.h"
 
 #include "core/format.h"
+#include "core/i18n.h"
 #include "core/string_builder.h"
 #include "hal/system.h"
 #include "ui/header.h"
@@ -10,16 +11,19 @@
 enum {
     TIME_TOP = 50,
     CLOCK_TOP = 100,
-    LINE_HEIGHT = 24
+    LINE_HEIGHT = 24,
+    CLOCK_DIGITS = 12
 };
 
 static void refresh(StopwatchScreen *stopwatch, uint32_t now_ms)
 {
     format_duration(now_ms - stopwatch->started_ms, stopwatch->text, sizeof stopwatch->text);
     StringBuilder builder = string_builder_make(stopwatch->clock, sizeof stopwatch->clock);
-    string_builder_append(&builder, "CPU ");
-    string_builder_append_unsigned(&builder, hal_system_clock_mhz());
-    string_builder_append(&builder, " MHz");
+    char mhz[CLOCK_DIGITS];
+    StringBuilder digits = string_builder_make(mhz, sizeof mhz);
+    string_builder_append_unsigned(&digits, hal_system_clock_mhz());
+    const char *arguments[] = {mhz};
+    i18n_format(&builder, STR_MENU_CPU_MHZ, arguments, 1);
 }
 
 static void enter(void *context, uint32_t now_ms)
@@ -65,7 +69,7 @@ Screen *stopwatch_screen_init(StopwatchScreen *stopwatch, const Theme *theme)
 {
     *stopwatch = (StopwatchScreen){.theme = theme};
     stopwatch->screen = (Screen){
-        .title = "Stopwatch",
+        .title = i18n_text(STR_MENU_STOPWATCH),
         .stays_on_wake = true,
         .context = stopwatch,
         .enter = enter,
