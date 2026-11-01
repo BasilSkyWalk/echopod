@@ -1,5 +1,23 @@
 # EchoPod release notes
 
+## 0.9.0
+
+### New
+
+- **Languages.** Settings → Language: English, Simplified Chinese, Japanese, Korean, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Danish, Norwegian and Finnish. The choice is saved and applies after you restart the player (the toast says so). Menus, settings, the equalizer, Bluetooth, USB, the updater and the diagnostics all follow it. The English text is no longer part of the firmware's code: every language, English included, is a small pack stored in the image and read when the player starts, which also leaves more free room for code than before.
+- The translations were written by Claude and no native speaker has reviewed them; the Chinese starts from chuqiao's translation (pull request 11). Some long texts may wrap or be cut on the small screen. Corrections are welcome as changes to `assets/lang/<code>.txt`.
+
+### Fixed
+
+- **Cyrillic, Greek, Polish, Czech, Turkish, Romanian and Vietnamese letters in track, artist and album names show instead of `?`** (reported by Katsuki, issue 7). Latin Extended-A letters, Greek, Cyrillic and the Vietnamese letters are now in the fonts the player reads on demand.
+- A long text that doesn't fit its box is no longer cut in the middle of a character.
+
+### When you update
+
+- Your library, settings, equalizer, orientation and Bluetooth headphones stay as they are. The language starts on English.
+- The settings file gains a language byte. Going back to 0.8.1 or earlier makes that older firmware ignore the file and start from default settings.
+- The Battery low notice shown before the player's storage starts, and the panic screen, stay in English.
+
 ## 0.8.1
 
 ### Fixed

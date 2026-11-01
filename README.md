@@ -16,6 +16,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 - **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.
 - **Equalizer:** FiiO's presets and a 7-band Custom EQ.
 - **Portrait mode:** Settings → Orientation turns the screen upright either way, with layouts made for it. The volume rocker turns with it.
+- **Languages:** Settings → Language: English, Simplified Chinese, Japanese, Korean, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Danish, Norwegian and Finnish. The choice applies after a restart. Titles and artists in Cyrillic, Greek, Polish, Czech, Turkish, Romanian and Vietnamese letters draw too.
 - **Audiobooks and podcasts** on their own shelves, with a bookmark for each.
 - **Bluetooth headphones:** pairing, up to six remembered, reconnecting by itself.
 - **USB:** both drives as mass storage, or the player as a USB DAC.
