@@ -1,5 +1,24 @@
 # EchoPod release notes
 
+## 0.8.1
+
+### Fixed
+
+- **176.4 kHz plays at the right speed.** It ran 0.28 % slow (about 5 cents flat) because of a clock setting inherited from FiiO's firmware; it now uses the same clock as 44.1 and 88.2 kHz. Found and measured by guiral lacotte, who is building another firmware for the Echo Mini.
+
+### Changed
+
+- **A steadier 200 MHz clock.** The main PLL ran its oscillator at the very bottom of its range; it now runs mid-range and gives the same 200 MHz.
+- **Quicker menus.** Home, Settings and choice lists act when you press Play, not when you let go. Holding Play on a song or an album still opens its menu.
+- **Less work when nothing moves.** A screen that is not changing is no longer redrawn, and the player sleeps between key presses, which should help the battery a little (not measured yet).
+- **Pause and skip respond sooner**, because the resume file is written after the screen is drawn.
+- **Albums, Favorites and Cover Flow open and scroll with fewer reads from the card.**
+- The splash is shorter, 0.5 s instead of 1.1 s.
+
+### When you update
+
+- Your library, settings, equalizer, orientation and Bluetooth headphones stay as they are.
+
 ## 0.8.0
 
 ### New
