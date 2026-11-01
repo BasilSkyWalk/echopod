@@ -18,6 +18,7 @@ static void the_i2s_divider_truncates_or_rounds(void)
     CHECK_EQUAL(3, i2s_divider_rounded(11288960, 44100));
     CHECK_EQUAL(3, i2s_divider_truncated(12288000, 48000));
     CHECK_EQUAL(3, i2s_divider_rounded(12288000, 48000));
+    CHECK_EQUAL(0, i2s_divider_rounded(11288960, 176400));
 }
 
 static void the_i2s_clock_register_holds_the_divider(void)

@@ -43,7 +43,7 @@ typedef struct PllRow {
 
 static const PllRow ROWS[] = {
     {.core_mhz = 96, .refdiv = 6, .fbdiv = 120, .postdiv1 = 1, .postdiv2 = 5, .pclk_shift = 1},
-    {.core_mhz = 200, .refdiv = 6, .fbdiv = 100, .postdiv1 = 1, .postdiv2 = 2, .pclk_shift = 2},
+    {.core_mhz = 200, .refdiv = 2, .fbdiv = 100, .postdiv1 = 3, .postdiv2 = 2, .pclk_shift = 2},
 };
 
 static PllSetting setting_of(const PllRow *row)
