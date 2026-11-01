@@ -27,6 +27,13 @@ typedef struct Write {
 enum {
     TOP_VOLUME_VALUE = 0x7A,
     BALANCED_TOP_VOLUME_VALUE = 0x7D,
+    BLUETOOTH_TOP_VOLUME_VALUE = 0x87,
+    SINGLE_ENDED_FLOOR_VOLUME_VALUE = 0xB3,
+    BALANCED_FLOOR_VOLUME_VALUE = 0xC8,
+    LOW_END_STEPS = 3,
+    FILTER_COUNT = 5,
+    FILTER_MAP = 0x090000,
+    BALANCE_UNITS_PER_STEP = 2,
     RAMP_STEP = 6,
     VOLUME_STEP_NUMERATOR = 12,
     VOLUME_STEP_DENOMINATOR = 5,
@@ -35,6 +42,7 @@ enum {
 };
 
 static const uint8_t CHIPS[CHIP_COUNT] = {DAC_LEFT_ADDRESS, DAC_RIGHT_ADDRESS};
+static const uint8_t FILTER_VALUES[FILTER_COUNT] = {0x02, 0x42, 0x82, 0xC2, 0x22};
 static const uint8_t CHANNEL_VALUES[CHIP_COUNT] = {0x07, 0x0F};
 
 static const Write AFTER_STATUS[] = {
@@ -219,9 +227,64 @@ void dac_set_volume(const DacBus *bus, uint8_t volume)
     write_both(bus, PCM_VOLUME_A, volume);
 }
 
+uint8_t dac_balance_volume(uint8_t volume, uint8_t balance, bool left_chip)
+{
+    if (volume == DAC_VOLUME_MUTED) {
+        return volume;
+    }
+    uint32_t steps = 0;
+    if (left_chip && balance > DAC_BALANCE_CENTER) {
+        steps = balance - DAC_BALANCE_CENTER;
+    } else if (!left_chip && balance < DAC_BALANCE_CENTER) {
+        steps = DAC_BALANCE_CENTER - balance;
+    }
+    uint32_t value = volume + steps * BALANCE_UNITS_PER_STEP;
+    return value < DAC_VOLUME_MUTED ? (uint8_t)value : (uint8_t)(DAC_VOLUME_MUTED - 1);
+}
+
+void dac_set_balanced_volume(const DacBus *bus, uint8_t volume, uint8_t balance)
+{
+    for (int chip = 0; chip < CHIP_COUNT; chip++) {
+        uint8_t value = dac_balance_volume(volume, balance, chip == 0);
+        bus->write(bus->context, CHIPS[chip], PCM_VOLUME_B, value);
+        bus->write(bus->context, CHIPS[chip], PCM_VOLUME_A, value);
+    }
+}
+
+void dac_set_filter(const DacBus *bus, uint8_t filter)
+{
+    write_both(bus, FILTER_MAP, FILTER_VALUES[filter < FILTER_COUNT ? filter : 0]);
+}
+
 void dac_set_gain(const DacBus *bus, bool high)
 {
     write_both(bus, HEADPHONE_GAIN, high ? GAIN_HIGH_VALUE : GAIN_LOW_VALUE);
+}
+
+static uint32_t curve_top(DacCurve curve)
+{
+    switch (curve) {
+    case DAC_CURVE_BALANCED:
+        return BALANCED_TOP_VOLUME_VALUE;
+    case DAC_CURVE_BLUETOOTH:
+        return BLUETOOTH_TOP_VOLUME_VALUE;
+    case DAC_CURVE_SINGLE_ENDED:
+        break;
+    }
+    return TOP_VOLUME_VALUE;
+}
+
+static uint32_t curve_floor(DacCurve curve)
+{
+    switch (curve) {
+    case DAC_CURVE_BALANCED:
+        return BALANCED_FLOOR_VOLUME_VALUE;
+    case DAC_CURVE_SINGLE_ENDED:
+        return SINGLE_ENDED_FLOOR_VOLUME_VALUE;
+    case DAC_CURVE_BLUETOOTH:
+        break;
+    }
+    return 0;
 }
 
 uint8_t dac_volume_value(uint8_t level, DacCurve curve)
@@ -230,7 +293,13 @@ uint8_t dac_volume_value(uint8_t level, DacCurve curve)
         return DAC_VOLUME_MUTED;
     }
     uint32_t capped = level < DAC_VOLUME_LEVELS ? level : DAC_VOLUME_LEVELS;
-    uint32_t top = curve == DAC_CURVE_BALANCED ? BALANCED_TOP_VOLUME_VALUE : TOP_VOLUME_VALUE;
+    uint32_t top = curve_top(curve);
+    uint32_t floor = curve_floor(curve);
+    if (floor != 0 && capped <= LOW_END_STEPS) {
+        uint32_t target =
+            top - VOLUME_STEP_NUMERATOR * (LOW_END_STEPS + 1) / VOLUME_STEP_DENOMINATOR;
+        return (uint8_t)(floor - (floor - target) * (capped - 1) / LOW_END_STEPS);
+    }
     return (uint8_t)(top - VOLUME_STEP_NUMERATOR * capped / VOLUME_STEP_DENOMINATOR);
 }
 

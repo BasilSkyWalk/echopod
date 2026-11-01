@@ -133,6 +133,9 @@ static HalToneDetail detail;
 static uint8_t volume_value;
 static bool volume_known;
 static bool gain_high;
+static uint8_t filter_choice;
+static uint8_t balance;
+static bool balance_known;
 static bool dac_up;
 static bool muted;
 static uint8_t applied_volume;
@@ -393,6 +396,11 @@ static HalToneResult result_of(DacResult result)
     return result == DAC_NOT_READY ? HAL_TONE_NOT_READY : HAL_TONE_SETUP_FAILED;
 }
 
+static uint8_t current_balance(void)
+{
+    return balance_known ? balance : DAC_BALANCE_CENTER;
+}
+
 static uint8_t current_volume(void)
 {
     return volume_known ? volume_value : DAC_VOLUME_MUTED;
@@ -454,6 +462,9 @@ static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, u
     if (gain_high) {
         dac_set_gain(&BUS, true);
     }
+    if (filter_choice != 0) {
+        dac_set_filter(&BUS, filter_choice);
+    }
     dac_up = true;
     muted = true;
     applied_volume = DAC_VOLUME_MUTED;
@@ -497,6 +508,13 @@ void dac_path_stop(void)
     stop_audio_path();
 }
 
+void dac_path_stop_if_up(void)
+{
+    if (dac_up) {
+        stop_audio_path();
+    }
+}
+
 void dac_path_set_fade_service(void (*service)(void))
 {
     fade_service = service;
@@ -516,7 +534,7 @@ static void fade_to(uint8_t target)
 {
     while (applied_volume != target) {
         applied_volume = dac_ramp_next(applied_volume, target);
-        dac_set_volume(&BUS, applied_volume);
+        dac_set_balanced_volume(&BUS, applied_volume, current_balance());
         wait_serving(FADE_STEP_US);
     }
 }
@@ -554,6 +572,23 @@ void dac_path_set_gain(bool high)
     gain_high = high;
     if (dac_up) {
         dac_set_gain(&BUS, high);
+    }
+}
+
+void dac_path_set_filter(uint8_t filter)
+{
+    filter_choice = filter;
+    if (dac_up) {
+        dac_set_filter(&BUS, filter);
+    }
+}
+
+void dac_path_set_balance(uint8_t balance_step)
+{
+    balance = balance_step;
+    balance_known = true;
+    if (dac_up && !muted) {
+        dac_set_balanced_volume(&BUS, applied_volume, current_balance());
     }
 }
 

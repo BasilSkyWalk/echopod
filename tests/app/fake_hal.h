@@ -80,6 +80,8 @@ void fake_hal_set_battery(HalBattery battery);
 int fake_hal_power_off_count(void);
 void fake_hal_set_usb_start(bool started);
 int fake_hal_audio_gain(void);
+int fake_hal_audio_filter(void);
+int fake_hal_audio_balance(void);
 int fake_hal_audio_output(void);
 EqualizerCurve fake_hal_equalizer(void);
 int fake_hal_equalizer_changes(void);

@@ -187,6 +187,16 @@ static void the_write_strobe_is_bit_24(void)
     CHECK_EQUAL(0x01000000u, PANEL_BUS_WR);
 }
 
+static void an_e8_second_id_byte_selects_variant_a(void)
+{
+    CHECK_EQUAL(PANEL_VARIANT_A, panel_variant_of_id(0x00E80000u));
+    CHECK_EQUAL(PANEL_VARIANT_A, panel_variant_of_id(0x12E856ABu));
+    CHECK_EQUAL(PANEL_VARIANT_B, panel_variant_of_id(0x00000000u));
+    CHECK_EQUAL(PANEL_VARIANT_B, panel_variant_of_id(0xFFFFFFFFu));
+    CHECK_EQUAL(PANEL_VARIANT_B, panel_variant_of_id(0x66666666u));
+    CHECK_EQUAL(PANEL_VARIANT_B, panel_variant_of_id(0x00E90000u));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -201,6 +211,7 @@ int main(void)
         TEST_CASE(a_data_byte_sets_dc_on_bit_25),
         TEST_CASE(a_bus_word_keeps_other_port_bits_and_clears_bus_bits),
         TEST_CASE(the_write_strobe_is_bit_24),
+        TEST_CASE(an_e8_second_id_byte_selects_variant_a),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

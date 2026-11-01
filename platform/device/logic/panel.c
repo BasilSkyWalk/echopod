@@ -82,6 +82,11 @@ void panel_begin_write(const PanelBus *bus, PanelWindow window)
     bus->command(bus->context, COMMAND_WRITE);
 }
 
+PanelVariant panel_variant_of_id(uint32_t id)
+{
+    return (id & PANEL_ID_VARIANT_MASK) == PANEL_ID_VARIANT_A ? PANEL_VARIANT_A : PANEL_VARIANT_B;
+}
+
 uint32_t panel_bus_word(uint32_t shadow, uint8_t value, bool data)
 {
     uint32_t bus_bits = (0xFFu << PANEL_BUS_DATA_SHIFT) | PANEL_BUS_WR | PANEL_BUS_DC;

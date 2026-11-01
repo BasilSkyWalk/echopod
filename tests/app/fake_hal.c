@@ -33,6 +33,8 @@ typedef struct FakeAudio {
     uint32_t last_seek_ms;
     uint8_t volume;
     HalAudioGain gain;
+    uint8_t filter;
+    uint8_t balance;
     HalAudioOutput output;
     EqualizerCurve equalizer;
     int equalizer_changes;
@@ -482,6 +484,26 @@ void hal_audio_set_volume(uint8_t level)
 void hal_audio_set_gain(HalAudioGain gain)
 {
     fake.audio.gain = gain;
+}
+
+void hal_audio_set_filter(uint8_t filter)
+{
+    fake.audio.filter = filter;
+}
+
+void hal_audio_set_balance(uint8_t balance)
+{
+    fake.audio.balance = balance;
+}
+
+int fake_hal_audio_filter(void)
+{
+    return fake.audio.filter;
+}
+
+int fake_hal_audio_balance(void)
+{
+    return fake.audio.balance;
 }
 
 void hal_audio_set_output(HalAudioOutput output)

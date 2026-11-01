@@ -476,6 +476,9 @@ void hal_audio_seek(uint32_t position_ms)
 
 static DacCurve output_curve(void)
 {
+    if (board_bluetooth_routed()) {
+        return DAC_CURVE_BLUETOOTH;
+    }
     switch (output_setting) {
     case HAL_AUDIO_OUTPUT_SINGLE_ENDED:
         return DAC_CURVE_SINGLE_ENDED;
@@ -506,6 +509,16 @@ void hal_audio_set_volume(uint8_t level)
 void hal_audio_set_gain(HalAudioGain gain)
 {
     dac_path_set_gain(gain == HAL_AUDIO_GAIN_HIGH);
+}
+
+void hal_audio_set_filter(uint8_t filter)
+{
+    dac_path_set_filter(filter);
+}
+
+void hal_audio_set_balance(uint8_t balance)
+{
+    dac_path_set_balance(balance);
 }
 
 void hal_audio_set_output(HalAudioOutput output)

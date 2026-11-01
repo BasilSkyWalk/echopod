@@ -13,7 +13,12 @@ enum {
     SECTORS_PER_MIB = 0x800,
     SCAN_LIMIT = FIRMWARE_START + 0x100000,
     SIGNATURE = 0x1FE,
-    PARTITION_ENTRY = 0x1BE
+    PARTITION_ENTRY = 0x1BE,
+    IMAGE_SIZE_AT = 0x1F4,
+    IMAGE_MAGIC_AT = 0x1F8,
+    MAX_IMAGE_BYTES = 0x1000000,
+    SECOND_SLOT_MARGIN = 0x4000,
+    SECOND_SLOT_TRIES = 20
 };
 
 static uint32_t le16(const uint8_t *bytes)
@@ -88,6 +93,47 @@ bool emmc_layout_allows_write(const EmmcLayout *layout, uint32_t lba, uint32_t c
                          inside(layout->slot_2, layout->slot_sectors, lba, count));
 }
 
+static bool read_image_header(const BlockDevice *device, uint32_t lba, uint32_t *image_bytes)
+{
+    static uint32_t words[SECTOR_SIZE / 4];
+    const uint8_t *bytes = (const uint8_t *)words;
+    if (!device->read(device->context, lba, 1, words) ||
+        !matches(bytes + IMAGE_MAGIC_AT, "RKnanoFW", 8)) {
+        return false;
+    }
+    *image_bytes = le32(bytes + IMAGE_SIZE_AT);
+    return true;
+}
+
+static void find_second_slot(EmmcLayout *layout, const BlockDevice *device)
+{
+    uint32_t ignored = 0;
+    uint32_t image_bytes = 0;
+    if (read_image_header(device, layout->slot_2, &ignored) ||
+        !read_image_header(device, layout->slot_1, &image_bytes) || image_bytes == 0 ||
+        image_bytes > MAX_IMAGE_BYTES) {
+        return;
+    }
+    uint32_t first = ((image_bytes + SECOND_SLOT_MARGIN) / SECTOR_SIZE + SECTORS_PER_MIB - 1) /
+                     SECTORS_PER_MIB * SECTORS_PER_MIB;
+    for (uint32_t attempt = 0; attempt < SECOND_SLOT_TRIES; attempt++) {
+        uint32_t lba = FIRMWARE_START + first + attempt * SECTORS_PER_MIB;
+        if (lba + SECTORS_PER_MIB > layout->firmware_end) {
+            return;
+        }
+        if (read_image_header(device, lba, &ignored)) {
+            layout->slot_2 = lba;
+            uint32_t room = layout->firmware_end - lba;
+            uint32_t gap = lba - layout->slot_1;
+            uint32_t room_for_both = room < gap ? room : gap;
+            if (room_for_both < layout->slot_sectors) {
+                layout->slot_sectors = room_for_both;
+            }
+            return;
+        }
+    }
+}
+
 bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t total_sectors)
 {
     uint32_t system_mib = 0;
@@ -101,6 +147,7 @@ bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t to
         .slot_sectors = firmware_sectors / 2,
         .firmware_end = FIRMWARE_START + firmware_sectors,
     };
+    find_second_slot(layout, device);
     if (!find_volume(device, layout->firmware_end, total_sectors, &layout->volume_start)) {
         return false;
     }

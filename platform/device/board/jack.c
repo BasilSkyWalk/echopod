@@ -2,6 +2,12 @@
 #include "device/jack_sense.h"
 #include "gpio.h"
 #include "hal/audio.h"
+#include "registers.h"
+
+#define SINGLE_ENDED_PULL 0x14u
+#define SINGLE_ENDED_PULL_ON 0x00200020u
+#define BALANCED_PULL 0x54u
+#define BALANCED_PULL_ON 0x00010001u
 
 static const GpioPin SINGLE_ENDED_SENSE = {0, 13};
 static const GpioPin BALANCED_SENSE = {2, 8};
@@ -25,6 +31,8 @@ static void prepare_pins(void)
     }
     boot_state = (HalJackPins){.single_ended = boot_pin(SINGLE_ENDED_SENSE),
                                .balanced = boot_pin(BALANCED_SENSE)};
+    register_write(GRF_BASE + SINGLE_ENDED_PULL, SINGLE_ENDED_PULL_ON);
+    register_write(GRF_BASE + BALANCED_PULL, BALANCED_PULL_ON);
     gpio_mux(SINGLE_ENDED_SENSE, GPIO_FUNCTION_GPIO);
     gpio_input(SINGLE_ENDED_SENSE);
     gpio_mux(BALANCED_SENSE, GPIO_FUNCTION_GPIO);

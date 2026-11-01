@@ -3,13 +3,16 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 6,
+    VERSION = 7,
     FIRST_VERSION = 1,
     AUTO_OFF_VERSION = 2,
     USB_MODE_VERSION = 3,
     DAC_VOLUME_VERSION = 4,
     ORIENTATION_VERSION = 5,
     LANGUAGE_VERSION = 6,
+    DAC_VERSION = 7,
+    FILTER_SHIFT = 5,
+    BALANCE_MASK = 0x1F,
     MAGIC_SIZE = 4,
     VERSION_FIELD = 4,
     BRIGHTNESS_FIELD = 6,
@@ -25,6 +28,7 @@ enum {
     DAC_VOLUME_FIELD = 16,
     ORIENTATION_FIELD = 17,
     LANGUAGE_FIELD = 18,
+    DAC_FIELD = 19,
     CHECKSUM_FIELD = 20,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
@@ -56,6 +60,8 @@ Settings settings_defaults(void)
         .dac_volume = SETTINGS_DEFAULT_DAC_VOLUME,
         .orientation = ORIENTATION_LANDSCAPE,
         .language = LANGUAGE_ENGLISH,
+        .filter = 0,
+        .balance = SETTINGS_BALANCE_CENTER,
     };
 }
 
@@ -124,6 +130,7 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     bytes[DAC_VOLUME_FIELD] = settings->dac_volume;
     bytes[ORIENTATION_FIELD] = (uint8_t)settings->orientation;
     bytes[LANGUAGE_FIELD] = (uint8_t)settings->language;
+    bytes[DAC_FIELD] = (uint8_t)(settings->filter << FILTER_SHIFT | settings->balance);
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
@@ -151,7 +158,10 @@ static bool values_valid(const uint8_t *bytes)
            bytes[USB_MODE_FIELD] < USB_MODE_COUNT &&
            bytes[DAC_VOLUME_FIELD] <= SETTINGS_VOLUME_MAX &&
            bytes[ORIENTATION_FIELD] < ORIENTATION_COUNT &&
-           (bytes[VERSION_FIELD] < LANGUAGE_VERSION || bytes[LANGUAGE_FIELD] < LANGUAGE_COUNT);
+           (bytes[VERSION_FIELD] < LANGUAGE_VERSION || bytes[LANGUAGE_FIELD] < LANGUAGE_COUNT) &&
+           (bytes[VERSION_FIELD] < DAC_VERSION ||
+            ((bytes[DAC_FIELD] >> FILTER_SHIFT) < DAC_FILTER_COUNT &&
+             (bytes[DAC_FIELD] & BALANCE_MASK) < SETTINGS_BALANCE_STEPS));
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
@@ -180,6 +190,9 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
                            : (Orientation)bytes[ORIENTATION_FIELD],
         .language = bytes[VERSION_FIELD] < LANGUAGE_VERSION ? LANGUAGE_ENGLISH
                                                             : (Language)bytes[LANGUAGE_FIELD],
+        .filter = bytes[VERSION_FIELD] < DAC_VERSION ? 0 : bytes[DAC_FIELD] >> FILTER_SHIFT,
+        .balance = bytes[VERSION_FIELD] < DAC_VERSION ? SETTINGS_BALANCE_CENTER
+                                                      : bytes[DAC_FIELD] & BALANCE_MASK,
     };
     return true;
 }

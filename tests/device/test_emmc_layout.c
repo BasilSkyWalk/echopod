@@ -59,6 +59,59 @@ static void the_firmware_area_and_slots_follow_the_idb_system_size(void)
     CHECK_EQUAL(0x24000, layout.firmware_end);
 }
 
+static void write_image_header(FakeDisk *disk, uint32_t lba)
+{
+    uint8_t *sector = fake_disk_sector(disk, lba);
+    memcpy(sector + 0x1F8, "RKnanoFW", 8);
+    sector[0x1F4] = 0x00;
+    sector[0x1F5] = 0xC0;
+    sector[0x1F6] = 0x44;
+    sector[0x1F7] = 0x00;
+}
+
+static void a_valid_second_slot_where_it_is_assumed_stays_there(void)
+{
+    static FakeDisk disk;
+    fake_disk_init(&disk, TOTAL_SECTORS);
+    write_idb(&disk, 0, RECHORD_SYSTEM_MIB);
+    write_fat_boot_sector(&disk, 0x24000);
+    write_image_header(&disk, 0x2000);
+    write_image_header(&disk, 0x13000);
+    EmmcLayout layout;
+    CHECK(read_layout(&disk, &layout));
+    CHECK_EQUAL(0x13000, layout.slot_2);
+    CHECK_EQUAL(0x11000, layout.slot_sectors);
+}
+
+static void a_second_slot_found_by_its_header_replaces_the_assumed_one(void)
+{
+    static FakeDisk disk;
+    fake_disk_init(&disk, TOTAL_SECTORS);
+    write_idb(&disk, 0, RECHORD_SYSTEM_MIB);
+    write_fat_boot_sector(&disk, 0x24000);
+    write_image_header(&disk, 0x2000);
+    write_image_header(&disk, 0x6000);
+    EmmcLayout layout;
+    CHECK(read_layout(&disk, &layout));
+    CHECK_EQUAL(0x6000, layout.slot_2);
+    CHECK_EQUAL(0x4000, layout.slot_sectors);
+    CHECK(emmc_layout_allows_write(&layout, 0x6000, 8));
+    CHECK(emmc_layout_allows_write(&layout, 0x2000, 8));
+    CHECK(!emmc_layout_allows_write(&layout, 0xB000, 8));
+}
+
+static void without_any_second_header_the_assumed_slot_is_kept(void)
+{
+    static FakeDisk disk;
+    fake_disk_init(&disk, TOTAL_SECTORS);
+    write_idb(&disk, 0, RECHORD_SYSTEM_MIB);
+    write_fat_boot_sector(&disk, 0x24000);
+    write_image_header(&disk, 0x2000);
+    EmmcLayout layout;
+    CHECK(read_layout(&disk, &layout));
+    CHECK_EQUAL(0x13000, layout.slot_2);
+}
+
 static void the_volume_right_after_the_firmware_is_found(void)
 {
     static FakeDisk disk;
@@ -204,6 +257,9 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_firmware_area_and_slots_follow_the_idb_system_size),
+        TEST_CASE(a_valid_second_slot_where_it_is_assumed_stays_there),
+        TEST_CASE(a_second_slot_found_by_its_header_replaces_the_assumed_one),
+        TEST_CASE(without_any_second_header_the_assumed_slot_is_kept),
         TEST_CASE(the_volume_right_after_the_firmware_is_found),
         TEST_CASE(a_volume_moved_past_a_save_block_is_found_by_scanning),
         TEST_CASE(an_mbr_or_exfat_volume_is_also_accepted),

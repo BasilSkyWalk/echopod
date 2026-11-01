@@ -100,7 +100,7 @@ static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(v
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(6, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(7, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
     CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
 }
@@ -223,7 +223,49 @@ static void a_newer_version_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 7;
+    bytes[VERSION_FIELD] = 8;
+    rewrite_checksum(bytes);
+    CHECK(!settings_decode(bytes, sizeof bytes, &settings));
+}
+
+static void the_filter_and_balance_share_byte_nineteen(void)
+{
+    Settings settings = custom_settings();
+    settings.filter = 3;
+    settings.balance = 20;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(3 << 5 | 20, bytes[19]);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(3, decoded.filter);
+    CHECK_EQUAL(20, decoded.balance);
+}
+
+static void a_version_six_file_loads_with_the_first_filter_and_centred_balance(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 6;
+    bytes[19] = 0;
+    rewrite_checksum(bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(0, decoded.filter);
+    CHECK_EQUAL(SETTINGS_BALANCE_CENTER, decoded.balance);
+    CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
+}
+
+static void an_unknown_filter_or_balance_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[19] = DAC_FILTER_COUNT << 5;
+    rewrite_checksum(bytes);
+    CHECK(!settings_decode(bytes, sizeof bytes, &settings));
+    bytes[19] = SETTINGS_BALANCE_STEPS;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -311,6 +353,9 @@ int main(void)
         TEST_CASE(an_unknown_language_is_rejected),
         TEST_CASE(an_unknown_orientation_is_rejected),
         TEST_CASE(a_newer_version_is_rejected),
+        TEST_CASE(the_filter_and_balance_share_byte_nineteen),
+        TEST_CASE(a_version_six_file_loads_with_the_first_filter_and_centred_balance),
+        TEST_CASE(an_unknown_filter_or_balance_is_rejected),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

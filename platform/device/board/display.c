@@ -20,6 +20,7 @@
 enum {
     PANEL_READ_STROBE_PIN = 12,
     PANEL_CONTROL_PIN = 15,
+    PANEL_ID_BYTES = 4,
     PANEL_FIRST_BUS_PIN = 16,
     PANEL_LAST_BUS_PIN = 25,
     RESET_HIGH_MS = 50,
@@ -122,6 +123,26 @@ static void pulse_reset(uint32_t settle_ms)
     board_delay_ms(RESET_LOW_MS);
     gpio_output(PANEL_RESET, true);
     board_delay_ms(settle_ms);
+}
+
+static uint32_t read_panel_id(void)
+{
+    uint32_t data_bits = 0xFFu << PANEL_BUS_DATA_SHIFT;
+    uint32_t id = 0;
+    send_byte(PANEL_READ_ID_COMMAND, false);
+    register_write(GPIO0_BASE + GPIO_DATA, port_shadow | PANEL_BUS_WR);
+    register_write(GPIO0_BASE + GPIO_DIRECTION,
+                   register_read(GPIO0_BASE + GPIO_DIRECTION) & ~data_bits);
+    for (int index = 0; index < PANEL_ID_BYTES; index++) {
+        register_write(GPIO0_BASE + GPIO_DATA, (port_shadow & ~PANEL_READ_STROBE) | PANEL_BUS_WR);
+        board_delay_ms(1);
+        id = id << 8 |
+             (register_read(GPIO0_BASE + GPIO_INPUT_LEVEL) >> PANEL_BUS_DATA_SHIFT & 0xFFu);
+        register_write(GPIO0_BASE + GPIO_DATA, port_shadow | PANEL_BUS_WR);
+    }
+    register_write(GPIO0_BASE + GPIO_DIRECTION,
+                   register_read(GPIO0_BASE + GPIO_DIRECTION) | data_bits);
+    return id;
 }
 
 void board_display_clear(void)
@@ -245,7 +266,7 @@ void board_display_start(void)
     set_bus_idle();
     pulse_reset(RESET_SETTLE_MS);
     pulse_reset(RESET_READY_MS);
-    panel_send_init(&BUS, PANEL_VARIANT_B);
+    panel_send_init(&BUS, panel_variant_of_id(read_panel_id()));
     board_display_clear();
 }
 

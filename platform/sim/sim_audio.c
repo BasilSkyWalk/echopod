@@ -320,6 +320,16 @@ void hal_audio_set_gain(HalAudioGain gain)
     unlock();
 }
 
+void hal_audio_set_filter(uint8_t filter)
+{
+    (void)filter;
+}
+
+void hal_audio_set_balance(uint8_t balance)
+{
+    (void)balance;
+}
+
 void hal_audio_set_equalizer(const EqualizerCurve *curve)
 {
     lock();

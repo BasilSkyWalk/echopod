@@ -35,6 +35,10 @@ static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2",
 static const StringId ORIENTATION_OPTIONS[ORIENTATION_COUNT] = {
     STR_SETTINGS_LANDSCAPE, STR_SETTINGS_PORTRAIT, STR_SETTINGS_PORTRAIT_FLIPPED};
 static const StringId GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {STR_SETTINGS_LOW, STR_SETTINGS_HIGH};
+static const char *const FILTER_OPTIONS[DAC_FILTER_COUNT] = {"1", "2", "3", "4", "5"};
+static const char *const BALANCE_OPTIONS[SETTINGS_BALANCE_STEPS] = {
+    "L12", "L11", "L10", "L9", "L8", "L7", "L6", "L5", "L4", "L3",  "L2",  "L1", "0",
+    "R1",  "R2",  "R3",  "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"};
 static const StringId OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {STR_SETTINGS_AUTO, STR_SETTINGS_JACK_35,
                                                            STR_SETTINGS_JACK_44};
 static const StringId OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
@@ -182,6 +186,28 @@ static void choose_gain(void *context, int index)
     apply_and_save(context);
 }
 
+static int current_filter(const void *context)
+{
+    return settings_of(context)->filter;
+}
+
+static void choose_filter(void *context, int index)
+{
+    editable_settings(context)->filter = (uint8_t)index;
+    apply_and_save(context);
+}
+
+static int current_balance(const void *context)
+{
+    return settings_of(context)->balance;
+}
+
+static void choose_balance(void *context, int index)
+{
+    editable_settings(context)->balance = (uint8_t)index;
+    apply_and_save(context);
+}
+
 static int current_output(const void *context)
 {
     return (int)settings_of(context)->output;
@@ -257,6 +283,10 @@ static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {STR_SETTINGS_ORIENTATION, ORIENTATION_OPTIONS, NULL, ORIENTATION_COUNT, current_orientation,
      choose_orientation, NULL},
     {STR_SETTINGS_GAIN, GAIN_OPTIONS, NULL, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
+    {STR_SETTINGS_FILTER, NULL, FILTER_OPTIONS, DAC_FILTER_COUNT, current_filter, choose_filter,
+     NULL},
+    {STR_SETTINGS_BALANCE, NULL, BALANCE_OPTIONS, SETTINGS_BALANCE_STEPS, current_balance,
+     choose_balance, NULL},
     {STR_SETTINGS_OUTPUT, OUTPUT_OPTIONS, NULL, OUTPUT_JACK_COUNT, current_output, choose_output,
      describe_output},
     {STR_SETTINGS_START_SCREEN, START_OPTIONS, NULL, START_SCREEN_COUNT, current_start,

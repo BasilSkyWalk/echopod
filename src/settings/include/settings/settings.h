@@ -65,6 +65,9 @@ enum {
     SETTINGS_BRIGHTNESS_MAX = 10,
     SETTINGS_VOLUME_MAX = 50,
     SETTINGS_DEFAULT_DAC_VOLUME = 30,
+    DAC_FILTER_COUNT = 5,
+    SETTINGS_BALANCE_STEPS = 25,
+    SETTINGS_BALANCE_CENTER = 12,
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
     AUTO_OFF_OPTION_COUNT = 4,
@@ -85,6 +88,8 @@ typedef struct Settings {
     uint8_t dac_volume;
     Orientation orientation;
     Language language;
+    uint8_t filter;
+    uint8_t balance;
 } Settings;
 
 Settings settings_defaults(void);

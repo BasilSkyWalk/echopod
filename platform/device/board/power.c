@@ -1,5 +1,6 @@
 #include "hal/power.h"
 #include "board.h"
+#include "dac.h"
 #include "gpio.h"
 #include "registers.h"
 #include "usb.h"
@@ -100,6 +101,7 @@ void hal_power_off(void)
     board_stall_pause(true);
     while (gpio_read(POWER_KEY)) {
     }
+    dac_path_stop_if_up();
     board_backlight_off();
     board_bluetooth_off();
     __asm__ volatile("cpsid i" ::: "memory");

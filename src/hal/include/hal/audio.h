@@ -125,6 +125,8 @@ void hal_audio_resume(void);
 void hal_audio_seek(uint32_t position_ms);
 void hal_audio_set_volume(uint8_t level);
 void hal_audio_set_gain(HalAudioGain gain);
+void hal_audio_set_filter(uint8_t filter);
+void hal_audio_set_balance(uint8_t balance);
 void hal_audio_set_output(HalAudioOutput output);
 void hal_audio_set_equalizer(const EqualizerCurve *curve);
 HalAudioStatus hal_audio_status(void);
