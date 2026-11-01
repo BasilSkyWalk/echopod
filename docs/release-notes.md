@@ -1,5 +1,29 @@
 # EchoPod release notes
 
+## 0.9.1
+
+Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Claude Code made (issue 12). Tested on the one Echo Mini 8 GB.
+
+### New
+
+- **Settings → Filter and Balance.** Filter has five options, 1 to 5, that write FiiO's five DAC filter values; the names aren't known, so they're numbered. Balance runs from L12 to R12 and turns the louder side down by one dB a step (the step size is a guess, not FiiO's). Both are saved and apply at once.
+
+### Fixed
+
+- **The quietest volume steps are quieter.** Step 1 starts at FiiO's quietest level and the first three steps rise smoothly from it. Before, step 1 was about −60 dB, which was loud with sensitive in-ear monitors.
+- **Bluetooth has its own volume curve**, 6.5 dB quieter than wired, as in FiiO's firmware.
+- **The screen type is read from the panel** (READ ID) instead of assumed, so a unit with the other panel gets its own start-up sequence. Tested only on a panel that uses the one EchoPod already used.
+- **The headphone-jack detect pins get their pull settings at start-up**, as in FiiO's firmware, not only when audio goes to Bluetooth.
+- **Turning off while music plays powers the DAC down first**, which should avoid a pop.
+- **The updater also installs `ECHOMINI.IMG`**, checked before `HIFIEC00.IMG` to `HIFIEC97.IMG`.
+- **The second firmware slot is found by its header** when it isn't where EchoPod assumed it, so internal-storage writes are fenced to the real slots. On the tested unit nothing changes.
+
+### When you update
+
+- Your library, settings, equalizer, orientation, language and Bluetooth headphones stay as they are.
+- The settings file gains a filter and balance byte. Going back to 0.9.0 or earlier makes that older firmware ignore the file and start from default settings.
+- Delete the update file from the player once it has installed, or it installs again.
+
 ## 0.9.0
 
 ### New
