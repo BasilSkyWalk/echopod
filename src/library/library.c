@@ -268,23 +268,39 @@ uint32_t library_fingerprint(const Library *library)
 
 enum {
     KEY_TEXT_CAPACITY = 256,
+    KEY_CHUNK = 32,
     KEY_SEPARATOR = 0x1F
 };
 
-static size_t text_length(const char *text)
+static uint32_t chunk_wanted(uint32_t strings_count, uint32_t offset, uint32_t done)
 {
-    size_t length = 0;
-    while (text[length] != '\0') {
-        length++;
+    uint32_t wanted = KEY_CHUNK;
+    if (KEY_TEXT_CAPACITY - 1 - done < wanted) {
+        wanted = KEY_TEXT_CAPACITY - 1 - done;
     }
-    return length;
+    return strings_count - offset - done < wanted ? strings_count - offset - done : wanted;
 }
 
 static uint32_t hash_string(const Library *library, uint32_t hash, uint32_t offset)
 {
-    char text[KEY_TEXT_CAPACITY];
-    library_read_string(library, offset, text, sizeof text);
-    return hash_update(hash, text, text_length(text));
+    LibrarySectionInfo strings = library->sections[LIBRARY_STRINGS];
+    char text[KEY_CHUNK];
+    for (uint32_t done = 0; done < KEY_TEXT_CAPACITY - 1 && offset + done < strings.count;
+         done += KEY_CHUNK) {
+        uint32_t wanted = chunk_wanted(strings.count, offset, done);
+        if (!read_source(library, strings.offset + offset + done, text, wanted)) {
+            break;
+        }
+        uint32_t length = 0;
+        while (length < wanted && text[length] != '\0') {
+            length++;
+        }
+        hash = hash_update(hash, text, length);
+        if (length < wanted) {
+            break;
+        }
+    }
+    return hash;
 }
 
 uint32_t library_album_key(const Library *library, uint32_t album_index)

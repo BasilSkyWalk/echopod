@@ -60,8 +60,8 @@ enum {
     DIAGNOSTICS_ACCEL_INDEX = 14,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
-    SPLASH_FADE_MS = 600,
-    SPLASH_MS = 1100,
+    SPLASH_FADE_MS = 300,
+    SPLASH_MS = 500,
     HALF_BATTERY = 50
 };
 
@@ -1643,6 +1643,48 @@ static void an_unchanged_frame_sends_no_pixels(void)
     CHECK_EQUAL(pixels, fake_hal_pixels_written());
 }
 
+static void a_calm_frame_is_not_drawn_again_for_a_while(void)
+{
+    start_app();
+    step();
+    step();
+    int presents = fake_hal_present_count();
+    now_ms += 10;
+    step();
+    CHECK_EQUAL(presents, fake_hal_present_count());
+    CHECK(app_idle());
+    now_ms += 200;
+    step();
+    CHECK_EQUAL(presents + 1, fake_hal_present_count());
+    CHECK(!app_idle());
+}
+
+static void a_key_draws_the_next_frame_at_once(void)
+{
+    start_app();
+    step();
+    step();
+    int presents = fake_hal_present_count();
+    fake_hal_queue_transition(KEY_VOLUME_UP, true, now_ms);
+    now_ms += 10;
+    step();
+    CHECK_EQUAL(presents + 1, fake_hal_present_count());
+}
+
+static void play_opens_a_menu_row_while_the_key_is_still_down(void)
+{
+    start_app();
+    step();
+    fake_hal_queue_transition(KEY_PLAY, true, now_ms);
+    now_ms += 10;
+    step();
+    CHECK(title_is("Music"));
+    fake_hal_queue_transition(KEY_PLAY, false, now_ms);
+    now_ms += 10;
+    step();
+    CHECK(title_is("Music"));
+}
+
 static void moving_the_selection_sends_only_part_of_the_screen(void)
 {
     start_app();
@@ -1956,6 +1998,9 @@ int main(void)
         TEST_CASE(cover_flow_starts_with_a_random_album),
         TEST_CASE(stopping_the_app_saves_the_session),
         TEST_CASE(each_step_records_its_duration),
+        TEST_CASE(a_calm_frame_is_not_drawn_again_for_a_while),
+        TEST_CASE(a_key_draws_the_next_frame_at_once),
+        TEST_CASE(play_opens_a_menu_row_while_the_key_is_still_down),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

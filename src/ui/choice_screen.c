@@ -70,6 +70,7 @@ Screen *choice_screen_init(ChoiceScreen *choice, ChoiceConfig config)
     choice->screen = (Screen){
         .title = config.title,
         .context = choice,
+        .select_on_press = true,
         .enter = enter,
         .handle_key = handle_key,
         .update = update,

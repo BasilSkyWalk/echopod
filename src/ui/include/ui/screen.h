@@ -27,6 +27,7 @@ struct Screen {
     bool paints_every_pixel;
     bool hold_volume_keys;
     bool stays_on_wake;
+    bool select_on_press;
     void (*enter)(void *context, uint32_t now_ms);
     ScreenAction (*handle_key)(void *context, KeyEvent event, uint32_t now_ms);
     void (*update)(void *context, uint32_t now_ms);

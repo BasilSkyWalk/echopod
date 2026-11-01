@@ -50,12 +50,14 @@ void key_tracker_key_down(KeyTracker *tracker, Key key, uint32_t now_ms)
     if (state->held) {
         return;
     }
+    bool immediate = tracker->config.behaviors[key] == KEY_BEHAVIOR_PRESS;
     *state = (KeyState){
         .held = true,
+        .immediate = immediate,
         .pressed_at_ms = now_ms,
         .next_repeat_at_ms = now_ms + tracker->config.timing.repeat_delay_ms,
     };
-    if (repeats(tracker, key)) {
+    if (repeats(tracker, key) || immediate) {
         push_event(tracker, key, KEY_GESTURE_PRESS);
     }
 }
@@ -74,7 +76,7 @@ void key_tracker_key_up(KeyTracker *tracker, Key key, uint32_t now_ms)
     if (!tracker->states[key].held) {
         return;
     }
-    if (!repeats(tracker, key)) {
+    if (!repeats(tracker, key) && !tracker->states[key].immediate) {
         finish_tap_or_hold(tracker, key, now_ms);
     }
     tracker->states[key].held = false;
@@ -105,7 +107,7 @@ void key_tracker_update(KeyTracker *tracker, uint32_t now_ms)
 {
     for (int index = 0; index < KEY_COUNT; index++) {
         Key key = (Key)index;
-        if (!tracker->states[key].held) {
+        if (!tracker->states[key].held || tracker->states[key].immediate) {
             continue;
         }
         bool repeating = repeats(tracker, key) ||

@@ -142,6 +142,7 @@ Screen *menu_screen_init(MenuScreen *menu, MenuConfig config)
     menu->screen = (Screen){
         .title = config.title,
         .context = menu,
+        .select_on_press = true,
         .enter = enter,
         .handle_key = handle_key,
         .update = update,

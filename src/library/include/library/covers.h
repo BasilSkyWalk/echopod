@@ -12,7 +12,9 @@ enum {
     COVER_HALF_PIXELS = COVER_HALF_SIZE * COVER_HALF_SIZE,
     COVERS_VERSION = 1,
     COVERS_HEADER_SIZE = 16,
-    COVERS_ENTRY_SIZE = 8
+    COVERS_ENTRY_SIZE = 8,
+    COVERS_TOP_NODES = 64,
+    COVERS_CHUNK_ENTRIES = 64
 };
 
 typedef enum CoverSize {
@@ -24,8 +26,10 @@ typedef struct Covers {
     ByteSource source;
     uint32_t size;
     uint32_t count;
+    uint64_t known_nodes;
+    uint32_t top_keys[COVERS_TOP_NODES];
 } Covers;
 
 bool covers_open(Covers *covers, ByteSource source, uint32_t size);
-bool covers_find(const Covers *covers, uint32_t key, uint32_t *record);
+bool covers_find(Covers *covers, uint32_t key, uint32_t *record);
 bool covers_read(const Covers *covers, uint32_t record, CoverSize size, uint16_t *pixels);

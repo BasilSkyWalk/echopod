@@ -29,6 +29,9 @@ void favorites_store_load(FavoritesStore *store, const Library *library)
 
 bool favorites_store_contains_album(const FavoritesStore *store, uint16_t album)
 {
+    if (store->favorites.count == 0) {
+        return false;
+    }
     return favorites_contains(&store->favorites, library_album_key(store->library, album));
 }
 

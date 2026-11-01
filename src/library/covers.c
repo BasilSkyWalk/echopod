@@ -66,26 +66,81 @@ static bool read_entry(const Covers *covers, uint32_t position, uint32_t *key, u
     return true;
 }
 
-bool covers_find(const Covers *covers, uint32_t key, uint32_t *record)
+static bool record_fits(const Covers *covers, uint32_t record)
 {
-    uint32_t low = 0;
-    uint32_t high = covers->count;
-    while (low < high) {
-        uint32_t middle = low + (high - low) / 2;
-        uint32_t found = 0;
-        if (!read_entry(covers, middle, &found, record)) {
-            return false;
-        }
+    return record <= covers->size && covers->size - record >= RECORD_BYTES;
+}
+
+static bool entry_key(Covers *covers, uint32_t position, uint32_t node, uint32_t *key)
+{
+    bool top = node < COVERS_TOP_NODES;
+    if (top && (covers->known_nodes >> node & 1u) != 0) {
+        *key = covers->top_keys[node];
+        return true;
+    }
+    uint32_t record = 0;
+    if (!read_entry(covers, position, key, &record)) {
+        return false;
+    }
+    if (top) {
+        covers->top_keys[node] = *key;
+        covers->known_nodes |= (uint64_t)1 << node;
+    }
+    return true;
+}
+
+static bool find_in_chunk(const Covers *covers, uint32_t low, uint32_t high, uint32_t key,
+                          uint32_t *record)
+{
+    uint8_t entries[COVERS_CHUNK_ENTRIES * COVERS_ENTRY_SIZE];
+    uint32_t count = high - low;
+    uint32_t offset = COVERS_HEADER_SIZE + low * COVERS_ENTRY_SIZE;
+    if (count == 0 ||
+        !covers->source.read(covers->source.context, offset, entries, count * COVERS_ENTRY_SIZE)) {
+        return false;
+    }
+    uint32_t first = 0;
+    uint32_t last = count;
+    while (first < last) {
+        uint32_t middle = first + (last - first) / 2;
+        uint32_t found = u32_at(entries, middle * COVERS_ENTRY_SIZE);
         if (found == key) {
-            return *record <= covers->size && covers->size - *record >= RECORD_BYTES;
+            *record = u32_at(entries, middle * COVERS_ENTRY_SIZE + 4);
+            return record_fits(covers, *record);
         }
         if (found < key) {
-            low = middle + 1;
+            first = middle + 1;
         } else {
-            high = middle;
+            last = middle;
         }
     }
     return false;
+}
+
+bool covers_find(Covers *covers, uint32_t key, uint32_t *record)
+{
+    uint32_t low = 0;
+    uint32_t high = covers->count;
+    uint32_t node = 1;
+    while (high - low > COVERS_CHUNK_ENTRIES) {
+        uint32_t middle = low + (high - low) / 2;
+        uint32_t found = 0;
+        if (!entry_key(covers, middle, node, &found)) {
+            return false;
+        }
+        if (found == key) {
+            uint32_t ignored = 0;
+            return read_entry(covers, middle, &ignored, record) && record_fits(covers, *record);
+        }
+        if (found < key) {
+            low = middle + 1;
+            node = node * 2 + 1;
+        } else {
+            high = middle;
+            node = node * 2;
+        }
+    }
+    return find_in_chunk(covers, low, high, key, record);
 }
 
 static void unpack_pixels(uint16_t *pixels, uint32_t count)

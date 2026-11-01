@@ -45,7 +45,8 @@ enum {
     STRIP_HEIGHT = 34,
     RESCAN_PROGRESS_MS = 250,
     BATTERY_CHECK_MS = 250,
-    CHARGE_LIT_MS = 5000
+    CHARGE_LIT_MS = 5000,
+    IDLE_RENDER_MS = 100
 };
 
 static const KeyConfig KEY_CONFIG = {
@@ -97,6 +98,11 @@ typedef struct AppState {
     bool rescan_requested;
     bool music_check_requested;
     bool light_after_frame;
+    bool frame_changed;
+    bool frame_stable;
+    bool key_activity;
+    bool idle;
+    uint32_t idle_render_ms;
     const char *goodbye_text;
     Toast toast;
     BluetoothLink bluetooth;
@@ -121,7 +127,7 @@ typedef struct AppState {
 
 static AppState app;
 
-static const FadeTiming SPLASH_TIMING = {.fade_ms = 600, .hold_ms = 500, .rising = true};
+static const FadeTiming SPLASH_TIMING = {.fade_ms = 300, .hold_ms = 200, .rising = true};
 static const uint32_t SCREEN_ON_CLOCK_MHZ = 200;
 static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
@@ -227,6 +233,7 @@ static void set_display(bool on)
 {
     app.display_on = on;
     app.light_after_frame = on;
+    app.frame_stable = false;
     if (!on) {
         hal_display_set_power(false);
     }
@@ -328,6 +335,9 @@ static void use_screen_key_behaviors(void)
     KeyBehavior volume = hold ? KEY_BEHAVIOR_TAP_HOLD_REPEAT : KEY_BEHAVIOR_REPEAT;
     key_tracker_set_behavior(&app.keys, KEY_VOLUME_UP, volume);
     key_tracker_set_behavior(&app.keys, KEY_VOLUME_DOWN, volume);
+    bool at_once = app.display_on && top_screen()->select_on_press;
+    key_tracker_set_behavior(&app.keys, KEY_PLAY,
+                             at_once ? KEY_BEHAVIOR_PRESS : KEY_BEHAVIOR_TAP_OR_HOLD);
 }
 
 static bool opens_now_playing(KeyEvent event)
@@ -421,6 +431,7 @@ static void dispatch_key_events(uint32_t now_ms)
 {
     KeyEvent event;
     while (!app.powered_off && key_tracker_next_event(&app.keys, &event)) {
+        app.key_activity = true;
         if (ignored_power_tap(event)) {
             continue;
         }
@@ -569,6 +580,7 @@ static void write_to_display(void *context, Rect area, const Color *pixels)
     uint32_t hash_started_us = hal_clock_microseconds();
     draw_profile_add(DRAW_PART_AUDIO, hash_started_us - audio_started_us);
     bool any_changed = frame_diff_changed(&app.frame_diff, area, pixels, &changed);
+    app.frame_changed |= any_changed;
     draw_profile_add(DRAW_PART_HASH, hal_clock_microseconds() - hash_started_us);
     if (!any_changed) {
         return;
@@ -631,6 +643,7 @@ static void render_frame(void)
 {
     uint32_t started_us = hal_clock_microseconds();
     app.send_us = 0;
+    app.frame_changed = false;
     app.status_bar = current_status_bar();
     bool screen_paints = top_screen()->paints_every_pixel && !fade_running() && !slide_running();
     render((FrameDrawer){.draw = draw_frame, .context = &app}, screen_paints);
@@ -638,6 +651,15 @@ static void render_frame(void)
     frame_stats_record(&app.send_stats, app.send_us);
     frame_stats_record(&app.draw_stats, render_us - app.send_us);
     draw_profile_finish_frame();
+    app.frame_stable = !app.frame_changed;
+    app.idle_render_ms = hal_clock_milliseconds() + IDLE_RENDER_MS;
+}
+
+static bool frame_needed(uint32_t now_ms)
+{
+    bool busy = app.key_activity || app.options.show_frame_time || app.light_after_frame ||
+                fade_running() || slide_running();
+    return busy || !app.frame_stable || deadline_reached(now_ms, app.idle_render_ms);
 }
 
 static void draw_notice(void *context, Canvas *canvas)
@@ -728,6 +750,9 @@ void app_start(void)
     app.toast = (Toast){.visible = false};
     app.powered_off = false;
     app.charging = false;
+    app.frame_stable = false;
+    app.key_activity = false;
+    app.idle = false;
     app.saying_goodbye = false;
     app.goodbye_text = GOODBYE_TEXT;
     low_battery_init(&app.low_battery);
@@ -850,6 +875,7 @@ static void follow_charge_keys(uint32_t now_ms)
 static void charge_step(uint32_t now_ms)
 {
     follow_charge_keys(now_ms);
+    player_flush_save(&app.player);
     if (!app.charging) {
         return;
     }
@@ -878,6 +904,7 @@ void app_step(void)
     if (app.powered_off) {
         return;
     }
+    app.idle = false;
     if (app.music_check_requested) {
         app.music_check_requested = false;
         bool changed = hal_system_restart_pending();
@@ -931,11 +958,20 @@ void app_step(void)
     toast_update(&app.toast, now_ms);
     update_screen(now_ms);
     frame_stats_record(&app.update_stats, hal_clock_microseconds() - started_us);
-    if (app.display_on) {
+    if (app.display_on && frame_needed(now_ms)) {
         render_frame();
         light_after_first_frame();
+    } else {
+        app.idle = app.display_on;
     }
+    app.key_activity = false;
+    player_flush_save(&app.player);
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
+}
+
+bool app_idle(void)
+{
+    return app.idle;
 }
 
 bool app_charging(void)

@@ -257,6 +257,37 @@ static void keys_without_their_own_time_use_the_shared_one(void)
     CHECK_EQUAL(KEY_GESTURE_LONG_PRESS, next_gesture(&tracker, KEY_PLAY));
 }
 
+static void a_press_key_acts_on_the_way_down_and_stays_quiet_after(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_set_behavior(&tracker, KEY_PLAY, KEY_BEHAVIOR_PRESS);
+    key_tracker_key_down(&tracker, KEY_PLAY, 1000);
+    CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_PLAY));
+    key_tracker_update(&tracker, 1000 + LONG_PRESS_MS + REPEAT_DELAY_MS);
+    key_tracker_key_up(&tracker, KEY_PLAY, 3000);
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_PLAY));
+}
+
+static void a_key_pressed_before_a_behavior_change_still_taps_on_release(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_key_down(&tracker, KEY_PLAY, 1000);
+    key_tracker_set_behavior(&tracker, KEY_PLAY, KEY_BEHAVIOR_PRESS);
+    key_tracker_key_up(&tracker, KEY_PLAY, 1100);
+    CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_PLAY));
+}
+
+static void a_press_key_released_after_a_switch_back_emits_nothing(void)
+{
+    KeyTracker tracker = make_tracker();
+    key_tracker_set_behavior(&tracker, KEY_PLAY, KEY_BEHAVIOR_PRESS);
+    key_tracker_key_down(&tracker, KEY_PLAY, 1000);
+    CHECK_EQUAL(KEY_GESTURE_PRESS, next_gesture(&tracker, KEY_PLAY));
+    key_tracker_set_behavior(&tracker, KEY_PLAY, KEY_BEHAVIOR_TAP_OR_HOLD);
+    key_tracker_key_up(&tracker, KEY_PLAY, 1100);
+    CHECK_EQUAL(NO_EVENT, next_gesture(&tracker, KEY_PLAY));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -280,6 +311,9 @@ int main(void)
         TEST_CASE(a_hold_repeat_key_taps_on_release),
         TEST_CASE(a_held_hold_repeat_key_long_presses_then_repeats),
         TEST_CASE(changing_a_behavior_leaves_other_keys_alone),
+        TEST_CASE(a_press_key_acts_on_the_way_down_and_stays_quiet_after),
+        TEST_CASE(a_key_pressed_before_a_behavior_change_still_taps_on_release),
+        TEST_CASE(a_press_key_released_after_a_switch_back_emits_nothing),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

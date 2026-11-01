@@ -149,21 +149,68 @@ static void load_row(BrowseScreen *browse, BrowseRows *rows, int row, int index)
     describe_spoken(browse, item, rows->details[row]);
 }
 
+typedef struct RowWindow {
+    int first;
+    int count;
+} RowWindow;
+
+static void copy_text(char *target, const char *source, int capacity)
+{
+    int length = 0;
+    for (; length < capacity - 1 && source[length] != '\0'; length++) {
+        target[length] = source[length];
+    }
+    target[length] = '\0';
+}
+
+static void copy_row(BrowseRows *rows, int target, int source)
+{
+    copy_text(rows->labels[target], rows->labels[source], BROWSE_LABEL_CAPACITY);
+    copy_text(rows->details[target], rows->details[source], BROWSE_DETAIL_CAPACITY);
+    rows->opens[target] = rows->opens[source];
+}
+
+static bool window_has(RowWindow window, int index)
+{
+    return index >= window.first && index < window.first + window.count;
+}
+
+static void keep_rows(BrowseRows *rows, RowWindow old, RowWindow now)
+{
+    bool forward = now.first >= old.first;
+    for (int step = 0; step < now.count; step++) {
+        int row = forward ? step : now.count - 1 - step;
+        int source = now.first + row - old.first;
+        if (window_has((RowWindow){0, old.count}, source) && source != row) {
+            copy_row(rows, row, source);
+        }
+    }
+}
+
+static RowWindow cached_window(BrowseScreen *browse)
+{
+    const BrowseRows *rows = rows_of_level(browse->pool, browse->level);
+    return rows != NULL ? (RowWindow){rows->first, rows->count} : (RowWindow){0, 0};
+}
+
 static void refresh_rows(BrowseScreen *browse)
 {
     if (rows_current(browse)) {
         return;
     }
+    RowWindow old = cached_window(browse);
+    RowWindow now = {list_view_top(&browse->list), rows_wanted(browse)};
     BrowseRows *rows = rows_to_fill(browse);
     rows->level = NO_LEVEL;
-    int top = list_view_top(&browse->list);
-    int count = rows_wanted(browse);
-    for (int row = 0; row < count; row++) {
-        load_row(browse, rows, row, top + row);
+    keep_rows(rows, old, now);
+    for (int row = 0; row < now.count; row++) {
+        if (!window_has(old, now.first + row)) {
+            load_row(browse, rows, row, now.first + row);
+        }
     }
     rows->level = browse->level;
-    rows->first = top;
-    rows->count = count;
+    rows->first = now.first;
+    rows->count = now.count;
 }
 
 static const char *cached_text(const BrowseScreen *browse, int index, bool detail)

@@ -64,7 +64,7 @@ CoverState cover_cache_full(const CoverCache *cache, uint16_t album, Image *imag
     return state_of(cache->full_state, image, loaded);
 }
 
-static CoverState read_cover(const CoverCache *cache, uint16_t album, CoverSize size, Color *pixels)
+static CoverState read_cover(CoverCache *cache, uint16_t album, CoverSize size, Color *pixels)
 {
     uint32_t record = 0;
     uint32_t key = library_album_key(cache->library, album);

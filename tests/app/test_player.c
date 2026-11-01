@@ -363,9 +363,33 @@ static void the_session_is_saved_regularly_while_playing(void)
 {
     Player *started = playing(0);
     player_update(started, 1000);
+    player_flush_save(started);
     int writes = fake_hal_write_count();
     player_update(started, 1000 + PLAYER_SAVE_INTERVAL_MS);
+    player_flush_save(started);
     CHECK_EQUAL(writes + 1, fake_hal_write_count());
+}
+
+static void pausing_writes_the_session_only_when_it_is_flushed(void)
+{
+    Player *started = playing(0);
+    player_flush_save(started);
+    int writes = fake_hal_write_count();
+    player_toggle_pause(started);
+    CHECK_EQUAL(writes, fake_hal_write_count());
+    player_flush_save(started);
+    CHECK_EQUAL(writes + 1, fake_hal_write_count());
+    player_flush_save(started);
+    CHECK_EQUAL(writes + 1, fake_hal_write_count());
+}
+
+static void saving_at_once_clears_the_pending_save(void)
+{
+    Player *started = playing(0);
+    CHECK(player_save(started));
+    int writes = fake_hal_write_count();
+    player_flush_save(started);
+    CHECK_EQUAL(writes, fake_hal_write_count());
 }
 
 static void finish_playing(Player *started)
@@ -485,6 +509,7 @@ static void up_next_survives_a_restart(void)
     Player *started = playing(0);
     player_add_to_up_next(started, HELP);
     player_add_to_up_next(started, ARMY_OF_ME);
+    player_flush_save(started);
     Player resumed;
     player_init(&resumed, &fixture.library);
     CHECK(player_restore(&resumed));
@@ -567,6 +592,8 @@ int main(void)
         TEST_CASE(a_saved_session_resumes_paused_at_its_position),
         TEST_CASE(a_session_from_another_library_is_ignored),
         TEST_CASE(the_session_is_saved_regularly_while_playing),
+        TEST_CASE(pausing_writes_the_session_only_when_it_is_flushed),
+        TEST_CASE(saving_at_once_clears_the_pending_save),
         TEST_CASE(an_added_song_plays_after_the_current_track),
         TEST_CASE(play_next_goes_before_earlier_added_songs),
         TEST_CASE(skipping_forward_takes_the_next_added_song),

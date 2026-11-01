@@ -155,9 +155,9 @@ static void switch_off_when_empty(uint32_t boot_millivolts)
     hal_power_off();
 }
 
-static void sleep_while_dark(void)
+static void sleep_while_idle(void)
 {
-    if (!board_display_lit()) {
+    if (!board_display_lit() || app_idle()) {
         __asm__ volatile("wfi" ::: "memory");
     }
 }
@@ -185,6 +185,6 @@ void board_main(void)
         app_step();
         board_display_service();
         check_usb();
-        sleep_while_dark();
+        sleep_while_idle();
     }
 }

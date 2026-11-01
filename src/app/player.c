@@ -16,6 +16,11 @@ static uint32_t current_position(const Player *player)
     return player->loaded ? hal_audio_status().position_ms : player->paused_position_ms;
 }
 
+static void save_later(Player *player)
+{
+    player->save_pending = true;
+}
+
 static bool track_path(const Player *player, uint16_t track, char *buffer, size_t capacity)
 {
     LibraryTrack record;
@@ -248,7 +253,7 @@ bool player_play_from(Player *player, PlayerListStart start)
         !start_playable(player, 0, 1, player->repeat == REPEAT_ALL)) {
         return false;
     }
-    player_save(player);
+    save_later(player);
     return true;
 }
 
@@ -258,7 +263,7 @@ void player_toggle_pause(Player *player)
     case PLAYER_PLAYING:
         hal_audio_pause();
         player->state = PLAYER_PAUSED;
-        player_save(player);
+        save_later(player);
         return;
     case PLAYER_PAUSED:
         if (player->loaded) {
@@ -361,7 +366,7 @@ void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed)
     if (play_queue_build(&player->queue, player->library, plan) && player->loaded) {
         queue_upcoming(player);
     }
-    player_save(player);
+    save_later(player);
 }
 
 void player_set_repeat(Player *player, RepeatMode repeat)
@@ -403,7 +408,7 @@ static void advance_to_next(Player *player)
     player->current_token = player->next_token;
     player->has_next = false;
     queue_upcoming(player);
-    player_save(player);
+    save_later(player);
 }
 
 static void finish_track(Player *player, bool failed)
@@ -412,7 +417,7 @@ static void finish_track(Player *player, bool failed)
         return;
     }
     become_idle(player);
-    player_save(player);
+    save_later(player);
 }
 
 static PlayerUpNextResult enqueue(Player *player, uint16_t track, bool next)
@@ -451,7 +456,7 @@ bool player_jump_to_up_next(Player *player, uint16_t index)
     }
     up_next_drop(&player->up_next, index);
     bool started = start_up_next(player);
-    player_save(player);
+    save_later(player);
     return started;
 }
 
@@ -462,7 +467,7 @@ bool player_jump_to_queue(Player *player, PlayQueueCursor cursor)
     player->from_up_next = false;
     play_queue_move_to(&player->queue, cursor);
     bool started = start_playable(player, 0, 1, player->repeat == REPEAT_ALL);
-    player_save(player);
+    save_later(player);
     return started;
 }
 
@@ -484,7 +489,7 @@ static void save_periodically(Player *player, uint32_t now_ms)
 {
     if (player->state == PLAYER_PLAYING &&
         now_ms - player->last_save_ms >= PLAYER_SAVE_INTERVAL_MS) {
-        player_save(player);
+        save_later(player);
         player->last_save_ms = now_ms;
     }
 }
@@ -514,8 +519,16 @@ void player_update(Player *player, uint32_t now_ms)
     save_periodically(player, now_ms);
 }
 
+void player_flush_save(Player *player)
+{
+    if (player->save_pending) {
+        player_save(player);
+    }
+}
+
 bool player_save(Player *player)
 {
+    player->save_pending = false;
     if (!player->has_track) {
         return false;
     }

@@ -83,6 +83,7 @@ typedef struct Player {
     PlayQueueCursor next_cursor;
     PlayerNextSource next_source;
     uint32_t last_save_ms;
+    bool save_pending;
     HalAudioJack jack;
     uint32_t refusal_count;
     HalAudioRefusal refusal;
@@ -111,6 +112,7 @@ bool player_jump_to_queue(Player *player, PlayQueueCursor cursor);
 void player_update(Player *player, uint32_t now_ms);
 void player_refusal_text(HalAudioRefusal refusal, char *text, size_t capacity);
 bool player_save(Player *player);
+void player_flush_save(Player *player);
 void player_release_output(Player *player);
 bool player_restore(Player *player);
 PlayerStatus player_status(const Player *player);

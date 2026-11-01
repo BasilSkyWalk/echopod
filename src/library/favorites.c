@@ -139,7 +139,8 @@ uint16_t favorites_collect(const Favorites *favorites, const Library *library,
 {
     uint16_t found = 0;
     uint32_t album_count = library_count(library, LIBRARY_ALBUMS);
-    for (uint32_t album = 0; album < album_count && found < collector.capacity; album++) {
+    uint32_t wanted = favorites->count < collector.capacity ? favorites->count : collector.capacity;
+    for (uint32_t album = 0; album < album_count && found < wanted; album++) {
         pause_between_albums(collector, album);
         if (favorites_contains(favorites, library_album_key(library, album))) {
             collector.albums[found++] = (uint16_t)album;

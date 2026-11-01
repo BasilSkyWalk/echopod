@@ -130,6 +130,16 @@ static void favorites_are_loaded_again(void)
     CHECK(!favorites_store_contains_album(&favorites, CHOSEN_ALBUM));
 }
 
+static void an_empty_favorites_list_answers_without_reading_the_library(void)
+{
+    fake_hal_reset();
+    FavoritesStore blank = {0};
+    favorites_store_load(&blank, fixture_library_open(&fixture));
+    fixture.memory.reads = 0;
+    CHECK(!favorites_store_contains_album(&blank, CHOSEN_ALBUM));
+    CHECK_EQUAL(0, fixture.memory.reads);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -142,6 +152,7 @@ int main(void)
         TEST_CASE(hardware_settings_reach_the_hal),
         TEST_CASE(toggling_an_album_adds_it_and_saves),
         TEST_CASE(favorites_are_loaded_again),
+        TEST_CASE(an_empty_favorites_list_answers_without_reading_the_library),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

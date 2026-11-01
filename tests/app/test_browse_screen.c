@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "browse_screen.h"
 #include "check.h"
 #include "default_theme.h"
@@ -52,12 +54,74 @@ static void album_tracks_have_no_letters(void)
     CHECK(opened(tracks)->model.section == NULL);
 }
 
+static void check_rows_match_the_library(BrowseScreen *browse, int rows)
+{
+    int top = list_view_top(&browse->list);
+    for (int row = 0; row < rows; row++) {
+        char label[BROWSE_LABEL_CAPACITY];
+        char detail[BROWSE_DETAIL_CAPACITY];
+        BrowseText text = {label, sizeof label, detail, sizeof detail};
+        BrowseItem item;
+        CHECK(
+            browse_item(browse->pool->config.library, browse->query, (uint32_t)(top + row), &item));
+        CHECK(browse_item_text(browse->pool->config.library, browse->query, item, text));
+        CHECK(strcmp(label, browse->model.label(browse, top + row)) == 0);
+    }
+}
+
+static void scrolling_one_row_at_a_time_keeps_every_row_right(void)
+{
+    BrowseScreen *albums = opened(browse_root_query(BROWSE_ALBUMS));
+    albums->list.visible_rows = 3;
+    albums->screen.update(albums, 0);
+    for (int step = 0; step < 4; step++) {
+        list_view_move(&albums->list, 1, false, 0);
+        albums->screen.update(albums, 0);
+        check_rows_match_the_library(albums, 3);
+    }
+    for (int step = 0; step < 4; step++) {
+        list_view_move(&albums->list, -1, false, 0);
+        albums->screen.update(albums, 0);
+        check_rows_match_the_library(albums, 3);
+    }
+}
+
+static void a_jump_longer_than_the_window_reloads_every_row(void)
+{
+    BrowseScreen *albums = opened(browse_root_query(BROWSE_ALBUMS));
+    albums->list.visible_rows = 2;
+    albums->screen.update(albums, 0);
+    list_view_select(&albums->list, 4, 0);
+    albums->screen.update(albums, 0);
+    check_rows_match_the_library(albums, 1);
+    list_view_select(&albums->list, 0, 0);
+    albums->screen.update(albums, 0);
+    check_rows_match_the_library(albums, 2);
+}
+
+static void scrolling_one_row_loads_only_the_new_row(void)
+{
+    BrowseScreen *albums = opened(browse_root_query(BROWSE_ALBUMS));
+    albums->list.visible_rows = 3;
+    albums->screen.update(albums, 0);
+    fixture.memory.reads = 0;
+    albums->screen.enter(albums, 0);
+    int full_reload = fixture.memory.reads;
+    list_view_select(&albums->list, 3, 0);
+    fixture.memory.reads = 0;
+    albums->screen.update(albums, 0);
+    CHECK(fixture.memory.reads < full_reload);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(albums_are_lettered_by_their_sort_key),
         TEST_CASE(lettered_lists_never_go_backwards),
         TEST_CASE(album_tracks_have_no_letters),
+        TEST_CASE(scrolling_one_row_at_a_time_keeps_every_row_right),
+        TEST_CASE(a_jump_longer_than_the_window_reloads_every_row),
+        TEST_CASE(scrolling_one_row_loads_only_the_new_row),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

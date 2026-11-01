@@ -18,7 +18,8 @@ typedef enum KeyGesture {
 typedef enum KeyBehavior {
     KEY_BEHAVIOR_TAP_OR_HOLD,
     KEY_BEHAVIOR_REPEAT,
-    KEY_BEHAVIOR_TAP_HOLD_REPEAT
+    KEY_BEHAVIOR_TAP_HOLD_REPEAT,
+    KEY_BEHAVIOR_PRESS
 } KeyBehavior;
 
 typedef struct KeyEvent {
@@ -40,6 +41,7 @@ typedef struct KeyConfig {
 
 typedef struct KeyState {
     bool held;
+    bool immediate;
     bool long_press_sent;
     uint32_t pressed_at_ms;
     uint32_t next_repeat_at_ms;
