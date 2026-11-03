@@ -409,8 +409,8 @@ def add_folder(folders, node, name, parent, tracks):
     for child_name in sorted(node["children"], key=lambda child: (sort_key(child), child)):
         folder.subfolders.append(add_folder(folders, node["children"][child_name], child_name,
                                             position, tracks))
-    folder.tracks = sorted(node["tracks"], key=lambda index: (
-        tracks[index].disc, tracks[index].number, sort_key(PurePosixPath(tracks[index].path).name)))
+    folder.tracks = sorted(
+        node["tracks"], key=lambda index: sort_key(PurePosixPath(tracks[index].path).name))
     return position
 
 

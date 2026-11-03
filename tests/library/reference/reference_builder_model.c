@@ -424,9 +424,9 @@ static bool number_folders(const ReferenceBuilder *builder, Work *work, FolderTr
 static int by_folder_track(const void *context, uint16_t left, uint16_t right)
 {
     const SortContext *sort = context;
-    uint16_t a = sort->model->final_tracks[left];
-    uint16_t b = sort->model->final_tracks[right];
-    return by_track_order(context, a, b);
+    const TrackRecord *a = reference_track(sort->builder, sort->model->final_tracks[left]);
+    const TrackRecord *b = reference_track(sort->builder, sort->model->final_tracks[right]);
+    return reference_compare_keys(sort->builder, a->file_name, b->file_name);
 }
 
 static bool collect_folder_tracks(const ReferenceBuilder *builder, Work *work, LibraryModel *model,

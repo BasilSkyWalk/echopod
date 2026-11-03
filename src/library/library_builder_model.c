@@ -820,8 +820,8 @@ static bool emit_folder_links(BuilderState *state, Prepared *prepared, const uin
         uint32_t track = final_tracks[position];
         TrackRow row;
         if (!builder_read_row(&prepared->rows, state, track, &row) ||
-            !put_link_tuple(&tail, phase->new_index[row.folder], KIND_TRACK, row.disc, row.number,
-                            files[track], position)) {
+            !put_link_tuple(&tail, phase->new_index[row.folder], KIND_TRACK, 0, 0, files[track],
+                            position)) {
             return false;
         }
     }
