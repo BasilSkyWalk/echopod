@@ -8,6 +8,14 @@ typedef struct HalFile {
     uint32_t size;
 } HalFile;
 
+typedef struct HalStorageInfo {
+    uint64_t capacity_bytes;
+    uint64_t available_bytes;
+    bool available_known;
+} HalStorageInfo;
+
+HalStorageInfo hal_storage_info(void);
+
 bool hal_file_open(HalFile *file, const char *path);
 bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length);
 void hal_file_close(HalFile *file);

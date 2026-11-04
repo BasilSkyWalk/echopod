@@ -6,6 +6,7 @@
 #include "core/i18n.h"
 #include "diagnostics_values.h"
 #include "hal/power.h"
+#include "hal/clock.h"
 #include "hal/system.h"
 
 typedef enum MusicSource {
@@ -43,6 +44,58 @@ static const MusicEntry MUSIC_ENTRIES[MUSIC_ITEM_COUNT] = {
 static bool player_has_track(const void *context)
 {
     return player_status(context).has_track;
+}
+
+static bool home_option_shown(const void *context)
+{
+    const HomeMenuOption *option = context;
+    return option->available &&
+           (option->was_shown == NULL || option->was_shown(option->shown_context)) &&
+           (option->store->settings.main_menu_items & (UINT64_C(1) << option->bit)) != 0;
+}
+
+static const char *home_option_value(const void *context)
+{
+    const HomeMenuOption *option = context;
+    bool enabled = (option->store->settings.main_menu_items & (UINT64_C(1) << option->bit)) != 0;
+    return i18n_text(enabled ? STR_ON : STR_OFF);
+}
+
+static ScreenAction toggle_home_option(void *context)
+{
+    HomeMenuOption *option = context;
+    uint64_t bit = UINT64_C(1) << option->bit;
+    uint64_t enabled = option->store->settings.main_menu_items;
+    if ((enabled & bit) != 0 && (enabled & ~bit) == 0) {
+        toast_show(option->toast, i18n_text(STR_SETTINGS_KEEP_ONE_MENU), hal_clock_milliseconds());
+        return screen_action_none();
+    }
+    option->store->settings.main_menu_items ^= bit;
+    if (!settings_store_save(option->store)) {
+        toast_show(option->toast, i18n_text(STR_SETTINGS_SAVE_FAILED), hal_clock_milliseconds());
+    }
+    return screen_action_none();
+}
+
+static void add_home_option(AppScreens *screens, int slot, MenuItem item, bool available)
+{
+    HomeMenuOption *option = &screens->home_options[slot];
+    *option = (HomeMenuOption){.store = screens->settings.context.store,
+                               .toast = screens->settings.context.toast,
+                               .bit = (uint8_t)slot,
+                               .available = available,
+                               .was_shown = item.shown,
+                               .shown_context = item.shown_context};
+    screens->home_items[slot] = item;
+    screens->home_items[slot].shown = home_option_shown;
+    screens->home_items[slot].shown_context = option;
+    if (available) {
+        screens->customization_items[screens->customization_item_count++] =
+            (MenuItem){.label = item.label,
+                       .select = toggle_home_option,
+                       .context = option,
+                       .value = home_option_value};
+    }
 }
 
 MenuItem app_screens_open_item(const char *label, Screen *target)
@@ -142,6 +195,8 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
         .rescan_requested = context.rescan_requested,
         .bluetooth = &screens->bluetooth,
         .equalizer = &screens->equalizer,
+        .main_menu_customization = &screens->main_menu_customization.screen,
+        .clock = &screens->clock_screen.screen,
         .sleep_option = 0,
     };
     settings_screens_init(&screens->settings, settings, context.theme);
@@ -177,19 +232,44 @@ static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, Spoke
 static void build_home(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
-    screens->home_items[0] =
-        app_screens_open_item(i18n_text(STR_RESCAN_MUSIC_TITLE), &screens->music.screen);
-    screens->home_items[1] = shelf_item(screens, context, SPOKEN_AUDIOBOOK);
-    screens->home_items[2] = shelf_item(screens, context, SPOKEN_PODCAST);
-    screens->home_items[3] =
-        app_screens_open_item(i18n_text(STR_MENU_SETTINGS), &screens->settings.menu.screen);
-    screens->home_items[4] =
-        app_screens_open_item(i18n_text(STR_DIAG_TITLE), &screens->diagnostics.screen);
-    screens->home_items[5] =
-        app_screens_open_item(i18n_text(STR_MENU_NOW_PLAYING), &screens->now_playing.screen);
-    screens->home_items[5].shown = player_has_track;
-    screens->home_items[5].shown_context = context.player;
+    MenuItem roots[HOME_ROOT_ITEM_COUNT] = {
+        app_screens_open_item(i18n_text(STR_RESCAN_MUSIC_TITLE), &screens->music.screen),
+        shelf_item(screens, context, SPOKEN_AUDIOBOOK),
+        shelf_item(screens, context, SPOKEN_PODCAST),
+        app_screens_open_item(i18n_text(STR_MENU_SETTINGS), &screens->settings.menu.screen),
+        app_screens_open_item(i18n_text(STR_DIAG_TITLE), &screens->diagnostics.screen),
+        app_screens_open_item(i18n_text(STR_MENU_NOW_PLAYING), &screens->now_playing.screen),
+    };
+    roots[5].shown = player_has_track;
+    roots[5].shown_context = context.player;
+    for (int index = 0; index < HOME_ROOT_ITEM_COUNT; index++) {
+        add_home_option(screens, index, roots[index], true);
+    }
+    int slot = HOME_ROOT_ITEM_COUNT;
+    for (int index = 0; index < HOME_MUSIC_SHORTCUT_COUNT; index++) {
+        add_home_option(screens, slot++, screens->music_items[index], true);
+    }
+    for (int index = 0; index < HOME_SETTINGS_SHORTCUT_COUNT - 1; index++) {
+        add_home_option(screens, slot++, screens->settings.items[index], true);
+    }
+    add_home_option(screens, slot++, screens->settings.items[SETTINGS_CLOCK_ITEM], true);
+    for (int index = 0; index < DIAGNOSTICS_ITEM_COUNT; index++) {
+        bool available = index < screens->diagnostics.config.item_count;
+        MenuItem item = available ? screens->diagnostics_items[index]
+                                  : (MenuItem){.label = ""};
+        add_home_option(screens, slot++, item, available);
+    }
+    MenuItem brick = app_screens_open_item(i18n_text(STR_MENU_BRICK), &screens->brick.screen);
+    add_home_option(screens, slot++, brick, true);
+    MenuItem quiz = app_screens_open_item(i18n_text(STR_MENU_MUSIC_QUIZ),
+                                          &screens->music_quiz.screen);
+    add_home_option(screens, slot++, quiz, true);
     home_art_init(&screens->home_art, context.covers, context.store, context.player, theme);
+    MenuConfig customization = {.title = i18n_text(STR_SETTINGS_CUSTOMIZE_MAIN_MENU),
+                                .items = screens->customization_items,
+                                .item_count = screens->customization_item_count,
+                                .theme = theme};
+    menu_screen_init(&screens->main_menu_customization, customization);
     MenuConfig home = {.title = "EchoPod",
                        .items = screens->home_items,
                        .item_count = HOME_ITEM_COUNT,
@@ -221,9 +301,15 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
     message_screen_init(&screens->no_library, no_library);
     bluetooth_screen_init(&screens->bluetooth, context.bluetooth, theme);
     now_playing_screen_init(&screens->now_playing, now_playing);
+    clock_screen_init(&screens->clock_screen, context.settings, context.toast, theme,
+                      hal_clock_milliseconds());
+    screen_saver_init(&screens->screen_saver, context.settings, context.player, context.covers,
+                      &screens->clock_screen, theme);
     build_music(screens, context);
     build_settings(screens, context);
     diagnostics_menu_build(screens, context.options, theme);
+    brick_screen_init(&screens->brick, theme);
+    music_quiz_screen_init(&screens->music_quiz, context.player, theme);
     build_home(screens, context);
     return &screens->home.screen;
 }

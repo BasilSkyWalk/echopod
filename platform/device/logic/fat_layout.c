@@ -175,6 +175,7 @@ static uint32_t log2_of(uint32_t value)
 static bool read_layout(FatVolume *volume, const uint8_t *boot)
 {
     uint32_t total = fat_le16(boot + 19) != 0 ? fat_le16(boot + 19) : fat_le32(boot + 32);
+    volume->volume_sector_count = total;
     uint32_t fat_size = fat_le16(boot + 22) != 0 ? fat_le16(boot + 22) : fat_le32(boot + 36);
     uint32_t root_entries = fat_le16(boot + 17);
     volume->root_sectors =
@@ -202,6 +203,9 @@ static bool read_layout(FatVolume *volume, const uint8_t *boot)
 static bool read_exfat_layout(FatVolume *volume, const uint8_t *boot)
 {
     volume->type = FAT_TYPE_EXFAT;
+    volume->volume_sector_count = (uint64_t)fat_le32(boot + 72) |
+                                  (uint64_t)fat_le32(boot + 76) << 32;
+    volume->percent_in_use = boot[112];
     volume->fat_start = volume->volume_start + fat_le32(boot + 80);
     volume->fat_sectors = fat_le32(boot + 84);
     volume->fat_count = boot[110];
@@ -240,6 +244,30 @@ bool fat_mount(FatVolume *volume, BlockDevice device)
     }
     volume->volume_start = start;
     return read_any_layout(volume);
+}
+
+FatSpace fat_space(FatVolume *volume)
+{
+    FatSpace space = {
+        .capacity_bytes = volume->volume_sector_count * FAT_SECTOR_SIZE,
+    };
+    uint64_t cluster_bytes = (uint64_t)FAT_SECTOR_SIZE << volume->cluster_shift;
+    if (volume->type == FAT_TYPE_EXFAT) {
+        if (volume->percent_in_use <= 100) {
+            space.available_bytes =
+                (volume->cluster_count * cluster_bytes) * (100u - volume->percent_in_use) / 100u;
+            space.available_known = true;
+        }
+    } else if (volume->info_sector != 0 && fat_read_sector(volume, volume->info_sector)) {
+        const uint8_t *info = fat_cached_sector(volume);
+        uint32_t free_clusters = fat_le32(info + 488);
+        if (fat_le32(info) == 0x41615252u && fat_le32(info + 484) == 0x61417272u &&
+            fat_le32(info + 508) == 0xAA550000u && free_clusters <= volume->cluster_count) {
+            space.available_bytes = free_clusters * cluster_bytes;
+            space.available_known = true;
+        }
+    }
+    return space;
 }
 
 static bool read_fat_sector(FatVolume *volume, uint32_t lba)

@@ -121,6 +121,7 @@ To see whether it works on your card, let the player scan it once, then run echo
 | `--check` | Only compare the computer's fingerprint with the player's |
 | `--yes` | Create `/.echo` without asking |
 | `--verbose` | List the albums without art |
+| `--make-smart-playlist` | Create an `.m3u8` from an artist, album artist, album, genre, or year/range rule, then rebuild the database and covers |
 
 The computer picks each album's cover the way the player does: the picture inside the album's first track (FLAC, MP3, WAV, DSF/DFF, `.m4a`, `.ape` and `.wma`; a front cover wins), otherwise a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks. Ogg pictures are skipped, as on the player. The covers can look a little different from the player's own, because the computer resizes them with a different filter. When the player rescans later (for example after you copy a new album to it), it keeps the computer's covers and only decodes art that's new or changed; on a card that isn't FAT32 or exFAT, albums whose cover is an image file are decoded again.
 

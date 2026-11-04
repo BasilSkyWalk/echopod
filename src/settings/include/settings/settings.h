@@ -54,6 +54,13 @@ typedef enum Orientation {
     ORIENTATION_PORTRAIT_FLIPPED
 } Orientation;
 
+typedef enum ScreensaverStyle {
+    SCREENSAVER_OFF,
+    SCREENSAVER_CLOCK,
+    SCREENSAVER_ARTWORK,
+    SCREENSAVER_CLOCK_ARTWORK
+} ScreensaverStyle;
+
 enum {
     GAIN_LEVEL_COUNT = GAIN_HIGH + 1,
     OUTPUT_JACK_COUNT = OUTPUT_BALANCED + 1,
@@ -71,7 +78,8 @@ enum {
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
     AUTO_OFF_OPTION_COUNT = 4,
-    SETTINGS_FILE_SIZE = 24
+    SETTINGS_FILE_SIZE = 36,
+    SCREENSAVER_STYLE_COUNT = SCREENSAVER_CLOCK_ARTWORK + 1
 };
 
 typedef struct Settings {
@@ -90,6 +98,10 @@ typedef struct Settings {
     Language language;
     uint8_t filter;
     uint8_t balance;
+    uint64_t main_menu_items;
+    ScreensaverStyle screensaver;
+    uint8_t clock_hour;
+    uint8_t clock_minute;
 } Settings;
 
 Settings settings_defaults(void);
