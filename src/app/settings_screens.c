@@ -347,16 +347,11 @@ static ScreenAction request_rescan(void *context)
 static void format_size(char *text, size_t capacity, uint64_t bytes)
 {
     StringBuilder builder = string_builder_make(text, capacity);
-    if (bytes >= 1000000000u) {
-        uint32_t tenths = (uint32_t)((bytes + 50000000u) / 100000000u);
-        string_builder_append_unsigned(&builder, tenths / 10u);
-        string_builder_append_char(&builder, '.');
-        string_builder_append_unsigned(&builder, tenths % 10u);
-        string_builder_append(&builder, " GB");
-    } else {
-        string_builder_append_unsigned(&builder, (uint32_t)((bytes + 500000u) / 1000000u));
-        string_builder_append(&builder, " MB");
-    }
+    uint32_t tenths = (uint32_t)((bytes + 50000000u) / 100000000u);
+    string_builder_append_unsigned(&builder, tenths / 10u);
+    string_builder_append_char(&builder, '.');
+    string_builder_append_unsigned(&builder, tenths % 10u);
+    string_builder_append(&builder, " GB");
 }
 
 static char about_capacity[16];
