@@ -290,6 +290,30 @@ static void the_file_list_lists_txt_presets(void)
     CHECK_EQUAL(EQUALIZER_PRESET_FILE, equalizer.list.selected);
 }
 
+static void the_settings_summary_uses_seven_characters_but_the_list_keeps_the_full_name(void)
+{
+    fake_hal_reset();
+    fake_hal_add_directory_entry("/EQ", "LongPresetName.txt", false, false);
+    add_preset("LongPresetName.txt", PRESET_A);
+    equalizer_store_load(&store);
+    toast = (Toast){0};
+    equalizer_screen_init(
+        &equalizer, (EqualizerConfig){.store = &store, .toast = &toast, .theme = &DEFAULT_THEME});
+    EqualizerTextError error;
+    CHECK(equalizer_store_select_file(&store, "LongPresetName.txt", &error));
+    CHECK_EQUAL(1, equalizer.files.count);
+    CHECK(strcmp("LongPre", equalizer_screen_summary(&equalizer)) == 0);
+    CHECK(strcmp("LongPresetName.txt", equalizer.files.names[0]) == 0);
+}
+
+static void entering_the_picker_does_not_rescan_the_card(void)
+{
+    Screen *picker = open_files();
+    int opens = fake_hal_dir_open_count();
+    picker->enter(picker->context, START_MS);
+    CHECK_EQUAL(opens, fake_hal_dir_open_count());
+}
+
 static void choosing_a_valid_file_applies_and_saves_it(void)
 {
     Screen *picker = open_files();
@@ -362,6 +386,8 @@ int main(void)
         TEST_CASE(the_saved_choice_comes_back_at_start),
         TEST_CASE(an_unchanged_choice_is_not_written_again),
         TEST_CASE(the_file_list_lists_txt_presets),
+        TEST_CASE(the_settings_summary_uses_seven_characters_but_the_list_keeps_the_full_name),
+        TEST_CASE(entering_the_picker_does_not_rescan_the_card),
         TEST_CASE(choosing_a_valid_file_applies_and_saves_it),
         TEST_CASE(highlighting_a_file_previews_it),
         TEST_CASE(an_invalid_file_is_not_applied_or_saved),

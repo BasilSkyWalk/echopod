@@ -2,7 +2,6 @@
 
 #include <stddef.h>
 
-#include "hal/audio.h"
 #include "hal/storage.h"
 
 static char lower(char character)
@@ -32,13 +31,9 @@ void equalizer_files_scan(EqualizerFileList *list)
         return;
     }
     HalDirEntry entry;
-    uint32_t seen = 0;
     while (hal_dir_next(&dir, &entry)) {
-        if (seen++ % 8 == 0) {
-            hal_audio_service();
-        }
         if (entry.directory || entry.hidden || entry.name[0] == '.' ||
-            !text_extension(entry.name) || list->count == EQUALIZER_FILES_MAX) {
+            !text_extension(entry.name)) {
             continue;
         }
         uint32_t length = 0;
@@ -52,6 +47,9 @@ void equalizer_files_scan(EqualizerFileList *list)
             list->names[list->count][index] = entry.name[index];
         }
         list->count++;
+        if (list->count == EQUALIZER_FILES_MAX) {
+            break;
+        }
     }
     hal_dir_close(&dir);
 }

@@ -156,7 +156,9 @@ void equalizer_process_block(Equalizer *equalizer, EqualizerBlock block)
     while (done < block.count) {
         uint32_t chunk =
             block.count - done < EQUALIZER_FADE_CHUNK ? block.count - done : EQUALIZER_FADE_CHUNK;
-        chunk = chunk < equalizer->fade_remaining ? chunk : equalizer->fade_remaining;
+        if (equalizer->has_pending) {
+            chunk = chunk < equalizer->fade_remaining ? chunk : equalizer->fade_remaining;
+        }
         Run left = {block.left + done * block.stride, chunk, block.stride};
         Run right = {NULL, chunk, block.stride};
         if (block.right != NULL) {

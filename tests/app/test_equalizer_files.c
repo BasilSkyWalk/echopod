@@ -45,6 +45,7 @@ static void the_scan_stops_at_eight_files(void)
     fake_hal_add_directory_entry("/EQ", "9.txt", false, false);
     equalizer_files_scan(&list);
     CHECK_EQUAL(EQUALIZER_FILES_MAX, list.count);
+    CHECK_EQUAL(EQUALIZER_FILES_MAX, fake_hal_dir_next_count());
     CHECK(!has_name(&list, "9.txt"));
 }
 

@@ -109,6 +109,7 @@ typedef struct FakeHal {
     int scratch_borrows;
     bool empty_card;
     int dir_opens;
+    int dir_nexts;
     int presents_at_dir_open;
     FakeDirEntry dir_entries[DIR_CAPACITY];
     int dir_count;
@@ -944,6 +945,11 @@ int fake_hal_dir_open_count(void)
     return fake.dir_opens;
 }
 
+int fake_hal_dir_next_count(void)
+{
+    return fake.dir_nexts;
+}
+
 int fake_hal_presents_at_last_dir_open(void)
 {
     return fake.presents_at_dir_open;
@@ -973,6 +979,7 @@ bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
         copy_path(entry->name, source->name);
         entry->directory = source->directory;
         entry->hidden = source->hidden;
+        fake.dir_nexts++;
         return true;
     }
     return false;

@@ -4,6 +4,7 @@
 
 #include "core/i18n.h"
 #include "core/string_builder.h"
+#include "core/utf8.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "ui/header.h"
@@ -37,7 +38,8 @@ enum {
     STACK_KNOB_WIDTH = 4,
     STACK_KNOB_HEIGHT = 16,
     STACK_HINT_GAP = 8,
-    EQ_CUT_CAPACITY = 16
+    EQ_CUT_CAPACITY = 16,
+    SUMMARY_CHARACTERS = 7
 };
 
 typedef struct HintLines {
@@ -199,7 +201,6 @@ static void enter_picker(void *context, uint32_t now_ms)
 {
     EqualizerScreen *equalizer = context;
     equalizer->now_ms = now_ms;
-    equalizer_files_scan(&equalizer->files);
     const EqualizerChoice *choice = choice_of(&equalizer->config);
     int selected = (int)choice->preset;
     if (choice->preset == EQUALIZER_PRESET_FILE) {
@@ -562,6 +563,7 @@ static void init_editor(EqualizerEditor *editor, EqualizerConfig config)
 Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config)
 {
     *equalizer = (EqualizerScreen){.config = config};
+    equalizer_files_scan(&equalizer->files);
     equalizer->model = (ListModel){.context = equalizer,
                                    .count = preset_count,
                                    .label = preset_label,
@@ -590,8 +592,18 @@ const char *equalizer_screen_summary(const void *context)
 {
     const EqualizerScreen *equalizer = context;
     const EqualizerChoice *choice = choice_of(&equalizer->config);
-    if (choice->preset == EQUALIZER_PRESET_FILE) {
-        return choice->preset_name;
+    if (choice->preset != EQUALIZER_PRESET_FILE) {
+        return equalizer_screen_preset_name(choice->preset);
     }
-    return equalizer_screen_preset_name(choice->preset);
+    static char summary[SUMMARY_CHARACTERS + 1];
+    size_t length = 0;
+    while (length < SUMMARY_CHARACTERS && choice->preset_name[length] != '\0') {
+        length++;
+    }
+    length = utf8_complete_length(choice->preset_name, length);
+    for (size_t index = 0; index < length; index++) {
+        summary[index] = choice->preset_name[index];
+    }
+    summary[length] = '\0';
+    return summary;
 }

@@ -1040,10 +1040,10 @@ static void a_new_firmware_checks_the_music_once_without_rescanning(void)
     step();
     CHECK(fake_hal_dir_open_count() > walks_before);
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
-    int walks_after = fake_hal_dir_open_count();
     restart_app();
+    int walks_after_restart = fake_hal_dir_open_count();
     step();
-    CHECK_EQUAL(walks_after, fake_hal_dir_open_count());
+    CHECK_EQUAL(walks_after_restart, fake_hal_dir_open_count());
 }
 
 static void the_music_check_after_usb_says_so_before_walking_the_card(void)

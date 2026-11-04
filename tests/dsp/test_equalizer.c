@@ -168,6 +168,18 @@ static void changing_a_gain_keeps_the_filter_history(void)
     CHECK_EQUAL(2000, equalizer.current.curve.bands[0].frequency_hz);
 }
 
+static void a_fade_can_finish_inside_a_block(void)
+{
+    Equalizer equalizer = equalizer_for(one_band(1000, -6, 14), 48000);
+    EqualizerCurve moved = one_band(2000, -3, 14);
+    equalizer_set_curve(&equalizer, &moved);
+    int32_t frames[2 * 502] = {0};
+    equalizer_process(&equalizer, frames, 502);
+    equalizer_process(&equalizer, frames, 32);
+    CHECK(!equalizer.has_pending);
+    CHECK_EQUAL(2000, equalizer.current.curve.bands[0].frequency_hz);
+}
+
 static void silence_after_loud_bass_comes_out_as_silence(void)
 {
     EqualizerCurve curve = {.band_count = 7};
@@ -284,6 +296,7 @@ int main(void)
         TEST_CASE(a_full_scale_boost_saturates_instead_of_wrapping),
         TEST_CASE(both_channels_are_filtered_on_their_own),
         TEST_CASE(changing_a_gain_keeps_the_filter_history),
+        TEST_CASE(a_fade_can_finish_inside_a_block),
         TEST_CASE(silence_after_loud_bass_comes_out_as_silence),
         TEST_CASE(a_batch_sounds_the_same_as_one_frame_at_a_time),
         TEST_CASE(a_tenth_decibel_cut_is_honoured),
