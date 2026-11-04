@@ -14,6 +14,7 @@
 void fake_hal_reset(void);
 void fake_hal_set_version(const char *version);
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size);
+void fake_hal_add_directory_entry(const char *path, const char *name, bool directory, bool hidden);
 void fake_hal_set_milliseconds(uint32_t now_ms);
 void fake_hal_set_microseconds_per_read(uint32_t step_us);
 uint32_t fake_hal_microseconds(void);

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 
 #include "check.h"
@@ -138,7 +139,7 @@ static void play_grabs_a_band_and_volume_changes_its_level(void)
     tap(editor, KEY_VOLUME_UP);
     press(editor, KEY_VOLUME_UP, KEY_GESTURE_REPEAT);
     CHECK_EQUAL(2, store.choice.custom_gains[0]);
-    CHECK_EQUAL(2, fake_hal_equalizer().bands[0].gain_db);
+    CHECK_EQUAL(20, fake_hal_equalizer().bands[0].gain_tenths);
     CHECK(strcmp("63 Hz   +2 dB", equalizer.editor.band_text) == 0);
     CHECK(strcmp("Preamp -2 dB", equalizer.editor.preamp_text) == 0);
     tap(editor, KEY_PLAY);
@@ -237,7 +238,7 @@ static void the_saved_choice_comes_back_at_start(void)
     CHECK_EQUAL(EQUALIZER_PRESET_CUSTOM, reloaded.choice.preset);
     CHECK_EQUAL(-1, reloaded.choice.custom_gains[0]);
     CHECK_EQUAL(EQUALIZER_CUSTOM_BANDS, fake_hal_equalizer().band_count);
-    CHECK_EQUAL(-1, fake_hal_equalizer().bands[0].gain_db);
+    CHECK_EQUAL(-10, fake_hal_equalizer().bands[0].gain_tenths);
 }
 
 static void an_unchanged_choice_is_not_written_again(void)
@@ -249,6 +250,97 @@ static void an_unchanged_choice_is_not_written_again(void)
     picker->enter(picker->context, START_MS);
     tap(picker, KEY_BACK);
     CHECK_EQUAL(writes, fake_hal_write_count());
+}
+
+static const char PRESET_A[] = "Preamp: -1 dB\n"
+                               "Filter 1: ON PK Fc 1000 Hz Gain 2 dB Q 1.5\n";
+static const char PRESET_B[] = "Preamp: -2 dB\n"
+                               "Filter 1: ON PK Fc 2000 Hz Gain -3 dB Q 0.8\n";
+static const char PRESET_BAD[] = "Filter 1: ON LS Fc 100 Hz Gain 3 dB Q 0.7\n";
+
+static void add_preset(const char *name, const char *text)
+{
+    char path[64];
+    snprintf(path, sizeof path, "/EQ/%s", name);
+    fake_hal_add_file(path, (const uint8_t *)text, (uint32_t)strlen(text));
+}
+
+static Screen *open_files(void)
+{
+    fake_hal_reset();
+    fake_hal_add_directory_entry("/EQ", "A.txt", false, false);
+    add_preset("A.txt", PRESET_A);
+    equalizer_store_load(&store);
+    toast = (Toast){0};
+    Screen *picker = equalizer_screen_init(
+        &equalizer, (EqualizerConfig){.store = &store, .toast = &toast, .theme = &DEFAULT_THEME});
+    equalizer_screen_open(&equalizer);
+    picker->enter(picker->context, START_MS);
+    for (int step = 0; step < EQUALIZER_PRESET_FILE; step++) {
+        tap(picker, KEY_VOLUME_UP);
+    }
+    return picker;
+}
+
+static void the_file_list_lists_txt_presets(void)
+{
+    open_files();
+    CHECK_EQUAL(1, equalizer.files.count);
+    CHECK(strcmp("A.txt", equalizer.files.names[0]) == 0);
+    CHECK_EQUAL(EQUALIZER_PRESET_FILE, equalizer.list.selected);
+}
+
+static void choosing_a_valid_file_applies_and_saves_it(void)
+{
+    Screen *picker = open_files();
+    CHECK_EQUAL(SCREEN_ACTION_POP, tap(picker, KEY_PLAY).type);
+    CHECK_EQUAL(EQUALIZER_PRESET_FILE, store.choice.preset);
+    CHECK(strcmp("A.txt", store.choice.preset_name) == 0);
+    CHECK_EQUAL(1, fake_hal_equalizer().band_count);
+    CHECK_EQUAL(1000, fake_hal_equalizer().bands[0].frequency_hz);
+    CHECK_EQUAL(20, fake_hal_equalizer().bands[0].gain_tenths);
+}
+
+static void highlighting_a_file_previews_it(void)
+{
+    fake_hal_reset();
+    fake_hal_add_directory_entry("/EQ", "A.txt", false, false);
+    fake_hal_add_directory_entry("/EQ", "B.txt", false, false);
+    add_preset("A.txt", PRESET_A);
+    add_preset("B.txt", PRESET_B);
+    equalizer_store_load(&store);
+    toast = (Toast){0};
+    Screen *picker = equalizer_screen_init(
+        &equalizer, (EqualizerConfig){.store = &store, .toast = &toast, .theme = &DEFAULT_THEME});
+    equalizer_screen_open(&equalizer);
+    picker->enter(picker->context, START_MS);
+    for (int step = 0; step < EQUALIZER_PRESET_FILE; step++) {
+        tap(picker, KEY_VOLUME_UP);
+    }
+    tap(picker, KEY_VOLUME_UP);
+    CHECK_EQUAL(EQUALIZER_PRESET_FILE, store.choice.preset);
+    CHECK(strcmp("B.txt", store.choice.preset_name) == 0);
+    CHECK_EQUAL(2000, fake_hal_equalizer().bands[0].frequency_hz);
+}
+
+static void an_invalid_file_is_not_applied_or_saved(void)
+{
+    fake_hal_reset();
+    fake_hal_add_directory_entry("/EQ", "Bad.txt", false, false);
+    add_preset("Bad.txt", PRESET_BAD);
+    equalizer_store_load(&store);
+    toast = (Toast){0};
+    Screen *picker = equalizer_screen_init(
+        &equalizer, (EqualizerConfig){.store = &store, .toast = &toast, .theme = &DEFAULT_THEME});
+    equalizer_screen_open(&equalizer);
+    picker->enter(picker->context, START_MS);
+    for (int step = 0; step < EQUALIZER_PRESET_FILE; step++) {
+        tap(picker, KEY_VOLUME_UP);
+    }
+    CHECK_EQUAL(SCREEN_ACTION_NONE, tap(picker, KEY_PLAY).type);
+    CHECK_EQUAL(EQUALIZER_PRESET_CUSTOM, store.choice.preset);
+    CHECK(toast.visible);
+    CHECK_EQUAL(EQUALIZER_CUSTOM_BANDS, fake_hal_equalizer().band_count);
 }
 
 int main(void)
@@ -269,6 +361,10 @@ int main(void)
         TEST_CASE(holding_back_saves_and_goes_home_while_adjusting),
         TEST_CASE(the_saved_choice_comes_back_at_start),
         TEST_CASE(an_unchanged_choice_is_not_written_again),
+        TEST_CASE(the_file_list_lists_txt_presets),
+        TEST_CASE(choosing_a_valid_file_applies_and_saves_it),
+        TEST_CASE(highlighting_a_file_previews_it),
+        TEST_CASE(an_invalid_file_is_not_applied_or_saved),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

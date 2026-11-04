@@ -65,6 +65,7 @@ echo_add_unit_test(NAME test_equalizer
     LIBRARIES echo_dsp $<$<PLATFORM_ID:Linux>:m>
 )
 echo_add_unit_test(NAME test_equalizer_file SOURCES sound/test_equalizer_file.c LIBRARIES echo_sound)
+echo_add_unit_test(NAME test_equalizer_text SOURCES sound/test_equalizer_text.c LIBRARIES echo_sound)
 
 foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader music_fingerprint)
     echo_add_unit_test(NAME test_${library_test}
@@ -174,6 +175,11 @@ echo_add_unit_test(NAME test_up_next_screen
 )
 echo_add_unit_test(NAME test_cover_flow_order
     SOURCES app/test_cover_flow_order.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_equalizer_files
+    SOURCES app/test_equalizer_files.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )

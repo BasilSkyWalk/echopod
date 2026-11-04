@@ -1,9 +1,12 @@
 #include "dsp/equalizer.h"
 
+#include <stddef.h>
+
 enum {
     COEFFICIENT_BITS = 14,
     COEFFICIENT_MAX = (1 << 16) - 1,
-    Q_TENTHS_MIN = 5,
+    M1_BITS = 20,
+    M1_MAX = (1 << 27) - 1,
     PRODUCT_SHIFT = 8,
     TABLE_BITS = 30,
     GAIN_TABLE_OFFSET = 24,
@@ -46,16 +49,52 @@ static int64_t product(int64_t first, int64_t second)
                    INT64_C(1) << (TABLE_BITS - 2 * PRODUCT_SHIFT));
 }
 
-static int clamped_gain(int gain)
+static int clamped_gain(int gain_tenths)
 {
-    return gain < EQUALIZER_GAIN_MIN_DB   ? EQUALIZER_GAIN_MIN_DB
-           : gain > EQUALIZER_GAIN_MAX_DB ? EQUALIZER_GAIN_MAX_DB
-                                          : gain;
+    return gain_tenths < EQUALIZER_GAIN_MIN_TENTHS   ? EQUALIZER_GAIN_MIN_TENTHS
+           : gain_tenths > EQUALIZER_GAIN_MAX_TENTHS ? EQUALIZER_GAIN_MAX_TENTHS
+                                                     : gain_tenths;
 }
 
-static int64_t power_of_ten(int fortieths)
+static int clamped_q(int q_tenths)
 {
-    return GAIN_Q30[fortieths + GAIN_TABLE_OFFSET];
+    return q_tenths < EQUALIZER_Q_MIN_TENTHS   ? EQUALIZER_Q_MIN_TENTHS
+           : q_tenths > EQUALIZER_Q_MAX_TENTHS ? EQUALIZER_Q_MAX_TENTHS
+                                               : q_tenths;
+}
+
+static int clamped_preamp(int preamp_tenths)
+{
+    return preamp_tenths < EQUALIZER_PREAMP_MIN_TENTHS   ? EQUALIZER_PREAMP_MIN_TENTHS
+           : preamp_tenths > EQUALIZER_PREAMP_MAX_TENTHS ? EQUALIZER_PREAMP_MAX_TENTHS
+                                                         : preamp_tenths;
+}
+
+static int64_t amplitude_for_gain_tenths(int gain_tenths)
+{
+    int scaled = clamped_gain(gain_tenths) + GAIN_TABLE_OFFSET * TENTHS;
+    int index = scaled / TENTHS;
+    int fraction = scaled % TENTHS;
+    int64_t low = GAIN_Q30[index];
+    if (fraction == 0) {
+        return low;
+    }
+    int64_t high = GAIN_Q30[index + 1];
+    return low + divided((high - low) * fraction, TENTHS);
+}
+
+static int64_t linear_for_preamp_tenths(int preamp_tenths)
+{
+    int value = clamped_preamp(preamp_tenths);
+    int64_t lower = multiply(amplitude_for_gain_tenths(EQUALIZER_GAIN_MIN_TENTHS),
+                             amplitude_for_gain_tenths(EQUALIZER_GAIN_MIN_TENTHS));
+    int64_t factor = ONE;
+    while (value < EQUALIZER_GAIN_MIN_TENTHS) {
+        factor = multiply(factor, lower);
+        value -= EQUALIZER_GAIN_MIN_TENTHS;
+    }
+    int64_t amplitude = amplitude_for_gain_tenths(value);
+    return multiply(factor, multiply(amplitude, amplitude));
 }
 
 static int64_t series(int64_t square, int last)
@@ -77,21 +116,40 @@ static Angle half_angle_of(uint32_t frequency, uint32_t rate)
 
 bool equalizer_band_audible(EqualizerBand band, uint32_t rate)
 {
-    return band.gain_db != 0 && band.frequency_hz > 0 && band.q_tenths > 0 &&
+    return band.gain_tenths != 0 && band.frequency_hz > 0 && band.q_tenths > 0 &&
            (uint32_t)band.frequency_hz * AUDIBLE_DENOMINATOR < rate * AUDIBLE_NUMERATOR;
 }
 
-int equalizer_preamp_db(const EqualizerCurve *curve, uint32_t rate)
+bool equalizer_curve_valid(const EqualizerCurve *curve, uint32_t rate)
+{
+    if (curve->band_count > EQUALIZER_MAX_BANDS || rate == 0 || rate > EQUALIZER_MAX_RATE) {
+        return false;
+    }
+    for (int index = 0; index < curve->band_count; index++) {
+        EqualizerBand band = curve->bands[index];
+        if (band.gain_tenths != 0 && !equalizer_band_audible(band, rate)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int equalizer_preamp_tenths(const EqualizerCurve *curve, uint32_t rate)
 {
     int boost = 0;
     for (int index = 0; index < curve->band_count; index++) {
         EqualizerBand band = curve->bands[index];
-        int gain = clamped_gain(band.gain_db);
+        int gain = clamped_gain(band.gain_tenths);
         if (equalizer_band_audible(band, rate) && gain > boost) {
             boost = gain;
         }
     }
-    return -boost;
+    int automatic = -boost;
+    if (!curve->preamp_set) {
+        return automatic;
+    }
+    int supplied = clamped_preamp(curve->preamp_tenths);
+    return supplied < automatic ? supplied : automatic;
 }
 
 static int32_t coefficient(int64_t value)
@@ -100,6 +158,12 @@ static int32_t coefficient(int64_t value)
     return rounded > COEFFICIENT_MAX    ? COEFFICIENT_MAX
            : rounded < -COEFFICIENT_MAX ? -COEFFICIENT_MAX
                                         : (int32_t)rounded;
+}
+
+static int32_t coefficient_m1(int64_t value)
+{
+    int64_t rounded = divided(value, INT64_C(1) << (TABLE_BITS - M1_BITS));
+    return rounded > M1_MAX ? M1_MAX : rounded < -M1_MAX ? -M1_MAX : (int32_t)rounded;
 }
 
 static int64_t widened(int32_t value)
@@ -116,8 +180,8 @@ static int64_t effective_damping(int32_t a1, int64_t g)
 static EqualizerStage design_stage(EqualizerBand band, uint32_t rate)
 {
     Angle half = half_angle_of(band.frequency_hz, rate);
-    int64_t amplitude = power_of_ten(clamped_gain(band.gain_db));
-    int q_tenths = band.q_tenths < Q_TENTHS_MIN ? Q_TENTHS_MIN : band.q_tenths;
+    int64_t amplitude = amplitude_for_gain_tenths(band.gain_tenths);
+    int q_tenths = clamped_q(band.q_tenths);
     int64_t damping = divided(ONE << TABLE_BITS, divided(amplitude * q_tenths, TENTHS));
     int32_t g = coefficient(divided(half.sine << TABLE_BITS, half.cosine));
     int64_t g_wide = widened(g);
@@ -127,46 +191,47 @@ static EqualizerStage design_stage(EqualizerBand band, uint32_t rate)
     return (EqualizerStage){
         .g = g,
         .a1 = a1,
-        .m1 = coefficient(product(effective_damping(a1, g_wide), squared_minus_one)),
+        .m1 = coefficient_m1(product(effective_damping(a1, g_wide), squared_minus_one)),
     };
 }
 
-static uint32_t active_bands(const Equalizer *equalizer)
+static void clear_histories(EqualizerChain *chain)
 {
-    uint32_t mask = 0;
-    for (int index = 0; index < equalizer->stage_count; index++) {
-        mask |= 1U << equalizer->stages[index].band;
-    }
-    return mask;
-}
-
-static void clear_history(Equalizer *equalizer, int band)
-{
-    for (int index = 0; index < EQUALIZER_HISTORY; index++) {
-        equalizer->left[band][index] = 0;
-        equalizer->right[band][index] = 0;
+    for (int band = 0; band < EQUALIZER_MAX_BANDS; band++) {
+        for (int index = 0; index < EQUALIZER_HISTORY; index++) {
+            chain->left[band][index] = 0;
+            chain->right[band][index] = 0;
+        }
     }
 }
 
-static void design(Equalizer *equalizer, bool keep_history)
+static void design_chain(EqualizerChain *chain, const EqualizerCurve *curve, uint32_t rate,
+                         bool keep_history)
 {
-    uint32_t previous = keep_history ? active_bands(equalizer) : 0;
-    const EqualizerCurve *curve = &equalizer->curve;
-    uint32_t rate = equalizer->rate;
-    equalizer->stage_count = 0;
+    chain->curve = *curve;
+    if (chain->curve.band_count > EQUALIZER_MAX_BANDS) {
+        chain->curve.band_count = EQUALIZER_MAX_BANDS;
+    }
+    chain->stage_count = 0;
+    chain->preamp = (int32_t)ONE;
+    chain->valid = 0;
+    if (!keep_history) {
+        clear_histories(chain);
+    }
     if (rate == 0 || rate > EQUALIZER_MAX_RATE) {
         return;
     }
-    equalizer->preamp = (int32_t)power_of_ten(2 * equalizer_preamp_db(curve, rate));
-    for (int band = 0; band < curve->band_count; band++) {
-        if (!equalizer_band_audible(curve->bands[band], rate)) {
+    if (!equalizer_curve_valid(&chain->curve, rate)) {
+        return;
+    }
+    chain->valid = 1;
+    chain->preamp = (int32_t)linear_for_preamp_tenths(equalizer_preamp_tenths(&chain->curve, rate));
+    for (int band = 0; band < chain->curve.band_count; band++) {
+        if (!equalizer_band_audible(chain->curve.bands[band], rate)) {
             continue;
         }
-        if ((previous & (1U << band)) == 0) {
-            clear_history(equalizer, band);
-        }
-        EqualizerStage *stage = &equalizer->stages[equalizer->stage_count++];
-        *stage = design_stage(curve->bands[band], rate);
+        EqualizerStage *stage = &chain->stages[chain->stage_count++];
+        *stage = design_stage(chain->curve.bands[band], rate);
         stage->band = (uint8_t)band;
     }
 }
@@ -184,6 +249,11 @@ static bool same_layout(const EqualizerCurve *first, const EqualizerCurve *secon
     return true;
 }
 
+static bool chain_active(const EqualizerChain *chain)
+{
+    return chain->stage_count > 0 || chain->preamp != (int32_t)ONE;
+}
+
 void equalizer_init(Equalizer *equalizer)
 {
     *equalizer = (Equalizer){0};
@@ -191,12 +261,27 @@ void equalizer_init(Equalizer *equalizer)
 
 void equalizer_set_curve(Equalizer *equalizer, const EqualizerCurve *curve)
 {
-    bool keep_history = same_layout(&equalizer->curve, curve);
-    equalizer->curve = *curve;
-    if (equalizer->curve.band_count > EQUALIZER_MAX_BANDS) {
-        equalizer->curve.band_count = EQUALIZER_MAX_BANDS;
+    bool keep_history = !equalizer->has_pending && chain_active(&equalizer->current) &&
+                        same_layout(&equalizer->current.curve, curve);
+    if (keep_history) {
+        design_chain(&equalizer->current, curve, equalizer->rate, true);
+        return;
     }
-    design(equalizer, keep_history);
+    if (!equalizer->has_pending && !chain_active(&equalizer->current)) {
+        design_chain(&equalizer->current, curve, equalizer->rate, false);
+        return;
+    }
+    equalizer->pending_curve = *curve;
+    equalizer->has_pending = 1;
+    equalizer->fading_out = 1;
+    equalizer->fade_remaining = EQUALIZER_FADE_FRAMES;
+}
+
+void equalizer_apply_pending(Equalizer *equalizer)
+{
+    design_chain(&equalizer->current, &equalizer->pending_curve, equalizer->rate, false);
+    equalizer->fading_out = 0;
+    equalizer->fade_remaining = EQUALIZER_FADE_FRAMES;
 }
 
 void equalizer_set_rate(Equalizer *equalizer, uint32_t rate)
@@ -205,5 +290,22 @@ void equalizer_set_rate(Equalizer *equalizer, uint32_t rate)
         return;
     }
     equalizer->rate = rate;
-    design(equalizer, false);
+    if (equalizer->has_pending) {
+        design_chain(&equalizer->current, &equalizer->pending_curve, rate, false);
+        equalizer->has_pending = 0;
+        equalizer->fading_out = 0;
+        equalizer->fade_remaining = 0;
+        return;
+    }
+    design_chain(&equalizer->current, &equalizer->current.curve, rate, false);
+}
+
+bool equalizer_active(const Equalizer *equalizer)
+{
+    return chain_active(&equalizer->current) || equalizer->has_pending;
+}
+
+bool equalizer_valid(const Equalizer *equalizer)
+{
+    return equalizer->current.valid != 0;
 }

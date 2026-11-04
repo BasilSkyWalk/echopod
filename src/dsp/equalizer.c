@@ -4,13 +4,17 @@
 
 enum {
     COEFFICIENT_BITS = 14,
+    M1_BITS = 20,
+    M1_HALF = 1 << (M1_BITS - 1),
     LOW_MASK = (1 << COEFFICIENT_BITS) - 1,
     HALF = 1 << (COEFFICIENT_BITS - 1),
     PREAMP_BITS = 30,
     HEADROOM_BITS = 4,
     SAMPLE_MAX = 8388607,
     SAMPLE_MIN = -8388608,
-    STEREO = 2
+    STEREO = 2,
+    MIX_BITS = 8,
+    MIX_ONE = 1 << MIX_BITS
 };
 
 static const int32_t UNITY = INT32_C(1) << PREAMP_BITS;
@@ -32,6 +36,14 @@ static int32_t plus(int32_t first, int32_t second)
 static int32_t minus(int32_t first, int32_t second)
 {
     return (int32_t)((uint32_t)first - (uint32_t)second);
+}
+
+static int32_t scaled_m1(int32_t coefficient, int32_t value)
+{
+    int64_t product = (int64_t)coefficient * value;
+    int64_t rounded =
+        product >= 0 ? (product + M1_HALF) >> M1_BITS : -((-product + M1_HALF) >> M1_BITS);
+    return (int32_t)rounded;
 }
 
 static int32_t doubled_minus(int32_t value, int32_t previous)
@@ -69,7 +81,7 @@ static void filter_channel(EqualizerStage stage, int32_t *history, Run run)
         int32_t next_low = plus(low, scaled_carried(stage.g, next_band, &carry_low));
         band = doubled_minus(next_band, band);
         low = doubled_minus(next_low, low);
-        samples[index] = plus(x, scaled(stage.m1, next_band));
+        samples[index] = plus(x, scaled_m1(stage.m1, next_band));
     }
     history[0] = band;
     history[1] = low;
@@ -100,26 +112,73 @@ static void to_samples(Run run)
     }
 }
 
-static void process_channel(Equalizer *equalizer, int32_t (*histories)[EQUALIZER_HISTORY], Run run)
+static void process_channel(EqualizerChain *chain, int32_t (*histories)[EQUALIZER_HISTORY], Run run)
 {
-    to_internal(run, equalizer->preamp);
-    for (int index = 0; index < equalizer->stage_count; index++) {
-        const EqualizerStage stage = equalizer->stages[index];
+    to_internal(run, chain->preamp);
+    for (int index = 0; index < chain->stage_count; index++) {
+        const EqualizerStage stage = chain->stages[index];
         filter_channel(stage, histories[stage.band], run);
     }
     to_samples(run);
 }
 
-bool equalizer_active(const Equalizer *equalizer)
+static void process_chain(EqualizerChain *chain, Run left, Run right)
 {
-    return equalizer->stage_count > 0;
+    process_channel(chain, chain->left, left);
+    if (right.samples != NULL) {
+        process_channel(chain, chain->right, right);
+    }
+}
+
+static void ramp_run(Run run, uint32_t elapsed, bool fading_in)
+{
+    for (uint32_t index = 0; index < run.count; index++) {
+        uint32_t position = elapsed + index + 1;
+        uint32_t weight =
+            fading_in ? position * MIX_ONE / EQUALIZER_FADE_FRAMES
+                      : (EQUALIZER_FADE_FRAMES - position) * MIX_ONE / EQUALIZER_FADE_FRAMES;
+        weight = weight > MIX_ONE ? MIX_ONE : weight;
+        int64_t value = (int64_t)run.samples[index * run.stride] * weight;
+        int64_t rounded =
+            value >= 0 ? (value + MIX_ONE / 2) >> MIX_BITS : -((-value + MIX_ONE / 2) >> MIX_BITS);
+        run.samples[index * run.stride] = (int32_t)rounded;
+    }
 }
 
 void equalizer_process_block(Equalizer *equalizer, EqualizerBlock block)
 {
-    process_channel(equalizer, equalizer->left, (Run){block.left, block.count, block.stride});
-    if (block.right != NULL) {
-        process_channel(equalizer, equalizer->right, (Run){block.right, block.count, block.stride});
+    if (!equalizer->has_pending) {
+        process_chain(&equalizer->current, (Run){block.left, block.count, block.stride},
+                      (Run){block.right, block.count, block.stride});
+        return;
+    }
+    uint32_t done = 0;
+    while (done < block.count) {
+        uint32_t chunk =
+            block.count - done < EQUALIZER_FADE_CHUNK ? block.count - done : EQUALIZER_FADE_CHUNK;
+        chunk = chunk < equalizer->fade_remaining ? chunk : equalizer->fade_remaining;
+        Run left = {block.left + done * block.stride, chunk, block.stride};
+        Run right = {NULL, chunk, block.stride};
+        if (block.right != NULL) {
+            right.samples = block.right + done * block.stride;
+        }
+        process_chain(&equalizer->current, left, right);
+        uint32_t elapsed = EQUALIZER_FADE_FRAMES - equalizer->fade_remaining;
+        bool fading_in = equalizer->fading_out == 0;
+        ramp_run(left, elapsed, fading_in);
+        if (right.samples != NULL) {
+            ramp_run(right, elapsed, fading_in);
+        }
+        equalizer->fade_remaining =
+            chunk >= equalizer->fade_remaining ? 0 : (uint16_t)(equalizer->fade_remaining - chunk);
+        if (equalizer->fade_remaining == 0) {
+            if (equalizer->fading_out) {
+                equalizer_apply_pending(equalizer);
+            } else {
+                equalizer->has_pending = 0;
+            }
+        }
+        done += chunk;
     }
 }
 

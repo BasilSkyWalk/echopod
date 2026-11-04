@@ -144,5 +144,5 @@ endif()
 target_include_directories(echo_device_logic PUBLIC include)
 target_link_libraries(echo_device_logic
     PUBLIC echo_core echo_hal echo_codec echo_libmad echo_faad2 echo_opus
-    PRIVATE echo_options
+    PRIVATE echo_options echo_compact
 )

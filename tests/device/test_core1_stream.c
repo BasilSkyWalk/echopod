@@ -205,8 +205,10 @@ static Core1EqualizerShare share;
 static EqualizerCurve two_bands(int8_t low_gain, int8_t high_gain)
 {
     EqualizerCurve curve = {.band_count = 2};
-    curve.bands[0] = (EqualizerBand){.frequency_hz = 160, .gain_db = low_gain, .q_tenths = 10};
-    curve.bands[1] = (EqualizerBand){.frequency_hz = 2500, .gain_db = high_gain, .q_tenths = 10};
+    curve.bands[0] = (EqualizerBand){
+        .frequency_hz = 160, .gain_tenths = (int16_t)(low_gain * 10), .q_tenths = 10};
+    curve.bands[1] = (EqualizerBand){
+        .frequency_hz = 2500, .gain_tenths = (int16_t)(high_gain * 10), .q_tenths = 10};
     return curve;
 }
 

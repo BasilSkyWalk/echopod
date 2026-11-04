@@ -50,14 +50,14 @@ static const HintLines EDIT_LINES = {STR_SETTINGS_EQ_EDIT_LINE_1, STR_SETTINGS_E
 static const HintLines BYPASS_LINES = {STR_SETTINGS_EQ_BYPASS_LINE_1,
                                        STR_SETTINGS_EQ_BYPASS_LINE_2};
 
-static const StringId PRESET_NAMES[EQUALIZER_PRESET_COUNT] = {STR_OFF,
-                                                              STR_SETTINGS_EQ_RETRO,
-                                                              STR_SETTINGS_EQ_BASS,
-                                                              STR_SETTINGS_EQ_HEAVY,
-                                                              STR_SETTINGS_EQ_POP,
-                                                              STR_SETTINGS_EQ_JAZZ,
-                                                              STR_SETTINGS_EQ_UNIQUE,
-                                                              STR_SETTINGS_EQ_CUSTOM};
+static const StringId PRESET_NAMES[EQUALIZER_PRESET_FILE] = {STR_OFF,
+                                                             STR_SETTINGS_EQ_RETRO,
+                                                             STR_SETTINGS_EQ_BASS,
+                                                             STR_SETTINGS_EQ_HEAVY,
+                                                             STR_SETTINGS_EQ_POP,
+                                                             STR_SETTINGS_EQ_JAZZ,
+                                                             STR_SETTINGS_EQ_UNIQUE,
+                                                             STR_SETTINGS_EQ_CUSTOM};
 static const char *const BAND_LABELS[EQUALIZER_CUSTOM_BANDS] = {"63",   "160",  "400", "1k",
                                                                 "2.5k", "6.3k", "16k"};
 static const char *const BAND_NAMES[EQUALIZER_CUSTOM_BANDS] = {
@@ -66,7 +66,7 @@ static const char CHECK_MARK[] = "\xE2\x9C\x93";
 
 const char *equalizer_screen_preset_name(EqualizerPreset preset)
 {
-    return (unsigned)preset < EQUALIZER_PRESET_COUNT ? i18n_text(PRESET_NAMES[preset]) : "";
+    return (unsigned)preset < EQUALIZER_PRESET_FILE ? i18n_text(PRESET_NAMES[preset]) : "";
 }
 
 static EqualizerChoice *choice_of(const EqualizerConfig *config)
@@ -91,28 +91,46 @@ static ScreenAction leave(const EqualizerConfig *config, ScreenAction action)
 static void use_preset(const EqualizerConfig *config, EqualizerPreset preset)
 {
     EqualizerChoice *choice = choice_of(config);
+    if (preset == EQUALIZER_PRESET_FILE) {
+        return;
+    }
     if (choice->preset != preset) {
         choice->preset = preset;
         equalizer_store_apply(config->store);
     }
 }
 
+static bool preview_file(EqualizerScreen *equalizer, int index);
+static bool same_name(const char *first, const char *second);
+
 static int preset_count(const void *context)
 {
-    (void)context;
-    return EQUALIZER_PRESET_COUNT;
+    const EqualizerScreen *equalizer = context;
+    return EQUALIZER_PRESET_FILE + equalizer->files.count;
 }
 
 static const char *preset_label(const void *context, int index)
 {
-    (void)context;
-    return i18n_text(PRESET_NAMES[index]);
+    const EqualizerScreen *equalizer = context;
+    if (index < EQUALIZER_PRESET_FILE) {
+        return i18n_text(PRESET_NAMES[index]);
+    }
+    int file = index - EQUALIZER_PRESET_FILE;
+    return file < equalizer->files.count ? equalizer->files.names[file] : "";
 }
 
 static const char *preset_mark(const void *context, int index)
 {
     const EqualizerScreen *equalizer = context;
-    return (int)choice_of(&equalizer->config)->preset == index ? CHECK_MARK : NULL;
+    const EqualizerChoice *choice = choice_of(&equalizer->config);
+    if (index < EQUALIZER_PRESET_FILE) {
+        return (int)choice->preset == index ? CHECK_MARK : NULL;
+    }
+    int file = index - EQUALIZER_PRESET_FILE;
+    return choice->preset == EQUALIZER_PRESET_FILE && file < equalizer->files.count &&
+                   same_name(choice->preset_name, equalizer->files.names[file])
+               ? CHECK_MARK
+               : NULL;
 }
 
 static bool preset_opens(const void *context, int index)
@@ -127,6 +145,12 @@ static ScreenAction choose_preset(void *context, int index)
     if (index == EQUALIZER_PRESET_CUSTOM) {
         return screen_action_push(&equalizer->editor.screen);
     }
+    if (index >= EQUALIZER_PRESET_FILE) {
+        if (!preview_file(equalizer, index)) {
+            return screen_action_none();
+        }
+        equalizer->file_preview = index;
+    }
     return screen_action_pop();
 }
 
@@ -134,16 +158,60 @@ static ScreenAction handle_picker_key(void *context, KeyEvent event, uint32_t no
 {
     EqualizerScreen *equalizer = context;
     ListSelection selection = {.select = choose_preset, .hold = NULL, .context = equalizer};
+    NavigationIntent intent = navigation_from_key(event).intent;
     ScreenAction action = list_navigation_handle(&equalizer->list, event, now_ms, selection);
-    use_preset(&equalizer->config, (EqualizerPreset)equalizer->list.selected);
+    int selected = equalizer->list.selected;
+    if (selected < EQUALIZER_PRESET_FILE) {
+        use_preset(&equalizer->config, (EqualizerPreset)selected);
+    } else if ((intent == NAVIGATION_NEXT || intent == NAVIGATION_PREVIOUS) &&
+               selected != equalizer->file_preview) {
+        equalizer->file_preview = selected;
+        preview_file(equalizer, selected);
+    }
     return leave(&equalizer->config, action);
+}
+
+static bool same_name(const char *first, const char *second)
+{
+    uint32_t index = 0;
+    while (first[index] != '\0' && first[index] == second[index]) {
+        index++;
+    }
+    return first[index] == second[index];
+}
+
+static void show_preset_error(EqualizerScreen *equalizer, EqualizerTextError error)
+{
+    StringBuilder notice = string_builder_make(equalizer->notice, sizeof equalizer->notice);
+    if (error.line > 0) {
+        char line[16];
+        StringBuilder line_text = string_builder_make(line, sizeof line);
+        string_builder_append_unsigned(&line_text, error.line);
+        const char *arguments[] = {line};
+        i18n_format(&notice, STR_SETTINGS_EQ_PRESET_ERROR, arguments, 1);
+    } else {
+        string_builder_append(&notice, i18n_text(STR_SETTINGS_EQ_PRESET_FAILED));
+    }
+    toast_show(equalizer->config.toast, equalizer->notice, equalizer->now_ms);
 }
 
 static void enter_picker(void *context, uint32_t now_ms)
 {
     EqualizerScreen *equalizer = context;
     equalizer->now_ms = now_ms;
-    list_view_select(&equalizer->list, (int)choice_of(&equalizer->config)->preset, now_ms);
+    equalizer_files_scan(&equalizer->files);
+    const EqualizerChoice *choice = choice_of(&equalizer->config);
+    int selected = (int)choice->preset;
+    if (choice->preset == EQUALIZER_PRESET_FILE) {
+        selected = EQUALIZER_PRESET_FILE;
+        for (int index = 0; index < equalizer->files.count; index++) {
+            if (same_name(choice->preset_name, equalizer->files.names[index])) {
+                selected = EQUALIZER_PRESET_FILE + index;
+            }
+        }
+    }
+    list_view_select(&equalizer->list, selected, now_ms);
+    equalizer->file_preview = selected >= EQUALIZER_PRESET_FILE ? selected : -1;
     if (above_equalizer_rate()) {
         toast_show(equalizer->config.toast, i18n_text(STR_SETTINGS_EQ_BYPASS_HINT), now_ms);
     }
@@ -161,6 +229,25 @@ static void draw_picker(void *context, Canvas *canvas)
     const Theme *theme = equalizer->config.theme;
     header_draw(canvas, theme, equalizer->screen.title);
     list_view_draw(&equalizer->list, canvas, theme_content_area(theme), equalizer->now_ms);
+}
+
+static bool preview_file(EqualizerScreen *equalizer, int index)
+{
+    int file = index - EQUALIZER_PRESET_FILE;
+    if (file < 0 || file >= equalizer->files.count) {
+        return false;
+    }
+    const char *name = equalizer->files.names[file];
+    EqualizerChoice *choice = choice_of(&equalizer->config);
+    if (choice->preset == EQUALIZER_PRESET_FILE && same_name(choice->preset_name, name)) {
+        return true;
+    }
+    EqualizerTextError error;
+    if (!equalizer_store_select_file(equalizer->config.store, name, &error)) {
+        show_preset_error(equalizer, error);
+        return false;
+    }
+    return true;
 }
 
 static int8_t *gains_of(const EqualizerEditor *editor)
@@ -474,8 +561,7 @@ static void init_editor(EqualizerEditor *editor, EqualizerConfig config)
 
 Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config)
 {
-    equalizer->config = config;
-    equalizer->now_ms = 0;
+    *equalizer = (EqualizerScreen){.config = config};
     equalizer->model = (ListModel){.context = equalizer,
                                    .count = preset_count,
                                    .label = preset_label,
@@ -503,5 +589,9 @@ ScreenAction equalizer_screen_open(void *context)
 const char *equalizer_screen_summary(const void *context)
 {
     const EqualizerScreen *equalizer = context;
-    return equalizer_screen_preset_name(choice_of(&equalizer->config)->preset);
+    const EqualizerChoice *choice = choice_of(&equalizer->config);
+    if (choice->preset == EQUALIZER_PRESET_FILE) {
+        return choice->preset_name;
+    }
+    return equalizer_screen_preset_name(choice->preset);
 }
