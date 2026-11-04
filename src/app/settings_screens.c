@@ -57,6 +57,9 @@ static const StringId LANGUAGE_OPTIONS[LANGUAGE_COUNT] = {
 static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
 static const StringId USB_MODE_MESSAGES[USB_MODE_COUNT] = {STR_SETTINGS_USB_DRIVES,
                                                            STR_SETTINGS_USB_SOUND};
+static const StringId SCREENSAVER_OPTIONS[SCREENSAVER_STYLE_COUNT] = {
+    STR_SETTINGS_SAVER_OFF, STR_SETTINGS_SAVER_CLOCK, STR_SETTINGS_SAVER_ARTWORK,
+    STR_SETTINGS_SAVER_CLOCK_ARTWORK};
 
 static const Settings *settings_of(const void *context)
 {
@@ -271,6 +274,17 @@ static void choose_language(void *context, int index)
     toast_show(settings->toast, i18n_text(STR_LANGUAGE_RESTART), hal_clock_milliseconds());
 }
 
+static int current_screensaver(const void *context)
+{
+    return (int)settings_of(context)->screensaver;
+}
+
+static void choose_screensaver(void *context, int index)
+{
+    editable_settings(context)->screensaver = (ScreensaverStyle)index;
+    save(context);
+}
+
 static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {STR_SETTINGS_SHUFFLE, SHUFFLE_OPTIONS, NULL, SHUFFLE_MODE_COUNT, current_shuffle,
      choose_shuffle, NULL},
@@ -299,6 +313,8 @@ static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
      choose_usb_mode, NULL},
     {STR_LANGUAGE_TITLE, LANGUAGE_OPTIONS, NULL, LANGUAGE_COUNT, current_language, choose_language,
      NULL},
+    {STR_SETTINGS_SCREENSAVER, SCREENSAVER_OPTIONS, NULL, SCREENSAVER_STYLE_COUNT,
+     current_screensaver, choose_screensaver, NULL},
 };
 
 static ScreenAction open_choice(void *context)
@@ -432,6 +448,15 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
     screens->items[SETTINGS_ABOUT_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_ABOUT),
                                                      .select = menu_open_screen,
                                                      .context = &screens->about,
+                                                     .opens = true};
+    screens->items[SETTINGS_CUSTOMIZE_MENU_ITEM] =
+        (MenuItem){.label = i18n_text(STR_SETTINGS_CUSTOMIZE_MAIN_MENU),
+                   .select = menu_open_screen,
+                   .context = context.main_menu_customization,
+                   .opens = true};
+    screens->items[SETTINGS_CLOCK_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_SET_CLOCK),
+                                                     .select = menu_open_screen,
+                                                     .context = context.clock,
                                                      .opens = true};
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};

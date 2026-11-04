@@ -12,9 +12,13 @@
 #include "library_store.h"
 #include "player.h"
 #include "screens/bluetooth_screen.h"
+#include "screens/brick_screen.h"
+#include "screens/clock_screen.h"
 #include "screens/cover_flow_screen.h"
 #include "screens/equalizer_screen.h"
 #include "screens/now_playing_screen.h"
+#include "screens/music_quiz_screen.h"
+#include "screens/screen_saver.h"
 #include "screens/test_pattern_screen.h"
 #include "screens/up_next_screen.h"
 #include "settings/settings.h"
@@ -25,10 +29,15 @@
 #include "ui/toast.h"
 
 enum {
-    HOME_ITEM_COUNT = 6,
+    DIAGNOSTICS_ITEM_COUNT = 16,
+    HOME_ROOT_ITEM_COUNT = 6,
+    HOME_MUSIC_SHORTCUT_COUNT = 9,
+    HOME_SETTINGS_SHORTCUT_COUNT = 20,
+    HOME_DIAGNOSTICS_SHORTCUT_COUNT = DIAGNOSTICS_ITEM_COUNT,
+    HOME_ITEM_COUNT = HOME_ROOT_ITEM_COUNT + HOME_MUSIC_SHORTCUT_COUNT +
+                      HOME_SETTINGS_SHORTCUT_COUNT + HOME_DIAGNOSTICS_SHORTCUT_COUNT + 2,
     SHELF_COUNT = 2,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 16,
     START_PATH_CAPACITY = 2
 };
 
@@ -62,8 +71,18 @@ typedef struct BrowseEntry {
     bool present;
 } BrowseEntry;
 
+typedef struct HomeMenuOption {
+    SettingsStore *store;
+    Toast *toast;
+    uint8_t bit;
+    bool available;
+    bool (*was_shown)(const void *context);
+    const void *shown_context;
+} HomeMenuOption;
+
 typedef struct AppScreens {
     MenuScreen home;
+    MenuScreen main_menu_customization;
     MenuScreen music;
     SettingsScreens settings;
     MenuScreen diagnostics;
@@ -75,12 +94,19 @@ typedef struct AppScreens {
     BrowseEntry browse_entries[MUSIC_ITEM_COUNT];
     BrowseEntry shelf_entries[SHELF_COUNT];
     TestPatternScreen test_pattern;
+    BrickScreen brick;
+    MusicQuizScreen music_quiz;
+    ClockScreen clock_screen;
+    ScreenSaverScreen screen_saver;
     BluetoothScreen bluetooth;
     EqualizerScreen equalizer;
     ClockOption clock;
     Core1Option core1;
     Core1AccelOption core1_accel;
     MenuItem home_items[HOME_ITEM_COUNT];
+    MenuItem customization_items[HOME_ITEM_COUNT];
+    HomeMenuOption home_options[HOME_ITEM_COUNT];
+    int customization_item_count;
     HomeArt home_art;
     MenuItem music_items[MUSIC_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];

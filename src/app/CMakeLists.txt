@@ -23,11 +23,15 @@ add_library(echo_app STATIC
     settings_store.c
     spoken_store.c
     screens/bluetooth_screen.c
+    screens/brick_screen.c
+    screens/clock_screen.c
     screens/charge_screen.c
     screens/cover_flow_screen.c
     screens/equalizer_screen.c
     screens/font_sample_screen.c
     screens/now_playing_screen.c
+    screens/music_quiz_screen.c
+    screens/screen_saver.c
     screens/up_next_screen.c
     screens/stopwatch_screen.c
     screens/test_pattern_screen.c

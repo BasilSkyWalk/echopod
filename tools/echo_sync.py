@@ -494,6 +494,55 @@ def build_library(card):
     return model, data
 
 
+SMART_FIELDS = {
+    "artist": "artist",
+    "album artist": "album_artist",
+    "album": "album",
+    "genre": "genre",
+    "year": "year",
+}
+
+
+def make_smart_playlist(card, read=input):
+    """Create a portable M3U from a simple tag rule, then let the normal sync index it."""
+    print("Smart playlist fields: artist, album artist, album, genre, year")
+    name = read("Playlist name: ").strip()
+    if not name or any(character in name for character in "/\\\0"):
+        raise SyncError("Choose a playlist name without a slash.")
+    field = read("Match field: ").strip().casefold()
+    if field not in SMART_FIELDS:
+        raise SyncError("Choose artist, album artist, album, genre, or year.")
+    wanted = read("Match value (year accepts a single year or range such as 1990-1999): ").strip()
+    if not wanted:
+        raise SyncError("A match value is required.")
+    tracks, _, failures = library_index.scan(card)
+    attribute = SMART_FIELDS[field]
+    if field == "year":
+        try:
+            parts = wanted.split("-", 1)
+            low = int(parts[0])
+            high = int(parts[-1])
+            if not (1 <= low <= high <= 9999):
+                raise ValueError
+        except ValueError as error:
+            raise SyncError("Enter a year or an ascending year range, such as 1990-1999.") from error
+        matches = [track for track in tracks if low <= track.year <= high]
+    else:
+        key = wanted.casefold()
+        matches = [track for track in tracks if getattr(track, attribute).casefold() == key]
+    if not matches:
+        raise SyncError(f"No tracks match {field} {wanted!r}; no playlist was written.")
+    playlist_path = card / f"{name}.m3u8"
+    if playlist_path.exists():
+        raise SyncError(f"{playlist_path.name} already exists; choose another name.")
+    data = "\n".join(["#EXTM3U", *(track.path for track in matches)]) + "\n"
+    try:
+        playlist_path.write_text(data, encoding="utf-8")
+    except OSError as error:
+        raise SyncError(f"couldn't write {playlist_path}: {error.strerror or error}") from error
+    print(f"Created {playlist_path.name}: {plural(len(matches), 'track')}")
+
+
 def album_sources(card, model, library_path):
     if model is not None:
         return cover_export.album_sources(model)
@@ -671,6 +720,9 @@ def parse_arguments(argv):
     parser.add_argument("--yes", action="store_true",
                         help="create the card's .echo folder without asking")
     parser.add_argument("--verbose", action="store_true", help="list the albums without art")
+    parser.add_argument("--make-smart-playlist", action="store_true",
+                        help="create an M3U8 playlist from artist, album, genre, or year tags, "
+                             "then rebuild the database and covers")
     return parser.parse_args(argv)
 
 
@@ -717,6 +769,10 @@ def run(arguments):
         options = options_from(arguments)
         print(f"EchoPod sync: {card} ({volume.file_system})")
         ensure_echo_folder(echo, options, arguments.yes)
+        if arguments.make_smart_playlist:
+            if not sys.stdin.isatty():
+                raise SyncError("--make-smart-playlist needs an interactive terminal.")
+            make_smart_playlist(card)
         recorded = sync(card, volume, options)
     except SyncError as error:
         print(f"echo_sync: {error}", file=sys.stderr)

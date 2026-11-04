@@ -3,7 +3,7 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 7,
+    VERSION = 9,
     FIRST_VERSION = 1,
     AUTO_OFF_VERSION = 2,
     USB_MODE_VERSION = 3,
@@ -29,7 +29,14 @@ enum {
     ORIENTATION_FIELD = 17,
     LANGUAGE_FIELD = 18,
     DAC_FIELD = 19,
-    CHECKSUM_FIELD = 20,
+    MENU_ITEMS_FIELD = 20,
+    SCREENSAVER_FIELD = 28,
+    CLOCK_HOUR_FIELD = 29,
+    CLOCK_MINUTE_FIELD = 30,
+    OLD_CHECKSUM_FIELD = 20,
+    VERSION_8_CHECKSUM_FIELD = 28,
+    CHECKSUM_FIELD = 32,
+    MAIN_MENU_ITEMS = 53,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
     DEFAULT_VOLUME = 12,
@@ -43,6 +50,13 @@ static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'S', 'T'};
 static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30, 60, 120, 300, 0};
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
 static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
+
+static uint32_t checksum_of(const uint8_t *bytes, uint32_t length);
+
+static uint64_t default_main_menu_items(void)
+{
+    return 0x3Fu;
+}
 
 Settings settings_defaults(void)
 {
@@ -62,6 +76,10 @@ Settings settings_defaults(void)
         .language = LANGUAGE_ENGLISH,
         .filter = 0,
         .balance = SETTINGS_BALANCE_CENTER,
+        .main_menu_items = default_main_menu_items(),
+        .screensaver = SCREENSAVER_OFF,
+        .clock_hour = 0,
+        .clock_minute = 0,
     };
 }
 
@@ -90,9 +108,9 @@ uint32_t settings_auto_off_ms(const Settings *settings)
     return settings_auto_off_option_minutes(settings->auto_off) * MILLISECONDS_PER_MINUTE;
 }
 
-static uint32_t checksum_of(const uint8_t *bytes)
+static uint32_t checksum_of(const uint8_t *bytes, uint32_t length)
 {
-    return hash_update(HASH_START, bytes, CHECKSUM_FIELD);
+    return hash_update(HASH_START, bytes, (size_t)length);
 }
 
 static void put_u32(uint8_t *bytes, int offset, uint32_t value)
@@ -131,7 +149,13 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     bytes[ORIENTATION_FIELD] = (uint8_t)settings->orientation;
     bytes[LANGUAGE_FIELD] = (uint8_t)settings->language;
     bytes[DAC_FIELD] = (uint8_t)(settings->filter << FILTER_SHIFT | settings->balance);
-    put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
+    for (int index = 0; index < 8; index++) {
+        bytes[MENU_ITEMS_FIELD + index] = (uint8_t)(settings->main_menu_items >> (8 * index));
+    }
+    bytes[SCREENSAVER_FIELD] = (uint8_t)settings->screensaver;
+    bytes[CLOCK_HOUR_FIELD] = settings->clock_hour;
+    bytes[CLOCK_MINUTE_FIELD] = settings->clock_minute;
+    put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes, CHECKSUM_FIELD));
 }
 
 static bool header_valid(const uint8_t *bytes)
@@ -142,8 +166,13 @@ static bool header_valid(const uint8_t *bytes)
         }
     }
     uint8_t version = bytes[VERSION_FIELD];
-    return version >= FIRST_VERSION && version <= VERSION && bytes[VERSION_FIELD + 1] == 0 &&
-           get_u32(bytes, CHECKSUM_FIELD) == checksum_of(bytes);
+    if (version < FIRST_VERSION || version > VERSION || bytes[VERSION_FIELD + 1] != 0) {
+        return false;
+    }
+    int checksum_field = version >= 9 ? CHECKSUM_FIELD
+                          : version >= 8 ? VERSION_8_CHECKSUM_FIELD
+                                         : OLD_CHECKSUM_FIELD;
+    return get_u32(bytes, checksum_field) == checksum_of(bytes, (uint32_t)checksum_field);
 }
 
 static bool values_valid(const uint8_t *bytes)
@@ -161,12 +190,19 @@ static bool values_valid(const uint8_t *bytes)
            (bytes[VERSION_FIELD] < LANGUAGE_VERSION || bytes[LANGUAGE_FIELD] < LANGUAGE_COUNT) &&
            (bytes[VERSION_FIELD] < DAC_VERSION ||
             ((bytes[DAC_FIELD] >> FILTER_SHIFT) < DAC_FILTER_COUNT &&
-             (bytes[DAC_FIELD] & BALANCE_MASK) < SETTINGS_BALANCE_STEPS));
+             (bytes[DAC_FIELD] & BALANCE_MASK) < SETTINGS_BALANCE_STEPS)) &&
+           (bytes[VERSION_FIELD] < 8 ||
+            (get_u32(bytes, MENU_ITEMS_FIELD + 4) <= 0x1FFFFFu &&
+             (bytes[VERSION_FIELD] < 9 ||
+              (bytes[SCREENSAVER_FIELD] < SCREENSAVER_STYLE_COUNT &&
+               bytes[CLOCK_HOUR_FIELD] < 24 && bytes[CLOCK_MINUTE_FIELD] < 60))));
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
 {
-    if (length < SETTINGS_FILE_SIZE || !header_valid(bytes) || !values_valid(bytes)) {
+    if (length < 24 || (bytes[VERSION_FIELD] >= 8 && bytes[VERSION_FIELD] < 9 && length < 32) ||
+        (bytes[VERSION_FIELD] >= 9 && length < SETTINGS_FILE_SIZE) ||
+        !header_valid(bytes) || !values_valid(bytes)) {
         return false;
     }
     *settings = (Settings){
@@ -193,6 +229,14 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .filter = bytes[VERSION_FIELD] < DAC_VERSION ? 0 : bytes[DAC_FIELD] >> FILTER_SHIFT,
         .balance = bytes[VERSION_FIELD] < DAC_VERSION ? SETTINGS_BALANCE_CENTER
                                                       : bytes[DAC_FIELD] & BALANCE_MASK,
+        .main_menu_items = bytes[VERSION_FIELD] < 8
+                               ? default_main_menu_items()
+                               : (uint64_t)get_u32(bytes, MENU_ITEMS_FIELD) |
+                                     (uint64_t)get_u32(bytes, MENU_ITEMS_FIELD + 4) << 32,
+        .screensaver = bytes[VERSION_FIELD] < 9 ? SCREENSAVER_OFF
+                                                : (ScreensaverStyle)bytes[SCREENSAVER_FIELD],
+        .clock_hour = bytes[VERSION_FIELD] < 9 ? 0 : bytes[CLOCK_HOUR_FIELD],
+        .clock_minute = bytes[VERSION_FIELD] < 9 ? 0 : bytes[CLOCK_MINUTE_FIELD],
     };
     return true;
 }

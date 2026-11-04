@@ -124,6 +124,7 @@ typedef struct AppState {
     uint32_t now_ms;
     AppOptions options;
     bool display_on;
+    bool screen_saver_active;
     bool powered_off;
     bool charging;
     uint32_t charge_lit_until_ms;
@@ -249,6 +250,7 @@ static void set_display(bool on)
 
 static void save_settings(void)
 {
+    clock_screen_commit(&app.screens.clock_screen, hal_clock_milliseconds());
     settings_store_capture(&app.settings, player_status(&app.player));
     settings_store_save(&app.settings);
     equalizer_store_save(&app.equalizer);
@@ -439,6 +441,16 @@ static void dispatch_key_events(uint32_t now_ms)
         if (ignored_power_tap(event)) {
             continue;
         }
+        if (app.screen_saver_active) {
+            app.screen_saver_active = false;
+            screen_stack_apply(&app.stack, screen_action_pop(), now_ms);
+            power_policy_wake(&app.power, now_ms);
+            use_screen_key_behaviors();
+            if (event.key == KEY_POWER && event.gesture == KEY_GESTURE_LONG_PRESS) {
+                shut_down(GOODBYE_TEXT);
+            }
+            continue;
+        }
         PowerKeyOutcome outcome = power_policy_key(&app.power, event, now_ms);
         if (outcome.shutdown) {
             shut_down(GOODBYE_TEXT);
@@ -477,6 +489,19 @@ static void update_power(uint32_t now_ms)
         return;
     }
     keep_awake_while_busy(now_ms);
+    if (app.screen_saver_active) {
+        app.power.last_activity_ms = now_ms;
+    } else if (app.power.timeout_ms > 0 &&
+               app.settings.settings.screensaver != SCREENSAVER_OFF &&
+               now_ms - app.power.last_activity_ms >= app.power.timeout_ms) {
+        if (screen_stack_apply(&app.stack,
+                               screen_action_push(&app.screens.screen_saver.screen), now_ms)) {
+            app.screen_saver_active = true;
+            power_policy_wake(&app.power, now_ms);
+            use_screen_key_behaviors();
+            return;
+        }
+    }
     if (power_policy_update(&app.power, now_ms)) {
         shut_down(GOODBYE_TEXT);
         return;
