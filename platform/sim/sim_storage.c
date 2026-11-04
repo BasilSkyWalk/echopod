@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include "hal/storage.h"
@@ -32,6 +33,17 @@ void sim_storage_configure(const char *card_directory, const char *system_direct
 {
     storage.card_directory = card_directory;
     storage.system_directory = system_directory;
+}
+
+HalStorageInfo hal_storage_info(void)
+{
+    struct statvfs info;
+    if (storage.card_directory == NULL || statvfs(storage.card_directory, &info) != 0) {
+        return (HalStorageInfo){0};
+    }
+    return (HalStorageInfo){.capacity_bytes = (uint64_t)info.f_blocks * info.f_frsize,
+                            .available_bytes = (uint64_t)info.f_bavail * info.f_frsize,
+                            .available_known = true};
 }
 
 bool sim_storage_host_path(const char *path, char *buffer, size_t capacity)

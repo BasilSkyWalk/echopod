@@ -37,6 +37,17 @@ static bool mounted(void)
     return mount_state == MOUNT_READY;
 }
 
+HalStorageInfo hal_storage_info(void)
+{
+    if (!mounted()) {
+        return (HalStorageInfo){0};
+    }
+    FatSpace space = fat_space(&volume);
+    return (HalStorageInfo){.capacity_bytes = space.capacity_bytes,
+                            .available_bytes = space.available_bytes,
+                            .available_known = space.available_known};
+}
+
 static int free_slot(void)
 {
     for (int slot = 0; slot < OPEN_FILE_CAPACITY; slot++) {

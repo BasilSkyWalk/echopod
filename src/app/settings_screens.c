@@ -1,8 +1,12 @@
 #include "settings_screens.h"
 
 #include "core/i18n.h"
+#include "core/string_builder.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
+#include "hal/storage.h"
+#include "hal/system.h"
+#include "library/library.h"
 
 enum {
     BRIGHTNESS_LEVEL_COUNT = SETTINGS_BRIGHTNESS_MAX - SETTINGS_BRIGHTNESS_MIN + 1,
@@ -340,6 +344,65 @@ static ScreenAction request_rescan(void *context)
     return screen_action_none();
 }
 
+static void format_size(char *text, size_t capacity, uint64_t bytes)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (bytes >= 1000000000u) {
+        uint32_t tenths = (uint32_t)((bytes + 50000000u) / 100000000u);
+        string_builder_append_unsigned(&builder, tenths / 10u);
+        string_builder_append_char(&builder, '.');
+        string_builder_append_unsigned(&builder, tenths % 10u);
+        string_builder_append(&builder, " GB");
+    } else {
+        string_builder_append_unsigned(&builder, (uint32_t)((bytes + 500000u) / 1000000u));
+        string_builder_append(&builder, " MB");
+    }
+}
+
+static char about_capacity[16];
+static char about_available[16];
+static char about_songs[16];
+
+static const char *about_capacity_value(const void *context)
+{
+    (void)context;
+    HalStorageInfo info = hal_storage_info();
+    if (info.capacity_bytes == 0) {
+        return i18n_text(STR_ABOUT_UNKNOWN);
+    }
+    format_size(about_capacity, sizeof about_capacity, info.capacity_bytes);
+    return about_capacity;
+}
+
+static const char *about_available_value(const void *context)
+{
+    (void)context;
+    HalStorageInfo info = hal_storage_info();
+    if (!info.available_known) {
+        return i18n_text(STR_ABOUT_UNKNOWN);
+    }
+    format_size(about_available, sizeof about_available, info.available_bytes);
+    return about_available;
+}
+
+static const char *about_songs_value(const void *context)
+{
+    const SettingsScreens *screens = context;
+    const Library *library = screens->context.player->library;
+    if (library == NULL) {
+        return i18n_text(STR_ABOUT_UNKNOWN);
+    }
+    StringBuilder builder = string_builder_make(about_songs, sizeof about_songs);
+    string_builder_append_unsigned(&builder, library_count(library, LIBRARY_TRACKS));
+    return about_songs;
+}
+
+static const char *about_firmware_value(const void *context)
+{
+    (void)context;
+    return hal_system_version();
+}
+
 Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context, const Theme *theme)
 {
     screens->context = context;
@@ -357,6 +420,24 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
                                                          .context = context.equalizer,
                                                          .value = equalizer_screen_summary,
                                                          .opens = true};
+    screens->about_items[0] = (MenuItem){.label = i18n_text(STR_ABOUT_SD_CARD),
+                                         .value = about_capacity_value};
+    screens->about_items[1] = (MenuItem){.label = i18n_text(STR_ABOUT_AVAILABLE),
+                                         .value = about_available_value};
+    screens->about_items[2] = (MenuItem){.label = i18n_text(STR_ABOUT_SONGS),
+                                         .value = about_songs_value,
+                                         .context = screens};
+    screens->about_items[3] = (MenuItem){.label = i18n_text(STR_ABOUT_FIRMWARE),
+                                         .value = about_firmware_value};
+    MenuConfig about = {.title = i18n_text(STR_SETTINGS_ABOUT),
+                        .items = screens->about_items,
+                        .item_count = ABOUT_ITEM_COUNT,
+                        .theme = theme};
+    menu_screen_init(&screens->about, about);
+    screens->items[SETTINGS_ABOUT_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_ABOUT),
+                                                     .select = menu_open_screen,
+                                                     .context = &screens->about,
+                                                     .opens = true};
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
         int item = index < SETTINGS_BLUETOOTH_ITEM ? index : index + 1;

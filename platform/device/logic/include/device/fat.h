@@ -51,6 +51,8 @@ typedef struct FatVolume {
     uint32_t data_start;
     uint32_t cluster_count;
     uint32_t cluster_shift;
+    uint64_t volume_sector_count;
+    uint8_t percent_in_use;
     uint32_t free_hint;
     uint32_t cache_lba;
     uint32_t cache_count;
@@ -67,6 +69,12 @@ typedef struct FatVolume {
     char parent_path[FAT_PARENT_CAPACITY];
 } FatVolume;
 
+typedef struct FatSpace {
+    uint64_t capacity_bytes;
+    uint64_t available_bytes;
+    bool available_known;
+} FatSpace;
+
 typedef struct FatDirCursor {
     FatFile directory;
     uint32_t index;
@@ -81,6 +89,7 @@ typedef struct FatDirEntry {
 } FatDirEntry;
 
 bool fat_mount(FatVolume *volume, BlockDevice device);
+FatSpace fat_space(FatVolume *volume);
 uint32_t fat_exfat_utc_stamp(uint32_t timestamp, uint8_t utc_offset);
 bool fat_open_directory(FatVolume *volume, const char *path, FatDirCursor *cursor);
 bool fat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *entry);
