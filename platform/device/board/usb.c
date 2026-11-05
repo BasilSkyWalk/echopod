@@ -56,6 +56,8 @@
 #define DSTS_SPEED_MASK 0x3u
 #define DSTS_HIGH_SPEED 0x0u
 #define DSTS_ODD_FRAME (1u << 8)
+#define DSTS_FRAME_SHIFT 8
+#define DSTS_FRAME_MASK 0x3FFFu
 #define DCFG_ADDRESS_SHIFT 4
 #define DCFG_ADDRESS_MASK (0x7Fu << DCFG_ADDRESS_SHIFT)
 #define DCTL_SOFT_DISCONNECT (1u << 1)
@@ -67,6 +69,7 @@
 #define EP_SET_ODD_FRAME (1u << 29)
 #define EP_ODD_FRAME (1u << 16)
 #define EP_ISO_ACTIVE 0x00048000u
+#define EP_INTERRUPT_ACTIVE 0x100C8000u
 #define EP_MAX_PACKET_MASK 0x7FFu
 #define EP_STALL (1u << 21)
 #define EP_TX_FIFO_SHIFT 22
@@ -82,6 +85,7 @@
 #define DOEPMSK_VALUE 0x0Fu
 #define DAINT_EP0 0x00010001u
 #define DAINT_EP1 0x00020002u
+#define DAINT_EP2_IN 0x00000004u
 #define RX_STATUS_ENDPOINT_MASK 0xFu
 #define RX_STATUS_COUNT_SHIFT 4
 #define RX_STATUS_COUNT_MASK 0x7FFu
@@ -111,6 +115,7 @@ enum {
     PACKET_OUT_DATA = 2,
     PACKET_SETUP_DATA = 6,
     BULK_ENDPOINT = 1,
+    HID_ENDPOINT = USB_HID_ENDPOINT_NUMBER,
     PACKET_WORDS = USB_PACKET_SIZE / 4,
     BULK_CHUNK_BYTES = 512,
     RESET_TIMEOUT_MS = 100,
@@ -454,6 +459,7 @@ static void handle_reset(UsbPort *port)
     flush_fifos();
     port->configured = false;
     port->in_busy = false;
+    port->report_busy = false;
     port->control_out_pending = false;
     if (port->msc != NULL) {
         msc_reset(port->msc);
@@ -482,7 +488,9 @@ static void activate_endpoints(const UsbPort *port)
         return;
     }
     write_register(out_control(BULK_ENDPOINT), USB_AUDIO_MAX_PACKET | EP_ISO_ACTIVE);
-    set_bits(DAINTMSK, DAINT_EP1);
+    uint32_t tx_fifo = port->dedicated_fifos ? 1u << EP_TX_FIFO_SHIFT : 0;
+    write_register(in_control(HID_ENDPOINT), USB_HID_PACKET_SIZE | tx_fifo | EP_INTERRUPT_ACTIVE);
+    set_bits(DAINTMSK, DAINT_EP1 | DAINT_EP2_IN);
     set_bits(GINTMSK, GINT_INCOMPLETE_ISO_OUT);
 }
 
@@ -589,6 +597,8 @@ static void handle_receive(UsbPort *port)
         port->setup_pending = true;
     } else if (type == PACKET_OUT_DATA) {
         read_fifo(port->out_packet, sizeof port->out_packet / 4, count);
+        port->packet_frame =
+            (uint16_t)((read_register(DSTS) >> DSTS_FRAME_SHIFT) & DSTS_FRAME_MASK);
         uint32_t capacity = sizeof port->out_packet;
         deliver(port, endpoint, count < capacity ? count : capacity);
     }
@@ -627,6 +637,13 @@ static void handle_in_endpoints(UsbPort *port)
         write_register(in_control(BULK_ENDPOINT) + 0x08u, events);
         if ((events & EP_INT_TRANSFER_DONE) != 0) {
             port->in_busy = false;
+        }
+    }
+    if ((pending & (1u << HID_ENDPOINT)) != 0) {
+        uint32_t events = read_register(in_control(HID_ENDPOINT) + 0x08u);
+        write_register(in_control(HID_ENDPOINT) + 0x08u, events);
+        if ((events & EP_INT_TRANSFER_DONE) != 0) {
+            port->report_busy = false;
         }
     }
 }
@@ -732,4 +749,14 @@ void usb_poll(UsbPort *port)
 bool usb_reply_pending(const UsbPort *port)
 {
     return port->in_busy || port->msc->phase == MSC_PHASE_STATUS;
+}
+
+bool usb_send_report(UsbPort *port, uint8_t report)
+{
+    if (port->audio == NULL || !port->configured || port->report_busy) {
+        return false;
+    }
+    usb_audio_set_report(port->audio, report);
+    port->report_busy = send(port, HID_ENDPOINT, &report, USB_HID_REPORT_LENGTH);
+    return port->report_busy;
 }

@@ -5,6 +5,11 @@
 
 #include "device/stream_drift.h"
 
+enum {
+    USB_AUDIO_SINK_MUTED = 0xFF,
+    USB_AUDIO_SINK_UNITY_GAIN = 1 << 24
+};
+
 typedef struct UsbAudioSinkStats {
     uint32_t packets;
     uint32_t dropped;
@@ -21,6 +26,8 @@ typedef struct UsbAudioSink {
     uint32_t guard;
     uint8_t sample_bytes;
     bool playing;
+    int32_t gain;
+    int32_t gain_target;
     StreamDrift drift;
     UsbAudioSinkStats stats;
 } UsbAudioSink;
@@ -28,6 +35,8 @@ typedef struct UsbAudioSink {
 void usb_audio_sink_init(UsbAudioSink *sink, uint32_t *ring, uint32_t ring_frames);
 void usb_audio_sink_start(UsbAudioSink *sink, uint32_t rate, uint8_t sample_bytes);
 void usb_audio_sink_set_playing(UsbAudioSink *sink, bool playing);
+void usb_audio_sink_set_attenuation(UsbAudioSink *sink, uint8_t half_decibels);
+int32_t usb_audio_sink_gain_for(uint8_t half_decibels);
 void usb_audio_sink_write(UsbAudioSink *sink, const uint8_t *bytes, uint32_t length,
                           uint32_t consumed);
 bool usb_audio_sink_primed(const UsbAudioSink *sink);

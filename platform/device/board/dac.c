@@ -109,6 +109,7 @@ static bool dac_up;
 static bool muted;
 static uint8_t applied_volume;
 static void (*fade_service)(void);
+static bool fades_off;
 
 HalToneDetail hal_audio_tone_detail(void)
 {
@@ -416,12 +417,19 @@ static void wait_serving(uint32_t microseconds)
     } while (hal_clock_microseconds() - start < microseconds);
 }
 
+void dac_path_set_fades(bool fades)
+{
+    fades_off = !fades;
+}
+
 static void fade_to(uint8_t target)
 {
     while (applied_volume != target) {
-        applied_volume = dac_ramp_next(applied_volume, target);
+        applied_volume = fades_off ? target : dac_ramp_next(applied_volume, target);
         dac_set_balanced_volume(&BUS, applied_volume, current_balance());
-        wait_serving(FADE_STEP_US);
+        if (!fades_off) {
+            wait_serving(FADE_STEP_US);
+        }
     }
 }
 

@@ -46,7 +46,10 @@ enum {
     SETTINGS_START_INDEX = 13,
     SETTINGS_RESCAN_INDEX = 14,
     SETTINGS_LANGUAGE_INDEX = 16,
-    SETTINGS_CLOCK_INDEX = 27,
+    SETTINGS_CLOCK_INDEX = 28,
+    SETTINGS_SWAP_INDEX = 20,
+    SETTINGS_USB_PROMPT_INDEX = 27,
+    DAC_VOLUME_WINDOW_MS = 3000,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -623,6 +626,164 @@ static void the_other_portrait_and_landscape_keep_the_rocker(void)
     tap(KEY_VOLUME_UP);
     tap(KEY_PLAY);
     CHECK(title_is("Gain"));
+}
+
+static void dac_press(Key key, uint32_t held_ms)
+{
+    fake_hal_queue_transition(key, true, now_ms);
+    now_ms += held_ms;
+    fake_hal_set_milliseconds(now_ms);
+}
+
+static void dac_release(Key key)
+{
+    fake_hal_queue_transition(key, false, now_ms);
+    now_ms += 10;
+    fake_hal_set_milliseconds(now_ms);
+}
+
+static AppDacKey dac_tap(Key key)
+{
+    dac_press(key, KEY_HOLD_MS);
+    dac_release(key);
+    return app_dac_next_key();
+}
+
+static void dac_keys_follow_the_swap_setting(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_UP));
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_DOWN));
+    CHECK_EQUAL(APP_DAC_KEY_NONE, app_dac_next_key());
+    app_dac_keys_stop();
+    open_setting(SETTINGS_SWAP_INDEX);
+    CHECK(title_is("Swap volume buttons"));
+    move_down(1);
+    tap(KEY_PLAY);
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_UP));
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_DOWN));
+    app_dac_keys_stop();
+}
+
+static void dac_keys_turn_around_in_a_swapping_portrait(void)
+{
+    start_app_with_library();
+    choose_orientation(swapping_portrait());
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_UP));
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_DOWN));
+    app_dac_keys_stop();
+}
+
+static void dac_keys_skip_on_a_held_rocker_and_play_pause_on_play(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_NEXT, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    CHECK_EQUAL(APP_DAC_KEY_NONE, app_dac_next_key());
+    dac_press(KEY_VOLUME_DOWN, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_PREVIOUS, app_dac_next_key());
+    dac_release(KEY_VOLUME_DOWN);
+    CHECK_EQUAL(APP_DAC_KEY_PLAY_PAUSE, dac_tap(KEY_PLAY));
+    CHECK_EQUAL(APP_DAC_KEY_NONE, dac_tap(KEY_MENU));
+    app_dac_keys_stop();
+}
+
+static void dac_keys_keep_changing_the_volume_when_held_right_after_a_tap(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_UP));
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, app_dac_next_key());
+    now_ms += 120;
+    fake_hal_set_milliseconds(now_ms);
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    now_ms += DAC_VOLUME_WINDOW_MS;
+    fake_hal_set_milliseconds(now_ms);
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_NEXT, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    app_dac_keys_stop();
+}
+
+static void dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_NONE, dac_tap(KEY_BACK));
+    dac_press(KEY_BACK, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_LEAVE, app_dac_next_key());
+    dac_release(KEY_BACK);
+    app_dac_keys_stop();
+    open_setting(0);
+    CHECK(title_is("Shuffle"));
+}
+
+static const StringId USB_PROMPT_OPTIONS[] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC, STR_OFF};
+
+static void a_usb_choice_is_picked_with_play(void)
+{
+    start_app_with_library();
+    app_choice_show("Computer found", USB_PROMPT_OPTIONS, 3, 1);
+    CHECK_EQUAL(-1, app_choice_step());
+    int presents = fake_hal_present_count();
+    dac_press(KEY_VOLUME_UP, KEY_HOLD_MS);
+    dac_release(KEY_VOLUME_UP);
+    CHECK_EQUAL(-1, app_choice_step());
+    CHECK(fake_hal_present_count() > presents);
+    dac_press(KEY_PLAY, KEY_HOLD_MS);
+    CHECK_EQUAL(2, app_choice_step());
+    dac_release(KEY_PLAY);
+    CHECK_EQUAL(2, app_choice_step());
+    app_choice_close();
+    open_setting(0);
+    CHECK(title_is("Shuffle"));
+}
+
+static void a_dismissed_usb_choice_keeps_the_saved_one(void)
+{
+    start_app_with_library();
+    app_choice_show("Computer found", USB_PROMPT_OPTIONS, 3, 1);
+    dac_press(KEY_BACK, KEY_HOLD_MS);
+    dac_release(KEY_BACK);
+    CHECK_EQUAL(1, app_choice_step());
+    app_choice_close();
+}
+
+static void the_usb_choice_lights_the_screen_and_keeps_the_audio_served(void)
+{
+    start_app_with_library();
+    wait_ms(DEFAULT_TIMEOUT_MS + 1000);
+    CHECK(!fake_hal_display_on());
+    int before = fake_hal_audio_service_count();
+    app_choice_show("Computer found", USB_PROMPT_OPTIONS, 3, 0);
+    app_choice_step();
+    CHECK(fake_hal_display_on());
+    CHECK(fake_hal_audio_service_count() > before);
+    app_choice_close();
+}
+
+static void the_last_setting_asks_whether_to_prompt_on_usb(void)
+{
+    start_app_with_library();
+    CHECK(fake_hal_usb_prompt());
+    open_setting(SETTINGS_USB_PROMPT_INDEX);
+    CHECK(title_is("Ask when connected"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    CHECK(!fake_hal_usb_prompt());
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(USB_PROMPT_OFF, settings.options[OPTION_USB_PROMPT]);
+    restart_app();
+    CHECK(!fake_hal_usb_prompt());
 }
 
 static bool drew_the_bottom_of_a_portrait_screen(void)
@@ -2174,6 +2335,15 @@ int main(void)
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
         TEST_CASE(the_header_shows_the_time_only_while_the_clock_setting_is_on),
         TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
+        TEST_CASE(dac_keys_follow_the_swap_setting),
+        TEST_CASE(dac_keys_turn_around_in_a_swapping_portrait),
+        TEST_CASE(dac_keys_skip_on_a_held_rocker_and_play_pause_on_play),
+        TEST_CASE(dac_keys_keep_changing_the_volume_when_held_right_after_a_tap),
+        TEST_CASE(dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again),
+        TEST_CASE(a_usb_choice_is_picked_with_play),
+        TEST_CASE(a_dismissed_usb_choice_keeps_the_saved_one),
+        TEST_CASE(the_usb_choice_lights_the_screen_and_keeps_the_audio_served),
+        TEST_CASE(the_last_setting_asks_whether_to_prompt_on_usb),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

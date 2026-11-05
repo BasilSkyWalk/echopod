@@ -41,6 +41,8 @@ typedef struct UsbPort {
     uint16_t bulk_packet;
     uint32_t setup[2];
     bool control_out_pending;
+    bool report_busy;
+    uint16_t packet_frame;
     UsbSetup control_out;
     uint32_t out_packet[USB_PORT_PACKET_WORDS];
     UsbDevice device;
@@ -59,3 +61,4 @@ bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms);
 void usb_poll(UsbPort *port);
 UsbProbe usb_probe(void);
 bool usb_reply_pending(const UsbPort *port);
+bool usb_send_report(UsbPort *port, uint8_t report);

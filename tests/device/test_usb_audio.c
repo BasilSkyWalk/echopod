@@ -4,12 +4,15 @@
 #include "device/usb_audio.h"
 
 enum {
-    CONFIGURATION_LENGTH = 159,
+    CONFIGURATION_LENGTH = 184,
+    HID_INTERFACE_OFFSET = 159,
+    REPORT_DESCRIPTOR_LENGTH = 29,
     FORMAT_LENGTH = 14,
     RATE_COUNT = 2
 };
 
 static const uint32_t RATES[RATE_COUNT] = {44100, 48000};
+static const uint16_t STREAMING_INTERFACE_INDEX = 1;
 
 static UsbDevice device;
 
@@ -61,6 +64,8 @@ static void the_device_is_a_full_speed_composite_of_audio_interfaces(void)
     CHECK_EQUAL(0x01, reply.data[3]);
     CHECK_EQUAL(0, reply.data[4]);
     CHECK_EQUAL(0x02, reply.data[10]);
+    CHECK_EQUAL(0x01, reply.data[12]);
+    CHECK_EQUAL(0x01, reply.data[13]);
     CHECK_EQUAL(0, reply.data[16]);
 }
 
@@ -253,6 +258,83 @@ static void requests_for_other_units_or_channels_stall(void)
     CHECK_EQUAL(USB_REPLY_STALL, usb_audio_setup(&audio, setup(0xA1, 0xFE, 0, 0, 1)).kind);
 }
 
+static void the_configuration_ends_with_a_hid_interface_on_an_interrupt_endpoint(void)
+{
+    UsbAudio audio = ready_audio();
+    UsbReply reply = configuration(&audio);
+    CHECK_EQUAL(3, reply.data[4]);
+    const uint8_t *interface = reply.data + HID_INTERFACE_OFFSET;
+    CHECK_EQUAL(4, interface[1]);
+    CHECK_EQUAL(USB_HID_INTERFACE, interface[2]);
+    CHECK_EQUAL(1, interface[4]);
+    CHECK_EQUAL(3, interface[5]);
+    const uint8_t *hid = interface + interface[0];
+    CHECK_EQUAL(0x21, hid[1]);
+    CHECK_EQUAL(0x22, hid[6]);
+    CHECK_EQUAL(REPORT_DESCRIPTOR_LENGTH, hid[7] | hid[8] << 8);
+    const uint8_t *endpoint = find_descriptor(reply, 5, 2);
+    CHECK_EQUAL(USB_HID_ENDPOINT, endpoint[2]);
+    CHECK_EQUAL(3, endpoint[3]);
+    CHECK_EQUAL(USB_HID_PACKET_SIZE, endpoint[4] | endpoint[5] << 8);
+    CHECK_EQUAL(USB_HID_INTERVAL_MS, endpoint[6]);
+    CHECK_EQUAL(reply.length, HID_INTERFACE_OFFSET + interface[0] + hid[0] + endpoint[0]);
+}
+
+static bool has_usage(UsbReply reply, uint8_t usage)
+{
+    for (uint16_t offset = 0; offset + 1 < reply.length; offset++) {
+        if (reply.data[offset] == 0x09 && reply.data[offset + 1] == usage) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void the_report_descriptor_is_a_consumer_control_with_three_media_keys(void)
+{
+    UsbAudio audio = ready_audio();
+    UsbReply reply = usb_audio_setup(&audio, setup(0x81, 6, 0x2200, USB_HID_INTERFACE, 255));
+    CHECK_EQUAL(USB_REPLY_DATA, reply.kind);
+    CHECK_EQUAL(REPORT_DESCRIPTOR_LENGTH, reply.length);
+    CHECK_EQUAL(0x05, reply.data[0]);
+    CHECK_EQUAL(0x0C, reply.data[1]);
+    CHECK(has_usage(reply, 0xCD));
+    CHECK(has_usage(reply, 0xB5));
+    CHECK(has_usage(reply, 0xB6));
+    CHECK_EQUAL(0xC0, reply.data[reply.length - 1]);
+    UsbReply hid = usb_audio_setup(&audio, setup(0x81, 6, 0x2100, USB_HID_INTERFACE, 9));
+    CHECK_EQUAL(9, hid.length);
+    CHECK_EQUAL(0x21, hid.data[1]);
+    CHECK_EQUAL(
+        USB_REPLY_STALL,
+        usb_audio_setup(&audio, setup(0x81, 6, 0x2200, STREAMING_INTERFACE_INDEX, 255)).kind);
+}
+
+static void hid_class_requests_are_answered(void)
+{
+    UsbAudio audio = ready_audio();
+    CHECK_EQUAL(USB_REPLY_STATUS,
+                usb_audio_setup(&audio, setup(0x21, 0x0A, 0, USB_HID_INTERFACE, 0)).kind);
+    CHECK_EQUAL(USB_REPLY_STATUS,
+                usb_audio_setup(&audio, setup(0x21, 0x0B, 1, USB_HID_INTERFACE, 0)).kind);
+    CHECK_EQUAL(USB_REPLY_STALL,
+                usb_audio_setup(&audio, setup(0x21, 0x09, 0x0100, USB_HID_INTERFACE, 1)).kind);
+    usb_audio_set_report(&audio, USB_HID_NEXT);
+    UsbReply report = usb_audio_setup(&audio, setup(0xA1, 0x01, 0x0100, USB_HID_INTERFACE, 1));
+    CHECK_EQUAL(USB_REPLY_DATA, report.kind);
+    CHECK_EQUAL(1, report.length);
+    CHECK_EQUAL(USB_HID_NEXT, report.data[0]);
+    UsbReply protocol = usb_audio_setup(&audio, setup(0xA1, 0x03, 0, USB_HID_INTERFACE, 1));
+    CHECK_EQUAL(1, protocol.data[0]);
+    UsbReply idle = usb_audio_setup(&audio, setup(0xA1, 0x02, 0, USB_HID_INTERFACE, 1));
+    CHECK_EQUAL(0, idle.data[0]);
+    CHECK_EQUAL(USB_REPLY_STATUS,
+                usb_audio_setup(&audio, setup(0x01, 11, 0, USB_HID_INTERFACE, 0)).kind);
+    CHECK_EQUAL(USB_REPLY_STALL,
+                usb_audio_setup(&audio, setup(0x01, 11, 1, USB_HID_INTERFACE, 0)).kind);
+    CHECK_EQUAL(0, usb_audio_take_changes(&audio));
+}
+
 static void standard_requests_reach_the_usb_device(void)
 {
     UsbAudio audio = ready_audio();
@@ -283,6 +365,9 @@ int main(void)
         TEST_CASE(mute_overrides_the_volume),
         TEST_CASE(requests_for_other_units_or_channels_stall),
         TEST_CASE(standard_requests_reach_the_usb_device),
+        TEST_CASE(the_configuration_ends_with_a_hid_interface_on_an_interrupt_endpoint),
+        TEST_CASE(the_report_descriptor_is_a_consumer_control_with_three_media_keys),
+        TEST_CASE(hid_class_requests_are_answered),
 
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

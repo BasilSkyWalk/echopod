@@ -310,7 +310,11 @@ static void choose_slot(void *context, int index)
 {
     SettingsEntry *entry = context;
     *option_of(entry) = (uint8_t)index;
-    save(&entry->owner->context);
+    if (entry->choice->slot - 1 == OPTION_USB_PROMPT) {
+        apply_and_save(&entry->owner->context);
+    } else {
+        save(&entry->owner->context);
+    }
 }
 
 #define OPTION_CHOICE(title, options, option)                                                      \
@@ -355,6 +359,7 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_LISTEN_HISTORY, SHOWN_OPTIONS, OPTION_LISTEN_HISTORY),
     {STR_SETTINGS_BLUETOOTH_LEVEL, BLUETOOTH_LEVEL_OPTIONS, NULL, 2, current_bluetooth_level,
      choose_bluetooth_level, NULL, 0},
+    OPTION_CHOICE(STR_SETTINGS_USB_PROMPT, SHOWN_OPTIONS, OPTION_USB_PROMPT),
     OPTION_CHOICE(STR_SETTINGS_CLOCK, SWITCH_OPTIONS, OPTION_CLOCK),
 };
 
