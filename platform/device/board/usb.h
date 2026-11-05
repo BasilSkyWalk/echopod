@@ -41,6 +41,7 @@ typedef struct UsbPort {
     uint16_t bulk_packet;
     uint32_t setup[2];
     bool control_out_pending;
+    uint16_t packet_frame;
     UsbSetup control_out;
     uint32_t out_packet[USB_PORT_PACKET_WORDS];
     UsbDevice device;

@@ -19,13 +19,15 @@ enum {
     STREAM_IDLE_MS = 100,
     BACK_HOLD_MS = 1000,
     POLLS_PER_SERVICE = 4,
-    NOTICE_CAPACITY = 128,
+    NOTICE_CAPACITY = 192,
     NUMBER_CAPACITY = 12,
     FORMAT_CAPACITY = 16,
     HZ_PER_KHZ = 1000,
     BITS_PER_BYTE = 8,
     VOLUME_REPEAT_DELAY_MS = 400,
-    VOLUME_REPEAT_MS = 80
+    VOLUME_REPEAT_MS = 80,
+    NOTICE_REFRESH_MS = 1000,
+    FRAME_NUMBER_MASK = 0x3FFF
 };
 
 static const char TITLE[] = "USB DAC";
@@ -43,6 +45,11 @@ static bool dac_volume_known;
 static bool holding_volume;
 static int held_step;
 static uint32_t next_repeat_ms;
+static bool frame_known;
+static uint16_t last_frame;
+static uint32_t missed_packets;
+static uint32_t notice_refreshed_ms;
+static char shown_text[NOTICE_CAPACITY];
 
 void hal_system_set_dac_volume(uint8_t level)
 {
@@ -50,10 +57,21 @@ void hal_system_set_dac_volume(uint8_t level)
     dac_volume_known = true;
 }
 
+static void count_missed_frames(void)
+{
+    uint16_t frame = port.packet_frame;
+    if (frame_known && playing) {
+        missed_packets += (uint16_t)(frame - last_frame - 1) & FRAME_NUMBER_MASK;
+    }
+    frame_known = true;
+    last_frame = frame;
+}
+
 static void receive_stream(const uint8_t *bytes, uint32_t length)
 {
     if (receiving) {
         last_packet_ms = hal_clock_milliseconds();
+        count_missed_frames();
         usb_audio_sink_write(&sink, bytes, length, board_audio_stream_consumed());
     }
 }
@@ -77,10 +95,10 @@ bool usb_dac_session_listen(void)
     return false;
 }
 
-static void volume_text(char *text, size_t capacity)
+static void number_text(char *text, size_t capacity, uint32_t value)
 {
     StringBuilder number = string_builder_make(text, capacity);
-    string_builder_append_unsigned(&number, dac_volume);
+    string_builder_append_unsigned(&number, value);
 }
 
 static void append_format(StringBuilder *line)
@@ -94,28 +112,84 @@ static void append_format(StringBuilder *line)
         string_builder_append_char(&rate_builder, '.');
         string_builder_append_unsigned(&rate_builder, audio.rate % HZ_PER_KHZ / 100);
     }
-    StringBuilder bits_builder = string_builder_make(bits, sizeof bits);
-    string_builder_append_unsigned(&bits_builder, BITS_PER_BYTE * usb_audio_sample_bytes(&audio));
-    volume_text(volume, sizeof volume);
+    number_text(bits, sizeof bits, BITS_PER_BYTE * usb_audio_sample_bytes(&audio));
+    number_text(volume, sizeof volume, dac_volume);
     const char *arguments[] = {rate, bits, volume};
     i18n_format(line, STR_USB_FORMAT_VOLUME, arguments, 3);
 }
 
-static void show_state(void)
+static void append_counters(StringBuilder *line)
 {
-    char text[NOTICE_CAPACITY];
-    StringBuilder line = string_builder_make(text, sizeof text);
+    char missed[NUMBER_CAPACITY];
+    char dropped[NUMBER_CAPACITY];
+    char repeated[NUMBER_CAPACITY];
+    char restarts[NUMBER_CAPACITY];
+    number_text(missed, sizeof missed, missed_packets);
+    number_text(dropped, sizeof dropped, sink.stats.dropped);
+    number_text(repeated, sizeof repeated, sink.stats.repeated);
+    number_text(restarts, sizeof restarts, sink.stats.realigned);
+    const char *arguments[] = {missed, dropped, repeated, restarts};
+    string_builder_append(line, " \xC2\xB7 ");
+    i18n_format(line, STR_USB_COUNTERS, arguments, 4);
+}
+
+static void state_text(char *text, size_t capacity)
+{
+    StringBuilder line = string_builder_make(text, capacity);
     if (usb_audio_sample_bytes(&audio) == 0) {
         char volume[NUMBER_CAPACITY];
-        volume_text(volume, sizeof volume);
+        number_text(volume, sizeof volume, dac_volume);
         const char *arguments[] = {volume};
         i18n_format(&line, STR_USB_CHOOSE_OUTPUT, arguments, 1);
     } else if (open_rate == 0) {
         string_builder_append(&line, i18n_text(STR_USB_OUTPUT_FAILED));
     } else {
         append_format(&line);
+        append_counters(&line);
     }
-    app_show_notice(TITLE, text);
+}
+
+static bool text_differs(const char *text)
+{
+    for (size_t index = 0;; index++) {
+        if (text[index] != shown_text[index]) {
+            return true;
+        }
+        if (text[index] == '\0') {
+            return false;
+        }
+    }
+}
+
+static void show_state(void)
+{
+    state_text(shown_text, sizeof shown_text);
+    notice_refreshed_ms = hal_clock_milliseconds();
+    app_show_notice(TITLE, shown_text);
+}
+
+static void refresh_state(void)
+{
+    uint32_t now_ms = hal_clock_milliseconds();
+    if (now_ms - notice_refreshed_ms < NOTICE_REFRESH_MS) {
+        return;
+    }
+    notice_refreshed_ms = now_ms;
+    char text[NOTICE_CAPACITY];
+    state_text(text, sizeof text);
+    if (text_differs(text)) {
+        show_state();
+    }
+}
+
+static void apply_attenuation(void)
+{
+    uint8_t player = board_audio_stream_attenuation();
+    uint8_t host = usb_audio_attenuation(&audio);
+    uint32_t total = player + (uint32_t)host;
+    bool muted = player == USB_AUDIO_SINK_MUTED || host == USB_AUDIO_MUTED;
+    usb_audio_sink_set_attenuation(
+        &sink, muted || total >= USB_AUDIO_SINK_MUTED ? USB_AUDIO_SINK_MUTED : (uint8_t)total);
 }
 
 static void stop_output(void)
@@ -124,6 +198,7 @@ static void stop_output(void)
         board_audio_stream_pause();
         playing = false;
     }
+    frame_known = false;
     usb_audio_sink_start(&sink, audio.rate, usb_audio_sample_bytes(&audio));
 }
 
@@ -134,6 +209,7 @@ static void follow_format(void)
     if (usb_audio_sample_bytes(&audio) != 0 && audio.rate != open_rate) {
         open_rate = board_audio_stream_open(audio.rate, serve_usb) ? audio.rate : 0;
     }
+    apply_attenuation();
     receiving = open_rate != 0 && usb_audio_sample_bytes(&audio) != 0;
     show_state();
 }
@@ -142,7 +218,7 @@ static void follow_host(void)
 {
     uint8_t changes = usb_audio_take_changes(&audio);
     if ((changes & USB_AUDIO_CHANGED_VOLUME) != 0) {
-        board_audio_set_attenuation(usb_audio_attenuation(&audio));
+        apply_attenuation();
     }
     if ((changes & USB_AUDIO_CHANGED_FORMAT) != 0) {
         follow_format();
@@ -167,6 +243,7 @@ static void step_volume(int step)
     }
     dac_volume = (uint8_t)level;
     hal_audio_set_volume(dac_volume);
+    apply_attenuation();
     show_state();
 }
 
@@ -230,6 +307,7 @@ static void serve(void)
         follow_host();
         keep_output();
         repeat_volume();
+        refresh_state();
     }
 }
 
@@ -242,6 +320,8 @@ static void start_session(void)
     receiving = false;
     playing = false;
     holding_volume = false;
+    frame_known = false;
+    missed_packets = 0;
     dac_volume = dac_volume_known ? dac_volume : (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME;
     hal_audio_set_volume(dac_volume);
 }
@@ -261,7 +341,6 @@ void usb_dac_session_run(void)
     receiving = false;
     stop_output();
     board_audio_stream_close();
-    board_audio_set_attenuation(0);
     hal_audio_set_volume(level);
     usb_power_down();
     if (dac_volume != starting_volume) {

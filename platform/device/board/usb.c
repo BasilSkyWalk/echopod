@@ -56,6 +56,8 @@
 #define DSTS_SPEED_MASK 0x3u
 #define DSTS_HIGH_SPEED 0x0u
 #define DSTS_ODD_FRAME (1u << 8)
+#define DSTS_FRAME_SHIFT 8
+#define DSTS_FRAME_MASK 0x3FFFu
 #define DCFG_ADDRESS_SHIFT 4
 #define DCFG_ADDRESS_MASK (0x7Fu << DCFG_ADDRESS_SHIFT)
 #define DCTL_SOFT_DISCONNECT (1u << 1)
@@ -589,6 +591,8 @@ static void handle_receive(UsbPort *port)
         port->setup_pending = true;
     } else if (type == PACKET_OUT_DATA) {
         read_fifo(port->out_packet, sizeof port->out_packet / 4, count);
+        port->packet_frame =
+            (uint16_t)((read_register(DSTS) >> DSTS_FRAME_SHIFT) & DSTS_FRAME_MASK);
         uint32_t capacity = sizeof port->out_packet;
         deliver(port, endpoint, count < capacity ? count : capacity);
     }

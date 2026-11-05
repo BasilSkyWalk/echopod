@@ -79,7 +79,7 @@ static uint32_t stopped_since_ms;
 static bool tone_active;
 static char last_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint8_t volume_level;
-static uint8_t extra_attenuation;
+static uint8_t stream_hardware_value;
 static void (*stream_service)(void);
 static bool volume_set;
 static HalAudioOutput output_setting;
@@ -491,11 +491,18 @@ static DacCurve output_curve(void)
                                                        : DAC_CURVE_SINGLE_ENDED;
 }
 
+static uint8_t hardware_volume_value(void)
+{
+    if (stream_service != NULL) {
+        return stream_hardware_value;
+    }
+    return dac_volume_value(volume_level, output_curve());
+}
+
 static void apply_volume(void)
 {
     if (volume_set) {
-        uint32_t value = dac_volume_value(volume_level, output_curve()) + extra_attenuation;
-        dac_path_set_volume(value < DAC_VOLUME_MUTED ? (uint8_t)value : DAC_VOLUME_MUTED);
+        dac_path_set_volume(hardware_volume_value());
     }
 }
 
@@ -794,10 +801,13 @@ uint8_t board_audio_volume_level(void)
     return volume_level;
 }
 
-void board_audio_set_attenuation(uint8_t steps)
+uint8_t board_audio_stream_attenuation(void)
 {
-    extra_attenuation = steps;
-    apply_volume();
+    uint8_t value = dac_volume_value(volume_level, output_curve());
+    if (value == DAC_VOLUME_MUTED) {
+        return DAC_VOLUME_MUTED;
+    }
+    return value > stream_hardware_value ? (uint8_t)(value - stream_hardware_value) : 0;
 }
 
 static void clear_ring(void)
@@ -813,7 +823,10 @@ bool board_audio_stream_open(uint32_t rate, void (*service)(void))
     ensure_audio_clock();
     board_audio_shut_down();
     clear_ring();
+    stream_hardware_value = dac_volume_value(HAL_AUDIO_VOLUME_MAX, output_curve());
     stream_service = service;
+    dac_path_set_fades(false);
+    apply_volume();
     return ensure_path(rate);
 }
 
@@ -842,6 +855,8 @@ uint32_t board_audio_stream_consumed(void)
 
 void board_audio_stream_close(void)
 {
-    stream_service = NULL;
     board_audio_shut_down();
+    stream_service = NULL;
+    dac_path_set_fades(true);
+    apply_volume();
 }
