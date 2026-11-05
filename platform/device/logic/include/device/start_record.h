@@ -18,6 +18,8 @@ typedef struct StartRecord {
     uint32_t step_finished;
     uint32_t step_ms;
     uint32_t millivolts;
+    uint32_t stalled;
+    uint32_t stall_lr;
 } StartRecord;
 
 typedef struct StartInfo {
@@ -32,6 +34,8 @@ typedef struct StartInfo {
     bool last_step_finished;
     uint32_t last_step_ms;
     uint32_t last_millivolts;
+    bool stalled;
+    uint32_t stall_lr;
 } StartInfo;
 
 StartInfo start_record_boot(StartRecord *record);
@@ -39,6 +43,7 @@ void start_record_tick(StartRecord *record, uint32_t uptime_ms);
 void start_record_power_off(StartRecord *record);
 void start_record_fault(StartRecord *record, uint32_t fault_status, uint32_t hard_fault_status,
                         uint32_t fault_address);
+void start_record_stall(StartRecord *record, uint32_t pc, uint32_t lr);
 void start_record_step_begin(StartRecord *record, HalStartStep step);
 void start_record_step_end(StartRecord *record);
 void start_record_battery(StartRecord *record, uint32_t millivolts);
