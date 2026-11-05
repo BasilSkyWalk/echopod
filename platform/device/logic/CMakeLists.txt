@@ -132,7 +132,9 @@ if(CMAKE_CROSSCOMPILING)
         image_crc.c
         mp3_probe.c
         msc.c
+        panel.c
         panic_text.c
+        pll.c
         sd_card.c
         start_record.c
         updater.c
