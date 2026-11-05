@@ -269,6 +269,7 @@ static uint32_t curve_top(DacCurve curve)
     case DAC_CURVE_BLUETOOTH:
         return BLUETOOTH_TOP_VOLUME_VALUE;
     case DAC_CURVE_SINGLE_ENDED:
+    case DAC_CURVE_BLUETOOTH_LOUD:
         break;
     }
     return TOP_VOLUME_VALUE;
@@ -282,6 +283,7 @@ static uint32_t curve_floor(DacCurve curve)
     case DAC_CURVE_SINGLE_ENDED:
         return SINGLE_ENDED_FLOOR_VOLUME_VALUE;
     case DAC_CURVE_BLUETOOTH:
+    case DAC_CURVE_BLUETOOTH_LOUD:
         break;
     }
     return 0;

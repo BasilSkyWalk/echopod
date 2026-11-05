@@ -38,7 +38,7 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 
 - Put music on a microSD card formatted FAT32 or exFAT, in any folder layout.
 - EchoPod plays FLAC, ALAC (Apple Lossless `.m4a`), AAC (`.m4a`), Opus (`.opus`), MP3 and WAV, up to 192 kHz. HE-AAC isn't supported yet. It lists the other formats FiiO lists, and says when it can't play one.
-- Album covers come from art inside each album's first track, or from a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks.
+- Album covers come from art inside one of each album's first four tracks (Ogg and Opus pictures included), or from a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks.
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
 - Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
 - EchoPod keeps its own files in a hidden `/.echo` folder on the card, about 110 MB of them. Don't delete it unless you want the library rebuilt.
@@ -126,7 +126,7 @@ To see whether it works on your card, let the player scan it once, then run echo
 | `--verbose` | List the albums without art |
 | `--history` | Also add the songs the player played to `.scrobbler.log` (see Listen history and Last.fm) |
 
-The computer picks each album's cover the way the player does: the picture inside the album's first track (FLAC, MP3, WAV, DSF/DFF, `.m4a`, `.ape` and `.wma`; a front cover wins), otherwise a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks. Ogg pictures are skipped, as on the player. The covers can look a little different from the player's own, because the computer resizes them with a different filter. When the player rescans later (for example after you copy a new album to it), it keeps the computer's covers and only decodes art that's new or changed; on a card that isn't FAT32 or exFAT, albums whose cover is an image file are decoded again.
+The computer picks each album's cover the way the player does: the picture inside the first of the album's first four tracks that has one (FLAC, MP3, WAV, DSF/DFF, `.m4a`, `.ape`, `.wma`, `.ogg` and `.opus`; a front cover wins), otherwise a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks. So several albums can share one folder and still each get their own embedded art. The covers can look a little different from the player's own, because the computer resizes them with a different filter. When the player rescans later (for example after you copy a new album to it), it keeps the computer's covers and only decodes art that's new or changed; on a card that isn't FAT32 or exFAT, albums whose cover is an image file are decoded again.
 
 ## Buttons
 
@@ -144,7 +144,7 @@ Settings → **Volume buttons** changes what the rocker does on Now Playing and 
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
-More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), and **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC). The start screen can also be Album Artists, Genres, Folders or All Songs.
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones), and **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC). The start screen can also be Album Artists, Genres, Folders or All Songs.
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
 
@@ -186,9 +186,11 @@ Settings → Bluetooth shows whether Bluetooth is on and which headphones are co
 
 **Every day:** with Bluetooth on, the player connects to your most recent headphones by itself when it starts and whenever they come back in range. If a connection stalls, it resets and tries again within about 15 seconds. To switch to other remembered headphones, select them and press ▶. To disconnect, select the connected headphones and press ▶: they stay disconnected until you press ▶ on them again or restart the player. To forget headphones, hold ▶ on them.
 
-Music plays through the headphones whenever nothing is plugged into either jack. To switch to wired headphones, pause, plug them in and press play: while music is going to Bluetooth the player can't see the jack. After you unplug, the next play goes back to Bluetooth.
+Music plays through the headphones whenever nothing is plugged into either jack. To switch to wired headphones, pause, plug them in and press play: while music is going to Bluetooth the player can't see the jack. After you unplug, the next play goes back to Bluetooth. Each play or resume waits a moment (about half a second) before the music starts, so the headphones don't miss the opening.
 
-The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery until you open its screen again or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
+**Too quiet?** Settings → **Bluetooth level** (the last row of the Settings list) has *Standard* and *Louder*. Standard is the level earlier versions used; Louder raises the signal sent to the Bluetooth module by 6.5 dB, to the same top level as the 3.5 mm jack. If Louder distorts at full volume with your headphones, go back to Standard. The headphones' own volume control is separate from the player's.
+
+The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery; it comes back when you open its screen, press play with nothing plugged in, or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
 
 ## Audiobooks and podcasts
 

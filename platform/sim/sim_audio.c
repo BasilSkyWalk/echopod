@@ -344,6 +344,11 @@ void hal_audio_set_output(HalAudioOutput output)
     unlock();
 }
 
+void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level)
+{
+    (void)level;
+}
+
 static bool dma_tone_running;
 
 void hal_audio_service(void)

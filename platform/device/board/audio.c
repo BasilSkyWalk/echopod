@@ -82,6 +82,7 @@ static uint8_t volume_level;
 static uint8_t stream_hardware_value;
 static void (*stream_service)(void);
 static bool volume_set;
+static bool bluetooth_louder;
 static HalAudioOutput output_setting;
 static uint32_t last_jack_poll_ms;
 static HalAudioStats stats;
@@ -435,6 +436,9 @@ void hal_audio_queue_next(const char *path, uint32_t token)
 void hal_audio_pause(void)
 {
     ensure_engine();
+    if (audio_engine_status(&engine).state != AUDIO_ENGINE_PLAYING) {
+        return;
+    }
     if (transferring) {
         dac_path_set_muted(true);
         dmac_suspend();
@@ -445,6 +449,9 @@ void hal_audio_pause(void)
 void hal_audio_resume(void)
 {
     ensure_engine();
+    if (audio_engine_status(&engine).state != AUDIO_ENGINE_PAUSED) {
+        return;
+    }
     if (transferring) {
         dmac_resume();
         dac_path_set_muted(false);
@@ -477,7 +484,7 @@ void hal_audio_seek(uint32_t position_ms)
 static DacCurve output_curve(void)
 {
     if (board_bluetooth_routed()) {
-        return DAC_CURVE_BLUETOOTH;
+        return bluetooth_louder ? DAC_CURVE_BLUETOOTH_LOUD : DAC_CURVE_BLUETOOTH;
     }
     switch (output_setting) {
     case HAL_AUDIO_OUTPUT_SINGLE_ENDED:
@@ -516,6 +523,12 @@ void hal_audio_set_volume(uint8_t level)
 void hal_audio_set_gain(HalAudioGain gain)
 {
     dac_path_set_gain(gain == HAL_AUDIO_GAIN_HIGH);
+}
+
+void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level)
+{
+    bluetooth_louder = level == HAL_AUDIO_BLUETOOTH_LOUDER;
+    apply_volume();
 }
 
 void hal_audio_set_filter(uint8_t filter)

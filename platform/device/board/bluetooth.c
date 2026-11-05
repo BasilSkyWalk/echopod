@@ -42,7 +42,9 @@ enum {
     FIFO_MODE_SHIFT = 16,
     FIFO_MODE_UNIT = 16,
     TX_WAIT_POLLS = 100000,
-    RX_BYTES_PER_SERVICE = 256,
+    RX_BYTES_PER_TICK = 64,
+    RX_RING_CAPACITY = 256,
+    RX_RING_MASK = RX_RING_CAPACITY - 1,
     ROUTE_SETTLE_MS = 500
 };
 
@@ -58,6 +60,12 @@ static bool powered;
 static bool routed;
 static uint32_t rerouted_ms;
 static bool matched_stock;
+static volatile bool listening;
+static volatile uint8_t rx_ring[RX_RING_CAPACITY];
+static volatile uint16_t rx_head;
+static volatile uint16_t rx_tail;
+static volatile uint32_t rx_overruns;
+static volatile uint16_t rx_peak;
 
 static void uart_write(uint32_t offset, uint32_t value)
 {
@@ -71,6 +79,7 @@ static uint32_t uart_read(uint32_t offset)
 
 static void pins_off(void)
 {
+    listening = false;
     gpio_mux(MODULE_POWER, GPIO_FUNCTION_GPIO);
     gpio_output(MODULE_POWER, false);
     gpio_mux(UART_PIN_B, GPIO_FUNCTION_GPIO);
@@ -130,6 +139,8 @@ static void power_on(void)
 {
     pins_off();
     uart_open();
+    rx_tail = rx_head;
+    listening = true;
     gpio_output(MODULE_POWER, true);
     bt_module_power_on(&module, hal_clock_milliseconds());
     module.status.link.fifo_depth = fifo_depth();
@@ -251,24 +262,49 @@ void hal_bluetooth_disconnect(void)
 static void note_fifo_level(void)
 {
     uint16_t level = (uint16_t)uart_read(UART_RX_LEVEL);
-    if (level > module.status.link.fifo_peak) {
-        module.status.link.fifo_peak = level;
+    if (level > rx_peak) {
+        rx_peak = level;
+    }
+}
+
+static void push_byte(uint8_t byte)
+{
+    uint16_t next = (uint16_t)((rx_head + 1u) & RX_RING_MASK);
+    if (next == rx_tail) {
+        rx_overruns++;
+        return;
+    }
+    rx_ring[rx_head] = byte;
+    rx_head = next;
+}
+
+void board_bluetooth_tick(void)
+{
+    if (!listening) {
+        return;
+    }
+    note_fifo_level();
+    for (int count = 0; count < RX_BYTES_PER_TICK; count++) {
+        uint32_t line = uart_read(UART_LINE_STATUS);
+        if ((line & LINE_OVERRUN) != 0) {
+            rx_overruns++;
+        }
+        if ((line & LINE_DATA_READY) == 0) {
+            return;
+        }
+        push_byte((uint8_t)uart_read(UART_DATA));
     }
 }
 
 static void receive(uint32_t now_ms)
 {
-    note_fifo_level();
-    for (int count = 0; count < RX_BYTES_PER_SERVICE; count++) {
-        uint32_t line = uart_read(UART_LINE_STATUS);
-        if ((line & LINE_OVERRUN) != 0) {
-            module.status.link.overruns++;
-        }
-        if ((line & LINE_DATA_READY) == 0) {
-            return;
-        }
-        bt_module_receive(&module, (uint8_t)uart_read(UART_DATA), now_ms);
+    while (rx_tail != rx_head) {
+        uint8_t byte = rx_ring[rx_tail];
+        rx_tail = (uint16_t)((rx_tail + 1u) & RX_RING_MASK);
+        bt_module_receive(&module, byte, now_ms);
     }
+    module.status.link.overruns = rx_overruns;
+    module.status.link.fifo_peak = rx_peak;
 }
 
 void hal_bluetooth_service(void)

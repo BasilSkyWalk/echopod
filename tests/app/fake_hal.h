@@ -86,6 +86,7 @@ int fake_hal_audio_gain(void);
 int fake_hal_audio_filter(void);
 int fake_hal_audio_balance(void);
 int fake_hal_audio_output(void);
+int fake_hal_audio_bluetooth_level(void);
 EqualizerCurve fake_hal_equalizer(void);
 int fake_hal_equalizer_changes(void);
 int fake_hal_usb_mode(void);

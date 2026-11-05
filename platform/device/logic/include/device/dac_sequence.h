@@ -28,7 +28,8 @@ typedef struct DacBus {
 typedef enum DacCurve {
     DAC_CURVE_SINGLE_ENDED,
     DAC_CURVE_BALANCED,
-    DAC_CURVE_BLUETOOTH
+    DAC_CURVE_BLUETOOTH,
+    DAC_CURVE_BLUETOOTH_LOUD
 } DacCurve;
 
 enum {

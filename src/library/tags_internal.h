@@ -19,6 +19,29 @@ typedef struct TagReader {
     bool present[TAG_FIELD_COUNT];
 } TagReader;
 
+typedef struct OggPage {
+    uint32_t offset;
+    uint32_t header_length;
+    uint32_t body_length;
+    uint64_t granule;
+} OggPage;
+
+typedef struct OggStream {
+    TagReader *reader;
+    OggPage first;
+    OggPage page;
+    uint32_t page_start;
+} OggStream;
+
+typedef struct TagPictureReader {
+    TagReader file;
+    OggStream stream;
+    uint32_t text;
+    uint32_t text_length;
+} TagPictureReader;
+
+bool tags_open_picture(TagPictureReader *reader, ByteSource file, uint32_t size,
+                       TagPicture *picture, ByteSource *bytes);
 bool tag_read(const TagReader *reader, uint32_t offset, void *buffer, uint32_t length);
 uint16_t tag_le16(const uint8_t *bytes);
 uint32_t tag_le32(const uint8_t *bytes);

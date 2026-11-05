@@ -7,6 +7,7 @@
 #include "library/covers.h"
 #include "library/library.h"
 #include "library/track_tags.h"
+#include "tags_internal.h"
 
 enum {
     ALIGNMENT = 8,
@@ -23,6 +24,7 @@ enum {
     STAMP_NUMBERS = 3,
     ART_EMBEDDED = 1,
     ART_FILE = 2,
+    ART_TRACKS = 4,
     BITS_PER_BYTE = 8
 };
 
@@ -55,6 +57,7 @@ typedef struct CoverMatch {
 typedef struct CoverState {
     Library library;
     TrackTags tags;
+    TagPictureReader picture;
     ScanEntry entry;
     LibraryAlbum album;
     uint32_t key;
@@ -338,25 +341,39 @@ static bool read_track_path(CoverState *state, uint32_t track_index, LibraryTrac
                                sizeof state->path - 1);
 }
 
-static bool open_embedded(CoverState *state, const CoverJob *job, ArtFile *art)
+static bool open_embedded(CoverState *state, const CoverJob *job, uint32_t track_index,
+                          ArtFile *art)
 {
     LibraryTrack track;
+    ByteSource file;
     uint32_t size = 0;
-    if (!read_track_path(state, state->album.first_track, &track) ||
-        !job->files.open_file(job->files.context, state->path, &art->source, &size)) {
+    if (!read_track_path(state, track_index, &track) ||
+        !job->files.open_file(job->files.context, state->path, &file, &size)) {
         return false;
     }
     TagFormat format = track_tags_format_for_name(state->path);
-    bool tagged = track_tags_read(art->source, size, format, &state->tags);
-    TagPicture picture = state->tags.picture;
-    if (!tagged || picture.kind != TAG_PICTURE_RAW || picture.length == 0) {
+    TagPicture *picture = &state->tags.picture;
+    if (!track_tags_read(file, size, format, &state->tags) ||
+        !tags_open_picture(&state->picture, file, size, picture, &art->source)) {
         job->files.close_file(job->files.context);
         return false;
     }
-    art->offset = picture.offset;
-    art->length = picture.length;
-    art->stamp = art_stamp(state->path, size, picture.length, ART_EMBEDDED);
+    art->offset = picture->offset;
+    art->length = picture->length;
+    art->stamp = art_stamp(state->path, size, picture->length, ART_EMBEDDED);
     return true;
+}
+
+static bool open_any_embedded(CoverState *state, const CoverJob *job, ArtFile *art)
+{
+    const LibraryAlbum *album = &state->album;
+    uint32_t tracks = album->track_count < ART_TRACKS ? album->track_count : ART_TRACKS;
+    for (uint32_t track = 0; track < tracks; track++) {
+        if (open_embedded(state, job, album->first_track + track, art)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static char lower(char character)
@@ -510,7 +527,7 @@ static bool open_art(CoverState *state, const CoverJob *job, ArtFile *art)
     if (state->album.track_count == 0) {
         return false;
     }
-    return open_embedded(state, job, art) || open_folder_art(state, job, art);
+    return open_any_embedded(state, job, art) || open_folder_art(state, job, art);
 }
 
 static bool decode_art(CoverState *state, const ArtFile *art)

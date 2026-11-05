@@ -72,7 +72,7 @@ The PC tools still work and write the same formats (`tools/library_index.py`, `t
 3. Switch on. The player creates `/.echo` on the card, scans it ("Scanning library", then "Finding covers") and shows "Library: N tracks, M covers".
 4. After copying music over USB, eject both drives: the player rescans by itself. Settings → Rescan library does it on demand.
 
-Nothing else on the card needs a computer. Covers come from art embedded in each album's first track (FLAC, MP3/WAV/DSF/DFF ID3, MP4, APE, WMA) or a `cover`/`folder`/`front`/`albumart` JPEG or PNG next to the tracks.
+Nothing else on the card needs a computer. Covers come from art embedded in one of each album's first four tracks (FLAC, MP3/WAV/DSF/DFF ID3, MP4, APE, WMA, Ogg Vorbis and Opus) or a `cover`/`folder`/`front`/`albumart` JPEG or PNG next to the tracks.
 
 ### Simulator keys
 
