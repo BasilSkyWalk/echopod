@@ -1,5 +1,49 @@
 # EchoPod release notes
 
+## 0.10.0
+
+This release answers most of the open GitHub issues.
+
+### New
+
+- **Play all and Shuffle all** at the top of every artist's, album artist's and genre's album list, and Shuffle all on All Songs and playlists (issues 9 and 22). The list still opens on the first album, so scroll up to reach them.
+- **Settings → Volume buttons:** *Tap: volume, hold: skip* (as before), *Tap: skip, hold: volume*, or *Tap: volume, hold: seek* (issues 21 and 25). In every mode, holding the rocker right after tapping the volume keeps changing the volume (issue 5).
+- **Settings → Swap volume buttons** turns + and − around (issue 25).
+- **Settings → Menu button → Next track:** on Now Playing and with the screen off, ≡ skips to the next track; hold ≡ for Up Next (issue 26).
+- **Hold ≡ anywhere outside Now Playing to open Settings** (issue 21).
+- **Settings → Accent color** (Blue, Red, Orange, Green, Teal, Purple, Pink, Graphite) and **Highlight** (Gradient or Flat) (issue 20).
+- **Settings → Battery percent** hides the number beside the battery icon (issue 24).
+- **Settings → Cover Flow order → Album title** sorts Cover Flow by album name instead of album artist (issue 18).
+- **Settings → Artist albums → Cover Flow** opens an artist, album artist or genre as a Cover Flow of only their albums (issue 27).
+- **Start screen** can also be Album Artists, Genres, Folders or All Songs (issue 22).
+- **Russian and Ukrainian** interface languages (issue 21). Written by Claude, not yet checked by a native speaker.
+- **`tools/echo_bookmarks.py`** lists the audiobook and podcast bookmarks on a card, or with `--finished` prints the finished episodes one per line for sync scripts (issue 16).
+- **Diagnostics → Panel** shows the screen's ID, which says which of the two screen start-up sequences the player uses (issue 15).
+
+### Fixed
+
+- **Turning off with the screen off now shows "Goodbye"** (issue 5). Before, the player switched off silently, so it looked like nothing happened. The sleep timer and auto off still turn off without lighting the screen.
+- **Fast scroll no longer races through the alphabet** (issue 5): after 3 s of holding it moves one letter every 0.45 s instead of one every 0.12 s.
+- **Holding the rocker in Cover Flow speeds up**, up to 4 albums a step (issue 5).
+- **A "?" at the end of some titles** (issue 21): invisible characters such as a stray byte-order mark, zero-width spaces and control codes are dropped, and bytes 0x80–0x9F in Latin-1 tags are read as Windows-1252 (curly quotes, dashes, "…"). Rescan the library to apply it. echo-sync does the same.
+- **The Bluetooth icon is a crisp 5 × 9 drawing** instead of thin diagonals that blurred at status-bar size (issue 21).
+- **Going back to FiiO's firmware** (issue 1):
+  - The search for the second firmware slot prefers the copy that matches the first slot, so an old leftover firmware header can no longer make the slot look too small.
+  - "isn't a valid image" now ends with a code such as `(E6/32)`: the reason (1 size, 2 header, 3 header copy, 4 checksum, 5 wrong model, 6 doesn't fit, 7 can't boot) and the slot size in MB.
+- **Portrait album lists drop the year** so album names have more room (issue 5).
+
+### Not in this build
+
+- FLAC files with blocks over 4,608 samples (ffmpeg's default at 96 kHz) still don't play (issue 5). Re-encode with `flac -b 4096` until the decoder's buffers can be reorganised.
+- Lyrics (issues 3 and 14), Cover Flow for folders and playlists (issue 17), the 512 MB model (issue 19, waiting on the contributor's pull request), a clock (issue 23) and the USB mode prompt and long-press power-on (issue 5).
+
+### When you update
+
+- Your library, settings, equalizer, orientation, language and Bluetooth headphones stay as they are. The new settings start at their old behaviour.
+- The settings file gains 8 bytes. Going back to 0.9.1 or earlier makes that firmware ignore the file and start from default settings.
+- Rescan the library once (Settings → Rescan library) to clean up titles that showed "?".
+- Delete the update file from the player once it has installed, or it installs again.
+
 ## 0.9.1
 
 Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Claude Code made (issue 12). Tested on the one Echo Mini 8 GB.
