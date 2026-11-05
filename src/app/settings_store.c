@@ -91,6 +91,10 @@ void settings_store_apply_hardware(const Settings *settings)
     hal_audio_set_filter(settings->filter);
     hal_audio_set_balance(settings->balance);
     hal_audio_set_output(HAL_OUTPUTS[settings->output]);
+    hal_audio_set_bluetooth_level(settings->options[OPTION_BLUETOOTH_LEVEL] ==
+                                          BLUETOOTH_LEVEL_LOUDER
+                                      ? HAL_AUDIO_BLUETOOTH_LOUDER
+                                      : HAL_AUDIO_BLUETOOTH_STANDARD);
     hal_system_set_usb_mode(HAL_USB_MODES[settings->usb_mode]);
     hal_system_set_dac_volume(settings->dac_volume);
 }

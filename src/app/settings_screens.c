@@ -67,6 +67,7 @@ static const StringId HIGHLIGHT_OPTIONS[2] = {STR_SETTINGS_GRADIENT, STR_SETTING
 static const StringId COVER_ORDER_OPTIONS[2] = {STR_SETTINGS_BY_ALBUM_ARTIST,
                                                 STR_SETTINGS_BY_ALBUM_TITLE};
 static const StringId ARTIST_VIEW_OPTIONS[2] = {STR_SETTINGS_LIST, STR_MENU_COVER_FLOW};
+static const StringId BLUETOOTH_LEVEL_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LOUDER};
 static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
 static const StringId USB_MODE_MESSAGES[USB_MODE_COUNT] = {STR_SETTINGS_USB_DRIVES,
                                                            STR_SETTINGS_USB_SOUND};
@@ -200,6 +201,17 @@ static int current_gain(const void *context)
 static void choose_gain(void *context, int index)
 {
     editable_settings(context)->gain = (GainLevel)index;
+    apply_and_save(context);
+}
+
+static int current_bluetooth_level(const void *context)
+{
+    return settings_of(context)->options[OPTION_BLUETOOTH_LEVEL];
+}
+
+static void choose_bluetooth_level(void *context, int index)
+{
+    editable_settings(context)->options[OPTION_BLUETOOTH_LEVEL] = (uint8_t)index;
     apply_and_save(context);
 }
 
@@ -341,6 +353,8 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_COVER_ORDER, COVER_ORDER_OPTIONS, OPTION_COVER_ORDER),
     OPTION_CHOICE(STR_SETTINGS_ARTIST_VIEW, ARTIST_VIEW_OPTIONS, OPTION_ARTIST_VIEW),
     OPTION_CHOICE(STR_SETTINGS_LISTEN_HISTORY, SHOWN_OPTIONS, OPTION_LISTEN_HISTORY),
+    {STR_SETTINGS_BLUETOOTH_LEVEL, BLUETOOTH_LEVEL_OPTIONS, NULL, 2, current_bluetooth_level,
+     choose_bluetooth_level, NULL, 0},
 };
 
 static ScreenAction open_choice(void *context)
