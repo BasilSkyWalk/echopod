@@ -44,10 +44,30 @@ static void every_language_has_a_pack_that_attaches(void)
     CHECK_EQUAL(LANGUAGE_COUNT, count);
 }
 
+static void polish_is_the_last_language_and_translates_the_menus(void)
+{
+    static uint8_t pack[PACK_LIMIT + 1];
+    CHECK_EQUAL(LANGUAGE_POLISH + 1, LANGUAGE_COUNT);
+    const char *cursor = PACK_PATHS;
+    const char *last = cursor;
+    while (strchr(cursor, '|') != NULL) {
+        cursor = strchr(cursor, '|') + 1;
+        last = cursor;
+    }
+    CHECK(strstr(last, "pl.bin") != NULL);
+    uint32_t size = read_pack(last, pack);
+    CHECK(size > 0 && size <= PACK_LIMIT);
+    CHECK(i18n_attach(pack, size));
+    CHECK(strcmp("Uruchom ponownie, aby zastosować", i18n_text(STR_LANGUAGE_RESTART)) == 0);
+    CHECK(strcmp("Polski", i18n_text(STR_LANGUAGE_PL)) == 0);
+    i18n_detach();
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(every_language_has_a_pack_that_attaches),
+        TEST_CASE(polish_is_the_last_language_and_translates_the_menus),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
