@@ -13,6 +13,7 @@
 #include "library/cover_build.h"
 #include "library/covers.h"
 #include "library_rescan.h"
+#include "listen_history.h"
 #include "settings/rocker.h"
 #include "settings/settings.h"
 #include "settings_store.h"
@@ -1006,6 +1007,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/upnext.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/bluetooth.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/equalizer.bin"));
+    CHECK_EQUAL(1024 * 1024, fake_hal_reserved_size("/.echo/history.bin"));
     step();
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
     CHECK(toast_is("Library: 0 tracks"));
@@ -1014,7 +1016,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(12, fake_hal_reserve_count());
+    CHECK_EQUAL(13, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -1886,6 +1888,67 @@ static void menu_does_nothing_while_nothing_plays(void)
     CHECK(title_is("EchoPod"));
 }
 
+static uint8_t history_settings[SETTINGS_FILE_SIZE];
+
+static void start_app_with_history(bool history_on)
+{
+    uint32_t size = 0;
+    const uint8_t *bytes = fixture_bytes(&size);
+    Settings settings = settings_defaults();
+    settings.options[OPTION_LISTEN_HISTORY] = history_on ? LISTEN_HISTORY_ON : LISTEN_HISTORY_OFF;
+    settings_encode(&settings, history_settings);
+    fake_hal_reset();
+    fake_hal_add_file("/.echo/library.db", bytes, size);
+    fake_hal_add_file("/.echo/settings.bin", history_settings, sizeof history_settings);
+    fake_hal_add_file(LISTEN_HISTORY_PATH, NULL, 16 * HISTORY_SLOT_BYTES);
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+    step();
+    app_release_audio();
+}
+
+static int history_records(HistoryRecord *records, int capacity)
+{
+    uint32_t size = 0;
+    const uint8_t *bytes = fake_hal_file_bytes(LISTEN_HISTORY_PATH, &size);
+    int count = 0;
+    for (uint32_t at = 0; bytes != NULL && at + HISTORY_SLOT_BYTES <= size && count < capacity;
+         at += HISTORY_SLOT_BYTES) {
+        count += listen_history_decode(bytes + at, &records[count]);
+    }
+    return count;
+}
+
+static void played_songs_go_to_the_listen_history_with_a_mark_for_usb(void)
+{
+    HistoryRecord records[16];
+    start_app_with_history(true);
+    int before = history_records(records, 16);
+    play_first_album_track();
+    wait_ms(40000);
+    app_release_audio();
+    int count = history_records(records, 16);
+    CHECK_EQUAL(before + 2, count);
+    CHECK_EQUAL(HISTORY_PLAY, records[count - 2].kind);
+    CHECK(records[count - 2].played_ms >= 40000);
+    CHECK_EQUAL(60000, records[count - 2].duration_ms);
+    CHECK_EQUAL(HISTORY_COMPUTER, records[count - 1].kind);
+    CHECK_EQUAL(now_ms, records[count - 1].end_ms);
+}
+
+static void a_listen_history_turned_off_records_nothing(void)
+{
+    HistoryRecord records[16];
+    start_app_with_history(false);
+    int before = history_records(records, 16);
+    play_first_album_track();
+    wait_ms(40000);
+    app_release_audio();
+    hold_power();
+    CHECK_EQUAL(before, history_records(records, 16));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -2025,6 +2088,8 @@ int main(void)
         TEST_CASE(a_calm_frame_is_not_drawn_again_for_a_while),
         TEST_CASE(a_key_draws_the_next_frame_at_once),
         TEST_CASE(play_opens_a_menu_row_while_the_key_is_still_down),
+        TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
+        TEST_CASE(a_listen_history_turned_off_records_nothing),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -29,6 +29,7 @@
 #include "hal/power.h"
 #include "library_rescan.h"
 #include "library_store.h"
+#include "listen_history.h"
 #include "music_check.h"
 #include "player.h"
 #include "screens/charge_screen.h"
@@ -95,6 +96,7 @@ typedef struct AppState {
     EqualizerStore equalizer;
     FavoritesStore favorites;
     SpokenStore spoken;
+    ListenHistory history;
     CoverCache covers;
     PowerPolicy power;
     LowBattery low_battery;
@@ -266,8 +268,23 @@ static void save_settings(void)
     equalizer_store_save(&app.equalizer);
 }
 
+static bool history_on(void)
+{
+    return app.settings.settings.options[OPTION_LISTEN_HISTORY] == LISTEN_HISTORY_ON;
+}
+
+static void follow_history(const PlayerStatus *status, uint32_t now_ms)
+{
+    if (history_on()) {
+        listen_history_follow(&app.history, &app.library.library, status, now_ms);
+    } else {
+        listen_history_close(&app.history, now_ms);
+    }
+}
+
 static void save_session(void)
 {
+    listen_history_close(&app.history, hal_clock_milliseconds());
     spoken_store_flush(&app.spoken, player_status(&app.player), hal_clock_milliseconds());
     player_save(&app.player);
     save_settings();
@@ -885,6 +902,7 @@ static void explain_refusals(uint32_t now_ms)
 
 static void run_rescan(void)
 {
+    listen_history_close(&app.history, hal_clock_milliseconds());
     app_show_notice(i18n_text(STR_RESCAN_TITLE), i18n_text(STR_RESCAN_STARTING));
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
     RescanOutcome outcome = library_rescan_run(progress);
@@ -900,6 +918,9 @@ static void run_rescan(void)
 
 void app_release_audio(void)
 {
+    if (history_on()) {
+        listen_history_note_computer(&app.history, hal_clock_milliseconds());
+    }
     spoken_store_flush(&app.spoken, player_status(&app.player), hal_clock_milliseconds());
     player_release_output(&app.player);
 }
@@ -1011,7 +1032,9 @@ void app_step(void)
     if (!app.powered_off) {
         player_update(&app.player, now_ms);
         bluetooth_link_step(&app.bluetooth, &app.player, now_ms);
-        spoken_store_follow(&app.spoken, player_status(&app.player), now_ms);
+        PlayerStatus status = player_status(&app.player);
+        spoken_store_follow(&app.spoken, status, now_ms);
+        follow_history(&status, now_ms);
         explain_refusals(now_ms);
         update_power(now_ms);
     }

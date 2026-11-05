@@ -13,6 +13,7 @@ TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS_DIRECTORY))
 
 import cover_export
+import echo_history
 import echo_sync
 import library_index
 from test_cover_export import image_bytes
@@ -466,6 +467,29 @@ class AskForCardTest(unittest.TestCase):
 
     def test_the_card_can_be_left_out_of_the_command(self):
         self.assertIsNone(echo_sync.parse_arguments([]).card)
+
+    def test_history_export_is_opt_in_and_adds_the_plays_to_the_log(self):
+        self.assertFalse(echo_sync.parse_arguments([]).history)
+        self.assertTrue(echo_sync.parse_arguments(["--history"]).history)
+        record = echo_history.Record(1, 1, echo_history.PLAY, 1, 0, 200_000, 0, 200_000,
+                                     240_000, 0, 200_000, "Artist", "Album", "Song")
+        with tempfile.TemporaryDirectory() as directory:
+            card = Path(directory)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                echo_sync.export_history(card, dry_run=False)
+            self.assertIn("none on this card", output.getvalue())
+            (card / ".echo").mkdir()
+            slot = echo_history.pack_slot(record)
+            (card / ".echo" / "history.bin").write_bytes(slot + bytes(512))
+            with contextlib.redirect_stdout(output):
+                echo_sync.export_history(card, dry_run=True)
+            self.assertFalse((card / ".scrobbler.log").exists())
+            with contextlib.redirect_stdout(output):
+                echo_sync.export_history(card, dry_run=False)
+            log = (card / ".scrobbler.log").read_text(encoding="utf-8")
+        self.assertIn("Artist	Album	Song	1	240	L	", log)
+        self.assertIn("1 new plays added", output.getvalue())
 
 
 if __name__ == "__main__":

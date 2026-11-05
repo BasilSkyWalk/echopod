@@ -136,6 +136,34 @@ Favorites outlive a re-index, so they don't store album indices. An album's key 
 
 Each bookmark is `u32 key`, `u32 track key`, `u32 position_ms`, `u16 chapter`, `u8 flags` (bit 0: finished), `u8 reserved`. The key is the FNV-1a hash of the book's folder path relative to the music root (`Audiobooks/The Long Road`), or of the track's own path for a single-file book or a podcast episode; the track key hashes the track's path. `chapter` is the track's place among its folder's tracks, checked against the track key before it's used. A zero-filled or damaged file reads as no bookmarks.
 
+## Listen history file
+
+`/.echo/history.bin` (1 MiB, reserved by the player) logs the songs the player played, for `tools/echo_history.py` to turn into a `.scrobbler.log` (see `docs/user-guide.md`, Listen history). It's a ring of 2,048 slots of 512 bytes; the player works out the slot count from the file's size, so a smaller or larger file works too. A record with sequence number `n` always sits in slot `(n − 1) mod slots`, so when the ring is full the newest record overwrites the oldest. Every value is little-endian.
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | `char[4]` | magic `EHST` |
+| 4 | `u32` | sequence number, from 1, one more for every record |
+| 8 | `u32` | session, one more for every start of the player that writes a record |
+| 12 | `u8` | kind: 1 = a play, 2 = connected to a computer |
+| 13 | `u8` | track number (0 when unknown) |
+| 14 | `u16` | reserved (0) |
+| 16 | `u32` | start: milliseconds since the player started, when the play began |
+| 20 | `u32` | end: milliseconds since the player started, when the play ended |
+| 24 | `u32` | Unix time at the end, or 0 when the player doesn't know the time |
+| 28 | `u32` | milliseconds actually listened (pauses and skipped-over parts don't count) |
+| 32 | `u32` | the track's length in milliseconds (0 when unknown) |
+| 36 | `u32` | position in the track where the play began, in milliseconds |
+| 40 | `u32` | position in the track where the play ended, in milliseconds |
+| 44 | 464 B | artist, album and title, each UTF-8 and NUL-terminated, then zeros |
+| 508 | `u32` | FNV-1a checksum of bytes 0–507 |
+
+The names are copied from the library when the play starts, not stored as indexes, so a rescan doesn't change them: the artist (the library already falls back to the album artist, then "Unknown Artist"), the album title and the track title. The artist and the album take at most 159 bytes each and the title gets the rest, cut at a whole UTF-8 character. A "connected to a computer" record (kind 2) has its start and end at the moment the USB session began and no names.
+
+A slot is a record when its magic, its checksum and its place (`(sequence − 1) mod slots`) all agree; anything else (zeros, a record torn by a power cut, data left on the card from before the file was made) is skipped. To find where to write, the player reads slot 0 and then bisects for the first slot that doesn't hold the next sequence number. If slot 0 isn't a record, it checks the last slot, so a torn write over slot 0 after a wrap continues from the right number; otherwise it starts at 1. The session is one more than the newest record's.
+
+Dating the records. The Unix-time field is 0 until the player has a clock, so the tool dates a session from its newest record with a time when there is one; otherwise it counts back from the moment it runs (`--now`), taken as the time of the newest record. That's exact for the session the player is in when it's connected (the "connected to a computer" record is written at that moment) and for every play in that session. An earlier session is placed so that its last record ends when the next session started: the time the player was off between them is unknown and counted as none, so those plays can be dated later than they really happened (by however long the player was off).
+
 ## Covers file
 
 The player builds `/.echo/covers.bin` after every rescan (see `docs/architecture.md`, Covers on the device); `tools/cover_export.py` writes the same format on a PC. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
