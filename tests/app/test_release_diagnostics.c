@@ -27,11 +27,11 @@ static bool has_row(const MenuConfig *menu, const char *label)
 
 static void the_release_menu_keeps_only_the_safe_rows(void)
 {
-    static const char *const SAFE[] = {"Key test",     "Firmware", "Battery",  "Last start",
-                                       "Last step",    "Last USB", "Jack 3.5", "Jack 4.4",
-                                       "Last battery", "Panel",    "Clock"};
+    static const char *const SAFE[] = {"Key test",   "Firmware",     "Battery",  "Last start",
+                                       "Last step",  "Last USB",     "Jack 3.5", "Jack 4.4",
+                                       "USB errors", "Last battery", "Panel",    "Clock"};
     const MenuConfig *menu = built();
-    CHECK_EQUAL(11, menu->item_count);
+    CHECK_EQUAL(12, menu->item_count);
     for (size_t index = 0; index < sizeof SAFE / sizeof SAFE[0]; index++) {
         CHECK(has_row(menu, SAFE[index]));
     }

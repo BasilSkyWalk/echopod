@@ -156,6 +156,52 @@ void diagnostics_usb_last_text(HalUsbLast last, char *text, size_t capacity)
     }
 }
 
+static void append_part(StringBuilder *builder, const char *label)
+{
+    if (builder->length > 0) {
+        string_builder_append_char(builder, ' ');
+    }
+    string_builder_append(builder, label);
+}
+
+static void append_count(StringBuilder *builder, const char *label, uint32_t value)
+{
+    if (value > 0) {
+        append_part(builder, label);
+        string_builder_append_unsigned(builder, value);
+    }
+}
+
+void diagnostics_usb_errors_text(HalUsbLast last, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (last.end == HAL_USB_END_NONE || last.end == HAL_USB_END_NO_HOST) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_NONE));
+        return;
+    }
+    if (last.internal_errors > 0 || last.card_errors > 0) {
+        append_part(&builder, "E");
+        string_builder_append_unsigned(&builder, last.internal_errors);
+        string_builder_append_char(&builder, '/');
+        string_builder_append_unsigned(&builder, last.card_errors);
+    }
+    append_count(&builder, "r", last.card_retries);
+    append_count(&builder, "i", last.card_starts);
+    append_count(&builder, "s", last.card_step);
+    if (last.card_step != 0) {
+        string_builder_append_char(&builder, ':');
+        append_hex(&builder, last.card_interrupts, 4);
+    }
+    append_count(&builder, "b", last.host_resets);
+    append_count(&builder, "v", last.vbus_dips);
+    if (last.fell_back || last.full_speed) {
+        append_part(&builder, last.fell_back ? "FS" : "fs");
+    }
+    if (builder.length == 0) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_NONE));
+    }
+}
+
 void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);

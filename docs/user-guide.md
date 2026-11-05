@@ -50,6 +50,15 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 3. **Eject both drives before you unplug.** If you unplug first, recent changes may be lost, and the player warns you.
 4. When music changed, the player rebuilds its library by itself. Copying other files doesn't trigger a rebuild. Settings → Rescan library rebuilds it on demand.
 
+During a long copy the screen goes dark after 30 seconds; any button lights it again. If the drives disappear from the computer on their own while the cable stays in, the player connects again by itself (without asking Storage or DAC) and the computer may warn that a drive was removed without ejecting. Afterwards, Home → Diagnostics → **USB errors** shows what happened in the last session, or *None*:
+
+- `E1/2`: commands that failed on internal storage / on the SD card.
+- `r3`: SD card transfers that failed and were tried again; `i1`: times the card had to be started again (also when it didn't answer at the start of the session, for example after it was taken out and put back while the player was on).
+- `s4:A208`: the card controller's step and status at the last card failure (for bug reports).
+- `b1`: times the computer reset the connection after it was working.
+- `v2`: moments the player briefly lost the cable's power reading and carried on.
+- `FS`: the connection dropped from high speed to full speed in this session (the computer sees one disconnect); `fs`: it was already at full speed from an earlier session since the player was switched on.
+
 ## Using the player as a USB DAC
 
 **Untested on a player so far** (see `docs/known-issues.md`). In this mode the player is a sound card for your computer or phone: their audio plays through the player's headphone outputs.
@@ -263,4 +272,4 @@ While the clock is set and has a time zone (a sync sets both; Date & time asks f
 - **"isn't a valid image for this player" when going back to FiiO:** check that you copied the `HIFIECnn.IMG` file, not `MINIVnnn.IMG`, and that it's unchanged (its hash matches the one in FiiO's zip). EchoPod 0.2.0 and earlier also refuse FiiO's 4.0.0 firmware: update EchoPod first, or install FiiO 3.9.0 (`HIFIEC39.IMG`) and then FiiO's own update to 4.0.0. To switch to another custom firmware, go back to FiiO's first: EchoPod only installs its own images and FiiO's.
 - **The install doesn't take** (FiiO's firmware comes back after a short "Updating"): copy the file again, check its hash on the player's drive, and make sure it's the only `HIFIECnn.IMG` there. If it keeps failing, the only other way in is maskrom (below).
 - **The player doesn't start at all:** every case so far was recovered through the chip's maskrom mode, which writes FiiO's firmware back from a computer over USB. It needs a patched `rkdeveloptool` and some care; the steps are in `docs/device-recovery.md`.
-- **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step and Last USB lines from Home → Diagnostics.
+- **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step, Last USB and USB errors lines from Home → Diagnostics.

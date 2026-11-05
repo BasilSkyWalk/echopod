@@ -43,6 +43,7 @@ typedef struct UsbPort {
     bool control_out_pending;
     bool report_busy;
     uint16_t packet_frame;
+    uint32_t configured_resets;
     UsbSetup control_out;
     uint32_t out_packet[USB_PORT_PACKET_WORDS];
     UsbDevice device;

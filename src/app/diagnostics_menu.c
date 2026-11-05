@@ -137,6 +137,7 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
     items[count++] = action_item(STR_DIAG_LPC_ACCEL, run_core1_accel_test, &screens->core1_accel,
                                  core1_accel_value);
     items[count++] = value_item(STR_DIAG_LAST_USB, diagnostics_row_usb_last);
+    items[count++] = value_item(STR_DIAG_USB_ERRORS, diagnostics_row_usb_errors);
     items[count++] =
         action_item(STR_DIAG_CLOCK, diagnostics_row_clock_read, NULL, diagnostics_row_clock);
     app_screens_build_menu(&screens->diagnostics, i18n_text(STR_DIAG_TITLE), items, count, theme);

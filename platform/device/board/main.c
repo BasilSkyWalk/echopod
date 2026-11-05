@@ -41,6 +41,7 @@ static uint32_t ask_started_ms;
 static HalUsbMode usb_mode;
 static bool usb_prompt;
 static bool dac_session;
+static bool resume_storage;
 
 void hal_system_set_usb_mode(HalUsbMode mode)
 {
@@ -74,7 +75,8 @@ static void run_usb_session(void)
     board_stall_pause(true);
     raise_clock_for_usb();
     UsbSessionEnd end = usb_session_run();
-    if (end == USB_SESSION_UNPLUGGED && hal_system_usb_last().left_mounted != 0) {
+    bool cable_back = end == USB_SESSION_UNPLUGGED && usb_vbus_present();
+    if (end == USB_SESSION_UNPLUGGED && !cable_back && hal_system_usb_last().left_mounted != 0) {
         app_show_notice(i18n_text(STR_USB_UNPLUGGED_TITLE), i18n_text(STR_USB_UNPLUGGED_MESSAGE));
         board_wait_for_key();
     }
@@ -88,6 +90,10 @@ static void run_usb_session(void)
     }
     app_wake();
     board_stall_pause(false);
+    if (cable_back) {
+        resume_storage = true;
+        usb_state = USB_STATE_UNPLUGGED;
+    }
 }
 
 static void run_dac_session(void)
@@ -140,7 +146,8 @@ static bool listen(int choice)
 
 static void start_listening(void)
 {
-    if (!listen(saved_choice())) {
+    if (!listen(resume_storage ? USB_CHOICE_STORAGE : saved_choice())) {
+        resume_storage = false;
         usb_state = USB_STATE_HANDLED;
         return;
     }
@@ -159,13 +166,16 @@ static void start_asking(void)
 static void keep_listening(void)
 {
     if (usb_session_host_seen()) {
-        if (usb_prompt) {
+        bool ask = usb_prompt && !resume_storage;
+        resume_storage = false;
+        if (ask) {
             start_asking();
         } else {
             usb_state = USB_STATE_HANDLED;
             run_session();
         }
     } else if (hal_clock_milliseconds() - listen_started_ms >= HOST_WAIT_MS) {
+        resume_storage = false;
         stop_listening();
         usb_state = USB_STATE_HANDLED;
     }
@@ -196,6 +206,7 @@ static void check_usb(void)
 {
     bool vbus = usb_vbus_present();
     if (!vbus) {
+        resume_storage = false;
         if (usb_state == USB_STATE_LISTENING) {
             stop_listening();
         } else if (usb_state == USB_STATE_ASKING) {

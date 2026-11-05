@@ -457,6 +457,9 @@ static void handle_reset(UsbPort *port)
         }
     }
     flush_fifos();
+    if (port->configured) {
+        port->configured_resets++;
+    }
     port->configured = false;
     port->in_busy = false;
     port->report_busy = false;
