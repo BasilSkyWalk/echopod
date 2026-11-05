@@ -164,6 +164,21 @@ static uint8_t capped(uint32_t value)
     return (uint8_t)(value < MAX_SMALL ? value : MAX_SMALL);
 }
 
+static char *append(char *out, const char *text)
+{
+    while (*text != '\0') {
+        *out++ = *text++;
+    }
+    return out;
+}
+
+static void add_version(char *out, const char *album, const char *version)
+{
+    out = append(append(append(out, album), " ("), version);
+    out[0] = ')';
+    out[1] = '\0';
+}
+
 static void fill_names(const TrackTags *tags, BuilderTrack *track)
 {
     const char *artist = tags->text[TAG_ARTIST];
@@ -189,6 +204,10 @@ void track_fields_from_tags(const char *path, const TrackTags *tags, TrackFields
     track->path = path;
     track->title = chosen(tags->text[TAG_TITLE], fields->title);
     track->album = chosen(tags->text[TAG_ALBUM], chosen(fields->album, UNKNOWN_ALBUM));
+    if (tags->text[TAG_ALBUM][0] != '\0' && tags->text[TAG_ALBUM_VERSION][0] != '\0') {
+        add_version(fields->album, tags->text[TAG_ALBUM], tags->text[TAG_ALBUM_VERSION]);
+        track->album = fields->album;
+    }
     fill_names(tags, track);
     track->year = (uint16_t)track_fields_year(tags->text[TAG_DATE]);
     uint32_t disc = track_fields_number(tags->text[TAG_DISC]);

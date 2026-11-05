@@ -72,6 +72,9 @@ The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` (AAC
 | date | `date` | `TDRC` (`TYER` in ID3v2.3) | `©day` | `Year` | `WM/Year` |
 | disc | `discnumber` | `TPOS` | `disk` (first number) | `Disc` | `WM/PartOfSet` |
 | track | `tracknumber` | `TRCK` | `trkn` (first number) | `Track` | `WM/TrackNumber` |
+| album version | `albumversion` | `TXXX` described `ALBUMVERSION` (any case) | `----` named `ALBUMVERSION` (any case, any mean) | `AlbumVersion` | not read |
+
+**Album versions.** When a track has both an album tag and an album version (the `ALBUMVERSION` tag Navidrome uses to tell editions apart; Picard users usually set it from `%_releasecomment%` with a script), the album title becomes `Album (Version)`, for example `Abbey Road (2019 Remix)`. The version is part of the title everywhere (lists, Now Playing, Cover Flow, sorting) and of the album key, so two editions of one album are two albums, each with its own cover and favorite. Albums without a version keep their key, so favorites and stored covers of those survive. A version without an album tag is ignored (the folder name stays the album). Navidrome also reads `MUSICBRAINZ_ALBUMCOMMENT` as the version; EchoPod doesn't.
 
 An MP3 without ID3v2 uses its ID3v1 tag. The duration is the container's length rounded to the nearest millisecond (FLAC and DSF sample counts, Ogg's last granule (for Opus minus the header's pre-skip, at 48 kHz), an MP3's Xing/Info frame count or its bitrate, MP4's track duration, WAV data length, APE frame counts, ASF play duration minus preroll, DFF DSD data length). `tools/tag_fixture.py` writes one small file per format to `tests/fixtures/tags`, and both the Python indexer and the device reader (`src/library/track_tags`) are tested against them.
 

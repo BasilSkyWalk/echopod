@@ -22,7 +22,7 @@ typedef struct ApeKey {
 static const ApeKey KEYS[] = {
     {"title", TAG_TITLE}, {"artist", TAG_ARTIST}, {"album artist", TAG_ALBUM_ARTIST},
     {"album", TAG_ALBUM}, {"genre", TAG_GENRE},   {"year", TAG_DATE},
-    {"disc", TAG_DISC},   {"track", TAG_TRACK},
+    {"disc", TAG_DISC},   {"track", TAG_TRACK},   {"albumversion", TAG_ALBUM_VERSION},
 };
 
 static uint32_t old_blocks_per_frame(uint32_t version, uint32_t compression)

@@ -159,12 +159,15 @@ def track_from_tags(relative_path, tags, duration_seconds):
     file_disc, file_number = numbers_from_filename(path.stem)
     artist = first_tag(tags, "artist")
     album_artist = first_tag(tags, "albumartist")
+    album = first_tag(tags, "album")
+    version = first_tag(tags, "albumversion")
     return TrackInfo(
         path=relative_path,
         title=first_tag(tags, "title") or title_from_filename(path.stem),
         artist=artist or album_artist or UNKNOWN_ARTIST,
         album_artist=album_artist or artist or UNKNOWN_ARTIST,
-        album=first_tag(tags, "album") or path.parent.name or UNKNOWN_ALBUM,
+        album=f"{album} ({version})" if album and version
+        else album or path.parent.name or UNKNOWN_ALBUM,
         genre=first_tag(tags, "genre") or UNKNOWN_GENRE,
         year=parse_year(first_tag(tags, "date")),
         disc=min(parse_number(first_tag(tags, "discnumber")) or file_disc or 1, MAX_U8),
@@ -196,6 +199,7 @@ FIELDS = ("title", "artist", "albumartist", "album", "genre", "date", "discnumbe
 ID3_FRAMES = ("TIT2", "TPE1", "TPE2", "TALB", "TCON", "TDRC", "TPOS", "TRCK")
 MP4_ATOMS = ("\xa9nam", "\xa9ART", "aART", "\xa9alb", "\xa9gen", "\xa9day", "disk", "trkn")
 APE_KEYS = ("title", "artist", "album artist", "album", "genre", "year", "disc", "track")
+VERSION_KEY = "albumversion"
 ASF_KEYS = ("Title", "Author", "WM/AlbumArtist", "WM/AlbumTitle", "WM/Genre", "WM/Year",
             "WM/PartOfSet", "WM/TrackNumber")
 
@@ -206,6 +210,9 @@ def id3_values(tags):
         frame = tags.get(frame_id)
         if frame is not None:
             values[field_name] = frame.genres if frame_id == "TCON" else [str(text) for text in frame.text]
+    for frame in tags.getall("TXXX"):
+        if frame.desc.lower() == VERSION_KEY:
+            values.setdefault(VERSION_KEY, []).extend(str(text) for text in frame.text)
     return values
 
 
@@ -218,13 +225,17 @@ def mp4_values(tags):
     for field_name, atom in zip(FIELDS, MP4_ATOMS):
         if atom in tags:
             values[field_name] = [mp4_text(value) for value in tags[atom]]
+    for key, value in tags.items():
+        if key.startswith("----:") and key.split(":", 2)[-1].lower() == VERSION_KEY:
+            values.setdefault(VERSION_KEY, []).extend(bytes(text).decode("utf-8", "replace")
+                                                      for text in value)
     return values
 
 
 def ape_values(tags):
     by_key = {key.lower(): value for key, value in tags.items()}
     values = {}
-    for field_name, key in zip(FIELDS, APE_KEYS):
+    for field_name, key in zip((*FIELDS, VERSION_KEY), (*APE_KEYS, VERSION_KEY)):
         value = by_key.get(key)
         if value is not None and value.kind == 0:
             values[field_name] = list(value)
@@ -243,7 +254,7 @@ def vorbis_values(tags):
     values = {}
     for key, value in tags:
         values.setdefault(key.lower(), []).append(value)
-    return {field_name: values[field_name] for field_name in FIELDS if field_name in values}
+    return {field_name: values[field_name] for field_name in (*FIELDS, VERSION_KEY) if field_name in values}
 
 
 def raw_tag_values(tags):

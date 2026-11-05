@@ -336,6 +336,25 @@ static void damaged_files_never_read_outside_the_file(void)
     }
 }
 
+static void album_versions_come_from_every_tag_kind_that_has_one(void)
+{
+    static const char *const NAMES[] = {
+        "../scan_music/Artist B/Old (2019)/07 - Oldie.mp3",
+        "../scan_music/Artist B/Old (2019)/08 - Newer.flac",
+        "../scan_music/Artist B/Old (2019)/09 - Newest.m4a",
+    };
+    static TrackTags tags;
+    for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
+        CHECK(read_fixture(NAMES[index], &tags));
+        CHECK_EQUAL(0, strcmp("Old Album", tags.text[TAG_ALBUM]));
+        CHECK_EQUAL(0, strcmp("2019 Remix", tags.text[TAG_ALBUM_VERSION]));
+    }
+    CHECK(read_fixture("../scan_music/Artist B/Old (2019)/10 - Last.ape", &tags));
+    CHECK_EQUAL(0, strcmp("Live", tags.text[TAG_ALBUM_VERSION]));
+    CHECK(read_fixture("id3v24.mp3", &tags));
+    CHECK_EQUAL(0, strcmp("", tags.text[TAG_ALBUM_VERSION]));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -348,6 +367,7 @@ int main(void)
         TEST_CASE(formats_come_from_the_extension_in_any_case),
         TEST_CASE(a_truncated_file_fails_cleanly),
         TEST_CASE(damaged_files_never_read_outside_the_file),
+        TEST_CASE(album_versions_come_from_every_tag_kind_that_has_one),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
