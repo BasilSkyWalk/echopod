@@ -111,6 +111,7 @@ typedef struct AppState {
     bool rocker_swapped[KEY_COUNT];
     uint32_t dac_volume_until_ms;
     Theme theme;
+    Theme stage_theme;
     int shown_theme;
     FrameStats frame_stats;
     FrameStats update_stats;
@@ -208,7 +209,7 @@ static HalDisplayRotation rotation_for(Orientation orientation)
 static int theme_key(const Settings *settings)
 {
     return (int)settings->orientation | settings->options[OPTION_ACCENT] << 2 |
-           settings->options[OPTION_HIGHLIGHT] << 5;
+           settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_THEME] << 6;
 }
 
 static void apply_orientation(void)
@@ -216,9 +217,12 @@ static void apply_orientation(void)
     const Settings *settings = &app.settings.settings;
     Orientation orientation = settings->orientation;
     app.shown_theme = theme_key(settings);
-    app.theme =
-        default_theme_styled(orientation != ORIENTATION_LANDSCAPE, settings->options[OPTION_ACCENT],
-                             settings->options[OPTION_HIGHLIGHT] != 0);
+    bool portrait = orientation != ORIENTATION_LANDSCAPE;
+    int accent = settings->options[OPTION_ACCENT];
+    bool flat = settings->options[OPTION_HIGHLIGHT] != 0;
+    app.theme = default_theme_styled(portrait, accent, flat,
+                                     settings->options[OPTION_THEME] == THEME_LIGHT);
+    app.stage_theme = default_theme_styled(portrait, accent, flat, false);
     hal_display_set_rotation(rotation_for(orientation));
     frame_diff_init(&app.frame_diff, row_hashes, app.theme.metrics.screen_height);
 }
@@ -812,6 +816,7 @@ static void start_screens(uint32_t now_ms)
     AppScreensContext context = {
         .options = &app.options,
         .theme = &app.theme,
+        .stage_theme = &app.stage_theme,
         .store = &app.library,
         .player = &app.player,
         .spoken = &app.spoken,

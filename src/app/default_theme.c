@@ -76,9 +76,28 @@ Theme default_theme_for(bool portrait)
     return theme;
 }
 
-Theme default_theme_styled(bool portrait, int accent, bool flat)
+static const ThemeColors LIGHT_COLORS = {
+    .background = COLOR_RGB(244, 244, 247),
+    .text = COLOR_RGB(18, 18, 22),
+    .text_secondary = COLOR_RGB(84, 84, 92),
+    .text_tertiary = COLOR_RGB(118, 118, 126),
+    .selection_text = COLOR_RGB(255, 255, 255),
+    .header_background = COLOR_RGB(226, 226, 232),
+    .header_top = COLOR_RGB(250, 250, 252),
+    .header_text = COLOR_RGB(18, 18, 22),
+    .divider = COLOR_RGB(200, 200, 208),
+    .scrollbar_thumb = COLOR_RGB(150, 150, 160),
+    .danger = COLOR_RGB(200, 40, 30),
+    .success = COLOR_RGB(24, 140, 56),
+    .chevron = COLOR_RGB(132, 132, 140),
+};
+
+Theme default_theme_styled(bool portrait, int accent, bool flat, bool light)
 {
     Theme theme = default_theme_for(portrait);
+    if (light) {
+        theme.colors = LIGHT_COLORS;
+    }
     const Color *shades = ACCENT_COLORS[accent >= 0 && accent < ACCENTS ? accent : 0];
     theme.colors.selection_background = shades[0];
     theme.colors.selection_top = flat ? shades[0] : shades[1];

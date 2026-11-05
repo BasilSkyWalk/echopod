@@ -46,7 +46,8 @@ enum {
     SETTINGS_START_INDEX = 13,
     SETTINGS_RESCAN_INDEX = 14,
     SETTINGS_LANGUAGE_INDEX = 16,
-    SETTINGS_CLOCK_INDEX = 30,
+    SETTINGS_THEME_INDEX = 30,
+    SETTINGS_CLOCK_INDEX = 31,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -2119,6 +2120,26 @@ static void the_clock_and_date_time_rows_end_the_settings_list(void)
     CHECK(title_is("Settings"));
 }
 
+static void the_light_theme_lightens_the_screens_and_keeps_the_accent(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_THEME_INDEX);
+    CHECK(title_is("Theme"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(THEME_LIGHT, settings.options[OPTION_THEME]);
+    Theme light = default_theme_styled(false, 0, false, true);
+    CHECK(light.colors.background != DEFAULT_THEME.colors.background);
+    CHECK_EQUAL(light.colors.background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+    Theme red_light = default_theme_styled(false, 1, false, true);
+    Theme red_dark = default_theme_styled(false, 1, false, false);
+    CHECK_EQUAL(red_dark.colors.selection_background, red_light.colors.selection_background);
+    CHECK_EQUAL(red_dark.colors.selection_shine, red_light.colors.selection_shine);
+}
+
 static void start_app_with_clock(bool clock_on)
 {
     static uint8_t clock_settings[SETTINGS_FILE_SIZE];
@@ -2333,6 +2354,7 @@ int main(void)
         TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
         TEST_CASE(a_listen_history_turned_off_records_nothing),
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
+        TEST_CASE(the_light_theme_lightens_the_screens_and_keeps_the_accent),
         TEST_CASE(the_header_shows_the_time_only_while_the_clock_setting_is_on),
         TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
         TEST_CASE(dac_keys_follow_the_swap_setting),
