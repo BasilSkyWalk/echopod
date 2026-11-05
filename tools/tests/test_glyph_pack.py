@@ -10,6 +10,7 @@ sys.path.insert(0, str(TOOLS_DIRECTORY))
 
 import font_build
 import glyph_pack
+import make_image
 
 
 def glyph(codepoint, width=2, height=2, left=0, top=2, advance=3, levels=None):
@@ -31,6 +32,20 @@ class CharacterSetTest(unittest.TestCase):
         self.assertEqual(6763, len(hanzi))
         self.assertIn(ord("中"), hanzi)
 
+    def test_big5_level_1_has_5401_hanzi_with_both_trail_ranges(self):
+        spec = {"codec": "big5", "leads": [164, 198], "trails": [[64, 126], [161, 254]],
+                "ranges": [[0x4E00, 0x9FFF]]}
+        hanzi = glyph_pack.set_characters(spec)
+        self.assertEqual(5401, len(hanzi))
+        for character in "臺灣國語們說個龍鳳":
+            self.assertIn(ord(character), hanzi, character)
+
+    def test_codec_sets_default_to_the_euc_trail_range(self):
+        low_trail = {ord(bytes([0xA4, 0x40]).decode("big5"))}
+        self.assertFalse(low_trail & glyph_pack.codec_characters("big5", [0xA4, 0xA4]))
+        self.assertTrue(low_trail <= glyph_pack.codec_characters("big5", [0xA4, 0xA4],
+                                                                  [[0x40, 0x7E]]))
+
     def test_ranges_without_a_codec_are_taken_whole(self):
         self.assertEqual({0x3041, 0x3042, 0x3043},
                          glyph_pack.set_characters({"ranges": [[0x3041, 0x3043]]}))
@@ -39,18 +54,25 @@ class CharacterSetTest(unittest.TestCase):
         config = json.loads((ASSETS_DIRECTORY / "glyph_pack.json").read_text())
         for face in config["faces"][:2]:
             wanted = glyph_pack.face_characters(config, face)
-            for character in "한국어中文日本語ひらがなカタカナ。「」！":
+            for character in "한국어中文日本語ひらがなカタカナ。「」！臺灣說們":
                 self.assertIn(ord(character), wanted, character)
-            self.assertLess(len(wanted), 13000)
+            self.assertLessEqual(len(wanted),
+                                 glyph_pack.MAX_DIRECTORY * glyph_pack.ENTRIES_PER_SECTOR)
 
     def test_the_inter_faces_hold_latin_greek_cyrillic_and_vietnamese_letters(self):
         config = json.loads((ASSETS_DIRECTORY / "glyph_pack.json").read_text())
         for face in config["faces"][2:]:
             wanted = glyph_pack.face_characters(config, face)
             self.assertTrue(set(range(160, 256)) <= wanted)
-            for character in "ĄęŁőŞğÇșțƠưЖжЯёΩλẠệ":
+            for character in "ĄęŁőŞğÇșțƠưЖжЯёΩλẠệ‧●„†‰′‹":
                 self.assertIn(ord(character), wanted, character)
             self.assertLess(max(wanted), 0x2E80)
+
+    def test_the_committed_faces_fit_the_image(self):
+        config = json.loads((ASSETS_DIRECTORY / "glyph_pack.json").read_text())
+        packs = TOOLS_DIRECTORY.parent / "src" / "fonts" / "packs"
+        sizes = [(packs / f"{face['name']}.bin").stat().st_size for face in config["faces"]]
+        self.assertEqual(len(sizes), len(make_image.glyph_face_offsets(sizes)))
 
     def test_faces_are_numbered_from_one_in_config_order(self):
         config = {"faces": [{"name": "a"}, {"name": "b"}]}

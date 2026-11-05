@@ -145,7 +145,7 @@ Settings → **Volume buttons** changes what the rocker does on Now Playing and 
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
-More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones), and **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC). The start screen can also be Album Artists, Genres, Folders or All Songs. **Clock** shows the time in the status bar and **Date & time** sets it (see Clock below).
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), **Cover Flow** shows 5 covers (the centre one and two each side) or 3 (one each side), **Animations** makes screen slides and Cover Flow scrolling Slower (1.5× as long) or Faster (0.6×), **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones), and **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC). The start screen can also be Album Artists, Genres, Folders or All Songs. **Clock** shows the time in the status bar and **Date & time** sets it (see Clock below).
 
 ## Clock
 
@@ -168,7 +168,7 @@ In portrait, Home shows the album art under the menu, Now Playing puts the cover
 
 ## Language
 
-Settings → Language lists English, 简体中文, 日本語, 한국어, Deutsch, Français, Español, Italiano, Português, Nederlands, Svenska, Dansk, Norsk, Suomi, Русский, Українська and Polski. Pick one and the player says "Restart to apply"; hold Power to turn it off and on again, and every menu, setting and message uses that language. Song, artist and album names are never translated.
+Settings → Language lists English, 简体中文, 日本語, 한국어, Deutsch, Français, Español, Italiano, Português, Nederlands, Svenska, Dansk, Norsk, Suomi, Русский, Українська, Polski and Bahasa Indonesia. Pick one and the player says "Restart to apply"; hold Power to turn it off and on again, and every menu, setting and message uses that language. Song, artist and album names are never translated.
 
 The translations were not checked by native speakers, and a few long texts may be cut short on the small screen. Folder names stay as they are: audiobooks and podcasts still go in folders named `Audiobooks` and `Podcasts`.
 

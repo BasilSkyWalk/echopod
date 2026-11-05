@@ -3,18 +3,19 @@
 static uint32_t elapsed_of(const Slide *slide, uint32_t now_ms)
 {
     uint32_t elapsed = now_ms - slide->start_ms;
-    return elapsed > SLIDE_DURATION_MS ? SLIDE_DURATION_MS : elapsed;
+    return elapsed > slide->duration_ms ? slide->duration_ms : elapsed;
 }
 
-void slide_start(Slide *slide, uint32_t now_ms, SlideDirection direction)
+void slide_start(Slide *slide, uint32_t now_ms, SlideDirection direction, uint32_t duration_ms)
 {
-    *slide = (Slide){.active = true, .start_ms = now_ms, .direction = direction};
+    *slide = (Slide){
+        .active = true, .start_ms = now_ms, .duration_ms = duration_ms, .direction = direction};
 }
 
 int slide_progress(const Slide *slide, uint32_t now_ms, int width)
 {
-    uint64_t remaining = SLIDE_DURATION_MS - elapsed_of(slide, now_ms);
-    uint64_t duration = SLIDE_DURATION_MS;
+    uint64_t duration = slide->duration_ms;
+    uint64_t remaining = duration - elapsed_of(slide, now_ms);
     uint64_t left =
         (uint64_t)width * remaining * remaining * remaining / (duration * duration * duration);
     return width - (int)left;
@@ -22,7 +23,7 @@ int slide_progress(const Slide *slide, uint32_t now_ms, int width)
 
 bool slide_finished(const Slide *slide, uint32_t now_ms)
 {
-    return elapsed_of(slide, now_ms) >= SLIDE_DURATION_MS;
+    return elapsed_of(slide, now_ms) >= slide->duration_ms;
 }
 
 int slide_leaving_x(const Slide *slide, uint32_t now_ms, int width)
@@ -39,5 +40,5 @@ int slide_arriving_x(const Slide *slide, uint32_t now_ms, int width)
 
 bool slide_shows_arriving_title(const Slide *slide, uint32_t now_ms)
 {
-    return elapsed_of(slide, now_ms) >= SLIDE_DURATION_MS / 2;
+    return elapsed_of(slide, now_ms) >= slide->duration_ms / 2;
 }

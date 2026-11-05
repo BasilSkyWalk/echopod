@@ -258,6 +258,23 @@ static void an_untagged_flac_has_empty_fields_and_its_duration(void)
     CHECK_EQUAL(TAG_PICTURE_NONE, tags.picture.kind);
 }
 
+static void odd_spaces_become_plain_spaces_and_ends_are_trimmed(void)
+{
+    static const char TEXT[] = "\xe2\x80\x83"
+                               "A\xe2\x80\x82"
+                               "B\xe2\x80\xaf"
+                               "C\xe2\x81\x9f"
+                               "D\xe2\x80\x8a"
+                               "E\xe2\x80\xa8"
+                               "F\xe2\x80\x89";
+    char out[TRACK_TAG_TEXT_CAPACITY];
+    tag_decode(out, (const uint8_t *)TEXT, sizeof TEXT - 1, TAG_UTF8);
+    CHECK_EQUAL(0, strcmp("A B C D E F", out));
+    static const uint8_t WIDE[] = {0x00, 0x20, 0x00, 'x', 0x20, 0x27, 0x00, 'y', 0x30, 0x00};
+    tag_decode(out, WIDE, sizeof WIDE, TAG_UTF16BE);
+    CHECK_EQUAL(0, strcmp("x\xe2\x80\xa7y", out));
+}
+
 static void formats_come_from_the_extension_in_any_case(void)
 {
     CHECK_EQUAL(TAG_FORMAT_FLAC, track_tags_format_for_name("a.FLAC"));
@@ -327,6 +344,7 @@ int main(void)
         TEST_CASE(ogg_comments_and_pictures_read_across_small_pages),
         TEST_CASE(an_mp3_with_only_id3v1_and_no_xing_header_still_reads),
         TEST_CASE(an_untagged_flac_has_empty_fields_and_its_duration),
+        TEST_CASE(odd_spaces_become_plain_spaces_and_ends_are_trimmed),
         TEST_CASE(formats_come_from_the_extension_in_any_case),
         TEST_CASE(a_truncated_file_fails_cleanly),
         TEST_CASE(damaged_files_never_read_outside_the_file),

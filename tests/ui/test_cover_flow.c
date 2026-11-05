@@ -3,7 +3,8 @@
 
 enum {
     ONE = COVER_FLOW_ONE,
-    FRAME_MS = 16
+    FRAME_MS = 16,
+    TIME_CONSTANT_MS = COVER_FLOW_TIME_CONSTANT_MS
 };
 
 static const CoverFlowLayout LAYOUT = {
@@ -112,7 +113,7 @@ static void the_position_never_overshoots_and_arrives(void)
     int32_t target = 3 * ONE;
     int frames = 0;
     while (position != target && frames < 100) {
-        int32_t next = cover_flow_approach(position, target, FRAME_MS);
+        int32_t next = cover_flow_approach(position, target, FRAME_MS, TIME_CONSTANT_MS);
         CHECK(next > position && next <= target);
         position = next;
         frames++;
@@ -123,13 +124,85 @@ static void the_position_never_overshoots_and_arrives(void)
 
 static void the_position_also_moves_back(void)
 {
-    int32_t next = cover_flow_approach(2 * ONE, 0, FRAME_MS);
+    int32_t next = cover_flow_approach(2 * ONE, 0, FRAME_MS, TIME_CONSTANT_MS);
     CHECK(next < 2 * ONE && next >= 0);
 }
 
 static void no_time_means_no_movement(void)
 {
-    CHECK_EQUAL(ONE, cover_flow_approach(ONE, 4 * ONE, 0));
+    CHECK_EQUAL(ONE, cover_flow_approach(ONE, 4 * ONE, 0, TIME_CONSTANT_MS));
+}
+
+static int frames_to_arrive(uint32_t time_constant_ms)
+{
+    int32_t position = 0;
+    int frames = 0;
+    while (position != 3 * ONE && frames < 1000) {
+        position = cover_flow_approach(position, 3 * ONE, FRAME_MS, time_constant_ms);
+        frames++;
+    }
+    return frames;
+}
+
+static void a_longer_time_constant_moves_more_slowly(void)
+{
+    int normal = frames_to_arrive(TIME_CONSTANT_MS);
+    CHECK(frames_to_arrive(TIME_CONSTANT_MS * 3 / 2) > normal);
+    CHECK(frames_to_arrive(TIME_CONSTANT_MS * 3 / 5) < normal);
+    CHECK(cover_flow_approach(0, 3 * ONE, FRAME_MS, TIME_CONSTANT_MS * 3 / 2) <
+          cover_flow_approach(0, 3 * ONE, FRAME_MS, TIME_CONSTANT_MS));
+}
+
+static void further_covers_shrink_with_depth(void)
+{
+    CoverFlowLayout layout = LAYOUT;
+    layout.side_shrink = ONE / 4;
+    Quad first = cover_flow_quad(&layout, ONE);
+    Quad second = cover_flow_quad(&layout, 2 * ONE);
+    CHECK_EQUAL(40, first.width);
+    CHECK_EQUAL(30, second.width);
+    CHECK_EQUAL(60, second.left_height);
+    CHECK_EQUAL(45, second.right_height);
+    CHECK_EQUAL(255, second.left);
+    Quad between = cover_flow_quad(&layout, ONE + ONE / 2);
+    CHECK(between.width < first.width && between.width > second.width);
+    Quad left = cover_flow_quad(&layout, -2 * ONE);
+    CHECK_EQUAL(30, left.width);
+    CHECK_EQUAL(45, left.left_height);
+}
+
+static void stacked_covers_shrink_with_depth(void)
+{
+    CoverStackLayout stack = {.center_x = 85,
+                              .center_top = 80,
+                              .center_size = 100,
+                              .side_offset = 70,
+                              .side_spacing = 30,
+                              .side_width = 80,
+                              .side_height = 40,
+                              .side_shrink = ONE / 4};
+    Quad first = cover_flow_stacked_quad(&stack, ONE);
+    Quad second = cover_flow_stacked_quad(&stack, 2 * ONE);
+    CHECK_EQUAL(80, first.width);
+    CHECK_EQUAL(40, first.left_height);
+    CHECK_EQUAL(60, second.width);
+    CHECK_EQUAL(30, second.left_height);
+    CHECK_EQUAL(130 + 100 - 15, second.left_top);
+    stack.side_shrink = 0;
+    CHECK_EQUAL(80, cover_flow_stacked_quad(&stack, 2 * ONE).width);
+}
+
+static void three_covers_hide_everything_past_the_first_side_slot(void)
+{
+    CoverFlowLayout layout = LAYOUT;
+    layout.fade_start = ONE;
+    layout.fade_end = ONE + ONE / 2;
+    CHECK_EQUAL(140, cover_flow_light(&layout, ONE).right);
+    QuadLight fading = cover_flow_light(&layout, ONE + ONE / 4);
+    CHECK(fading.right > 0 && fading.right < 140);
+    QuadLight gone = cover_flow_light(&layout, 2 * ONE);
+    CHECK_EQUAL(0, gone.left);
+    CHECK_EQUAL(0, gone.right);
 }
 
 static void covers_are_drawn_from_the_edges_in(void)
@@ -167,6 +240,10 @@ int main(void)
         TEST_CASE(the_position_never_overshoots_and_arrives),
         TEST_CASE(the_position_also_moves_back),
         TEST_CASE(no_time_means_no_movement),
+        TEST_CASE(a_longer_time_constant_moves_more_slowly),
+        TEST_CASE(further_covers_shrink_with_depth),
+        TEST_CASE(stacked_covers_shrink_with_depth),
+        TEST_CASE(three_covers_hide_everything_past_the_first_side_slot),
         TEST_CASE(covers_are_drawn_from_the_edges_in),
         TEST_CASE(only_existing_albums_are_drawn),
     };

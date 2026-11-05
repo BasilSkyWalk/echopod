@@ -3,7 +3,6 @@
 #include <stdbool.h>
 
 enum {
-    TIME_CONSTANT_MS = 70,
     MIN_UNITS_PER_MS = 1
 };
 
@@ -24,13 +23,21 @@ static int lerp(int from, int to, int32_t amount)
     return from + (int)((int32_t)(to - from) * amount / COVER_FLOW_ONE);
 }
 
+static int32_t depth_scale(int shrink, int32_t beyond)
+{
+    int32_t scale = COVER_FLOW_ONE - shrink * beyond / COVER_FLOW_ONE;
+    return scale < 0 ? 0 : scale;
+}
+
 static CoverShape shape_at(const CoverFlowLayout *layout, int32_t distance)
 {
     if (distance >= COVER_FLOW_ONE) {
         int32_t beyond = distance - COVER_FLOW_ONE;
         int offset = layout->side_offset + (int)(layout->side_spacing * beyond / COVER_FLOW_ONE);
-        return (CoverShape){offset, layout->side_width, layout->side_near_height,
-                            layout->side_far_height};
+        int32_t scale = depth_scale(layout->side_shrink, beyond);
+        return (CoverShape){offset, lerp(0, layout->side_width, scale),
+                            lerp(0, layout->side_near_height, scale),
+                            lerp(0, layout->side_far_height, scale)};
     }
     return (CoverShape){
         lerp(0, layout->side_offset, distance),
@@ -66,9 +73,10 @@ Quad cover_flow_stacked_quad(const CoverStackLayout *layout, int32_t relative)
     int height = lerp(layout->center_size, layout->side_height, distance);
     if (distance >= COVER_FLOW_ONE) {
         int32_t beyond = distance - COVER_FLOW_ONE;
+        int32_t scale = depth_scale(layout->side_shrink, beyond);
         offset = layout->side_offset + (int)(layout->side_spacing * beyond / COVER_FLOW_ONE);
-        width = layout->side_width;
-        height = layout->side_height;
+        width = lerp(0, layout->side_width, scale);
+        height = lerp(0, layout->side_height, scale);
     }
     int middle = layout->center_top + layout->center_size / 2 + (relative > 0 ? offset : -offset);
     int top = middle - height / 2;
@@ -104,11 +112,12 @@ QuadLight cover_flow_light(const CoverFlowLayout *layout, int32_t relative)
     return relative > 0 ? (QuadLight){near, far} : (QuadLight){far, near};
 }
 
-int32_t cover_flow_approach(int32_t position, int32_t target, uint32_t elapsed_ms)
+int32_t cover_flow_approach(int32_t position, int32_t target, uint32_t elapsed_ms,
+                            uint32_t time_constant_ms)
 {
     int32_t difference = target - position;
     int32_t distance = abs_of(difference);
-    int32_t step = (int32_t)((int64_t)distance * elapsed_ms / TIME_CONSTANT_MS);
+    int32_t step = (int32_t)((int64_t)distance * elapsed_ms / time_constant_ms);
     int32_t minimum = (int32_t)elapsed_ms * MIN_UNITS_PER_MS;
     step = step < minimum ? minimum : step;
     step = step > distance ? distance : step;

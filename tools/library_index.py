@@ -180,9 +180,11 @@ def nfc(text):
 
 HIDDEN_CONTROLS = [code for code in range(0x20) if code not in range(0x09, 0x0E) and code < 0x1C]
 HIDDEN_MARKS = [0x7F, 0xFEFF, 0x2060, 0xFFFE, 0xFFFF, *range(0x200B, 0x2010)]
+ODD_SPACES = [*range(0x2000, 0x200B), 0x2028, 0x2029, 0x202F, 0x205F]
 TAG_TEXT_FIXES = {
     **{code: bytes([code]).decode("cp1252", "ignore") for code in range(0x80, 0xA0)},
     **{code: None for code in HIDDEN_CONTROLS + HIDDEN_MARKS},
+    **{code: " " for code in ODD_SPACES},
 }
 
 

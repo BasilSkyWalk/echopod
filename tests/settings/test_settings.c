@@ -450,6 +450,18 @@ static void the_new_options_default_to_their_first_choice(void)
     CHECK_EQUAL(106, TIME_ZONE_OPTION_COUNT);
 }
 
+static void the_animation_speed_scales_animation_times(void)
+{
+    Settings settings = settings_defaults();
+    CHECK_EQUAL(240u, settings_animation_ms(settings.options, 240));
+    settings.options[OPTION_ANIMATION_SPEED] = ANIMATION_SLOWER;
+    CHECK_EQUAL(360u, settings_animation_ms(settings.options, 240));
+    settings.options[OPTION_ANIMATION_SPEED] = ANIMATION_FASTER;
+    CHECK_EQUAL(144u, settings_animation_ms(settings.options, 240));
+    CHECK_EQUAL(42u, settings_animation_ms(settings.options, 70));
+    CHECK_EQUAL(70u, settings_animation_ms(NULL, 70));
+}
+
 static void a_version_9_file_is_48_bytes_with_the_checksum_at_the_end(void)
 {
     Settings settings = settings_with_every_option_at_its_top();
@@ -552,6 +564,7 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(the_new_options_are_saved_and_read_back),
         TEST_CASE(the_new_options_default_to_their_first_choice),
+        TEST_CASE(the_animation_speed_scales_animation_times),
         TEST_CASE(a_version_9_file_is_48_bytes_with_the_checksum_at_the_end),
         TEST_CASE(a_version_8_file_keeps_every_value_and_gets_the_new_defaults),
         TEST_CASE(a_version_8_file_is_saved_again_as_version_9),

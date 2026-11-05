@@ -1,5 +1,7 @@
 #include "settings/settings.h"
 
+#include <stddef.h>
+
 #include "core/hash.h"
 
 enum {
@@ -49,6 +51,7 @@ static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'S', 'T'};
 static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30, 60, 120, 300, 0};
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
 static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
+static const uint8_t ANIMATION_PERCENT[ANIMATION_SPEED_COUNT] = {100, 150, 60};
 static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_BATTERY] = 2,
     [OPTION_VOLUME_KEYS] = 2,
@@ -114,6 +117,13 @@ uint32_t settings_auto_off_option_minutes(int option)
 uint32_t settings_auto_off_ms(const Settings *settings)
 {
     return settings_auto_off_option_minutes(settings->auto_off) * MILLISECONDS_PER_MINUTE;
+}
+
+uint32_t settings_animation_ms(const uint8_t *options, uint32_t normal_ms)
+{
+    uint8_t speed = options != NULL ? options[OPTION_ANIMATION_SPEED] : ANIMATION_NORMAL;
+    uint32_t percent = speed < ANIMATION_SPEED_COUNT ? ANIMATION_PERCENT[speed] : 100;
+    return normal_ms * percent / 100;
 }
 
 uint8_t settings_option_count(SettingOption option)
