@@ -25,7 +25,7 @@ Version 0.10.0 adds Play all / Shuffle all, button and colour settings, Russian 
 | Library and covers built on a computer | device | echo-sync, one file for Windows, macOS and Linux, writes `library.db`, `covers.bin` and the scan fingerprint so the player doesn't rescan; 1,563 tracks in 2 min on Windows (macOS and Linux untested on a card) |
 | Screen-off controls | device | Pause, volume and track skip with the screen off |
 | Portrait mode | device | Settings → Orientation: Portrait or Portrait, flipped, with portrait layouts for Home, Now Playing, Cover Flow, the Custom EQ and lists; the volume rocker turns with the screen |
-| Languages | installed once; not checked screen by screen | Settings → Language, 14 languages in packs loaded at start; the translations were written by Claude and no native speaker has reviewed them (the Chinese starts from a contributor's text); Cyrillic, Greek and extended Latin letters in track names draw |
+| Languages | installed once; not checked screen by screen | Settings → Language, 16 languages in packs loaded at start; no native speaker has reviewed the translations yet (the Chinese starts from a contributor's text); Cyrillic, Greek and extended Latin letters in track names draw |
 | Settings | device | Shuffle, repeat, equalizer, sleep timer, screen timeout, auto off, brightness, orientation, gain, output, start screen, USB mode |
 | Battery and power | device | Battery level, charging, charge screen, low-battery shutdown, auto off |
 | Bluetooth headphones | device | Pair, remember up to six, auto-reconnect, switch and disconnect; headphone controls; tested with OnePlus Buds 3 |
