@@ -413,7 +413,8 @@ static void start_slide(Screen *leaving, int depth_before, uint32_t now_ms)
     }
     bool deeper = screen_stack_depth(&app.stack) > depth_before;
     app.leaving = leaving;
-    slide_start(&app.slide, now_ms, deeper ? SLIDE_FORWARD : SLIDE_BACK);
+    slide_start(&app.slide, now_ms, deeper ? SLIDE_FORWARD : SLIDE_BACK,
+                settings_animation_ms(app.settings.settings.options, SLIDE_DURATION_MS));
 }
 
 static bool slide_running(void)

@@ -30,7 +30,9 @@ enum {
     SHUFFLE_STROKE = 4,
     STACK_TITLE_TOP = 272,
     STACK_ARTIST_TOP = 294,
-    STACK_FLOOR_TOP = 266
+    STACK_FLOOR_TOP = 266,
+    THREE_FADE_START = COVER_FLOW_ONE,
+    THREE_FADE_END = COVER_FLOW_ONE + COVER_FLOW_ONE / 2
 };
 
 static const CoverStackLayout STACK = {
@@ -41,6 +43,7 @@ static const CoverStackLayout STACK = {
     .side_spacing = 30,
     .side_width = 100,
     .side_height = 30,
+    .side_shrink = COVER_FLOW_ONE / 4,
 };
 
 static const CoverFlowLayout LAYOUT = {
@@ -52,6 +55,7 @@ static const CoverFlowLayout LAYOUT = {
     .side_width = 46,
     .side_near_height = 104,
     .side_far_height = 78,
+    .side_shrink = COVER_FLOW_ONE / 4,
     .side_near_light = 230,
     .side_far_light = 140,
     .fade_start = 2 * COVER_FLOW_ONE,
@@ -380,7 +384,10 @@ static void update(void *context, uint32_t now_ms)
 {
     CoverFlowScreen *flow = context;
     int32_t target = (int32_t)flow->target * COVER_FLOW_ONE;
-    flow->position = cover_flow_approach(flow->position, target, now_ms - flow->last_ms);
+    uint32_t time_constant_ms =
+        settings_animation_ms(flow->config.options, COVER_FLOW_TIME_CONSTANT_MS);
+    flow->position =
+        cover_flow_approach(flow->position, target, now_ms - flow->last_ms, time_constant_ms);
     flow->last_ms = now_ms;
     flow->now_ms = now_ms;
     load_covers(flow);
@@ -398,13 +405,24 @@ static bool cover_image(const CoverFlowScreen *flow, int position, Image *image)
            cover_cache_half(flow->config.covers, position, album, image) == COVER_LOADED;
 }
 
+static bool three_covers(const CoverFlowScreen *flow)
+{
+    const uint8_t *options = flow->config.options;
+    return options != NULL && options[OPTION_COVER_FLOW_COVERS] == COVER_FLOW_THREE_COVERS;
+}
+
 static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position)
 {
     int32_t relative = (int32_t)position * COVER_FLOW_ONE - flow->position;
     bool stacked = theme_is_portrait(flow->config.theme);
     Quad quad =
         stacked ? cover_flow_stacked_quad(&STACK, relative) : cover_flow_quad(&LAYOUT, relative);
-    QuadLight light = cover_flow_light(&LAYOUT, relative);
+    CoverFlowLayout layout = LAYOUT;
+    if (three_covers(flow)) {
+        layout.fade_start = THREE_FADE_START;
+        layout.fade_end = THREE_FADE_END;
+    }
+    QuadLight light = cover_flow_light(&layout, relative);
     if (light.left == 0 && light.right == 0) {
         return;
     }

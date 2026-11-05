@@ -15,10 +15,11 @@ typedef enum SlideDirection {
 typedef struct Slide {
     bool active;
     uint32_t start_ms;
+    uint32_t duration_ms;
     SlideDirection direction;
 } Slide;
 
-void slide_start(Slide *slide, uint32_t now_ms, SlideDirection direction);
+void slide_start(Slide *slide, uint32_t now_ms, SlideDirection direction, uint32_t duration_ms);
 int slide_progress(const Slide *slide, uint32_t now_ms, int width);
 bool slide_finished(const Slide *slide, uint32_t now_ms);
 int slide_leaving_x(const Slide *slide, uint32_t now_ms, int width);
