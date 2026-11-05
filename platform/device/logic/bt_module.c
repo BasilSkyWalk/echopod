@@ -25,6 +25,7 @@ static void set_state(BtModule *module, HalBluetoothState state, uint32_t now_ms
         module->resend_stream = true;
         module->resend_on = false;
         module->linked_ms = now_ms;
+        module->odd_status = 0;
     }
     if (state != HAL_BLUETOOTH_CONNECTED) {
         module->status.streaming = false;
@@ -215,17 +216,31 @@ static void handle_ready(BtModule *module, uint8_t version, uint32_t now_ms)
     }
 }
 
+static bool is_letter(uint8_t byte)
+{
+    return byte >= 'A' && byte <= 'Z';
+}
+
 static void handle_status(BtModule *module, const uint8_t *bytes, uint32_t size, uint32_t now_ms)
 {
-    module->status.link_status = (char)bytes[2];
-    if (bytes[2] == 'O') {
+    char letter = (char)bytes[2];
+    module->status.link_status = letter;
+    if (letter == 'O') {
         copy_device(&module->status.connected, bytes + CONNECTED_HEADER_SIZE,
                     size - CONNECTED_HEADER_SIZE);
         set_state(module, HAL_BLUETOOTH_CONNECTED, now_ms);
-    } else if (module->status.state == HAL_BLUETOOTH_CONNECTED) {
+        module->odd_status = 0;
+        return;
+    }
+    if (module->status.state != HAL_BLUETOOTH_CONNECTED) {
+        return;
+    }
+    bool plausible = is_letter(bytes[2]);
+    if (plausible && module->odd_status == letter) {
         module->status.pairing = HAL_BLUETOOTH_PAIRING_NONE;
         set_state(module, HAL_BLUETOOTH_READY, now_ms);
     }
+    module->odd_status = plausible ? letter : 0;
 }
 
 static void finish_connect(BtModule *module, HalBluetoothPairing pairing, uint32_t now_ms)
@@ -395,6 +410,12 @@ static uint32_t parse_at(BtModule *module, uint32_t start, bool silent, uint32_t
     }
     if (size > UNKNOWN_SIZE) {
         handle_frame(module, bytes, size, now_ms);
+    } else if (is_letter(bytes[1])) {
+        if (available < STATUS_FRAME_SIZE && !silent) {
+            return 0;
+        }
+        bool shown = available > 2 && (is_letter(bytes[2]) || is_digit(bytes[2]));
+        add_event(module, (char)bytes[1], shown ? (char)bytes[2] : '.', now_ms);
     }
     return size;
 }

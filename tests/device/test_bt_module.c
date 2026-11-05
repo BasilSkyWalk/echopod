@@ -599,11 +599,51 @@ static void a_connected_module_is_still_asked_for_its_status(void)
     CHECK(frame_is(&frame, "CQ00"));
 }
 
-static void another_status_letter_means_the_link_dropped(void)
+static void the_same_odd_status_letter_twice_means_the_link_dropped(void)
 {
     connected_for(START_MS + 400);
     receive_text("CQI", START_MS + 500);
     settle(START_MS + 500);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+    receive_text("CQI", START_MS + 3500);
+    settle(START_MS + 3500);
+    CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
+}
+
+static void a_connected_reply_in_between_keeps_the_link(void)
+{
+    connected_for(START_MS + 400);
+    receive_text("CQI", START_MS + 500);
+    settle(START_MS + 500);
+    receive_connected(PHONES, "WH-1000XM4", START_MS + 3500);
+    settle(START_MS + 3500);
+    receive_text("CQI", START_MS + 6500);
+    settle(START_MS + 6500);
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+}
+
+static void a_garbled_status_byte_never_drops_the_link(void)
+{
+    static const uint8_t GARBLED[] = {'C', 'Q', 0x7F};
+    connected_for(START_MS + 400);
+    for (int round = 0; round < 3; round++) {
+        receive_bytes(GARBLED, sizeof GARBLED, START_MS + 500 + (uint32_t)round * 3000);
+        settle(START_MS + 500 + (uint32_t)round * 3000);
+    }
+    CHECK_EQUAL(HAL_BLUETOOTH_CONNECTED, module.status.state);
+}
+
+static void an_unknown_frame_is_logged(void)
+{
+    static const uint8_t NOT_A_LETTER[] = {'C', 0x01, 'X', 'Y'};
+    power_on_ready();
+    receive_text("CZ7x", START_MS + 400);
+    receive_bytes(NOT_A_LETTER, sizeof NOT_A_LETTER, START_MS + 400);
+    settle(START_MS + 400);
+    const HalBluetoothLink *link = &module.status.link;
+    CHECK_EQUAL(2, link->event_count);
+    CHECK_EQUAL('Z', link->events[1][0]);
+    CHECK_EQUAL('7', link->events[1][1]);
     CHECK_EQUAL(HAL_BLUETOOTH_READY, module.status.state);
 }
 
@@ -917,6 +957,8 @@ static void a_dropped_link_clears_the_pairing(void)
     module.status.pairing = HAL_BLUETOOTH_PAIRED;
     receive_text("CQI", START_MS + 500);
     settle(START_MS + 500);
+    receive_text("CQI", START_MS + 3500);
+    settle(START_MS + 3500);
     CHECK_EQUAL(HAL_BLUETOOTH_PAIRING_NONE, module.status.pairing);
 }
 
@@ -1024,6 +1066,9 @@ static void a_dropped_link_ends_the_stream(void)
     poll(SETTLED_MS + 300, &frame);
     receive_text("CQI", SETTLED_MS + 400);
     settle(SETTLED_MS + 400);
+    CHECK(module.status.streaming);
+    receive_text("CQI", SETTLED_MS + 3400);
+    settle(SETTLED_MS + 3400);
     CHECK(!module.status.streaming);
 }
 
@@ -1070,7 +1115,10 @@ int main(void)
         TEST_CASE(a_long_connected_name_is_cut),
         TEST_CASE(chok_connects_the_picked_device),
         TEST_CASE(a_connected_module_is_still_asked_for_its_status),
-        TEST_CASE(another_status_letter_means_the_link_dropped),
+        TEST_CASE(the_same_odd_status_letter_twice_means_the_link_dropped),
+        TEST_CASE(a_connected_reply_in_between_keeps_the_link),
+        TEST_CASE(a_garbled_status_byte_never_drops_the_link),
+        TEST_CASE(an_unknown_frame_is_logged),
         TEST_CASE(disconnecting_sends_ct00_and_ctok_confirms_it),
         TEST_CASE(disconnecting_needs_a_link),
         TEST_CASE(a_disconnect_cancels_a_pending_connect),

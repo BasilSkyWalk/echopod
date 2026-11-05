@@ -45,6 +45,7 @@ typedef struct BtModule {
     bool resend_stream;
     bool resend_on;
     uint8_t notice_pending;
+    char odd_status;
     uint32_t query_paused_ms;
     uint32_t stream_changed_ms;
     uint32_t stream_due_ms;
