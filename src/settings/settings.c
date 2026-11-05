@@ -3,7 +3,7 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 8,
+    VERSION = 9,
     FIRST_VERSION = 1,
     AUTO_OFF_VERSION = 2,
     USB_MODE_VERSION = 3,
@@ -12,6 +12,7 @@ enum {
     LANGUAGE_VERSION = 6,
     DAC_VERSION = 7,
     OPTIONS_VERSION = 8,
+    WIDE_VERSION = 9,
     FILTER_SHIFT = 5,
     BALANCE_MASK = 0x1F,
     MAGIC_SIZE = 4,
@@ -32,7 +33,9 @@ enum {
     DAC_FIELD = 19,
     OLD_CHECKSUM_FIELD = 20,
     OPTIONS_FIELD = 20,
-    CHECKSUM_FIELD = OPTIONS_FIELD + SETTINGS_OPTION_COUNT,
+    V8_OPTION_COUNT = 8,
+    V8_CHECKSUM_FIELD = OPTIONS_FIELD + V8_OPTION_COUNT,
+    CHECKSUM_FIELD = SETTINGS_FILE_SIZE - 4,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
     DEFAULT_VOLUME = 12,
@@ -46,12 +49,25 @@ static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'S', 'T'};
 static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30, 60, 120, 300, 0};
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
 static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
-static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
-    [OPTION_BATTERY] = 2,     [OPTION_VOLUME_KEYS] = 2,       [OPTION_ROCKER] = ROCKER_MODE_COUNT,
-    [OPTION_MENU_KEY] = 2,    [OPTION_ACCENT] = ACCENT_COUNT, [OPTION_HIGHLIGHT] = 2,
-    [OPTION_COVER_ORDER] = 2, [OPTION_ARTIST_VIEW] = 2};
+static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {[OPTION_BATTERY] = 2,
+                                                             [OPTION_VOLUME_KEYS] = 2,
+                                                             [OPTION_ROCKER] = ROCKER_MODE_COUNT,
+                                                             [OPTION_MENU_KEY] = 2,
+                                                             [OPTION_ACCENT] = ACCENT_COUNT,
+                                                             [OPTION_HIGHLIGHT] = 2,
+                                                             [OPTION_COVER_ORDER] = 2,
+                                                             [OPTION_ARTIST_VIEW] = 2,
+                                                             [OPTION_COVER_FLOW_COVERS] = 2,
+                                                             [OPTION_ANIMATION_SPEED] =
+                                                                 ANIMATION_SPEED_COUNT,
+                                                             [OPTION_CLOCK] = 2,
+                                                             [OPTION_BLUETOOTH_LEVEL] = 2,
+                                                             [OPTION_USB_PROMPT] = 2,
+                                                             [OPTION_LISTEN_HISTORY] = 2};
 
-_Static_assert(CHECKSUM_FIELD + 4 <= SETTINGS_FILE_SIZE, "the options must fit the file");
+_Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
+               "the options must fit the file");
+_Static_assert(V8_CHECKSUM_FIELD + 4 == SETTINGS_V8_FILE_SIZE, "version 8 files are 32 bytes");
 
 Settings settings_defaults(void)
 {
@@ -106,7 +122,16 @@ uint8_t settings_option_count(SettingOption option)
 
 static int checksum_field_of(uint8_t version)
 {
-    return version < OPTIONS_VERSION ? OLD_CHECKSUM_FIELD : CHECKSUM_FIELD;
+    return version < OPTIONS_VERSION ? OLD_CHECKSUM_FIELD
+           : version < WIDE_VERSION  ? V8_CHECKSUM_FIELD
+                                     : CHECKSUM_FIELD;
+}
+
+static int option_count_of(uint8_t version)
+{
+    return version < OPTIONS_VERSION ? 0
+           : version < WIDE_VERSION  ? V8_OPTION_COUNT
+                                     : SETTINGS_OPTION_COUNT;
 }
 
 static uint32_t checksum_of(const uint8_t *bytes)
@@ -156,7 +181,7 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
-static bool header_valid(const uint8_t *bytes)
+static bool header_valid(const uint8_t *bytes, uint32_t length)
 {
     for (int index = 0; index < MAGIC_SIZE; index++) {
         if (bytes[index] != MAGIC[index]) {
@@ -165,15 +190,13 @@ static bool header_valid(const uint8_t *bytes)
     }
     uint8_t version = bytes[VERSION_FIELD];
     return version >= FIRST_VERSION && version <= VERSION && bytes[VERSION_FIELD + 1] == 0 &&
+           (uint32_t)checksum_field_of(version) + 4 <= length &&
            get_u32(bytes, checksum_field_of(version)) == checksum_of(bytes);
 }
 
 static bool options_valid(const uint8_t *bytes)
 {
-    if (bytes[VERSION_FIELD] < OPTIONS_VERSION) {
-        return true;
-    }
-    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+    for (int option = 0; option < option_count_of(bytes[VERSION_FIELD]); option++) {
         if (bytes[OPTIONS_FIELD + option] >= OPTION_COUNTS[option]) {
             return false;
         }
@@ -202,7 +225,7 @@ static bool values_valid(const uint8_t *bytes)
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
 {
-    if (length < SETTINGS_FILE_SIZE || !header_valid(bytes) || !values_valid(bytes)) {
+    if (length < SETTINGS_V8_FILE_SIZE || !header_valid(bytes, length) || !values_valid(bytes)) {
         return false;
     }
     *settings = (Settings){
@@ -230,8 +253,7 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .balance = bytes[VERSION_FIELD] < DAC_VERSION ? SETTINGS_BALANCE_CENTER
                                                       : bytes[DAC_FIELD] & BALANCE_MASK,
     };
-    for (int option = 0; option < SETTINGS_OPTION_COUNT && bytes[VERSION_FIELD] >= OPTIONS_VERSION;
-         option++) {
+    for (int option = 0; option < option_count_of(bytes[VERSION_FIELD]); option++) {
         settings->options[option] = bytes[OPTIONS_FIELD + option];
     }
     return true;
