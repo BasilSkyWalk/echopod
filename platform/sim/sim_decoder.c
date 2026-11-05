@@ -40,6 +40,9 @@ static SimCodec codec_for(const char *path)
     if (has_extension(path, ".opus")) {
         return SIM_CODEC_OPUS;
     }
+    if (has_extension(path, ".qoa")) {
+        return SIM_CODEC_QOA;
+    }
     return SIM_CODEC_NONE;
 }
 
@@ -115,6 +118,48 @@ static bool open_opus(SimDecoder *decoder, const char *path)
     return true;
 }
 
+static bool read_qoa_file(void *context, uint32_t offset, void *buffer, uint32_t length)
+{
+    FILE *file = context;
+    if (fseek(file, (long)offset, SEEK_SET) != 0) {
+        return false;
+    }
+    return fread(buffer, 1, length, file) == length;
+}
+
+static bool open_qoa(SimDecoder *decoder, const char *path)
+{
+    decoder->qoa_file = fopen(path, "rb");
+    if (decoder->qoa_file == NULL) {
+        return false;
+    }
+    if (fseek(decoder->qoa_file, 0, SEEK_END) != 0) {
+        fclose(decoder->qoa_file);
+        decoder->qoa_file = NULL;
+        return false;
+    }
+    long size = ftell(decoder->qoa_file);
+    rewind(decoder->qoa_file);
+    if (size <= 0) {
+        fclose(decoder->qoa_file);
+        decoder->qoa_file = NULL;
+        return false;
+    }
+    FlacInput input = {.read = read_qoa_file, .context = decoder->qoa_file, .size = (uint32_t)size};
+    if (qoa_open(&decoder->qoa, input) != QOA_OK) {
+        fclose(decoder->qoa_file);
+        decoder->qoa_file = NULL;
+        return false;
+    }
+    decoder->sample_rate = decoder->qoa.info.sample_rate;
+    decoder->channels = decoder->qoa.info.channels;
+    decoder->bits_per_sample = QOA_BITS_PER_SAMPLE;
+    decoder->audio_bytes = (uint64_t)size - QOA_FILE_HEADER_BYTES;
+    decoder->total_frames = decoder->qoa.info.total_samples;
+    decoder->qoa_pending = 0;
+    return true;
+}
+
 static bool open_codec(SimDecoder *decoder, const char *path)
 {
     switch (decoder->codec) {
@@ -128,6 +173,8 @@ static bool open_codec(SimDecoder *decoder, const char *path)
         return open_mp4(decoder, path);
     case SIM_CODEC_OPUS:
         return open_opus(decoder, path);
+    case SIM_CODEC_QOA:
+        return open_qoa(decoder, path);
     case SIM_CODEC_NONE:
         return false;
     }
@@ -152,6 +199,34 @@ bool sim_decoder_open(SimDecoder *decoder, const char *host_path)
 
 static uint64_t read_native(SimDecoder *decoder, uint64_t count)
 {
+    if (decoder->codec == SIM_CODEC_QOA) {
+        uint64_t done = 0;
+        while (done < count) {
+            if (decoder->qoa_pending == 0) {
+                uint32_t first = 0;
+                uint32_t samples = 0;
+                if (qoa_next_block(&decoder->qoa, &decoder->qoa_left, &decoder->qoa_right,
+                                   &decoder->qoa_stride, &first, &samples) != QOA_OK) {
+                    break;
+                }
+                decoder->qoa_pending = samples;
+            }
+            uint64_t take =
+                count - done < decoder->qoa_pending ? count - done : decoder->qoa_pending;
+            for (uint64_t index = 0; index < take; index++) {
+                float *out = &native_samples[(done + index) * decoder->channels];
+                out[0] = (float)decoder->qoa_left[index * decoder->qoa_stride] / 32768.0f;
+                if (decoder->channels > 1) {
+                    out[1] = (float)decoder->qoa_right[index * decoder->qoa_stride] / 32768.0f;
+                }
+            }
+            decoder->qoa_left += take * decoder->qoa_stride;
+            decoder->qoa_right += take * decoder->qoa_stride;
+            decoder->qoa_pending -= (uint32_t)take;
+            done += take;
+        }
+        return done;
+    }
     switch (decoder->codec) {
     case SIM_CODEC_FLAC:
         return drflac_read_pcm_frames_f32(decoder->flac, count, native_samples);
@@ -163,6 +238,8 @@ static uint64_t read_native(SimDecoder *decoder, uint64_t count)
         return sim_mp4_read(&decoder->mp4, native_samples, count, decoder->channels);
     case SIM_CODEC_OPUS:
         return sim_opus_read(&decoder->opus, native_samples, count, decoder->channels);
+    case SIM_CODEC_QOA:
+        return 0;
     case SIM_CODEC_NONE:
         return 0;
     }
@@ -202,6 +279,12 @@ bool sim_decoder_seek(SimDecoder *decoder, uint64_t frame)
     case SIM_CODEC_OPUS:
         sought = sim_opus_seek(&decoder->opus, frame);
         break;
+    case SIM_CODEC_QOA: {
+        QoaResult result = qoa_seek(&decoder->qoa, (uint32_t)frame);
+        sought = result == QOA_OK;
+        decoder->qoa_pending = 0;
+        break;
+    }
     case SIM_CODEC_NONE:
         break;
     }
@@ -230,6 +313,13 @@ void sim_decoder_close(SimDecoder *decoder)
     case SIM_CODEC_OPUS:
         sim_opus_close(&decoder->opus);
         break;
+    case SIM_CODEC_QOA:
+        if (decoder->qoa_file != NULL) {
+            fclose(decoder->qoa_file);
+            decoder->qoa_file = NULL;
+        }
+        decoder->qoa_pending = 0;
+        break;
     case SIM_CODEC_NONE:
         break;
     }
@@ -247,6 +337,8 @@ static HalAudioCodec hal_codec(SimCodec codec)
         return HAL_AUDIO_CODEC_WAV;
     case SIM_CODEC_OPUS:
         return HAL_AUDIO_CODEC_OPUS;
+    case SIM_CODEC_QOA:
+        return HAL_AUDIO_CODEC_QOA;
     case SIM_CODEC_NONE:
     case SIM_CODEC_MP4:
         return HAL_AUDIO_CODEC_UNKNOWN;

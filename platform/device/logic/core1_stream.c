@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "codec/ogg.h"
+#include "codec/qoa.h"
 #include "device/core1_control.h"
 #include "device/mp3_probe.h"
 
@@ -816,4 +817,69 @@ static bool open_ogg(void *context, const char *path, uint32_t start_ms, AudioTr
 AudioSource core1_source_ogg_interface(Core1Source *source)
 {
     return (AudioSource){open_ogg, next_frame, release_frame, close_stream, source};
+}
+
+static bool open_qoa(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
+{
+    Core1Source *source = context;
+    stop_streaming(source);
+    FlacFileOpener files = source->flac.files;
+    if (!files.open(files.context, path, &source->input)) {
+        return false;
+    }
+    source->file_open = true;
+    QoaInfo info;
+    if (qoa_parse_header(source->input, &info) != QOA_OK) {
+        stop_streaming(source);
+        return false;
+    }
+    uint32_t playable = info.total_samples;
+    uint32_t target = (uint32_t)((uint64_t)start_ms * info.sample_rate / MILLISECONDS_PER_SECOND);
+    target = smaller(target, playable - 1);
+    uint32_t offset = 0;
+    uint32_t first = 0;
+    if (!qoa_frame_at(source->input, &info, target, &offset, &first)) {
+        stop_streaming(source);
+        return false;
+    }
+    source->start_offset = offset;
+    source->end_offset = source->input.size;
+    source->written = offset;
+    source->lead_trim = 0;
+    source->play_from = 0;
+    source->play_end = UINT32_MAX;
+    source->slot = 0;
+    source->read_failed = false;
+    source->bits_per_sample = QOA_BITS_PER_SAMPLE;
+    source->channels = info.channels;
+    *track = (AudioTrackInfo){.stream = {.sample_rate = info.sample_rate,
+                                         .channels = info.channels,
+                                         .bits_per_sample = QOA_BITS_PER_SAMPLE,
+                                         .min_block = info.frame_samples,
+                                         .max_block = info.frame_samples,
+                                         .total_samples = playable},
+                              .audio_bytes = source->input.size - QOA_FILE_HEADER_BYTES,
+                              .codec = AUDIO_CODEC_QOA};
+    volatile StreamControl *control = source->region.control;
+    control->sample_rate = info.sample_rate;
+    control->channels = info.channels;
+    control->bits_per_sample = QOA_BITS_PER_SAMPLE;
+    control->min_block = info.frame_samples;
+    control->max_block = info.frame_samples;
+    control->total_samples = playable;
+    control->first_sample = first;
+    control->start_offset = source->start_offset;
+    control->end_offset = source->end_offset;
+    control->written = source->written;
+    control->codec = STREAM_CODEC_QOA;
+    use_ring(source, source->ring_capacity);
+    publish();
+    control->generation = next_generation(source);
+    source->streaming = true;
+    return true;
+}
+
+AudioSource core1_source_qoa_interface(Core1Source *source)
+{
+    return (AudioSource){open_qoa, next_frame, release_frame, close_stream, source};
 }

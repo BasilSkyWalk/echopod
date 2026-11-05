@@ -84,6 +84,8 @@ const char *now_playing_codec_name(HalAudioCodec codec)
         return "AAC";
     case HAL_AUDIO_CODEC_OPUS:
         return "Opus";
+    case HAL_AUDIO_CODEC_QOA:
+        return "QOA";
     case HAL_AUDIO_CODEC_UNKNOWN:
         return "";
     }

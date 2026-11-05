@@ -9,6 +9,7 @@
 #include "device/core1_control.h"
 #include "device/core1_mp3.h"
 #include "device/core1_opus.h"
+#include "device/core1_qoa.h"
 #include "device/core1_stream.h"
 #include "device/mp3_probe.h"
 #include "flac_writer.h"
@@ -43,6 +44,8 @@ static AlacDecoder alac_decoder;
 static Core1Alac core1_alac;
 static Core1Aac core1_aac;
 static Core1Opus core1_opus;
+static QoaDecoder qoa_decoder;
+static Core1Qoa core1_qoa;
 static uint8_t opus_state[32 * 1024] __attribute__((aligned(8)));
 static uint8_t opus_packet[CORE1_OPUS_PACKET_BYTES];
 static int16_t opus_output[CORE1_OPUS_MAX_FRAME * FLAC_MAX_CHANNELS];
@@ -72,7 +75,10 @@ static Fixture load(const char *name, const char *extension)
                                              : copy_of(made.bytes, made.size);
     }
     char path[512];
-    if (strncmp(name, "opus/", 5) == 0) {
+    if (strncmp(name, "qoa/", 4) == 0) {
+        const char *suffix = strcmp(extension, "flac") == 0 ? "qoa" : extension;
+        snprintf(path, sizeof path, "%s/%s.%s", ECHO_FIXTURE_DIR, name, suffix);
+    } else if (strncmp(name, "opus/", 5) == 0) {
         const char *suffix = strcmp(extension, "flac") == 0 ? "opus" : extension;
         snprintf(path, sizeof path, "%s/%s.%s", ECHO_FIXTURE_DIR, name, suffix);
     } else if (strncmp(name, "mp3/", 4) == 0) {
@@ -1022,6 +1028,99 @@ static void an_opus_track_describes_its_stream(void)
     CHECK(core1_opus_decoder_bytes() <= sizeof opus_state);
 }
 
+static void start_qoa(uint32_t ring_bytes)
+{
+    start_with(ring_bytes, false);
+    core1_stream_set_decoder(&stream, STREAM_CODEC_QOA,
+                             core1_qoa_decoder(&core1_qoa, &qoa_decoder));
+    interface = core1_source_qoa_interface(&source);
+}
+
+static bool qoa_matches(const Fixture *pcm, const AudioFrame *frame, int channels)
+{
+    for (uint32_t sample = 0; sample < frame->samples; sample++) {
+        uint32_t index = (frame->first_sample + sample) * (uint32_t)channels;
+        if (2 * (index + (uint32_t)channels) > pcm->size) {
+            return false;
+        }
+        int16_t left = 0;
+        int16_t right = 0;
+        memcpy(&left, pcm->bytes + 2 * index, sizeof left);
+        memcpy(&right, pcm->bytes + 2 * (index + (uint32_t)(channels - 1)), sizeof right);
+        if (frame->left[sample] != left || frame->right[sample] != right) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool qoa_plays_exactly(const char *name, int channels, uint32_t ring_bytes,
+                              uint32_t start_ms, uint32_t *first)
+{
+    start_qoa(ring_bytes);
+    Fixture pcm = load(name, "pcm");
+    AudioTrackInfo info = {0};
+    bool ok = pcm.size > 0 && interface.open(interface.context, name, start_ms, &info) &&
+              info.codec == AUDIO_CODEC_QOA && control.codec == STREAM_CODEC_QOA;
+    uint32_t target = (uint32_t)((uint64_t)start_ms * info.stream.sample_rate / 1000);
+    uint32_t next_sample = UINT32_MAX;
+    AudioFrame frame;
+    AudioFrameResult result = AUDIO_FRAME_READY;
+    while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
+        if (next_sample == UINT32_MAX) {
+            *first = frame.first_sample;
+            ok = frame.first_sample <= target && target < frame.first_sample + frame.samples;
+            next_sample = frame.first_sample;
+        }
+        ok = ok && frame.first_sample == next_sample && frame.bits == 16 &&
+             qoa_matches(&pcm, &frame, channels);
+        next_sample += frame.samples;
+        interface.release(interface.context);
+    }
+    ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples &&
+         info.stream.total_samples == pcm.size / 2 / (uint32_t)channels;
+    interface.close(interface.context);
+    free(pcm.bytes);
+    return ok;
+}
+
+static void a_qoa_track_streams_through_core_1_like_the_reference_decoder(void)
+{
+    uint32_t first = 0;
+    CHECK(qoa_plays_exactly("qoa/stereo_44k", 2, BIG_RING_BYTES, 0, &first));
+    CHECK_EQUAL(0u, first);
+    CHECK(qoa_plays_exactly("qoa/mono_22k", 1, BIG_RING_BYTES, 0, &first));
+    CHECK(qoa_plays_exactly("qoa/stereo_48k", 2, BIG_RING_BYTES, 0, &first));
+    CHECK(qoa_plays_exactly("qoa/stereo_44k", 2, 8192, 0, &first));
+    CHECK(control.released > 8192);
+}
+
+static void a_qoa_track_opened_part_way_starts_on_the_frame_with_the_target(void)
+{
+    uint32_t first = 0;
+    CHECK(qoa_plays_exactly("qoa/stereo_44k", 2, BIG_RING_BYTES, 100, &first));
+    CHECK_EQUAL(0u, first);
+    CHECK(qoa_plays_exactly("qoa/stereo_44k", 2, BIG_RING_BYTES, 130, &first));
+    CHECK_EQUAL(QOA_FRAME_SAMPLES, first);
+    CHECK(qoa_plays_exactly("qoa/stereo_44k", 2, BIG_RING_BYTES, 270, &first));
+    CHECK_EQUAL(2 * QOA_FRAME_SAMPLES, first);
+}
+
+static void a_qoa_track_describes_its_stream(void)
+{
+    start_qoa(BIG_RING_BYTES);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "qoa/stereo_44k", 0, &info));
+    CHECK_EQUAL(AUDIO_CODEC_QOA, info.codec);
+    CHECK_EQUAL(44100u, info.stream.sample_rate);
+    CHECK_EQUAL(16, info.stream.bits_per_sample);
+    CHECK_EQUAL(2, info.stream.channels);
+    CHECK_EQUAL(12000u, info.stream.total_samples);
+    CHECK_EQUAL(QOA_FRAME_SAMPLES, info.stream.max_block);
+    CHECK(info.audio_bytes == opened.size - 8);
+    interface.close(interface.context);
+}
+
 static bool close_to_reference(const Fixture *pcm, const AudioFrame *frame, int channels)
 {
     for (uint32_t sample = 0; sample < frame->samples; sample++) {
@@ -1148,6 +1247,9 @@ int main(void)
         TEST_CASE(an_opus_track_opened_part_way_starts_on_the_sample),
         TEST_CASE(an_opus_track_describes_its_stream),
         TEST_CASE(opus_leaves_the_top_of_the_ring_to_its_decoder),
+        TEST_CASE(a_qoa_track_streams_through_core_1_like_the_reference_decoder),
+        TEST_CASE(a_qoa_track_opened_part_way_starts_on_the_frame_with_the_target),
+        TEST_CASE(a_qoa_track_describes_its_stream),
     };
     int failures = test_run_all(cases, TEST_CASE_COUNT(cases));
     core1_aac_close(&core1_aac);
