@@ -93,7 +93,8 @@ bool emmc_layout_allows_write(const EmmcLayout *layout, uint32_t lba, uint32_t c
                          inside(layout->slot_2, layout->slot_sectors, lba, count));
 }
 
-static bool read_image_header(const BlockDevice *device, uint32_t lba, uint32_t *image_bytes)
+static bool read_image_header(const BlockDevice *device, uint32_t lba, uint32_t *image_bytes,
+                              uint32_t *sum)
 {
     static uint32_t words[SECTOR_SIZE / 4];
     const uint8_t *bytes = (const uint8_t *)words;
@@ -102,6 +103,10 @@ static bool read_image_header(const BlockDevice *device, uint32_t lba, uint32_t 
         return false;
     }
     *image_bytes = le32(bytes + IMAGE_SIZE_AT);
+    *sum = 0;
+    for (uint32_t index = 0; index < SECTOR_SIZE / 4; index++) {
+        *sum = (*sum << 5 | *sum >> 27) ^ words[index];
+    }
     return true;
 }
 
@@ -109,28 +114,37 @@ static void find_second_slot(EmmcLayout *layout, const BlockDevice *device)
 {
     uint32_t ignored = 0;
     uint32_t image_bytes = 0;
-    if (read_image_header(device, layout->slot_2, &ignored) ||
-        !read_image_header(device, layout->slot_1, &image_bytes) || image_bytes == 0 ||
+    uint32_t slot_1_sum = 0;
+    uint32_t sum = 0;
+    if (read_image_header(device, layout->slot_2, &ignored, &sum) ||
+        !read_image_header(device, layout->slot_1, &image_bytes, &slot_1_sum) || image_bytes == 0 ||
         image_bytes > MAX_IMAGE_BYTES) {
         return;
     }
     uint32_t first = ((image_bytes + SECOND_SLOT_MARGIN) / SECTOR_SIZE + SECTORS_PER_MIB - 1) /
                      SECTORS_PER_MIB * SECTORS_PER_MIB;
+    uint32_t found = 0;
     for (uint32_t attempt = 0; attempt < SECOND_SLOT_TRIES; attempt++) {
         uint32_t lba = FIRMWARE_START + first + attempt * SECTORS_PER_MIB;
         if (lba + SECTORS_PER_MIB > layout->firmware_end) {
-            return;
+            break;
         }
-        if (read_image_header(device, lba, &ignored)) {
-            layout->slot_2 = lba;
-            uint32_t room = layout->firmware_end - lba;
-            uint32_t gap = lba - layout->slot_1;
-            uint32_t room_for_both = room < gap ? room : gap;
-            if (room_for_both < layout->slot_sectors) {
-                layout->slot_sectors = room_for_both;
+        if (read_image_header(device, lba, &ignored, &sum)) {
+            found = found == 0 || sum == slot_1_sum ? lba : found;
+            if (sum == slot_1_sum) {
+                break;
             }
-            return;
         }
+    }
+    if (found == 0) {
+        return;
+    }
+    layout->slot_2 = found;
+    uint32_t room = layout->firmware_end - found;
+    uint32_t gap = found - layout->slot_1;
+    uint32_t room_for_both = room < gap ? room : gap;
+    if (room_for_both < layout->slot_sectors) {
+        layout->slot_sectors = room_for_both;
     }
 }
 

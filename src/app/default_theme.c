@@ -47,7 +47,20 @@ const Theme DEFAULT_THEME = {
 
 enum {
     PORTRAIT_STATUS_HEIGHT = 16,
-    PORTRAIT_TITLE_HEIGHT = 24
+    PORTRAIT_TITLE_HEIGHT = 24,
+    ACCENT_SHADES = 3,
+    ACCENTS = 8
+};
+
+static const Color ACCENT_COLORS[ACCENTS][ACCENT_SHADES] = {
+    {COLOR_RGB(34, 96, 208), COLOR_RGB(82, 145, 240), COLOR_RGB(120, 170, 248)},
+    {COLOR_RGB(192, 38, 46), COLOR_RGB(230, 84, 88), COLOR_RGB(244, 128, 128)},
+    {COLOR_RGB(206, 100, 18), COLOR_RGB(240, 148, 58), COLOR_RGB(250, 186, 110)},
+    {COLOR_RGB(28, 136, 68), COLOR_RGB(68, 186, 108), COLOR_RGB(120, 214, 150)},
+    {COLOR_RGB(14, 124, 136), COLOR_RGB(50, 174, 184), COLOR_RGB(110, 206, 212)},
+    {COLOR_RGB(108, 56, 194), COLOR_RGB(150, 102, 232), COLOR_RGB(186, 150, 244)},
+    {COLOR_RGB(196, 48, 118), COLOR_RGB(234, 96, 158), COLOR_RGB(246, 146, 190)},
+    {COLOR_RGB(76, 78, 90), COLOR_RGB(116, 118, 132), COLOR_RGB(156, 158, 170)},
 };
 
 Theme default_theme_for(bool portrait)
@@ -60,5 +73,15 @@ Theme default_theme_for(bool portrait)
         theme.metrics.header_height = PORTRAIT_STATUS_HEIGHT + PORTRAIT_TITLE_HEIGHT;
         theme.metrics.header_inset = theme.metrics.padding;
     }
+    return theme;
+}
+
+Theme default_theme_styled(bool portrait, int accent, bool flat)
+{
+    Theme theme = default_theme_for(portrait);
+    const Color *shades = ACCENT_COLORS[accent >= 0 && accent < ACCENTS ? accent : 0];
+    theme.colors.selection_background = shades[0];
+    theme.colors.selection_top = flat ? shades[0] : shades[1];
+    theme.colors.selection_shine = flat ? shades[0] : shades[2];
     return theme;
 }

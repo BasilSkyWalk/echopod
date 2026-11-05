@@ -13,6 +13,7 @@ typedef struct PowerPolicy {
     uint32_t sleep_deadline_ms;
     uint32_t auto_off_ms;
     uint32_t awake_ms;
+    bool menu_is_media;
 } PowerPolicy;
 
 typedef struct PowerKeyOutcome {

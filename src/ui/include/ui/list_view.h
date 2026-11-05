@@ -12,6 +12,7 @@ enum {
     LIST_FAST_SCROLL_ROWS = 4,
     LIST_FASTEST_SCROLL_ROWS = 12,
     LIST_SECTION_SHOWN_MS = 600,
+    LIST_SECTION_JUMP_EVERY_MS = 450,
     LIST_SECTION_BEFORE_LETTERS = 0,
     LIST_SECTION_FIRST_LETTER = 1,
     LIST_SECTION_AFTER_LETTERS = 27
@@ -36,6 +37,7 @@ typedef struct ListView {
     uint32_t selection_changed_ms;
     uint32_t scroll_started_ms;
     uint32_t section_shown_until_ms;
+    uint32_t section_jumped_ms;
 } ListView;
 
 void list_view_init(ListView *view, const ListModel *model, const Theme *theme, uint32_t now_ms);

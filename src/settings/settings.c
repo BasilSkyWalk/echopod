@@ -3,7 +3,7 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 7,
+    VERSION = 8,
     FIRST_VERSION = 1,
     AUTO_OFF_VERSION = 2,
     USB_MODE_VERSION = 3,
@@ -11,6 +11,7 @@ enum {
     ORIENTATION_VERSION = 5,
     LANGUAGE_VERSION = 6,
     DAC_VERSION = 7,
+    OPTIONS_VERSION = 8,
     FILTER_SHIFT = 5,
     BALANCE_MASK = 0x1F,
     MAGIC_SIZE = 4,
@@ -29,7 +30,9 @@ enum {
     ORIENTATION_FIELD = 17,
     LANGUAGE_FIELD = 18,
     DAC_FIELD = 19,
-    CHECKSUM_FIELD = 20,
+    OLD_CHECKSUM_FIELD = 20,
+    OPTIONS_FIELD = 20,
+    CHECKSUM_FIELD = OPTIONS_FIELD + SETTINGS_OPTION_COUNT,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
     DEFAULT_VOLUME = 12,
@@ -43,6 +46,12 @@ static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'S', 'T'};
 static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30, 60, 120, 300, 0};
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
 static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
+static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
+    [OPTION_BATTERY] = 2,     [OPTION_VOLUME_KEYS] = 2,       [OPTION_ROCKER] = ROCKER_MODE_COUNT,
+    [OPTION_MENU_KEY] = 2,    [OPTION_ACCENT] = ACCENT_COUNT, [OPTION_HIGHLIGHT] = 2,
+    [OPTION_COVER_ORDER] = 2, [OPTION_ARTIST_VIEW] = 2};
+
+_Static_assert(CHECKSUM_FIELD + 4 <= SETTINGS_FILE_SIZE, "the options must fit the file");
 
 Settings settings_defaults(void)
 {
@@ -90,9 +99,19 @@ uint32_t settings_auto_off_ms(const Settings *settings)
     return settings_auto_off_option_minutes(settings->auto_off) * MILLISECONDS_PER_MINUTE;
 }
 
+uint8_t settings_option_count(SettingOption option)
+{
+    return option < SETTINGS_OPTION_COUNT ? OPTION_COUNTS[option] : 0;
+}
+
+static int checksum_field_of(uint8_t version)
+{
+    return version < OPTIONS_VERSION ? OLD_CHECKSUM_FIELD : CHECKSUM_FIELD;
+}
+
 static uint32_t checksum_of(const uint8_t *bytes)
 {
-    return hash_update(HASH_START, bytes, CHECKSUM_FIELD);
+    return hash_update(HASH_START, bytes, (size_t)checksum_field_of(bytes[VERSION_FIELD]));
 }
 
 static void put_u32(uint8_t *bytes, int offset, uint32_t value)
@@ -131,6 +150,9 @@ void settings_encode(const Settings *settings, uint8_t *bytes)
     bytes[ORIENTATION_FIELD] = (uint8_t)settings->orientation;
     bytes[LANGUAGE_FIELD] = (uint8_t)settings->language;
     bytes[DAC_FIELD] = (uint8_t)(settings->filter << FILTER_SHIFT | settings->balance);
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+        bytes[OPTIONS_FIELD + option] = settings->options[option];
+    }
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
@@ -143,7 +165,20 @@ static bool header_valid(const uint8_t *bytes)
     }
     uint8_t version = bytes[VERSION_FIELD];
     return version >= FIRST_VERSION && version <= VERSION && bytes[VERSION_FIELD + 1] == 0 &&
-           get_u32(bytes, CHECKSUM_FIELD) == checksum_of(bytes);
+           get_u32(bytes, checksum_field_of(version)) == checksum_of(bytes);
+}
+
+static bool options_valid(const uint8_t *bytes)
+{
+    if (bytes[VERSION_FIELD] < OPTIONS_VERSION) {
+        return true;
+    }
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+        if (bytes[OPTIONS_FIELD + option] >= OPTION_COUNTS[option]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 static bool values_valid(const uint8_t *bytes)
@@ -161,7 +196,8 @@ static bool values_valid(const uint8_t *bytes)
            (bytes[VERSION_FIELD] < LANGUAGE_VERSION || bytes[LANGUAGE_FIELD] < LANGUAGE_COUNT) &&
            (bytes[VERSION_FIELD] < DAC_VERSION ||
             ((bytes[DAC_FIELD] >> FILTER_SHIFT) < DAC_FILTER_COUNT &&
-             (bytes[DAC_FIELD] & BALANCE_MASK) < SETTINGS_BALANCE_STEPS));
+             (bytes[DAC_FIELD] & BALANCE_MASK) < SETTINGS_BALANCE_STEPS)) &&
+           options_valid(bytes);
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
@@ -194,5 +230,9 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .balance = bytes[VERSION_FIELD] < DAC_VERSION ? SETTINGS_BALANCE_CENTER
                                                       : bytes[DAC_FIELD] & BALANCE_MASK,
     };
+    for (int option = 0; option < SETTINGS_OPTION_COUNT && bytes[VERSION_FIELD] >= OPTIONS_VERSION;
+         option++) {
+        settings->options[option] = bytes[OPTIONS_FIELD + option];
+    }
     return true;
 }

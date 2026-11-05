@@ -39,6 +39,11 @@ static HalUsbLast last_session;
 static uint32_t write_buffer[WRITE_BUFFER_SECTORS * MSC_SECTOR_SIZE / 4]
     __attribute__((section(".high_ram")));
 
+uint32_t *board_usb_scratch(void)
+{
+    return write_buffer;
+}
+
 static void serial_text(uint32_t serial, char *text)
 {
     static const char DIGITS[] = "0123456789ABCDEF";

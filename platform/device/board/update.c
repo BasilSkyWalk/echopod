@@ -17,7 +17,8 @@ enum {
     PERCENT = 100,
     HIGHEST_NUMBER = 97,
     TENS_AT = 7,
-    UNITS_AT = 8
+    UNITS_AT = 8,
+    SECTORS_PER_MIB = 2048
 };
 
 static const char UPDATE_TEMPLATE[] = "/HIFIEC00.IMG";
@@ -119,6 +120,8 @@ void update_after_usb(void)
     if (!open_update(&storage)) {
         return;
     }
+    _Static_assert(UPDATER_SCRATCH_WORDS * 4 <= 64 * 512, "the USB write buffer holds the scratch");
+    updater_use_scratch(board_usb_scratch());
     UpdateFile update = {read_update, file.size, NULL};
     const char *name = update_path + 1;
     char text[MESSAGE_CAPACITY];
@@ -132,6 +135,11 @@ void update_after_usb(void)
     } else if (check == UPDATE_INVALID) {
         builder = string_builder_make(text, sizeof text);
         i18n_format(&builder, STR_UPDATE_INVALID_IMAGE, arguments, 1);
+        string_builder_append(&builder, " (E");
+        string_builder_append_unsigned(&builder, (uint32_t)updater_refusal());
+        string_builder_append_char(&builder, '/');
+        string_builder_append_unsigned(&builder, storage.slot_sectors / SECTORS_PER_MIB);
+        string_builder_append_char(&builder, ')');
         app_show_notice(i18n_text(STR_UPDATE_NOT_INSTALLED), text);
         board_wait_for_key();
     }

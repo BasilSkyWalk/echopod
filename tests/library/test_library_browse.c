@@ -227,9 +227,56 @@ static void playlists_list_their_tracks_in_order(void)
     CHECK(label_is(library, tracks, item_at(library, tracks, 2), "Jóga"));
 }
 
+static uint32_t expected_tracks(Library *library, BrowseQuery albums, uint16_t *tracks)
+{
+    uint32_t count = 0;
+    for (uint32_t album = 0; album < browse_count(library, albums); album++) {
+        BrowseQuery listed = child_of(albums, item_at(library, albums, album));
+        for (uint32_t track = 0; track < browse_count(library, listed); track++) {
+            tracks[count++] = item_at(library, listed, track).index;
+        }
+    }
+    return count;
+}
+
+static void check_group_tracks(Library *library, BrowseQuery albums)
+{
+    uint16_t expected[16];
+    uint32_t count = expected_tracks(library, albums, expected);
+    BrowseQuery all = browse_group_tracks(albums);
+    CHECK_EQUAL(BROWSE_GROUP_TRACKS, all.kind);
+    CHECK_EQUAL(count, browse_count(library, all));
+    for (uint32_t position = 0; position < count; position++) {
+        BrowseItem item = item_at(library, all, position);
+        CHECK_EQUAL(BROWSE_ITEM_TRACK, item.kind);
+        CHECK_EQUAL(expected[position], item.index);
+    }
+    for (uint32_t position = count; position-- > 0;) {
+        CHECK_EQUAL(expected[position], item_at(library, all, position).index);
+    }
+    BrowseItem past;
+    CHECK(!browse_item(library, all, count, &past));
+}
+
+static void play_all_lists_every_track_of_an_artist_or_genre(void)
+{
+    Library *library = open_fixture();
+    BrowseQuery artists = browse_root_query(BROWSE_ARTISTS);
+    BrowseQuery bjork = child_of(artists, item_at(library, artists, BJORK));
+    check_group_tracks(library, bjork);
+    CHECK_EQUAL(3, browse_count(library, browse_group_tracks(bjork)));
+    BrowseQuery genres = browse_root_query(BROWSE_GENRES);
+    check_group_tracks(library, child_of(genres, item_at(library, genres, METAL)));
+    BrowseQuery album_artists = browse_root_query(BROWSE_ALBUM_ARTISTS);
+    check_group_tracks(library,
+                       child_of(album_artists, item_at(library, album_artists, VARIOUS_ARTISTS)));
+    CHECK(title_is(library, browse_group_tracks(bjork), "Björk"));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(play_all_lists_every_track_of_an_artist_or_genre),
         TEST_CASE(top_level_views_count_their_tables),
         TEST_CASE(top_level_items_point_at_their_records),
         TEST_CASE(an_artist_opens_their_albums_in_order),

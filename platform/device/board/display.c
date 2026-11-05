@@ -125,6 +125,8 @@ static void pulse_reset(uint32_t settle_ms)
     board_delay_ms(settle_ms);
 }
 
+static uint32_t panel_id;
+
 static uint32_t read_panel_id(void)
 {
     uint32_t data_bits = 0xFFu << PANEL_BUS_DATA_SHIFT;
@@ -266,8 +268,14 @@ void board_display_start(void)
     set_bus_idle();
     pulse_reset(RESET_SETTLE_MS);
     pulse_reset(RESET_READY_MS);
-    panel_send_init(&BUS, panel_variant_of_id(read_panel_id()));
+    panel_id = read_panel_id();
+    panel_send_init(&BUS, panel_variant_of_id(panel_id));
     board_display_clear();
+}
+
+uint32_t hal_display_panel_id(void)
+{
+    return panel_id;
 }
 
 void hal_display_set_rotation(HalDisplayRotation turned)

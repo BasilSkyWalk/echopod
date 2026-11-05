@@ -185,9 +185,22 @@ static void auto_off_set_to_zero_never_shuts_down(void)
     CHECK(!power_policy_update(&policy, START_MS + 10 * AUTO_OFF_MS));
 }
 
+static void menu_is_a_background_key_only_when_it_skips(void)
+{
+    PowerPolicy policy = fresh_policy();
+    send(&policy, KEY_POWER, KEY_GESTURE_PRESS, START_MS);
+    CHECK(!send(&policy, KEY_MENU, KEY_GESTURE_PRESS, START_MS + 10).background);
+    policy.menu_is_media = true;
+    PowerKeyOutcome outcome = send(&policy, KEY_MENU, KEY_GESTURE_PRESS, START_MS + 20);
+    CHECK(outcome.consumed);
+    CHECK(outcome.background);
+    CHECK(!policy.display_on);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(menu_is_a_background_key_only_when_it_skips),
         TEST_CASE(the_display_starts_on_and_unlocked),
         TEST_CASE(the_display_turns_off_after_the_timeout),
         TEST_CASE(activity_restarts_the_timeout),

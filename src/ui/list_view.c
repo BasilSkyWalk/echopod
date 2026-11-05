@@ -154,7 +154,10 @@ void list_view_keep_scrolling(ListView *view, int direction, uint32_t now_ms)
     if (held_ms < LIST_SECTION_JUMP_AFTER_MS) {
         list_view_move(view, direction * LIST_FAST_SCROLL_ROWS, false, now_ms);
     } else if (sectioned) {
-        list_view_select(view, section_jump_target(view, direction), now_ms);
+        if (now_ms - view->section_jumped_ms >= LIST_SECTION_JUMP_EVERY_MS) {
+            view->section_jumped_ms = now_ms;
+            list_view_select(view, section_jump_target(view, direction), now_ms);
+        }
     } else {
         list_view_move(view, direction * LIST_FASTEST_SCROLL_ROWS, false, now_ms);
     }

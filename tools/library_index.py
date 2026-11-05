@@ -178,6 +178,18 @@ def nfc(text):
     return unicodedata.normalize("NFC", text)
 
 
+HIDDEN_CONTROLS = [code for code in range(0x20) if code not in range(0x09, 0x0E) and code < 0x1C]
+HIDDEN_MARKS = [0x7F, 0xFEFF, 0x2060, 0xFFFE, 0xFFFF, *range(0x200B, 0x2010)]
+TAG_TEXT_FIXES = {
+    **{code: bytes([code]).decode("cp1252", "ignore") for code in range(0x80, 0xA0)},
+    **{code: None for code in HIDDEN_CONTROLS + HIDDEN_MARKS},
+}
+
+
+def tag_text(text):
+    return nfc(text.translate(TAG_TEXT_FIXES))
+
+
 FIELDS = ("title", "artist", "albumartist", "album", "genre", "date", "discnumber", "tracknumber")
 ID3_FRAMES = ("TIT2", "TPE1", "TPE2", "TALB", "TCON", "TDRC", "TPOS", "TRCK")
 MP4_ATOMS = ("\xa9nam", "\xa9ART", "aART", "\xa9alb", "\xa9gen", "\xa9day", "disk", "trkn")
@@ -251,7 +263,7 @@ def raw_tag_values(tags):
 def normalized_tags(audio):
     if audio is None or audio.tags is None:
         return {}
-    return {key: [nfc(value) for value in values] for key, values in raw_tag_values(audio.tags).items()}
+    return {key: [tag_text(value) for value in values] for key, values in raw_tag_values(audio.tags).items()}
 
 
 def read_track(root, path):

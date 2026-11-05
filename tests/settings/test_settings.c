@@ -11,6 +11,8 @@ enum {
     ORIENTATION_FIELD = 17,
     LANGUAGE_FIELD = 18,
     CHECKSUM_FIELD = 20,
+    OPTIONS_FIELD = 20,
+    OPTIONS_CHECKSUM_FIELD = 28,
     NEVER_OPTION = 6
 };
 
@@ -100,7 +102,7 @@ static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(v
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(7, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(8, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
     CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
 }
@@ -329,9 +331,60 @@ static void out_of_range_values_are_rejected(void)
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
 
+static void the_new_options_are_saved_and_read_back(void)
+{
+    Settings settings = custom_settings();
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+        settings.options[option] = (uint8_t)(settings_option_count((SettingOption)option) - 1);
+    }
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(ACCENT_COUNT - 1, bytes[OPTIONS_FIELD + OPTION_ACCENT]);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+        CHECK_EQUAL(settings.options[option], decoded.options[option]);
+    }
+}
+
+static void an_option_out_of_range_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[OPTIONS_FIELD + OPTION_ROCKER] = ROCKER_MODE_COUNT;
+    uint32_t checksum = hash_update(HASH_START, bytes, OPTIONS_CHECKSUM_FIELD);
+    for (int index = 0; index < 4; index++) {
+        bytes[OPTIONS_CHECKSUM_FIELD + index] = (uint8_t)(checksum >> (8 * index));
+    }
+    Settings decoded;
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+}
+
+static void a_version_7_file_loads_with_the_options_off(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 7;
+    for (int index = OPTIONS_FIELD; index < SETTINGS_FILE_SIZE; index++) {
+        bytes[index] = 0xEE;
+    }
+    rewrite_checksum(bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+        CHECK_EQUAL(0, decoded.options[option]);
+    }
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_new_options_are_saved_and_read_back),
+        TEST_CASE(an_option_out_of_range_is_rejected),
+        TEST_CASE(a_version_7_file_loads_with_the_options_off),
         TEST_CASE(defaults_are_comfortable),
         TEST_CASE(timeout_options_end_with_never),
         TEST_CASE(sleep_options_start_with_off),

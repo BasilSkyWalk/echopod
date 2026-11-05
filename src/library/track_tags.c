@@ -211,11 +211,27 @@ static uint32_t next_code_point(const uint8_t *text, uint32_t length, uint32_t *
     return 0;
 }
 
+static const uint16_t WINDOWS_1252[32] = {
+    0x20AC, 0,      0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160,
+    0x2039, 0x0152, 0,      0x017D, 0,      0,      0x2018, 0x2019, 0x201C, 0x201D, 0x2022,
+    0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0,      0x017E, 0x0178};
+
+static uint32_t visible(uint32_t code_point)
+{
+    if (code_point >= 0x80 && code_point < 0xA0) {
+        return WINDOWS_1252[code_point - 0x80];
+    }
+    bool hidden = (code_point < 0x20 && !is_space(code_point)) || code_point == 0x7F ||
+                  code_point == 0xFEFF || (code_point >= 0x200B && code_point <= 0x200F) ||
+                  code_point == 0x2060 || code_point == 0xFFFE || code_point == 0xFFFF;
+    return hidden ? 0 : code_point;
+}
+
 void tag_decode(char *out, const uint8_t *text, uint32_t length, TagEncoding encoding)
 {
     TextBuilder builder = {.text = out, .length = 0, .content_end = 0, .started = false};
     for (uint32_t index = 0; index < length;) {
-        put_code_point(&builder, next_code_point(text, length, &index, encoding));
+        put_code_point(&builder, visible(next_code_point(text, length, &index, encoding)));
     }
     out[builder.content_end] = '\0';
 }

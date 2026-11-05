@@ -390,6 +390,12 @@ class UnicodeFormTest(unittest.TestCase):
             track = library_index.read_track(root, path)
         self.assertEqual("Bj\u00f6rk", track.artist)
 
+    def test_invisible_marks_are_dropped_and_windows_1252_bytes_mapped(self):
+        self.assertEqual("Title", library_index.tag_text("Title\ufeff"))
+        self.assertEqual("AB", library_index.tag_text("A\u200bB\x01"))
+        self.assertEqual("It\u2019s \u2026", library_index.tag_text("It\x92s \x85"))
+        self.assertEqual("Tab\tkept", library_index.tag_text("Tab\tkept"))
+
     def test_decomposed_playlist_entries_and_folders_are_composed(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

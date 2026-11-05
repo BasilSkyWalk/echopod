@@ -253,9 +253,41 @@ static void a_corrupt_system_size_is_rejected(void)
     CHECK(!read_layout(&disk, &layout));
 }
 
+static void a_stale_header_loses_to_the_copy_that_matches_slot_1(void)
+{
+    static FakeDisk disk;
+    fake_disk_init(&disk, TOTAL_SECTORS);
+    write_idb(&disk, 0, RECHORD_SYSTEM_MIB);
+    write_fat_boot_sector(&disk, 0x24000);
+    write_image_header(&disk, 0x2000);
+    write_image_header(&disk, 0x6000);
+    fake_disk_sector(&disk, 0x6000)[0] = 0x26;
+    write_image_header(&disk, 0x7000);
+    EmmcLayout layout;
+    CHECK(read_layout(&disk, &layout));
+    CHECK_EQUAL(0x7000, layout.slot_2);
+    CHECK_EQUAL(0x5000, layout.slot_sectors);
+}
+
+static void without_a_matching_copy_the_first_header_found_is_used(void)
+{
+    static FakeDisk disk;
+    fake_disk_init(&disk, TOTAL_SECTORS);
+    write_idb(&disk, 0, RECHORD_SYSTEM_MIB);
+    write_fat_boot_sector(&disk, 0x24000);
+    write_image_header(&disk, 0x2000);
+    write_image_header(&disk, 0x6000);
+    fake_disk_sector(&disk, 0x6000)[0] = 0x26;
+    EmmcLayout layout;
+    CHECK(read_layout(&disk, &layout));
+    CHECK_EQUAL(0x6000, layout.slot_2);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(a_stale_header_loses_to_the_copy_that_matches_slot_1),
+        TEST_CASE(without_a_matching_copy_the_first_header_found_is_used),
         TEST_CASE(the_firmware_area_and_slots_follow_the_idb_system_size),
         TEST_CASE(a_valid_second_slot_where_it_is_assumed_stays_there),
         TEST_CASE(a_second_slot_found_by_its_header_replaces_the_assumed_one),

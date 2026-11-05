@@ -18,9 +18,10 @@ static PowerKeyOutcome power_key(PowerPolicy *policy, KeyGesture gesture)
     return outcome(true, false, false);
 }
 
-static bool is_media_key(Key key)
+static bool is_media_key(const PowerPolicy *policy, Key key)
 {
-    return key == KEY_VOLUME_UP || key == KEY_VOLUME_DOWN || key == KEY_PLAY;
+    return key == KEY_VOLUME_UP || key == KEY_VOLUME_DOWN || key == KEY_PLAY ||
+           (key == KEY_MENU && policy->menu_is_media);
 }
 
 void power_policy_init(PowerPolicy *policy, uint32_t timeout_ms, uint32_t now_ms)
@@ -47,7 +48,7 @@ PowerKeyOutcome power_policy_key(PowerPolicy *policy, KeyEvent event, uint32_t n
     if (policy->display_on) {
         return outcome(false, false, false);
     }
-    return outcome(true, false, is_media_key(event.key));
+    return outcome(true, false, is_media_key(policy, event.key));
 }
 
 void power_policy_start_sleep_timer(PowerPolicy *policy, uint32_t duration_ms, uint32_t now_ms)

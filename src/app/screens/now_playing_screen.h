@@ -32,13 +32,22 @@ typedef enum NowPlayingCommand {
     NOW_PLAYING_SCRUB_COMMIT,
     NOW_PLAYING_SCRUB_CANCEL,
     NOW_PLAYING_UP_NEXT,
-    NOW_PLAYING_EQUALIZER
+    NOW_PLAYING_EQUALIZER,
+    NOW_PLAYING_SEEK_FORWARD,
+    NOW_PLAYING_SEEK_BACK
 } NowPlayingCommand;
+
+typedef struct NowPlayingControls {
+    uint8_t rocker;
+    bool menu_skips;
+    bool volume_shown;
+} NowPlayingControls;
 
 enum {
     NOW_PLAYING_SCRUB_STEP_MS = 5000,
     NOW_PLAYING_SCRUB_FAST_STEP_MS = 15000,
     NOW_PLAYING_VOLUME_FEEDBACK_MS = 1500,
+    NOW_PLAYING_VOLUME_HOLD_MS = 2500,
     NOW_PLAYING_BADGE_MS = 700
 };
 
@@ -58,6 +67,7 @@ typedef struct NowPlayingConfig {
     CoverCache *covers;
     Screen *up_next;
     Screen *equalizer;
+    const uint8_t *options;
 } NowPlayingConfig;
 
 typedef struct NowPlayingScreen {
@@ -79,6 +89,9 @@ typedef struct NowPlayingScreen {
 } NowPlayingScreen;
 
 NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing);
+NowPlayingCommand now_playing_command_with(KeyEvent event, bool scrubbing,
+                                           NowPlayingControls controls);
+NowPlayingControls now_playing_controls_of(const uint8_t *options);
 uint32_t now_playing_scrub_target(uint32_t position_ms, uint32_t duration_ms, int32_t delta_ms);
 const char *now_playing_codec_name(HalAudioCodec codec);
 void now_playing_stream_text(HalAudioFormat format, char *buffer, size_t capacity);

@@ -44,12 +44,28 @@ static const StringId OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {STR_SETTINGS_AUTO, ST
 static const StringId OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
     STR_SETTINGS_OUTPUT_FOLLOWS, STR_SETTINGS_OUTPUT_USING_35, STR_SETTINGS_OUTPUT_USING_44};
 static const StringId START_OPTIONS[START_SCREEN_COUNT] = {
-    STR_SETTINGS_MAIN_MENU, STR_MENU_NOW_PLAYING, STR_MENU_ALBUMS,    STR_MENU_ARTISTS,
-    STR_MENU_FAVORITES,     STR_MENU_PLAYLISTS,   STR_MENU_COVER_FLOW};
+    STR_SETTINGS_MAIN_MENU, STR_MENU_NOW_PLAYING, STR_MENU_ALBUMS,     STR_MENU_ARTISTS,
+    STR_MENU_FAVORITES,     STR_MENU_PLAYLISTS,   STR_MENU_COVER_FLOW, STR_MENU_ALBUM_ARTISTS,
+    STR_MENU_GENRES,        STR_MENU_FOLDERS,     STR_MENU_ALL_SONGS};
 static const StringId LANGUAGE_OPTIONS[LANGUAGE_COUNT] = {
-    STR_LANGUAGE_EN, STR_LANGUAGE_ZH, STR_LANGUAGE_JA, STR_LANGUAGE_KO, STR_LANGUAGE_DE,
-    STR_LANGUAGE_FR, STR_LANGUAGE_ES, STR_LANGUAGE_IT, STR_LANGUAGE_PT, STR_LANGUAGE_NL,
-    STR_LANGUAGE_SV, STR_LANGUAGE_DA, STR_LANGUAGE_NO, STR_LANGUAGE_FI};
+    STR_LANGUAGE_EN, STR_LANGUAGE_ZH, STR_LANGUAGE_JA, STR_LANGUAGE_KO,
+    STR_LANGUAGE_DE, STR_LANGUAGE_FR, STR_LANGUAGE_ES, STR_LANGUAGE_IT,
+    STR_LANGUAGE_PT, STR_LANGUAGE_NL, STR_LANGUAGE_SV, STR_LANGUAGE_DA,
+    STR_LANGUAGE_NO, STR_LANGUAGE_FI, STR_LANGUAGE_RU, STR_LANGUAGE_UK};
+static const StringId SHOWN_OPTIONS[2] = {STR_ON, STR_OFF};
+static const StringId SWITCH_OPTIONS[2] = {STR_OFF, STR_ON};
+static const StringId ROCKER_OPTIONS[ROCKER_MODE_COUNT] = {STR_SETTINGS_ROCKER_VOLUME_SKIP,
+                                                           STR_SETTINGS_ROCKER_SKIP_VOLUME,
+                                                           STR_SETTINGS_ROCKER_VOLUME_SEEK};
+static const StringId MENU_KEY_OPTIONS[2] = {STR_MENU_UP_NEXT, STR_SETTINGS_NEXT_TRACK};
+static const StringId ACCENT_OPTIONS[ACCENT_COUNT] = {
+    STR_SETTINGS_COLOR_BLUE,  STR_SETTINGS_COLOR_RED,     STR_SETTINGS_COLOR_ORANGE,
+    STR_SETTINGS_COLOR_GREEN, STR_SETTINGS_COLOR_TEAL,    STR_SETTINGS_COLOR_PURPLE,
+    STR_SETTINGS_COLOR_PINK,  STR_SETTINGS_COLOR_GRAPHITE};
+static const StringId HIGHLIGHT_OPTIONS[2] = {STR_SETTINGS_GRADIENT, STR_SETTINGS_FLAT};
+static const StringId COVER_ORDER_OPTIONS[2] = {STR_SETTINGS_BY_ALBUM_ARTIST,
+                                                STR_SETTINGS_BY_ALBUM_TITLE};
+static const StringId ARTIST_VIEW_OPTIONS[2] = {STR_SETTINGS_LIST, STR_MENU_COVER_FLOW};
 static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
 static const StringId USB_MODE_MESSAGES[USB_MODE_COUNT] = {STR_SETTINGS_USB_DRIVES,
                                                            STR_SETTINGS_USB_SOUND};
@@ -267,34 +283,62 @@ static void choose_language(void *context, int index)
     toast_show(settings->toast, i18n_text(STR_LANGUAGE_RESTART), hal_clock_milliseconds());
 }
 
+static uint8_t *option_of(const SettingsEntry *entry)
+{
+    return &entry->owner->context.store->settings.options[entry->choice->slot - 1];
+}
+
+static int current_slot(const void *context)
+{
+    return *option_of(context);
+}
+
+static void choose_slot(void *context, int index)
+{
+    SettingsEntry *entry = context;
+    *option_of(entry) = (uint8_t)index;
+    save(&entry->owner->context);
+}
+
+#define OPTION_CHOICE(title, options, option)                                                      \
+    {title, options, NULL, (int)(sizeof options / sizeof options[0]), NULL, NULL, NULL, option + 1}
+
 static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {STR_SETTINGS_SHUFFLE, SHUFFLE_OPTIONS, NULL, SHUFFLE_MODE_COUNT, current_shuffle,
-     choose_shuffle, NULL},
+     choose_shuffle, NULL, 0},
     {STR_SETTINGS_REPEAT, REPEAT_OPTIONS, NULL, REPEAT_MODE_COUNT, current_repeat, choose_repeat,
-     NULL},
+     NULL, 0},
     {STR_SETTINGS_SLEEP_TIMER, SLEEP_OPTIONS, NULL, SLEEP_TIMER_OPTION_COUNT, current_sleep,
-     choose_sleep, NULL},
+     choose_sleep, NULL, 0},
     {STR_SETTINGS_AUTO_OFF, AUTO_OFF_OPTIONS, NULL, AUTO_OFF_OPTION_COUNT, current_auto_off,
-     choose_auto_off, NULL},
+     choose_auto_off, NULL, 0},
     {STR_SETTINGS_SCREEN_TIMEOUT, TIMEOUT_OPTIONS, NULL, SCREEN_TIMEOUT_OPTION_COUNT,
-     current_timeout, choose_timeout, NULL},
+     current_timeout, choose_timeout, NULL, 0},
     {STR_SETTINGS_BRIGHTNESS, NULL, BRIGHTNESS_OPTIONS, BRIGHTNESS_LEVEL_COUNT, current_brightness,
-     choose_brightness, NULL},
+     choose_brightness, NULL, 0},
     {STR_SETTINGS_ORIENTATION, ORIENTATION_OPTIONS, NULL, ORIENTATION_COUNT, current_orientation,
-     choose_orientation, NULL},
-    {STR_SETTINGS_GAIN, GAIN_OPTIONS, NULL, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL},
+     choose_orientation, NULL, 0},
+    {STR_SETTINGS_GAIN, GAIN_OPTIONS, NULL, GAIN_LEVEL_COUNT, current_gain, choose_gain, NULL, 0},
     {STR_SETTINGS_FILTER, NULL, FILTER_OPTIONS, DAC_FILTER_COUNT, current_filter, choose_filter,
-     NULL},
+     NULL, 0},
     {STR_SETTINGS_BALANCE, NULL, BALANCE_OPTIONS, SETTINGS_BALANCE_STEPS, current_balance,
-     choose_balance, NULL},
+     choose_balance, NULL, 0},
     {STR_SETTINGS_OUTPUT, OUTPUT_OPTIONS, NULL, OUTPUT_JACK_COUNT, current_output, choose_output,
-     describe_output},
+     describe_output, 0},
     {STR_SETTINGS_START_SCREEN, START_OPTIONS, NULL, START_SCREEN_COUNT, current_start,
-     choose_start, NULL},
+     choose_start, NULL, 0},
     {STR_SETTINGS_USB_MODE, USB_MODE_OPTIONS, NULL, USB_MODE_COUNT, current_usb_mode,
-     choose_usb_mode, NULL},
+     choose_usb_mode, NULL, 0},
     {STR_LANGUAGE_TITLE, LANGUAGE_OPTIONS, NULL, LANGUAGE_COUNT, current_language, choose_language,
-     NULL},
+     NULL, 0},
+    OPTION_CHOICE(STR_SETTINGS_ACCENT, ACCENT_OPTIONS, OPTION_ACCENT),
+    OPTION_CHOICE(STR_SETTINGS_HIGHLIGHT, HIGHLIGHT_OPTIONS, OPTION_HIGHLIGHT),
+    OPTION_CHOICE(STR_SETTINGS_BATTERY_PERCENT, SHOWN_OPTIONS, OPTION_BATTERY),
+    OPTION_CHOICE(STR_SETTINGS_SWAP_VOLUME, SWITCH_OPTIONS, OPTION_VOLUME_KEYS),
+    OPTION_CHOICE(STR_SETTINGS_ROCKER, ROCKER_OPTIONS, OPTION_ROCKER),
+    OPTION_CHOICE(STR_SETTINGS_MENU_KEY, MENU_KEY_OPTIONS, OPTION_MENU_KEY),
+    OPTION_CHOICE(STR_SETTINGS_COVER_ORDER, COVER_ORDER_OPTIONS, OPTION_COVER_ORDER),
+    OPTION_CHOICE(STR_SETTINGS_ARTIST_VIEW, ARTIST_VIEW_OPTIONS, OPTION_ARTIST_VIEW),
 };
 
 static ScreenAction open_choice(void *context)
@@ -302,14 +346,15 @@ static ScreenAction open_choice(void *context)
     SettingsEntry *entry = context;
     SettingsScreens *screens = entry->owner;
     const SettingChoice *choice = entry->choice;
+    bool slot = choice->slot != 0;
     ChoiceConfig config = {
         .title = i18n_text(choice->title),
         .options = choice->plain_options,
         .option_ids = choice->options,
         .option_count = choice->option_count,
-        .current = choice->current,
-        .choose = choice->choose,
-        .context = &screens->context,
+        .current = slot ? current_slot : choice->current,
+        .choose = slot ? choose_slot : choice->choose,
+        .context = slot ? (void *)entry : &screens->context,
         .theme = screens->theme,
     };
     return screen_action_push(choice_screen_init(&screens->choice, config));
@@ -318,7 +363,8 @@ static ScreenAction open_choice(void *context)
 static const char *choice_value(const void *context)
 {
     const SettingsEntry *entry = context;
-    int current = entry->choice->current(&entry->owner->context);
+    int current = entry->choice->slot != 0 ? current_slot(entry)
+                                           : entry->choice->current(&entry->owner->context);
     if (current < 0 || current >= entry->choice->option_count) {
         return "";
     }

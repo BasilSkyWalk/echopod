@@ -57,7 +57,7 @@ typedef struct BrowseEntry {
     Screen *unavailable;
     BrowseQuery query;
     bool favorites;
-    Screen *fixed;
+    CoverFlowScreen *flow;
     SpokenKind shelf;
     bool present;
 } BrowseEntry;

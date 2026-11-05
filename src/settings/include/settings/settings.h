@@ -23,7 +23,11 @@ typedef enum StartScreen {
     START_ARTISTS,
     START_FAVORITES,
     START_PLAYLISTS,
-    START_COVER_FLOW
+    START_COVER_FLOW,
+    START_ALBUM_ARTISTS,
+    START_GENRES,
+    START_FOLDERS,
+    START_ALL_SONGS
 } StartScreen;
 
 typedef enum UsbMode {
@@ -45,7 +49,9 @@ typedef enum Language {
     LANGUAGE_SWEDISH,
     LANGUAGE_DANISH,
     LANGUAGE_NORWEGIAN,
-    LANGUAGE_FINNISH
+    LANGUAGE_FINNISH,
+    LANGUAGE_RUSSIAN,
+    LANGUAGE_UKRAINIAN
 } Language;
 
 typedef enum Orientation {
@@ -54,13 +60,37 @@ typedef enum Orientation {
     ORIENTATION_PORTRAIT_FLIPPED
 } Orientation;
 
+typedef enum SettingOption {
+    OPTION_BATTERY,
+    OPTION_VOLUME_KEYS,
+    OPTION_ROCKER,
+    OPTION_MENU_KEY,
+    OPTION_ACCENT,
+    OPTION_HIGHLIGHT,
+    OPTION_COVER_ORDER,
+    OPTION_ARTIST_VIEW,
+    SETTINGS_OPTION_COUNT
+} SettingOption;
+
+typedef enum RockerMode {
+    ROCKER_VOLUME_SKIP,
+    ROCKER_SKIP_VOLUME,
+    ROCKER_VOLUME_SEEK,
+    ROCKER_MODE_COUNT
+} RockerMode;
+
+enum {
+    ACCENT_COUNT = 8,
+    MENU_KEY_NEXT = 1
+};
+
 enum {
     GAIN_LEVEL_COUNT = GAIN_HIGH + 1,
     OUTPUT_JACK_COUNT = OUTPUT_BALANCED + 1,
-    START_SCREEN_COUNT = START_COVER_FLOW + 1,
+    START_SCREEN_COUNT = START_ALL_SONGS + 1,
     USB_MODE_COUNT = USB_MODE_DAC + 1,
     ORIENTATION_COUNT = ORIENTATION_PORTRAIT_FLIPPED + 1,
-    LANGUAGE_COUNT = LANGUAGE_FINNISH + 1,
+    LANGUAGE_COUNT = LANGUAGE_UKRAINIAN + 1,
     SETTINGS_BRIGHTNESS_MIN = 1,
     SETTINGS_BRIGHTNESS_MAX = 10,
     SETTINGS_VOLUME_MAX = 50,
@@ -71,7 +101,7 @@ enum {
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
     AUTO_OFF_OPTION_COUNT = 4,
-    SETTINGS_FILE_SIZE = 24
+    SETTINGS_FILE_SIZE = 32
 };
 
 typedef struct Settings {
@@ -90,6 +120,7 @@ typedef struct Settings {
     Language language;
     uint8_t filter;
     uint8_t balance;
+    uint8_t options[SETTINGS_OPTION_COUNT];
 } Settings;
 
 Settings settings_defaults(void);
@@ -98,5 +129,6 @@ uint32_t settings_sleep_option_minutes(int option);
 uint32_t settings_screen_timeout_ms(const Settings *settings);
 uint32_t settings_auto_off_option_minutes(int option);
 uint32_t settings_auto_off_ms(const Settings *settings);
+uint8_t settings_option_count(SettingOption option);
 void settings_encode(const Settings *settings, uint8_t *bytes);
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings);

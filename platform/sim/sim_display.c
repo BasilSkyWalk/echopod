@@ -105,6 +105,11 @@ bool sim_display_save_bmp(const char *path)
     return saved;
 }
 
+uint32_t hal_display_panel_id(void)
+{
+    return 0;
+}
+
 void hal_display_set_rotation(HalDisplayRotation rotation)
 {
     bool landscape = rotation == HAL_DISPLAY_LANDSCAPE;

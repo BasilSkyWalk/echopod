@@ -60,6 +60,8 @@ int main(int argument_count, char **arguments)
         printf("no device image at %s: skipped\n", argument_count == 2 ? arguments[1] : "?");
         return SKIPPED;
     }
+    static uint32_t scratch[UPDATER_SCRATCH_WORDS];
+    updater_use_scratch(scratch);
     UpdateFile file = {read_image, (uint32_t)image_size, NULL};
     UpdateStorage storage = {read_blank, refuse_write,          NULL,
                              0x2000,     0x2000 + SLOT_SECTORS, SLOT_SECTORS};

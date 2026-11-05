@@ -82,7 +82,7 @@ typedef struct AppState {
     KeyTracker keys;
     bool rocker_swapped[KEY_COUNT];
     Theme theme;
-    Orientation shown_orientation;
+    int shown_theme;
     FrameStats frame_stats;
     FrameStats update_stats;
     FrameStats draw_stats;
@@ -170,26 +170,38 @@ static HalDisplayRotation rotation_for(Orientation orientation)
     return HAL_DISPLAY_LANDSCAPE;
 }
 
+static int theme_key(const Settings *settings)
+{
+    return (int)settings->orientation | settings->options[OPTION_ACCENT] << 2 |
+           settings->options[OPTION_HIGHLIGHT] << 5;
+}
+
 static void apply_orientation(void)
 {
-    Orientation orientation = app.settings.settings.orientation;
-    app.shown_orientation = orientation;
-    app.theme = default_theme_for(orientation != ORIENTATION_LANDSCAPE);
+    const Settings *settings = &app.settings.settings;
+    Orientation orientation = settings->orientation;
+    app.shown_theme = theme_key(settings);
+    app.theme =
+        default_theme_styled(orientation != ORIENTATION_LANDSCAPE, settings->options[OPTION_ACCENT],
+                             settings->options[OPTION_HIGHLIGHT] != 0);
     hal_display_set_rotation(rotation_for(orientation));
     frame_diff_init(&app.frame_diff, row_hashes, app.theme.metrics.screen_height);
 }
 
 static void follow_orientation(void)
 {
-    if (app.settings.settings.orientation != app.shown_orientation) {
+    if (theme_key(&app.settings.settings) != app.shown_theme) {
         apply_orientation();
     }
+    app.power.menu_is_media = app.settings.settings.options[OPTION_MENU_KEY] == MENU_KEY_NEXT;
 }
 
 static Key oriented_key(HalKeyTransition transition)
 {
     if (transition.pressed) {
-        app.rocker_swapped[transition.key] = rocker_swapped_in(app.settings.settings.orientation);
+        const Settings *settings = &app.settings.settings;
+        app.rocker_swapped[transition.key] = rocker_swapped_in(settings->orientation) !=
+                                             (settings->options[OPTION_VOLUME_KEYS] != 0);
     }
     return rocker_key(transition.key, app.rocker_swapped[transition.key]);
 }
@@ -309,10 +321,14 @@ static void finish_shut_down(void)
     power_off_now();
 }
 
-static void shut_down(const char *text)
+static void shut_down(const char *text, bool shown)
 {
     app.goodbye_text = text;
     save_session();
+    if (shown && !app.display_on) {
+        power_policy_wake(&app.power, app.now_ms);
+        set_display(true);
+    }
     if (!app.display_on) {
         finish_shut_down();
         return;
@@ -350,6 +366,22 @@ static bool opens_now_playing(KeyEvent event)
            player_status(&app.player).has_track && top_screen() != &app.screens.now_playing.screen;
 }
 
+static bool settings_open(void)
+{
+    for (int index = 0; index < app.stack.depth; index++) {
+        if (app.stack.screens[index] == &app.screens.settings.menu.screen) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool opens_settings(KeyEvent event)
+{
+    return event.key == KEY_MENU && event.gesture == KEY_GESTURE_LONG_PRESS &&
+           top_screen() != &app.screens.now_playing.screen && !settings_open();
+}
+
 static ScreenAction now_playing_action(void)
 {
     return top_screen() == &app.screens.up_next.screen
@@ -376,8 +408,9 @@ static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
 {
     Screen *screen = top_screen();
     int depth_before = screen_stack_depth(&app.stack);
-    ScreenAction action = opens_now_playing(event)
-                              ? now_playing_action()
+    ScreenAction action = opens_now_playing(event) ? now_playing_action()
+                          : opens_settings(event)
+                              ? screen_action_push(&app.screens.settings.menu.screen)
                               : screen->handle_key(screen->context, event, now_ms);
     if (screen_stack_apply(&app.stack, action, now_ms)) {
         use_screen_key_behaviors();
@@ -404,7 +437,9 @@ static void show_now_playing(uint32_t now_ms)
 
 static void run_background(KeyEvent event)
 {
-    switch (now_playing_command_for(event, false)) {
+    NowPlayingControls controls = now_playing_controls_of(app.settings.settings.options);
+    NowPlayingCommand command = now_playing_command_with(event, false, controls);
+    switch (command) {
     case NOW_PLAYING_TOGGLE_PAUSE:
         player_toggle_pause(&app.player);
         break;
@@ -419,6 +454,11 @@ static void run_background(KeyEvent event)
         break;
     case NOW_PLAYING_VOLUME_DOWN:
         player_change_volume(&app.player, -1);
+        break;
+    case NOW_PLAYING_SEEK_FORWARD:
+    case NOW_PLAYING_SEEK_BACK:
+        player_jump(&app.player, command == NOW_PLAYING_SEEK_FORWARD ? NOW_PLAYING_SCRUB_STEP_MS
+                                                                     : -NOW_PLAYING_SCRUB_STEP_MS);
         break;
     default:
         break;
@@ -441,7 +481,7 @@ static void dispatch_key_events(uint32_t now_ms)
         }
         PowerKeyOutcome outcome = power_policy_key(&app.power, event, now_ms);
         if (outcome.shutdown) {
-            shut_down(GOODBYE_TEXT);
+            shut_down(GOODBYE_TEXT, true);
         } else if (outcome.background) {
             run_background(event);
         } else if (!outcome.consumed) {
@@ -473,12 +513,12 @@ static void keep_awake_while_busy(uint32_t now_ms)
 static void update_power(uint32_t now_ms)
 {
     if (!app.saying_goodbye && battery_empty(now_ms)) {
-        shut_down(i18n_text(STR_BOOT_BATTERY_LOW));
+        shut_down(i18n_text(STR_BOOT_BATTERY_LOW), false);
         return;
     }
     keep_awake_while_busy(now_ms);
     if (power_policy_update(&app.power, now_ms)) {
-        shut_down(GOODBYE_TEXT);
+        shut_down(GOODBYE_TEXT, false);
         return;
     }
     if (app.power.display_on == app.display_on) {
@@ -625,6 +665,7 @@ static StatusBarState current_status_bar(void)
         .battery_known = battery.known,
         .battery_percent = battery.percent,
         .charging = battery.charging,
+        .hide_percent = app.settings.settings.options[OPTION_BATTERY] != 0,
     };
 }
 

@@ -130,11 +130,17 @@ The computer picks each album's cover the way the player does: the picture insid
 |---|---|---|
 | Volume up / down | Next / previous item; hold to scroll faster | Volume; hold Vol+ for the next track, Vol− for the previous one (in audiobooks and podcasts: 30 s forward, 15 s back) |
 | Play | Select; a song plays the list from that song. Hold on an album for Favorites, hold on a song for Play Next / Add to Up Next | Play / pause; hold to seek |
-| Menu | | Opens Up Next; hold for the Equalizer |
+| Menu | Hold for Settings | Opens Up Next; hold for the Equalizer (or, with Settings → Menu button → Next track: next track; hold for Up Next) |
 | Back | Back; hold to go home | Back; hold to go home |
 | Power | Screen off or on; hold 2 s to turn off | Same |
 
 With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks (or jumps 30 s / 15 s in audiobooks and podcasts).
+
+Settings → **Volume buttons** changes what the rocker does on Now Playing and with the screen off: *Tap: volume, hold: skip* (the default), *Tap: skip, hold: volume*, or *Tap: volume, hold: seek* (5 s steps while held). Right after you tap the volume, holding the rocker keeps changing the volume in every mode. **Swap volume buttons** turns + and − around everywhere.
+
+At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
+
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, and **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums. The start screen can also be Album Artists, Genres, Folders or All Songs.
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
 
@@ -203,6 +209,7 @@ Podcasts/
 - An episode or book counts as finished once it played to its last tenth (at most its last 30 s).
 - These folders still appear under Music (Albums, Artists, Folders and so on), as all tracks on the card do. Give them a genre such as "Audiobook" if you want to find them there.
 - Playback speed can't be changed yet.
+- To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `python tools/echo_bookmarks.py E:\ --finished` with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
 
 ## Updating EchoPod
 

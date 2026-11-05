@@ -65,6 +65,7 @@ void board_audio_stream_close(void);
 void board_wait_for_key(void);
 void board_main(void);
 bool board_usb_listening(void);
+uint32_t *board_usb_scratch(void);
 void board_power_hold(void);
 void board_power_cut(void);
 bool board_power_key_down(void);

@@ -30,6 +30,7 @@ typedef struct StatusBarState {
     bool battery_known;
     uint8_t battery_percent;
     bool charging;
+    bool hide_percent;
 } StatusBarState;
 
 Rect status_bar_playback_area(const Theme *theme);

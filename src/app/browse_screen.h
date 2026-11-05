@@ -42,6 +42,7 @@ typedef struct BrowseScreen {
     BrowseQuery query;
     uint32_t count;
     bool favorites_only;
+    int extra;
     SpokenKind shelf;
     bool shelf_root;
     char title[BROWSE_TITLE_CAPACITY];
@@ -58,6 +59,9 @@ typedef struct BrowsePoolConfig {
     FavoritesStore *favorites;
     Toast *toast;
     SpokenStore *spoken;
+    const uint8_t *options;
+    Screen *(*open_flow)(void *context, LibrarySection group, uint16_t subject, int level);
+    void *flow_context;
 } BrowsePoolConfig;
 
 typedef struct SongActions {

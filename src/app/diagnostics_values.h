@@ -31,6 +31,7 @@ uint32_t diagnostics_next_clock_mhz(uint32_t current_mhz);
 void diagnostics_clock_text(uint32_t mhz, bool failed, char *text, size_t capacity);
 void diagnostics_loop_text(bool run, HalLoopCycles cycles, char *text, size_t capacity);
 void diagnostics_battery_text(HalBattery battery, char *text, size_t capacity);
+void diagnostics_panel_text(uint32_t id, char *text, size_t capacity);
 void diagnostics_boot_hold_text(HalPowerHold hold, char *text, size_t capacity);
 void diagnostics_jack_pin_text(HalJackPin pin, char *text, size_t capacity);
 void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity);

@@ -172,6 +172,8 @@ static UpdateProgress progress(void)
 
 static void reset(uint8_t *image, uint32_t size)
 {
+    static uint32_t scratch[UPDATER_SCRATCH_WORDS];
+    updater_use_scratch(scratch);
     free(storage.sectors);
     free(file.bytes);
     memset(&storage, 0, sizeof storage);
@@ -480,6 +482,20 @@ static void a_stock_image_needs_a_slot_it_fits(void)
 {
     CHECK_EQUAL(UPDATE_INVALID,
                 check_stock(stock_image(1), STOCK_IMAGE_SIZE, STOCK_FW_END / 512 - 1));
+    CHECK_EQUAL(UPDATE_REFUSED_ROOM, updater_refusal());
+}
+
+static void a_refused_image_says_why(void)
+{
+    uint8_t *image = stock_image(1);
+    image[0x100000] ^= 1;
+    CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+    CHECK_EQUAL(UPDATE_REFUSED_CRC, updater_refusal());
+    uint8_t *other = model_image(1, STOCK_FW_SIZE, NULL, 0);
+    CHECK_EQUAL(UPDATE_INVALID, check_stock(other, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+    CHECK_EQUAL(UPDATE_REFUSED_MODEL, updater_refusal());
+    check_invalid(valid_image(1), IMAGE_SIZE - 4);
+    CHECK_EQUAL(UPDATE_REFUSED_SIZE, updater_refusal());
 }
 
 static void installing_a_stock_image_fills_both_slots_slot_2_first(void)
@@ -531,6 +547,7 @@ int main(void)
         TEST_CASE(a_stock_header_copy_off_a_sector_is_invalid),
         TEST_CASE(damaged_or_other_model_stock_images_are_invalid),
         TEST_CASE(a_stock_image_needs_a_slot_it_fits),
+        TEST_CASE(a_refused_image_says_why),
         TEST_CASE(installing_a_stock_image_fills_both_slots_slot_2_first),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));

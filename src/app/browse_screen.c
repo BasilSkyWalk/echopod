@@ -8,6 +8,7 @@
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "library/sort_key.h"
+#include "settings/settings.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/list_navigation.h"
@@ -88,8 +89,9 @@ static uint32_t source_position(const BrowseScreen *browse, int index)
 
 static bool item_at(const BrowseScreen *browse, int index, BrowseItem *item)
 {
-    return browse_item(browse->pool->config.library, browse->query, source_position(browse, index),
-                       item);
+    index -= browse->extra;
+    return index >= 0 && browse_item(browse->pool->config.library, browse->query,
+                                     source_position(browse, index), item);
 }
 
 static bool is_favorite(const BrowseScreen *browse, BrowseItem item)
@@ -130,6 +132,12 @@ static void load_row(BrowseScreen *browse, BrowseRows *rows, int row, int index)
     BrowseItem item;
     rows->details[row][0] = '\0';
     rows->opens[row] = false;
+    if (index < browse->extra) {
+        StringBuilder label = string_builder_make(rows->labels[row], BROWSE_LABEL_CAPACITY);
+        string_builder_append(&label, i18n_text(index == browse->extra - 1 ? STR_MENU_SHUFFLE_ALL
+                                                                           : STR_MENU_PLAY_ALL));
+        return;
+    }
     if (!item_at(browse, index, &item) ||
         !browse_item_text(browse->pool->config.library, browse->query, item, text)) {
         rows->labels[row][0] = '\0';
@@ -137,6 +145,9 @@ static void load_row(BrowseScreen *browse, BrowseRows *rows, int row, int index)
         return;
     }
     rows->opens[row] = item.kind != BROWSE_ITEM_TRACK;
+    if (item.kind == BROWSE_ITEM_ALBUM && theme_is_portrait(browse->pool->config.theme)) {
+        rows->details[row][0] = '\0';
+    }
     if (is_favorite(browse, item)) {
         mark_favorite(rows->details[row]);
     }
@@ -255,6 +266,7 @@ static bool is_lettered(BrowseKind kind)
     case BROWSE_ALBUM_TRACKS:
     case BROWSE_FOLDER:
     case BROWSE_PLAYLIST_TRACKS:
+    case BROWSE_GROUP_TRACKS:
         break;
     }
     return false;
@@ -283,17 +295,22 @@ static bool is_loaded_track(const BrowseScreen *browse, int index)
            item.kind == BROWSE_ITEM_TRACK && item.index == status.track;
 }
 
-static ScreenAction start_list(BrowseScreen *browse, BrowseQuery source, uint32_t position)
+static ScreenAction start_from(BrowseScreen *browse, PlayerListStart start)
 {
     BrowsePoolConfig *config = &browse->pool->config;
-    PlayerListStart start = {.source = source,
-                             .position = position,
-                             .seed = hal_clock_microseconds(),
-                             .in_order = browse->shelf != SPOKEN_NONE};
     if (!player_play_from(config->player, start)) {
         return screen_action_none();
     }
     return screen_action_push(config->now_playing);
+}
+
+static ScreenAction start_list(BrowseScreen *browse, BrowseQuery source, uint32_t position)
+{
+    PlayerListStart start = {.source = source,
+                             .position = position,
+                             .seed = hal_clock_microseconds(),
+                             .in_order = browse->shelf != SPOKEN_NONE};
+    return start_from(browse, start);
 }
 
 static ScreenAction play_from(BrowseScreen *browse, int index)
@@ -301,11 +318,45 @@ static ScreenAction play_from(BrowseScreen *browse, int index)
     if (is_loaded_track(browse, index)) {
         return screen_action_push(browse->pool->config.now_playing);
     }
-    return start_list(browse, browse->query, (uint32_t)index);
+    return start_list(browse, browse->query, (uint32_t)(index - browse->extra));
+}
+
+static ScreenAction play_all(BrowseScreen *browse, bool shuffled)
+{
+    BrowseQuery source = browse->query.kind == BROWSE_GROUP_ALBUMS
+                             ? browse_group_tracks(browse->query)
+                             : browse->query;
+    uint32_t count = browse_count(browse->pool->config.library, source);
+    uint32_t seed = hal_clock_microseconds();
+    if (count == 0) {
+        return screen_action_none();
+    }
+    PlayerListStart start = {.source = source,
+                             .position = shuffled ? seed % count : 0,
+                             .seed = seed,
+                             .in_order = !shuffled,
+                             .shuffled = shuffled};
+    return start_from(browse, start);
+}
+
+static bool opens_flow(const BrowseScreen *browse, BrowseItem item)
+{
+    const BrowsePoolConfig *config = &browse->pool->config;
+    return item.kind == BROWSE_ITEM_GROUP && item.group != LIBRARY_PLAYLISTS &&
+           config->open_flow != NULL && config->options != NULL &&
+           config->options[OPTION_ARTIST_VIEW] != 0;
 }
 
 static ScreenAction open_child(BrowseScreen *browse, BrowseItem item)
 {
+    if (opens_flow(browse, item)) {
+        BrowsePoolConfig *config = &browse->pool->config;
+        Screen *flow =
+            config->open_flow(config->flow_context, item.group, item.index, browse->level + 1);
+        if (flow != NULL) {
+            return screen_action_push(flow);
+        }
+    }
     BrowseQuery child;
     if (!browse_child(browse->query, item, &child)) {
         return screen_action_none();
@@ -356,6 +407,9 @@ static ScreenAction select_row(void *context, int index)
 {
     BrowseScreen *browse = context;
     BrowseItem item;
+    if (index < browse->extra) {
+        return play_all(browse, index == browse->extra - 1);
+    }
     if (!item_at(browse, index, &item)) {
         return screen_action_none();
     }
@@ -570,6 +624,13 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     browse->shelf = SPOKEN_NONE;
     browse->shelf_root = false;
     browse->count = browse_count(pool->config.library, query);
+    browse->extra = 0;
+    if (browse->count > 0 && pool->config.player != NULL) {
+        bool group = query.kind == BROWSE_GROUP_ALBUMS && query.group != LIBRARY_PLAYLISTS;
+        bool songs = query.kind == BROWSE_ALL_SONGS || query.kind == BROWSE_PLAYLIST_TRACKS;
+        browse->extra = group ? 2 : songs ? 1 : 0;
+    }
+    browse->count += (uint32_t)browse->extra;
     browse_title(pool->config.library, query, browse->title, sizeof browse->title);
     browse->model = (ListModel){.context = browse,
                                 .count = row_count,
@@ -578,6 +639,7 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
                                 .opens = row_opens,
                                 .section = is_lettered(query.kind) ? row_section : NULL};
     list_view_init(&browse->list, &browse->model, pool->config.theme, 0);
+    list_view_select(&browse->list, browse->extra, 0);
     browse->screen = (Screen){
         .title = browse->title,
         .context = browse,

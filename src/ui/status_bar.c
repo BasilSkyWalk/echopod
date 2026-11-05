@@ -148,6 +148,8 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
         if (state.charging) {
             icon_draw_bolt(canvas, status_bar_bolt_area(theme), theme->colors.success);
         }
-        draw_percent(canvas, theme, state.battery_percent, state.charging);
+        if (!state.hide_percent) {
+            draw_percent(canvas, theme, state.battery_percent, state.charging);
+        }
     }
 }

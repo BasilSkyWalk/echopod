@@ -30,12 +30,18 @@ typedef struct CoverFlowConfig {
     Toast *toast;
     BrowsePool *browse;
     Player *player;
+    const uint8_t *options;
 } CoverFlowConfig;
 
 typedef struct CoverFlowScreen {
     Screen screen;
     CoverFlowConfig config;
     CoverFlowOrder order;
+    CoverFlowOrder artist_order;
+    BrowseQuery parent;
+    int32_t order_key;
+    int album_level;
+    int held_repeats;
     int count;
     int target;
     int32_t position;
@@ -49,6 +55,9 @@ typedef struct CoverFlowScreen {
 } CoverFlowScreen;
 
 Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config);
+Screen *cover_flow_screen_open_all(CoverFlowScreen *flow);
+Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group, uint16_t subject,
+                                     int album_level);
 CoverFlowOrder cover_flow_order_make(const Library *library);
 bool cover_flow_order_album(const Library *library, CoverFlowOrder order, uint32_t position,
                             uint16_t *album);

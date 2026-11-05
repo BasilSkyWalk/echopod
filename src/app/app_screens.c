@@ -21,11 +21,21 @@ typedef struct MusicEntry {
 } MusicEntry;
 
 enum {
-    MUSIC_COVER_FLOW_ENTRY = 0,
-    MUSIC_ARTISTS_ENTRY = 1,
-    MUSIC_ALBUMS_ENTRY = 3,
-    MUSIC_PLAYLISTS_ENTRY = 7,
-    MUSIC_FAVORITES_ENTRY = 8
+    START_HOME_ONLY = -1
+};
+
+static const int8_t START_ENTRIES[START_SCREEN_COUNT] = {
+    [START_MAIN_MENU] = START_HOME_ONLY,
+    [START_NOW_PLAYING] = START_HOME_ONLY,
+    [START_ALBUMS] = 3,
+    [START_ARTISTS] = 1,
+    [START_FAVORITES] = 8,
+    [START_PLAYLISTS] = 7,
+    [START_COVER_FLOW] = 0,
+    [START_ALBUM_ARTISTS] = 2,
+    [START_GENRES] = 4,
+    [START_FOLDERS] = 5,
+    [START_ALL_SONGS] = 6,
 };
 
 static const MusicEntry MUSIC_ENTRIES[MUSIC_ITEM_COUNT] = {
@@ -66,8 +76,8 @@ static Screen *browse_screen_for(BrowseEntry *entry)
     if (!entry->store->available) {
         return entry->unavailable;
     }
-    if (entry->fixed != NULL) {
-        return entry->fixed;
+    if (entry->flow != NULL) {
+        return cover_flow_screen_open_all(entry->flow);
     }
     if (entry->favorites) {
         return browse_pool_open_favorites(entry->pool, 0);
@@ -92,7 +102,7 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
         .unavailable = &screens->no_library.screen,
         .query = browse_root_query(entry->kind),
         .favorites = entry->source == MUSIC_FAVORITES,
-        .fixed = entry->source == MUSIC_COVER_FLOW ? &screens->cover_flow.screen : NULL,
+        .flow = entry->source == MUSIC_COVER_FLOW ? &screens->cover_flow : NULL,
         .shelf = SPOKEN_NONE,
         .present = true,
     };
@@ -101,6 +111,11 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
                       .context = &screens->browse_entries[index],
                       .value = NULL,
                       .opens = true};
+}
+
+static Screen *open_group_flow(void *context, LibrarySection group, uint16_t subject, int level)
+{
+    return cover_flow_screen_open_group(context, group, subject, level);
 }
 
 static void build_music(AppScreens *screens, AppScreensContext context)
@@ -113,6 +128,9 @@ static void build_music(AppScreens *screens, AppScreensContext context)
         .favorites = context.favorites,
         .toast = context.toast,
         .spoken = context.spoken,
+        .options = context.settings->settings.options,
+        .open_flow = open_group_flow,
+        .flow_context = &screens->cover_flow,
     };
     browse_pool_init(&screens->browse, browse);
     CoverFlowConfig cover_flow = {
@@ -123,6 +141,7 @@ static void build_music(AppScreens *screens, AppScreensContext context)
         .toast = context.toast,
         .browse = &screens->browse,
         .player = context.player,
+        .options = context.settings->settings.options,
     };
     cover_flow_screen_init(&screens->cover_flow, cover_flow);
     for (int index = 0; index < MUSIC_ITEM_COUNT; index++) {
@@ -214,7 +233,8 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
                                     .library = &context.store->library,
                                     .theme = theme,
                                     .covers = context.covers,
-                                    .up_next = up_next_screen_init(&screens->up_next, up_next)};
+                                    .up_next = up_next_screen_init(&screens->up_next, up_next),
+                                    .options = context.settings->settings.options};
     EqualizerConfig equalizer = {
         .store = context.equalizer, .toast = context.toast, .theme = theme};
     now_playing.equalizer = equalizer_screen_init(&screens->equalizer, equalizer);
@@ -242,23 +262,13 @@ static int music_path(AppScreens *screens, int entry, Screen **path)
 
 int app_screens_start_path(AppScreens *screens, StartScreen start, Screen **path)
 {
-    switch (start) {
-    case START_MAIN_MENU:
-        return 0;
-    case START_NOW_PLAYING:
+    if (start == START_NOW_PLAYING) {
         list_view_select(&screens->home.list, 1, 0);
         path[0] = &screens->now_playing.screen;
         return 1;
-    case START_ALBUMS:
-        return music_path(screens, MUSIC_ALBUMS_ENTRY, path);
-    case START_ARTISTS:
-        return music_path(screens, MUSIC_ARTISTS_ENTRY, path);
-    case START_FAVORITES:
-        return music_path(screens, MUSIC_FAVORITES_ENTRY, path);
-    case START_PLAYLISTS:
-        return music_path(screens, MUSIC_PLAYLISTS_ENTRY, path);
-    case START_COVER_FLOW:
-        return music_path(screens, MUSIC_COVER_FLOW_ENTRY, path);
     }
-    return 0;
+    if ((int)start >= (int)START_SCREEN_COUNT || START_ENTRIES[start] == START_HOME_ONLY) {
+        return 0;
+    }
+    return music_path(screens, START_ENTRIES[start], path);
 }

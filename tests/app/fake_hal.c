@@ -203,6 +203,11 @@ int fake_hal_present_count(void)
     return fake.present_count;
 }
 
+uint32_t hal_display_panel_id(void)
+{
+    return 0;
+}
+
 void hal_display_set_rotation(HalDisplayRotation rotation)
 {
     fake.rotation = rotation;

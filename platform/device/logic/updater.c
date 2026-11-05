@@ -52,8 +52,31 @@ typedef struct ModelScan {
     bool small_model;
 } ModelScan;
 
-static uint32_t source_chunk[CHUNK_WORDS];
-static uint32_t target_chunk[CHUNK_WORDS];
+static uint32_t *source_chunk;
+static uint32_t *target_chunk;
+static uint32_t *prefix;
+
+_Static_assert(2 * CHUNK_WORDS + PREFIX_BYTES / 4 <= UPDATER_SCRATCH_WORDS,
+               "scratch holds both chunks and the header");
+static UpdateRefusal refusal;
+
+static UpdateCheck refuse(UpdateRefusal reason)
+{
+    refusal = reason;
+    return UPDATE_INVALID;
+}
+
+UpdateRefusal updater_refusal(void)
+{
+    return refusal;
+}
+
+void updater_use_scratch(uint32_t *words)
+{
+    source_chunk = words;
+    target_chunk = words != NULL ? words + CHUNK_WORDS : NULL;
+    prefix = words != NULL ? words + 2 * CHUNK_WORDS : NULL;
+}
 
 typedef struct SlotCopy {
     const UpdateFile *file;
@@ -253,37 +276,58 @@ static UpdateCheck stock_check(const UpdateFile *file, const UpdateStorage *stor
 {
     const uint8_t *bytes = (const uint8_t *)header;
     uint32_t fw_size = le32(bytes + FW_SIZE_OFFSET);
-    bool fits = STOCK_FW_END / SECTOR_BYTES <= storage->slot_sectors;
     bool copy_fits = fw_size >= HEADER_BYTES && fw_size % SECTOR_BYTES == 0 &&
                      fw_size <= STOCK_FW_END - HEADER_BYTES;
     ModelScan scan = {.carried = false, .eight_gb = false, .small_model = false};
-    bool valid = fits && copy_fits && has_text(bytes + MAGIC_OFFSET, MAGIC, sizeof MAGIC) &&
-                 has_text(bytes + BRAND_OFFSET, STOCK_BRAND, sizeof STOCK_BRAND) &&
-                 header_copy_matches(file, header, fw_size) &&
-                 crc_is_valid(file, STOCK_FW_END, &scan);
-    return valid && scan.eight_gb && !scan.small_model ? UPDATE_STOCK : UPDATE_INVALID;
+    if (STOCK_FW_END / SECTOR_BYTES > storage->slot_sectors) {
+        return refuse(UPDATE_REFUSED_ROOM);
+    }
+    if (!copy_fits || !has_text(bytes + MAGIC_OFFSET, MAGIC, sizeof MAGIC) ||
+        !has_text(bytes + BRAND_OFFSET, STOCK_BRAND, sizeof STOCK_BRAND)) {
+        return refuse(UPDATE_REFUSED_HEADER);
+    }
+    if (!header_copy_matches(file, header, fw_size)) {
+        return refuse(UPDATE_REFUSED_HEADER_COPY);
+    }
+    if (!crc_is_valid(file, STOCK_FW_END, &scan)) {
+        return refuse(UPDATE_REFUSED_CRC);
+    }
+    if (!scan.eight_gb || scan.small_model) {
+        return refuse(UPDATE_REFUSED_MODEL);
+    }
+    return UPDATE_STOCK;
 }
 
 UpdateCheck updater_check(const UpdateFile *file, const UpdateStorage *storage)
 {
-    static uint32_t header[PREFIX_BYTES / 4];
     bool stock = file->size == UPDATER_STOCK_IMAGE_SIZE;
-    if ((file->size != UPDATER_IMAGE_SIZE && !stock) ||
-        !file->read(file->context, 0, header, PREFIX_BYTES)) {
+    refusal = UPDATE_REFUSED_NONE;
+    if (source_chunk == NULL || (file->size != UPDATER_IMAGE_SIZE && !stock) ||
+        !file->read(file->context, 0, prefix, PREFIX_BYTES)) {
+        refusal = UPDATE_REFUSED_SIZE;
         return UPDATE_INVALID;
     }
     if (stock) {
-        return stock_check(file, storage, header);
+        return stock_check(file, storage, prefix);
     }
-    const uint8_t *bytes = (const uint8_t *)header;
-    if (!header_is_valid(bytes, storage) || !header_copy_matches(file, header, FW_SIZE) ||
-        !layout_is_bootable(file, bytes)) {
+    const uint8_t *bytes = (const uint8_t *)prefix;
+    if (!header_is_valid(bytes, storage)) {
+        refusal = FW_END / SECTOR_BYTES <= storage->slot_sectors ? UPDATE_REFUSED_HEADER
+                                                                 : UPDATE_REFUSED_ROOM;
+        return UPDATE_INVALID;
+    }
+    if (!header_copy_matches(file, prefix, FW_SIZE) || !layout_is_bootable(file, bytes)) {
+        refusal = UPDATE_REFUSED_LAYOUT;
         return UPDATE_INVALID;
     }
     if (matches_installed(file, storage, le32(bytes + FW1_END_OFFSET))) {
         return UPDATE_ALREADY_INSTALLED;
     }
-    return crc_is_valid(file, FW_END, NULL) ? UPDATE_VALID : UPDATE_INVALID;
+    if (!crc_is_valid(file, FW_END, NULL)) {
+        refusal = UPDATE_REFUSED_CRC;
+        return UPDATE_INVALID;
+    }
+    return UPDATE_VALID;
 }
 
 static bool read_source(const SlotCopy *copy, uint32_t chunk)
@@ -350,6 +394,9 @@ static bool copy_slot(const SlotCopy *copy)
 
 bool updater_install(const UpdateFile *file, const UpdateStorage *storage, UpdateProgress progress)
 {
+    if (source_chunk == NULL) {
+        return false;
+    }
     uint32_t chunks = (file->size - 4) / UPDATER_CHUNK_BYTES;
     SlotCopy second = {file, storage, 0, storage->slot_2, progress, 0, chunks};
     SlotCopy first = {NULL, storage, storage->slot_2, storage->slot_1, progress, 1, chunks};

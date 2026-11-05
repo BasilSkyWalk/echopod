@@ -167,22 +167,55 @@ static NowPlayingCommand scrub_command_for(KeyEvent event)
     return NOW_PLAYING_NONE;
 }
 
+NowPlayingControls now_playing_controls_of(const uint8_t *options)
+{
+    if (options == NULL) {
+        return (NowPlayingControls){0};
+    }
+    return (NowPlayingControls){.rocker = options[OPTION_ROCKER],
+                                .menu_skips = options[OPTION_MENU_KEY] == MENU_KEY_NEXT};
+}
+
+static NowPlayingCommand rocker_command(KeyGesture gesture, NowPlayingControls controls, bool up)
+{
+    NowPlayingCommand volume = up ? NOW_PLAYING_VOLUME_UP : NOW_PLAYING_VOLUME_DOWN;
+    NowPlayingCommand skip = up ? NOW_PLAYING_NEXT : NOW_PLAYING_PREVIOUS;
+    bool held = gesture != KEY_GESTURE_PRESS;
+    if (controls.rocker == ROCKER_SKIP_VOLUME) {
+        return held ? volume : skip;
+    }
+    if (held && controls.volume_shown) {
+        return volume;
+    }
+    if (held && controls.rocker == ROCKER_VOLUME_SEEK) {
+        return up ? NOW_PLAYING_SEEK_FORWARD : NOW_PLAYING_SEEK_BACK;
+    }
+    return by_gesture(gesture, volume, skip);
+}
+
 NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing)
+{
+    return now_playing_command_with(event, scrubbing, (NowPlayingControls){0});
+}
+
+NowPlayingCommand now_playing_command_with(KeyEvent event, bool scrubbing,
+                                           NowPlayingControls controls)
 {
     if (scrubbing) {
         return scrub_command_for(event);
     }
     switch (event.key) {
     case KEY_VOLUME_UP:
-        return by_gesture(event.gesture, NOW_PLAYING_VOLUME_UP, NOW_PLAYING_NEXT);
     case KEY_VOLUME_DOWN:
-        return by_gesture(event.gesture, NOW_PLAYING_VOLUME_DOWN, NOW_PLAYING_PREVIOUS);
+        return rocker_command(event.gesture, controls, event.key == KEY_VOLUME_UP);
     case KEY_PLAY:
         return by_gesture(event.gesture, NOW_PLAYING_TOGGLE_PAUSE, NOW_PLAYING_SCRUB_START);
     case KEY_BACK:
         return by_gesture(event.gesture, NOW_PLAYING_LEAVE, NOW_PLAYING_HOME);
     case KEY_MENU:
-        return by_gesture(event.gesture, NOW_PLAYING_UP_NEXT, NOW_PLAYING_EQUALIZER);
+        return controls.menu_skips
+                   ? by_gesture(event.gesture, NOW_PLAYING_NEXT, NOW_PLAYING_UP_NEXT)
+                   : by_gesture(event.gesture, NOW_PLAYING_UP_NEXT, NOW_PLAYING_EQUALIZER);
     case KEY_POWER:
         return NOW_PLAYING_NONE;
     }
@@ -298,6 +331,11 @@ static ScreenAction run_command(NowPlayingScreen *now_playing, NowPlayingCommand
     case NOW_PLAYING_VOLUME_DOWN:
         player_change_volume(player, -1);
         break;
+    case NOW_PLAYING_SEEK_FORWARD:
+    case NOW_PLAYING_SEEK_BACK:
+        player_jump(player, command == NOW_PLAYING_SEEK_FORWARD ? NOW_PLAYING_SCRUB_STEP_MS
+                                                                : -NOW_PLAYING_SCRUB_STEP_MS);
+        break;
     case NOW_PLAYING_LEAVE:
         return screen_action_pop();
     case NOW_PLAYING_UP_NEXT:
@@ -362,7 +400,11 @@ static void refresh(NowPlayingScreen *now_playing, uint32_t now_ms)
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
-    NowPlayingCommand command = now_playing_command_for(event, now_playing->scrubbing);
+    NowPlayingControls controls = now_playing_controls_of(now_playing->config.options);
+    controls.volume_shown = now_playing->feedback == NOW_PLAYING_FEEDBACK_VOLUME &&
+                            now_ms - now_playing->feedback_started_ms < NOW_PLAYING_VOLUME_HOLD_MS;
+    now_playing->now_ms = now_ms;
+    NowPlayingCommand command = now_playing_command_with(event, now_playing->scrubbing, controls);
     ScreenAction action = run_command(now_playing, command);
     refresh(now_playing, now_ms);
     NowPlayingFeedback feedback = now_playing_feedback_for(command, now_playing->status.state);

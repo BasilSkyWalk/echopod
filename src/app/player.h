@@ -60,6 +60,7 @@ typedef struct PlayerListStart {
     uint32_t position;
     uint32_t seed;
     bool in_order;
+    bool shuffled;
 } PlayerListStart;
 
 typedef struct Player {

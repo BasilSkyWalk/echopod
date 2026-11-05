@@ -2,6 +2,7 @@
 
 #include "check.h"
 #include "screens/now_playing_screen.h"
+#include "settings/settings.h"
 
 enum {
     TEXT_CAPACITY = 48
@@ -197,9 +198,67 @@ static void the_detail_line_leaves_out_what_is_unknown(void)
     CHECK(detail_text_is((PlayerStatus){0}, ""));
 }
 
+static NowPlayingCommand controlled(Key key, KeyGesture gesture, NowPlayingControls controls)
+{
+    return now_playing_command_with((KeyEvent){.key = key, .gesture = gesture}, false, controls);
+}
+
+static void tap_skip_hold_volume_swaps_the_rocker_gestures(void)
+{
+    NowPlayingControls controls = {.rocker = ROCKER_SKIP_VOLUME};
+    CHECK_EQUAL(NOW_PLAYING_NEXT, controlled(KEY_VOLUME_UP, KEY_GESTURE_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_PREVIOUS, controlled(KEY_VOLUME_DOWN, KEY_GESTURE_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_VOLUME_UP, controlled(KEY_VOLUME_UP, KEY_GESTURE_LONG_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_VOLUME_DOWN, controlled(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT, controls));
+}
+
+static void hold_to_seek_moves_within_the_track(void)
+{
+    NowPlayingControls controls = {.rocker = ROCKER_VOLUME_SEEK};
+    CHECK_EQUAL(NOW_PLAYING_VOLUME_UP, controlled(KEY_VOLUME_UP, KEY_GESTURE_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_SEEK_FORWARD,
+                controlled(KEY_VOLUME_UP, KEY_GESTURE_LONG_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_SEEK_BACK, controlled(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT, controls));
+}
+
+static void holding_while_the_volume_shows_keeps_changing_it(void)
+{
+    NowPlayingControls controls = {.rocker = ROCKER_VOLUME_SKIP, .volume_shown = true};
+    CHECK_EQUAL(NOW_PLAYING_VOLUME_UP, controlled(KEY_VOLUME_UP, KEY_GESTURE_LONG_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_VOLUME_DOWN, controlled(KEY_VOLUME_DOWN, KEY_GESTURE_REPEAT, controls));
+    controls.volume_shown = false;
+    CHECK_EQUAL(NOW_PLAYING_NEXT, controlled(KEY_VOLUME_UP, KEY_GESTURE_LONG_PRESS, controls));
+}
+
+static void the_menu_button_can_skip_to_the_next_track(void)
+{
+    NowPlayingControls controls = {.menu_skips = true};
+    CHECK_EQUAL(NOW_PLAYING_NEXT, controlled(KEY_MENU, KEY_GESTURE_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_UP_NEXT, controlled(KEY_MENU, KEY_GESTURE_LONG_PRESS, controls));
+    controls.menu_skips = false;
+    CHECK_EQUAL(NOW_PLAYING_UP_NEXT, controlled(KEY_MENU, KEY_GESTURE_PRESS, controls));
+    CHECK_EQUAL(NOW_PLAYING_EQUALIZER, controlled(KEY_MENU, KEY_GESTURE_LONG_PRESS, controls));
+}
+
+static void controls_follow_the_saved_options(void)
+{
+    uint8_t options[SETTINGS_OPTION_COUNT] = {0};
+    options[OPTION_ROCKER] = ROCKER_VOLUME_SEEK;
+    options[OPTION_MENU_KEY] = MENU_KEY_NEXT;
+    NowPlayingControls controls = now_playing_controls_of(options);
+    CHECK_EQUAL(ROCKER_VOLUME_SEEK, controls.rocker);
+    CHECK(controls.menu_skips);
+    CHECK(!now_playing_controls_of(NULL).menu_skips);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(tap_skip_hold_volume_swaps_the_rocker_gestures),
+        TEST_CASE(hold_to_seek_moves_within_the_track),
+        TEST_CASE(holding_while_the_volume_shows_keeps_changing_it),
+        TEST_CASE(the_menu_button_can_skip_to_the_next_track),
+        TEST_CASE(controls_follow_the_saved_options),
         TEST_CASE(the_codec_has_a_short_name),
         TEST_CASE(lossless_streams_show_bit_depth_and_rate),
         TEST_CASE(lossy_streams_show_only_the_rate),

@@ -94,6 +94,8 @@ static void a_long_hold_jumps_to_the_next_section(void)
     repeat_down_at(LIST_SECTION_JUMP_AFTER_MS);
     CHECK_EQUAL(10, view.selected);
     repeat_down_at(LIST_SECTION_JUMP_AFTER_MS + REPEAT_MS);
+    CHECK_EQUAL(10, view.selected);
+    repeat_down_at(LIST_SECTION_JUMP_AFTER_MS + LIST_SECTION_JUMP_EVERY_MS);
     CHECK_EQUAL(20, view.selected);
 }
 
@@ -104,6 +106,8 @@ static void jumping_back_lands_on_the_start_of_each_section(void)
     repeat_up_at(LIST_SECTION_JUMP_AFTER_MS);
     CHECK_EQUAL(20, view.selected);
     repeat_up_at(LIST_SECTION_JUMP_AFTER_MS + REPEAT_MS);
+    CHECK_EQUAL(20, view.selected);
+    repeat_up_at(LIST_SECTION_JUMP_AFTER_MS + LIST_SECTION_JUMP_EVERY_MS);
     CHECK_EQUAL(10, view.selected);
 }
 

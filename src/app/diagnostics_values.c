@@ -40,6 +40,12 @@ static void number_text(char *text, size_t capacity, uint32_t value)
     string_builder_append_unsigned(&builder, value);
 }
 
+void diagnostics_panel_text(uint32_t id, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    append_hex(&builder, id, 6);
+}
+
 static void hex_text(char *text, size_t capacity, uint32_t value, int digits)
 {
     StringBuilder builder = string_builder_make(text, capacity);

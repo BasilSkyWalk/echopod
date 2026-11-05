@@ -14,7 +14,7 @@
 #include "ui/toast.h"
 
 enum {
-    SETTINGS_CHOICE_COUNT = 14,
+    SETTINGS_CHOICE_COUNT = 22,
     SETTINGS_BLUETOOTH_ITEM = 2,
     SETTINGS_EQUALIZER_ITEM = 3,
     SETTINGS_RESCAN_ITEM = 14,
@@ -40,6 +40,7 @@ typedef struct SettingChoice {
     int (*current)(const void *context);
     void (*choose)(void *context, int index);
     const char *(*describe)(int current);
+    uint8_t slot;
 } SettingChoice;
 
 typedef struct SettingsScreens SettingsScreens;

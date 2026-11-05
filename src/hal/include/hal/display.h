@@ -23,3 +23,4 @@ void hal_display_write(int x, int y, int width, int height, const uint16_t *pixe
 void hal_display_present(void);
 void hal_display_set_power(bool on);
 void hal_display_set_brightness(uint8_t level);
+uint32_t hal_display_panel_id(void);

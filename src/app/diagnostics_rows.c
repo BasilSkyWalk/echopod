@@ -2,6 +2,7 @@
 
 #include "diagnostics_values.h"
 #include "hal/audio.h"
+#include "hal/display.h"
 #include "hal/power.h"
 #include "hal/system.h"
 
@@ -74,4 +75,13 @@ const char *diagnostics_row_usb_last(const void *context)
     (void)context;
     diagnostics_usb_last_text(hal_system_usb_last(), usb_last_text, sizeof usb_last_text);
     return usb_last_text;
+}
+
+static char panel_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+const char *diagnostics_row_panel(const void *context)
+{
+    (void)context;
+    diagnostics_panel_text(hal_display_panel_id(), panel_text, sizeof panel_text);
+    return panel_text;
 }
