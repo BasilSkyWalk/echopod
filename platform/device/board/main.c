@@ -17,23 +17,44 @@
 enum {
     START_CLOCK_MHZ = 96,
     HOST_WAIT_MS = 3000,
-    EMPTY_NOTICE_MS = 2000
+    ASK_TIMEOUT_MS = 5000,
+    EMPTY_NOTICE_MS = 2000,
+    USB_CHOICE_STORAGE = 0,
+    USB_CHOICE_DAC = 1,
+    USB_CHOICE_CHARGE_ONLY = 2,
+    USB_CHOICE_COUNT = 3
 };
 
 typedef enum UsbState {
     USB_STATE_UNPLUGGED,
     USB_STATE_LISTENING,
+    USB_STATE_ASKING,
     USB_STATE_HANDLED
 } UsbState;
 
+static const StringId USB_CHOICES[USB_CHOICE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC,
+                                                       STR_USB_CHARGE_ONLY};
+
 static UsbState usb_state;
 static uint32_t listen_started_ms;
+static uint32_t ask_started_ms;
 static HalUsbMode usb_mode;
+static bool usb_prompt;
 static bool dac_session;
 
 void hal_system_set_usb_mode(HalUsbMode mode)
 {
     usb_mode = mode;
+}
+
+void hal_system_set_usb_prompt(bool ask)
+{
+    usb_prompt = ask;
+}
+
+static int saved_choice(void)
+{
+    return usb_mode == HAL_USB_MODE_DAC ? USB_CHOICE_DAC : USB_CHOICE_STORAGE;
 }
 
 bool board_usb_listening(void)
@@ -106,12 +127,20 @@ static void report_failed_start(void)
     }
 }
 
-static void start_listening(void)
+static bool listen(int choice)
 {
     raise_clock_for_usb();
-    dac_session = usb_mode == HAL_USB_MODE_DAC;
-    if (!(dac_session ? usb_dac_session_listen() : usb_session_listen())) {
-        report_failed_start();
+    dac_session = choice == USB_CHOICE_DAC;
+    if (dac_session ? usb_dac_session_listen() : usb_session_listen()) {
+        return true;
+    }
+    report_failed_start();
+    return false;
+}
+
+static void start_listening(void)
+{
+    if (!listen(saved_choice())) {
         usb_state = USB_STATE_HANDLED;
         return;
     }
@@ -119,15 +148,48 @@ static void start_listening(void)
     usb_state = USB_STATE_LISTENING;
 }
 
+static void start_asking(void)
+{
+    stop_listening();
+    app_choice_show(i18n_text(STR_USB_PROMPT_TITLE), USB_CHOICES, USB_CHOICE_COUNT, saved_choice());
+    ask_started_ms = hal_clock_milliseconds();
+    usb_state = USB_STATE_ASKING;
+}
+
 static void keep_listening(void)
 {
     if (usb_session_host_seen()) {
-        usb_state = USB_STATE_HANDLED;
-        run_session();
+        if (usb_prompt) {
+            start_asking();
+        } else {
+            usb_state = USB_STATE_HANDLED;
+            run_session();
+        }
     } else if (hal_clock_milliseconds() - listen_started_ms >= HOST_WAIT_MS) {
         stop_listening();
         usb_state = USB_STATE_HANDLED;
     }
+}
+
+static void start_chosen_session(int choice)
+{
+    if (choice == USB_CHOICE_CHARGE_ONLY) {
+        app_wake();
+    } else if (listen(choice)) {
+        run_session();
+    }
+}
+
+static void keep_asking(void)
+{
+    int choice = app_choice_step();
+    bool timed_out = hal_clock_milliseconds() - ask_started_ms >= ASK_TIMEOUT_MS;
+    if (choice < 0 && !timed_out) {
+        return;
+    }
+    app_choice_close();
+    usb_state = USB_STATE_HANDLED;
+    start_chosen_session(choice < 0 ? saved_choice() : choice);
 }
 
 static void check_usb(void)
@@ -136,12 +198,16 @@ static void check_usb(void)
     if (!vbus) {
         if (usb_state == USB_STATE_LISTENING) {
             stop_listening();
+        } else if (usb_state == USB_STATE_ASKING) {
+            app_choice_close();
         }
         usb_state = USB_STATE_UNPLUGGED;
     } else if (usb_state == USB_STATE_UNPLUGGED) {
         start_listening();
     } else if (usb_state == USB_STATE_LISTENING) {
         keep_listening();
+    } else if (usb_state == USB_STATE_ASKING) {
+        keep_asking();
     }
 }
 
@@ -182,7 +248,9 @@ void board_main(void)
     board_stall_pause(false);
     for (;;) {
         board_stall_beat();
-        app_step();
+        if (usb_state != USB_STATE_ASKING) {
+            app_step();
+        }
         board_display_service();
         check_usb();
         sleep_while_idle();

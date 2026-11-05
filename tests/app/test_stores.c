@@ -126,11 +126,13 @@ static void hardware_settings_reach_the_hal(void)
     chosen.gain = GAIN_HIGH;
     chosen.output = OUTPUT_BALANCED;
     chosen.usb_mode = USB_MODE_DAC;
+    chosen.options[OPTION_USB_PROMPT] = USB_PROMPT_ON;
     settings_store_apply_hardware(&chosen);
     CHECK_EQUAL(BRIGHT, fake_hal_display_brightness());
     CHECK_EQUAL(HAL_AUDIO_GAIN_HIGH, fake_hal_audio_gain());
     CHECK_EQUAL(HAL_AUDIO_OUTPUT_BALANCED, fake_hal_audio_output());
     CHECK_EQUAL(HAL_USB_MODE_DAC, fake_hal_usb_mode());
+    CHECK(fake_hal_usb_prompt());
     CHECK_EQUAL(SETTINGS_DEFAULT_DAC_VOLUME, fake_hal_dac_volume());
 }
 

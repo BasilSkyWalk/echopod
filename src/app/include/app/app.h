@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 #include "core/frame_stats.h"
+#include "core/strings.h"
 
 void app_start(void);
 void app_step(void);
@@ -28,6 +29,9 @@ typedef enum AppDacKey {
 void app_dac_keys_start(void);
 AppDacKey app_dac_next_key(void);
 void app_dac_keys_stop(void);
+void app_choice_show(const char *title, const StringId *options, int count, int current);
+int app_choice_step(void);
+void app_choice_close(void);
 void app_request_rescan(void);
 void app_request_rescan_if_music_changed(void);
 void app_show_splash(void);

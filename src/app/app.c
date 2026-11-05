@@ -35,6 +35,7 @@
 #include "screens/charge_screen.h"
 #include "settings/rocker.h"
 #include "settings_store.h"
+#include "ui/choice_screen.h"
 #include "ui/fade.h"
 #include "ui/header.h"
 #include "ui/label.h"
@@ -143,6 +144,9 @@ typedef struct AppState {
     StatusBarState status_bar;
     AppScreens screens;
     MessageScreen notice;
+    ChoiceScreen prompt;
+    int prompt_default;
+    int prompt_result;
     FrameDiff frame_diff;
     Fade splash;
     Fade goodbye;
@@ -1007,6 +1011,83 @@ AppDacKey app_dac_next_key(void)
         }
     }
     return APP_DAC_KEY_NONE;
+}
+
+static int prompt_current(const void *context)
+{
+    const AppState *state = context;
+    return state->prompt_default;
+}
+
+static void prompt_choose(void *context, int index)
+{
+    AppState *state = context;
+    state->prompt_result = index;
+}
+
+void app_choice_show(const char *title, const StringId *options, int count, int current)
+{
+    app.prompt_default = current;
+    app.prompt_result = -1;
+    ChoiceConfig config = {.title = title,
+                           .options = NULL,
+                           .option_ids = options,
+                           .option_count = count,
+                           .current = prompt_current,
+                           .choose = prompt_choose,
+                           .context = &app,
+                           .theme = current_theme()};
+    Screen *screen = choice_screen_init(&app.prompt, config);
+    app.now_ms = hal_clock_milliseconds();
+    screen->enter(screen->context, app.now_ms);
+    key_tracker_init(&app.keys, &KEY_CONFIG);
+    key_tracker_set_behavior(&app.keys, KEY_PLAY, KEY_BEHAVIOR_PRESS);
+    if (!app.display_on) {
+        set_display(true);
+    }
+    app.frame_stable = false;
+}
+
+static void draw_prompt(void *context, Canvas *canvas)
+{
+    Screen *screen = context;
+    screen->draw(screen->context, canvas);
+}
+
+static void follow_prompt_keys(uint32_t now_ms)
+{
+    KeyEvent event;
+    Screen *screen = &app.prompt.screen;
+    while (app.prompt_result < 0 && key_tracker_next_event(&app.keys, &event)) {
+        ScreenAction action = screen->handle_key(screen->context, event, now_ms);
+        bool dismissed =
+            action.type == SCREEN_ACTION_POP || action.type == SCREEN_ACTION_POP_TO_ROOT;
+        if (dismissed && app.prompt_result < 0) {
+            app.prompt_result = app.prompt_default;
+        }
+    }
+}
+
+int app_choice_step(void)
+{
+    uint32_t now_ms = hal_clock_milliseconds();
+    app.now_ms = now_ms;
+    hal_audio_service();
+    hal_bluetooth_service();
+    read_input();
+    key_tracker_update(&app.keys, now_ms);
+    follow_prompt_keys(now_ms);
+    Screen *screen = &app.prompt.screen;
+    screen->update(screen->context, now_ms);
+    render((FrameDrawer){.draw = draw_prompt, .context = screen}, false);
+    light_after_first_frame();
+    return app.prompt_result;
+}
+
+void app_choice_close(void)
+{
+    app.frame_stable = false;
+    app_dac_keys_stop();
 }
 
 void app_dac_keys_stop(void)
