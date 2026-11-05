@@ -10,6 +10,7 @@
 #include "device/usb_audio_sink.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
+#include "hal/power.h"
 #include "settings/settings.h"
 #include "usb.h"
 
@@ -125,6 +126,20 @@ static void append_counters(StringBuilder *line)
     i18n_format(line, STR_USB_COUNTERS, arguments, 4);
 }
 
+static void append_battery(StringBuilder *line)
+{
+    HalBattery battery = hal_power_battery();
+    char percent[NUMBER_CAPACITY];
+    number_text(percent, sizeof percent, battery.percent);
+    const char *arguments[] = {percent};
+    string_builder_append(line, " · ");
+    if (!battery.known) {
+        string_builder_append(line, i18n_text(STR_USB_BATTERY_UNKNOWN));
+        return;
+    }
+    i18n_format(line, battery.charging ? STR_USB_BATTERY_CHARGING : STR_USB_BATTERY, arguments, 1);
+}
+
 static void state_text(char *text, size_t capacity)
 {
     StringBuilder line = string_builder_make(text, capacity);
@@ -139,6 +154,7 @@ static void state_text(char *text, size_t capacity)
         append_format(&line);
         append_counters(&line);
     }
+    append_battery(&line);
 }
 
 static bool text_differs(const char *text)
