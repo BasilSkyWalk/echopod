@@ -114,6 +114,7 @@ add_library(echo_device_logic STATIC
     usb_audio_sink.c
     usb_device.c
     usb_fallback.c
+    vbus_debounce.c
     wav_source.c
 )
 if(CMAKE_CROSSCOMPILING)

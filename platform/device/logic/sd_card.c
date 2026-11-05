@@ -179,3 +179,31 @@ uint32_t sd_card_rca_argument(const SdCard *card)
 {
     return (uint32_t)card->rca << 16;
 }
+
+static bool recover(const SdRetry *retry, SdRetryStats *stats, int attempt)
+{
+    if (attempt == 0 && retry->resume(retry->context)) {
+        return true;
+    }
+    stats->restarts++;
+    return retry->restart(retry->context);
+}
+
+bool sd_card_retry(const SdRetry *retry, SdRetryStats *stats)
+{
+    if (retry->transfer(retry->context)) {
+        return true;
+    }
+    for (int attempt = 0; attempt < SD_RETRY_ATTEMPTS; attempt++) {
+        stats->retries++;
+        if (!recover(retry, stats, attempt)) {
+            break;
+        }
+        if (retry->transfer(retry->context)) {
+            stats->recovered++;
+            return true;
+        }
+    }
+    stats->failed++;
+    return false;
+}

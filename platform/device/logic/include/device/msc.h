@@ -42,6 +42,7 @@ typedef struct MscStats {
     uint32_t lun_sectors_written[MSC_MAX_LUNS];
     uint32_t read_failures;
     uint32_t write_failures;
+    uint32_t lun_failures[MSC_MAX_LUNS];
     uint32_t last_failed_lba;
     uint32_t last_written_lba[MSC_MAX_LUNS];
     uint32_t writes_after_eject;

@@ -33,6 +33,28 @@ static void a_full_speed_session_never_falls_back(void)
     CHECK(!usb_fallback_due(&fallback, false, 5 * USB_FALLBACK_MS));
 }
 
+static void it_remembers_that_it_fell_back(void)
+{
+    UsbFallback fallback;
+    usb_fallback_start(&fallback, true, 0);
+    CHECK(!fallback.fired);
+    usb_fallback_due(&fallback, false, USB_FALLBACK_MS - 1);
+    CHECK(!fallback.fired);
+    usb_fallback_due(&fallback, false, USB_FALLBACK_MS);
+    CHECK(fallback.fired);
+    usb_fallback_due(&fallback, false, 2 * USB_FALLBACK_MS);
+    CHECK(fallback.fired);
+}
+
+static void a_working_session_never_marks_a_fall_back(void)
+{
+    UsbFallback fallback;
+    usb_fallback_start(&fallback, true, 0);
+    usb_fallback_due(&fallback, true, 100);
+    usb_fallback_due(&fallback, false, 3 * USB_FALLBACK_MS);
+    CHECK(!fallback.fired);
+}
+
 static void the_timeout_survives_the_clock_wrapping(void)
 {
     UsbFallback fallback;
@@ -48,6 +70,8 @@ int main(void)
         TEST_CASE(it_falls_back_only_once),
         TEST_CASE(a_working_session_never_falls_back),
         TEST_CASE(a_full_speed_session_never_falls_back),
+        TEST_CASE(it_remembers_that_it_fell_back),
+        TEST_CASE(a_working_session_never_marks_a_fall_back),
         TEST_CASE(the_timeout_survives_the_clock_wrapping),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

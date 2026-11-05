@@ -50,6 +50,15 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 3. **Eject both drives before you unplug.** If you unplug first, recent changes may be lost, and the player warns you.
 4. When music changed, the player rebuilds its library by itself. Copying other files doesn't trigger a rebuild. Settings → Rescan library rebuilds it on demand.
 
+During a long copy the screen goes dark after 30 seconds; any button lights it again. If the drives disappear from the computer on their own while the cable stays in, the player connects again by itself (without asking Storage or DAC) and the computer may warn that a drive was removed without ejecting. Afterwards, Home → Diagnostics → **USB errors** shows what happened in the last session, or *None*:
+
+- `E1/2`: commands that failed on internal storage / on the SD card.
+- `r3`: SD card transfers that failed and were tried again; `i1`: times the card had to be started again (also when it didn't answer at the start of the session, for example after it was taken out and put back while the player was on).
+- `s4:A208`: the card controller's step and status at the last card failure (for bug reports).
+- `b1`: times the computer reset the connection after it was working.
+- `v2`: moments the player briefly lost the cable's power reading and carried on.
+- `FS`: the connection dropped from high speed to full speed in this session (the computer sees one disconnect); `fs`: it was already at full speed from an earlier session since the player was switched on.
+
 ## Using the player as a USB DAC
 
 **Untested on a player so far** (see `docs/known-issues.md`). In this mode the player is a sound card for your computer or phone: their audio plays through the player's headphone outputs.
@@ -265,4 +274,4 @@ While the clock is set and has a time zone (a sync sets both; Date & time asks f
 - **The player doesn't start at all:** every case so far was recovered through the chip's maskrom mode, which writes FiiO's firmware back from a computer over USB. It needs a patched `rkdeveloptool` and some care; the steps are in `docs/device-recovery.md`.
 - **A "STALL" or "FAULT" screen** (white text on black with PC and LR lines): photograph it, then press the small RST hole rather than holding Power. RST keeps the player's memory, so Home → Diagnostics → Last start and Last stack still show what stopped; holding Power on battery wipes it.
 - **The player doesn't turn on after an update:** press RST once and start it; then photograph Home → Diagnostics → Last update (what the installer did and the state it left the internal storage in), Last start ("#n after power-off" means the player never lost power when you switched it off) and Boot hold if present.
-- **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step, Last stack, Last USB and Last update lines from Home → Diagnostics.
+- **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step, Last stack, Last USB, USB errors and Last update lines from Home → Diagnostics.

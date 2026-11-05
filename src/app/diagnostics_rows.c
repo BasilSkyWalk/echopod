@@ -81,6 +81,15 @@ const char *diagnostics_row_usb_last(const void *context)
     return usb_last_text;
 }
 
+static char usb_errors_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+const char *diagnostics_row_usb_errors(const void *context)
+{
+    (void)context;
+    diagnostics_usb_errors_text(hal_system_usb_last(), usb_errors_text, sizeof usb_errors_text);
+    return usb_errors_text;
+}
+
 static char panel_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 const char *diagnostics_row_panel(const void *context)

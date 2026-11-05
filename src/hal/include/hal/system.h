@@ -43,6 +43,16 @@ typedef struct HalUsbLast {
     uint32_t internal_written;
     uint32_t card_written;
     uint32_t writes_after_eject;
+    uint32_t internal_errors;
+    uint32_t card_errors;
+    uint32_t card_retries;
+    uint32_t card_starts;
+    uint8_t card_step;
+    uint32_t card_interrupts;
+    uint32_t host_resets;
+    uint32_t vbus_dips;
+    bool fell_back;
+    bool full_speed;
 } HalUsbLast;
 
 HalUsbLast hal_system_usb_last(void);
