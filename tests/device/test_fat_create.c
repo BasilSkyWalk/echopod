@@ -316,9 +316,44 @@ static void lower_case_short_names_keep_their_case(void)
     sparse_card_free(&card->sparse);
 }
 
+static uint32_t stamp_of(Card *card, const char *folder, const char *name)
+{
+    FatDirCursor cursor;
+    static FatDirEntry entry;
+    CHECK(fat_open_directory(&card->volume, folder, &cursor));
+    while (fat_next_entry(&card->volume, &cursor, &entry)) {
+        if (strcmp(entry.name, name) == 0) {
+            return entry.modified;
+        }
+    }
+    return 0;
+}
+
+static void new_entries_carry_the_stamp_the_clock_gave(void)
+{
+    uint32_t fixed = (uint32_t)(2026 - 1980) << 25 | 1u << 21 | 1u << 16;
+    uint32_t stamp =
+        (uint32_t)(2026 - 1980) << 25 | 11u << 21 | 5u << 16 | 13u << 11 | 45u << 5 | 29u;
+    CHECK_EQUAL(fixed, fat_new_stamp());
+    fat_set_new_stamp(stamp);
+    Card *card = mounted("fat32_mbr");
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.made/stamped.bin", 600));
+    remount(card);
+    CHECK_EQUAL(stamp, stamp_of(card, "/.made", "stamped.bin"));
+    sparse_card_free(&card->sparse);
+    card = mounted("exfat_mbr");
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.made/stamped.bin", 600));
+    remount(card);
+    CHECK_EQUAL(fat_exfat_utc_stamp(stamp, 0), stamp_of(card, "/.made", "stamped.bin"));
+    sparse_card_free(&card->sparse);
+    fat_set_new_stamp(0);
+    CHECK_EQUAL(fixed, fat_new_stamp());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(new_entries_carry_the_stamp_the_clock_gave),
         TEST_CASE(fat32_reserves_a_new_folder_and_files_that_read_back_cleared),
         TEST_CASE(fat16_reserves_a_new_folder_and_files_that_read_back_cleared),
         TEST_CASE(exfat_reserves_a_new_folder_and_files_that_read_back_cleared),

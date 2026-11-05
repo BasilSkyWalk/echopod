@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "core/wall_clock.h"
 #include "library/library.h"
 #include "player.h"
 
@@ -50,6 +51,7 @@ typedef struct ListenHistory {
     uint32_t sequence;
     uint32_t session;
     uint32_t slots;
+    const WallClock *clock;
     HistoryRecord record;
     uint8_t slot[HISTORY_SLOT_BYTES];
 } ListenHistory;

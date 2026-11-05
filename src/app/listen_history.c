@@ -85,6 +85,10 @@ static void store(ListenHistory *history, HistoryRecord *record)
     }
     record->sequence = history->sequence;
     record->session = history->session;
+    if (history->clock == NULL ||
+        !wall_clock_unix(history->clock, record->end_ms, &record->unix_time)) {
+        record->unix_time = 0;
+    }
     listen_history_encode(record, history->slot);
     uint32_t offset = (record->sequence - 1) % history->slots * HISTORY_SLOT_BYTES;
     if (hal_file_write_at(LISTEN_HISTORY_PATH, offset, history->slot, HISTORY_SLOT_BYTES)) {

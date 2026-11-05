@@ -408,9 +408,31 @@ static uint8_t short_name_checksum(const uint8_t *name)
     return sum;
 }
 
+enum {
+    DEFAULT_STAMP = (FAT_NEW_DATE_YEAR - 1980) << 25 | FAT_NEW_DATE_MONTH << 21 |
+        FAT_NEW_DATE_DAY << 16
+};
+
+static uint32_t new_stamp;
+
+void fat_set_new_stamp(uint32_t dos_stamp)
+{
+    new_stamp = dos_stamp;
+}
+
+uint32_t fat_new_stamp(void)
+{
+    return new_stamp != 0 ? new_stamp : (uint32_t)DEFAULT_STAMP;
+}
+
 static uint16_t new_date(void)
 {
-    return (uint16_t)((FAT_NEW_DATE_YEAR - 1980) << 9 | FAT_NEW_DATE_MONTH << 5 | FAT_NEW_DATE_DAY);
+    return (uint16_t)(fat_new_stamp() >> 16);
+}
+
+static uint16_t new_time(void)
+{
+    return (uint16_t)fat_new_stamp();
 }
 
 static void clear_entry(uint8_t *entry)
@@ -447,9 +469,11 @@ static void fill_short_entry(uint8_t *out, const uint8_t *name, uint8_t case_fla
     }
     out[ATTRIBUTES] = file->directory ? ATTRIBUTE_DIRECTORY : ATTRIBUTE_ARCHIVE;
     out[CASE_FLAGS] = case_flags;
+    put16(out + 14, new_time());
     put16(out + 16, new_date());
     put16(out + 18, new_date());
     put16(out + 20, file->first_cluster >> 16);
+    put16(out + 22, new_time());
     put16(out + 24, new_date());
     put16(out + 26, file->first_cluster);
     put32(out + 28, file->directory ? 0 : file->size);
