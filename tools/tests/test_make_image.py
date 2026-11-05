@@ -614,7 +614,7 @@ class GlyphFaceTest(unittest.TestCase):
         self.assertEqual((0, 0), (word(image, table + 8), word(image, table + 12)))
 
     def test_faces_stay_clear_of_everything_else(self):
-        sizes = [1_700_000, 1_100_000, 8_000, 8_000, 8_000]
+        sizes = [1_720_000, 1_060_000, 35_000, 51_000, 53_000]
         offsets = make_image.glyph_face_offsets(sizes)
         taken = [(make_image.OVERLAY_OFFSET, make_image.OVERLAY_OFFSET + make_image.OVERLAY_CAPACITY),
                  (make_image.CORE1_MP3_OFFSET, make_image.CORE1_MP3_OFFSET + 512 +

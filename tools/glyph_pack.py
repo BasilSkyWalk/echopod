@@ -45,11 +45,13 @@ class Face:
     dropped: list
 
 
-def codec_characters(codec, leads, trails=(0xA1, 0xFE)):
-    """Every character a double-byte codec encodes with lead bytes in [first, last]."""
+def codec_characters(codec, leads, trails=((0xA1, 0xFE),)):
+    """Every character a double-byte codec encodes with lead bytes in [first, last]
+    and trail bytes in any of the [first, last] trail ranges."""
     found = set()
+    trail_bytes = [trail for first, last in trails for trail in range(first, last + 1)]
     for lead in range(leads[0], leads[1] + 1):
-        for trail in range(trails[0], trails[1] + 1):
+        for trail in trail_bytes:
             try:
                 text = bytes([lead, trail]).decode(codec)
             except UnicodeDecodeError:
@@ -66,7 +68,8 @@ def in_ranges(codepoint, ranges):
 def set_characters(spec):
     ranges = spec["ranges"]
     if "codec" in spec:
-        return {codepoint for codepoint in codec_characters(spec["codec"], spec["leads"])
+        trails = spec.get("trails", [[0xA1, 0xFE]])
+        return {codepoint for codepoint in codec_characters(spec["codec"], spec["leads"], trails)
                 if in_ranges(codepoint, ranges)}
     return {codepoint for first, last in ranges for codepoint in range(first, last + 1)}
 
