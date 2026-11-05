@@ -3,8 +3,13 @@
 #include "board.h"
 #include "device/fat.h"
 #include "hal/storage.h"
+#include "hal/time.h"
 #include "sd.h"
 #include "storage_reset.h"
+
+enum {
+    DOS_FIRST_YEAR = 1980
+};
 
 enum {
     OPEN_FILE_CAPACITY = 8,
@@ -128,11 +133,28 @@ static HalReserveResult reserve_result(FatReserveResult result)
     return HAL_RESERVE_FAILED;
 }
 
+static void stamp_from_clock(void)
+{
+    static bool stamped;
+    HalTime time;
+    if (stamped) {
+        return;
+    }
+    stamped = true;
+    if (hal_time_read(&time) && time.valid && time.year >= DOS_FIRST_YEAR) {
+        fat_set_new_stamp((uint32_t)(time.year - DOS_FIRST_YEAR) << 25 |
+                          (uint32_t)time.month << 21 | (uint32_t)time.day << 16 |
+                          (uint32_t)time.hour << 11 | (uint32_t)time.minute << 5 |
+                          time.second / 2u);
+    }
+}
+
 HalReserveResult hal_file_reserve(const char *path, uint32_t size)
 {
     if (!mounted()) {
         return HAL_RESERVE_FAILED;
     }
+    stamp_from_clock();
     card_device = volume.device;
     volume.device.read = read_and_beat;
     board_start_record_step(HAL_START_STEP_CARD_WRITE);

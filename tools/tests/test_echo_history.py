@@ -133,6 +133,17 @@ class HistoryTest(unittest.TestCase):
         self.assertEqual(1_600_000_050, plays[0].timestamp)
         self.assertEqual(NOW - 200, plays[1].timestamp)
 
+    def test_records_before_the_clock_was_set_share_their_sessions_time(self):
+        records = [play(1, 1, 50_000, 200_000, title="Before sync"),
+                   mark(2, 1, 300_000, ),
+                   play(3, 1, 400_000, 200_000, title="After sync", unix_time=1_600_000_600),
+                   play(4, 2, 10_000, 200_000, title="Next boot")]
+        records[1] = mark(2, 1, 300_000)
+        plays = echo_history.plays_of(records, NOW * 1000)
+        self.assertEqual(1_600_000_600 - 600 + 50, plays[0].timestamp)
+        self.assertEqual(1_600_000_600 - 600 + 400, plays[1].timestamp)
+        self.assertEqual(NOW - 200, plays[2].timestamp)
+
     def test_a_play_cut_by_a_power_off_and_resumed_counts_once(self):
         records = [play(1, 1, 0, 100_000, start_at=0, end_at=100_000),
                    play(2, 2, 5_000, 100_000, start_at=100_500, end_at=200_000),

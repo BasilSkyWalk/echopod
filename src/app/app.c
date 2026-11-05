@@ -6,6 +6,7 @@
 #include "app_screens.h"
 #include "bluetooth_link.h"
 #include "card_files.h"
+#include "clock_store.h"
 #include "core/deadline.h"
 #include "core/i18n.h"
 #include "core/key_tracker.h"
@@ -97,6 +98,8 @@ typedef struct AppState {
     FavoritesStore favorites;
     SpokenStore spoken;
     ListenHistory history;
+    ClockStore clock;
+    bool usb_written;
     CoverCache covers;
     PowerPolicy power;
     LowBattery low_battery;
@@ -673,6 +676,18 @@ static StatusBluetooth bluetooth_of(const BluetoothLink *link)
     return link->connected ? STATUS_BLUETOOTH_CONNECTED : STATUS_BLUETOOTH_ON;
 }
 
+static const char *status_clock_text(void)
+{
+    static char text[WALL_CLOCK_TIME_CAPACITY];
+    WallCivil civil;
+    if (app.settings.settings.options[OPTION_CLOCK] != CLOCK_ON ||
+        !clock_store_now(&app.clock, app.now_ms, &civil)) {
+        return NULL;
+    }
+    wall_clock_time_text(&civil, text, sizeof text);
+    return text;
+}
+
 static StatusBarState current_status_bar(void)
 {
     HalBattery battery = hal_power_battery();
@@ -683,6 +698,7 @@ static StatusBarState current_status_bar(void)
         .battery_percent = battery.percent,
         .charging = battery.charging,
         .hide_percent = app.settings.settings.options[OPTION_BATTERY] != 0,
+        .clock = status_clock_text(),
     };
 }
 
@@ -776,6 +792,7 @@ static void start_screens(uint32_t now_ms)
         .rescan_requested = &app.rescan_requested,
         .bluetooth = &app.bluetooth,
         .equalizer = &app.equalizer,
+        .clock = &app.clock,
     };
     Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);
@@ -833,6 +850,8 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
+    clock_store_start(&app.clock, &app.settings.settings, now_ms);
+    app.history.clock = &app.clock.clock;
     apply_language(app.settings.settings.language);
     apply_orientation();
     equalizer_store_load(&app.equalizer);
@@ -939,6 +958,20 @@ void app_request_rescan(void)
 void app_request_rescan_if_music_changed(void)
 {
     app.music_check_requested = true;
+    app.usb_written = true;
+}
+
+static void take_computer_clock(void)
+{
+    if (!app.usb_written) {
+        return;
+    }
+    app.usb_written = false;
+    uint32_t now_ms = hal_clock_milliseconds();
+    if (clock_store_after_usb(&app.clock, &app.settings.settings, now_ms)) {
+        settings_store_save(&app.settings);
+        toast_show(&app.toast, i18n_text(STR_SETTINGS_CLOCK_SYNCED), now_ms);
+    }
 }
 
 static void draw_charge(void *context, Canvas *canvas)
@@ -992,6 +1025,7 @@ void app_step(void)
         return;
     }
     app.idle = false;
+    take_computer_clock();
     if (app.music_check_requested) {
         app.music_check_requested = false;
         bool changed = hal_system_restart_pending();
@@ -1030,6 +1064,7 @@ void app_step(void)
         finish_shut_down();
     }
     if (!app.powered_off) {
+        clock_store_step(&app.clock, now_ms);
         player_update(&app.player, now_ms);
         bluetooth_link_step(&app.bluetooth, &app.player, now_ms);
         PlayerStatus status = player_status(&app.player);
@@ -1089,6 +1124,7 @@ void app_wake(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
     power_policy_wake(&app.power, now_ms);
+    clock_store_wake(&app.clock, now_ms);
     if (app.charging) {
         light_charge_screen(now_ms);
     }

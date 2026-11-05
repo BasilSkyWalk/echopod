@@ -49,3 +49,13 @@ bool hal_time_read(HalTime *time)
     pcf8563_decode(registers, time);
     return true;
 }
+
+bool hal_time_write(const HalTime *time)
+{
+    I2cPort port;
+    uint8_t run[] = {PCF8563_WRITE_ADDRESS, PCF8563_CONTROL_REGISTER, 0};
+    uint8_t frame[2 + PCF8563_TIME_REGISTER_COUNT] = {PCF8563_WRITE_ADDRESS, PCF8563_TIME_REGISTER};
+    pcf8563_encode(time, frame + 2);
+    start_bus(&port);
+    return i2c_send(&port, run, sizeof run) && i2c_send(&port, frame, sizeof frame);
+}

@@ -84,6 +84,33 @@ Rect status_bar_percent_area(const Theme *theme, const char *text, bool charging
     return (Rect){beside.x - percent_gap(theme) - width, beside.y, width, beside.height};
 }
 
+static int right_items_left(const Theme *theme, StatusBarState state)
+{
+    if (!state.battery_known) {
+        return theme->metrics.screen_width - theme->metrics.padding;
+    }
+    if (!state.hide_percent) {
+        return status_bar_percent_area(theme, "100%", state.charging).x;
+    }
+    return state.charging ? status_bar_bolt_area(theme).x : status_bar_battery_area(theme).x;
+}
+
+Rect status_bar_clock_area(const Theme *theme, StatusBarState state)
+{
+    Rect bluetooth = status_bar_bluetooth_area(theme);
+    int gap = percent_gap(theme);
+    int left = bluetooth.x + bluetooth.width + gap;
+    int right = right_items_left(theme, state) - gap;
+    int width = state.clock != NULL ? text_width(theme->fonts.small, state.clock) : 0;
+    bool centered = theme->metrics.status_height > 0;
+    int x = centered ? (theme->metrics.screen_width - width) / 2 : left;
+    int limit = centered ? right : theme->metrics.header_inset;
+    if (width == 0 || x < left || x + width > limit) {
+        return (Rect){0, 0, 0, 0};
+    }
+    return (Rect){x, bluetooth.y, width, bluetooth.height};
+}
+
 static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent, bool charging)
 {
     char text[STATUS_BAR_PERCENT_CAPACITY];
@@ -142,6 +169,13 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
         Color tint =
             state.bluetooth == STATUS_BLUETOOTH_CONNECTED ? color : theme->colors.text_tertiary;
         icon_draw_bluetooth(canvas, status_bar_bluetooth_area(theme), tint);
+    }
+    Rect clock = status_bar_clock_area(theme, state);
+    if (!rect_is_empty(clock)) {
+        TextStyle style = {.font = theme->fonts.small, .color = color};
+        label_draw(canvas, style,
+                   (Label){.area = label_centered_area(style.font, clock, state.clock),
+                           .text = state.clock});
     }
     if (state.battery_known) {
         draw_battery(canvas, theme, state);

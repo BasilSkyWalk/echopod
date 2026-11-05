@@ -86,3 +86,14 @@ void pcf8563_decode(const uint8_t *registers, HalTime *time)
                   time->weekday <= LAST_WEEKDAY &&
                   civil_date_valid(time->year, time->month, time->day);
 }
+
+void pcf8563_encode(const HalTime *time, uint8_t *registers)
+{
+    registers[0] = bcd_encode(time->second);
+    registers[1] = bcd_encode(time->minute);
+    registers[2] = bcd_encode(time->hour);
+    registers[3] = bcd_encode(time->day);
+    registers[4] = (uint8_t)(time->weekday & WEEKDAYS_MASK);
+    registers[5] = bcd_encode(time->month);
+    registers[6] = bcd_encode((uint8_t)(time->year % 100));
+}

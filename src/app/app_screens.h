@@ -13,6 +13,7 @@
 #include "player.h"
 #include "screens/bluetooth_screen.h"
 #include "screens/cover_flow_screen.h"
+#include "screens/date_time_screen.h"
 #include "screens/equalizer_screen.h"
 #include "screens/now_playing_screen.h"
 #include "screens/test_pattern_screen.h"
@@ -77,6 +78,7 @@ typedef struct AppScreens {
     TestPatternScreen test_pattern;
     BluetoothScreen bluetooth;
     EqualizerScreen equalizer;
+    DateTimeScreen date_time;
     ClockOption clock;
     Core1Option core1;
     Core1AccelOption core1_accel;
@@ -100,6 +102,7 @@ typedef struct AppScreensContext {
     SpokenStore *spoken;
     BluetoothLink *bluetooth;
     EqualizerStore *equalizer;
+    ClockStore *clock;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);

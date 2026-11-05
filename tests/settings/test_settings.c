@@ -444,6 +444,10 @@ static void the_new_options_default_to_their_first_choice(void)
     CHECK_EQUAL(2, settings_option_count(OPTION_BLUETOOTH_LEVEL));
     CHECK_EQUAL(2, settings_option_count(OPTION_USB_PROMPT));
     CHECK_EQUAL(2, settings_option_count(OPTION_LISTEN_HISTORY));
+    CHECK_EQUAL(CLOCK_OFF, settings.options[OPTION_CLOCK]);
+    CHECK_EQUAL(TIME_ZONE_UNSET, settings.options[OPTION_TIME_ZONE]);
+    CHECK_EQUAL(TIME_ZONE_OPTION_COUNT, settings_option_count(OPTION_TIME_ZONE));
+    CHECK_EQUAL(106, TIME_ZONE_OPTION_COUNT);
 }
 
 static void a_version_9_file_is_48_bytes_with_the_checksum_at_the_end(void)

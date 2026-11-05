@@ -11,11 +11,13 @@ enum {
 
 static bool clock_absent;
 static bool clock_unset;
+static time_t clock_shift;
 
 void sim_time_configure(bool absent, bool unset)
 {
     clock_absent = absent;
     clock_unset = unset;
+    clock_shift = 0;
 }
 
 bool hal_time_read(HalTime *reading)
@@ -24,7 +26,7 @@ bool hal_time_read(HalTime *reading)
     if (clock_absent) {
         return false;
     }
-    time_t now = time(NULL);
+    time_t now = time(NULL) + clock_shift;
     const struct tm *local = localtime(&now);
     if (local == NULL) {
         return false;
@@ -42,5 +44,28 @@ bool hal_time_read(HalTime *reading)
         .second = (uint8_t)second,
         .weekday = (uint8_t)local->tm_wday,
     };
+    return true;
+}
+
+bool hal_time_write(const HalTime *wanted_time)
+{
+    if (clock_absent) {
+        return false;
+    }
+    struct tm local = {
+        .tm_year = wanted_time->year - TM_YEAR_BASE,
+        .tm_mon = wanted_time->month - 1,
+        .tm_mday = wanted_time->day,
+        .tm_hour = wanted_time->hour,
+        .tm_min = wanted_time->minute,
+        .tm_sec = wanted_time->second,
+        .tm_isdst = -1,
+    };
+    time_t wanted = mktime(&local);
+    if (wanted == (time_t)-1) {
+        return false;
+    }
+    clock_shift = wanted - time(NULL);
+    clock_unset = false;
     return true;
 }

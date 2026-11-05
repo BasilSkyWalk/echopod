@@ -419,10 +419,34 @@ static void a_missing_file_records_nothing(void)
     CHECK(!history.located);
 }
 
+static void a_known_clock_with_a_zone_dates_each_record(void)
+{
+    WallClock clock = {0};
+    start();
+    history.clock = &clock;
+    play_album(0);
+    wait(40 * SECOND_MS);
+    listen_history_close(&history, now_ms);
+    CHECK_EQUAL(0, record_at(0).unix_time);
+    wall_clock_set(&clock, 1793880000u, now_ms);
+    play_album(1);
+    wait(40 * SECOND_MS);
+    listen_history_close(&history, now_ms);
+    CHECK_EQUAL(0, record_at(1).unix_time);
+    clock.zone = wall_clock_zone_of(60);
+    play_album(0);
+    wait(40 * SECOND_MS);
+    listen_history_note_computer(&history, now_ms);
+    CHECK_EQUAL(1793880000u + 80 - 3600, record_at(2).unix_time);
+    CHECK_EQUAL(1793880000u + 80 - 3600, record_at(3).unix_time);
+    CHECK_EQUAL(HISTORY_COMPUTER, record_at(3).kind);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(a_record_survives_encoding),
+        TEST_CASE(a_known_clock_with_a_zone_dates_each_record),
         TEST_CASE(a_damaged_record_is_refused),
         TEST_CASE(a_played_song_is_recorded_with_its_names),
         TEST_CASE(paused_time_does_not_count),

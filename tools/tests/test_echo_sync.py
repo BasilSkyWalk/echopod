@@ -333,6 +333,50 @@ class ScanRecordTest(unittest.TestCase):
         self.assertEqual(bytes(16), echo_sync.stored_version(b""))
 
 
+class ClockRecordTest(unittest.TestCase):
+    def test_the_record_holds_the_time_the_offset_and_a_checksum(self):
+        record = echo_sync.clock_record(1_793_880_000, -300)
+        self.assertEqual(20, len(record))
+        self.assertEqual(b"ECLK\x01\x00\x00\x00", record[:8])
+        self.assertEqual(struct.pack("<Ih", 1_793_880_000, -300), record[8:14])
+        self.assertEqual(cover_export.fnv1a(record[:16]), struct.unpack("<I", record[16:])[0])
+        self.assertEqual((1_793_880_000, -300), echo_sync.stored_clock(record))
+
+    def test_a_damaged_or_foreign_record_reads_as_none(self):
+        record = bytearray(echo_sync.clock_record(1_793_880_000, 60))
+        record[9] ^= 1
+        self.assertIsNone(echo_sync.stored_clock(bytes(record)))
+        self.assertIsNone(echo_sync.stored_clock(b"MESC" + bytes(16)))
+        self.assertIsNone(echo_sync.stored_clock(b""))
+
+    def test_the_record_is_described_in_local_time(self):
+        self.assertEqual("2026-11-05 07:00 UTC-05:00", echo_sync.clock_text(1_793_880_000, -300))
+        self.assertEqual("2026-11-05 17:30 UTC+05:30", echo_sync.clock_text(1_793_880_000, 330))
+
+    def test_write_clock_writes_the_record_unless_dry_or_out_of_range(self):
+        with tempfile.TemporaryDirectory() as directory:
+            echo = Path(directory)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                dry = echo_sync.write_clock(echo, echo_sync.SyncOptions(dry_run=True),
+                                            now=1_793_880_000, offset_minutes=60)
+                self.assertFalse(dry)
+                self.assertFalse((echo / "clock.bin").exists())
+                self.assertFalse(echo_sync.write_clock(echo, echo_sync.SyncOptions(),
+                                                       now=1_000_000_000, offset_minutes=0))
+                self.assertFalse((echo / "clock.bin").exists())
+                self.assertTrue(echo_sync.write_clock(echo, echo_sync.SyncOptions(),
+                                                      now=1_793_880_000, offset_minutes=60))
+            self.assertEqual((1_793_880_000, 60),
+                             echo_sync.stored_clock((echo / "clock.bin").read_bytes()))
+        self.assertIn("would write clock.bin: 2026-11-05 13:00 UTC+01:00", output.getvalue())
+        self.assertIn("clock.bin   2026-11-05 13:00 UTC+01:00", output.getvalue())
+
+    def test_the_clock_is_written_unless_no_clock_is_given(self):
+        self.assertTrue(echo_sync.options_from(echo_sync.parse_arguments([])).clock)
+        self.assertFalse(echo_sync.options_from(echo_sync.parse_arguments(["--no-clock"])).clock)
+
+
 class SyncTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -374,7 +418,16 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(echo_sync.card_fingerprint(self.card, volume),
                          echo_sync.stored_fingerprint(scan))
         self.assertIn("Eject the card safely", output.replace("eject", "Eject"))
+        self.assertIn("sets its clock", output)
+        self.assertIsNotNone(echo_sync.stored_clock((self.echo / "clock.bin").read_bytes()))
         self.assertEqual(0, self.run_sync("--check")[0])
+
+    def test_no_clock_leaves_the_clock_record_out(self):
+        self.prepare_echo()
+        status, output = self.run_sync("--no-clock")
+        self.assertEqual(0, status, output)
+        self.assertFalse((self.echo / "clock.bin").exists())
+        self.assertNotIn("sets its clock", output)
 
     def test_covers_use_the_players_layout_for_the_cards_file(self):
         self.prepare_echo()

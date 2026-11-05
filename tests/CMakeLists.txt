@@ -28,6 +28,7 @@ echo_add_unit_test(NAME test_permutation SOURCES core/test_permutation.c LIBRARI
 echo_add_unit_test(NAME test_hash SOURCES core/test_hash.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_power_policy SOURCES core/test_power_policy.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_low_battery SOURCES core/test_low_battery.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_wall_clock SOURCES core/test_wall_clock.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_color SOURCES gfx/test_color.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_rect SOURCES gfx/test_rect.c LIBRARIES echo_gfx)
 echo_add_unit_test(NAME test_canvas SOURCES gfx/test_canvas.c LIBRARIES echo_gfx)
@@ -210,6 +211,16 @@ echo_add_unit_test(NAME test_bluetooth_screen
 )
 echo_add_unit_test(NAME test_stopwatch_screen
     SOURCES app/test_stopwatch_screen.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_scan
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_clock_store
+    SOURCES app/test_clock_store.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_scan
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_date_time_screen
+    SOURCES app/test_date_time_screen.c app/fake_hal.c
     LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )

@@ -126,6 +126,7 @@ typedef struct FakeHal {
     uint8_t dac_volume;
     HalTime time;
     int time_reads;
+    int time_writes;
 } FakeHal;
 
 static FakeHal fake;
@@ -157,6 +158,30 @@ bool hal_time_read(HalTime *time)
     fake.time_reads++;
     *time = fake.time;
     return fake.time.present;
+}
+
+bool hal_time_write(const HalTime *time)
+{
+    fake.time_writes++;
+    if (!fake.time.present) {
+        return false;
+    }
+    fake.time = *time;
+    fake.time.present = true;
+    fake.time.valid = true;
+    fake.time.low_voltage = false;
+    fake.time.stopped = false;
+    return true;
+}
+
+int fake_hal_time_write_count(void)
+{
+    return fake.time_writes;
+}
+
+HalTime fake_hal_time(void)
+{
+    return fake.time;
 }
 
 const char *hal_system_version(void)

@@ -19,3 +19,4 @@ typedef struct HalTime {
 } HalTime;
 
 bool hal_time_read(HalTime *time);
+bool hal_time_write(const HalTime *time);

@@ -158,8 +158,7 @@ static uint16_t set_checksum(const uint8_t *entries, uint32_t count)
 
 static uint32_t new_timestamp(void)
 {
-    return (uint32_t)(FAT_NEW_DATE_YEAR - 1980) << 25 | (uint32_t)FAT_NEW_DATE_MONTH << 21 |
-           (uint32_t)FAT_NEW_DATE_DAY << 16;
+    return fat_new_stamp();
 }
 
 static void fill_file_entry(uint8_t *entry, uint32_t count, bool directory)

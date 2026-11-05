@@ -37,6 +37,34 @@ static void civil_dates_follow_the_calendar(void)
     CHECK(!civil_date_valid(2026, 6, 0));
 }
 
+static void a_time_encodes_as_the_seven_time_registers(void)
+{
+    HalTime time = {
+        .year = 2026, .month = 11, .day = 5, .hour = 13, .minute = 45, .second = 59, .weekday = 4};
+    uint8_t registers[PCF8563_TIME_REGISTER_COUNT];
+    pcf8563_encode(&time, registers);
+    CHECK_EQUAL(0x59, registers[0]);
+    CHECK_EQUAL(0x45, registers[1]);
+    CHECK_EQUAL(0x13, registers[2]);
+    CHECK_EQUAL(0x05, registers[3]);
+    CHECK_EQUAL(0x04, registers[4]);
+    CHECK_EQUAL(0x11, registers[5]);
+    CHECK_EQUAL(0x26, registers[6]);
+    CHECK_EQUAL(0x02, PCF8563_TIME_REGISTER);
+    CHECK_EQUAL(0x00, PCF8563_CONTROL_REGISTER);
+    uint8_t frame[PCF8563_REGISTER_COUNT] = {0};
+    for (int index = 0; index < PCF8563_TIME_REGISTER_COUNT; index++) {
+        frame[PCF8563_TIME_REGISTER + index] = registers[index];
+    }
+    HalTime back;
+    pcf8563_decode(frame, &back);
+    CHECK(back.valid);
+    CHECK(!back.low_voltage);
+    CHECK_EQUAL(2026, back.year);
+    CHECK_EQUAL(59, back.second);
+    CHECK_EQUAL(4, back.weekday);
+}
+
 static void a_running_clock_decodes_as_a_valid_local_time(void)
 {
     HalTime time;
@@ -150,6 +178,7 @@ int main(void)
         TEST_CASE(bcd_decodes_and_encodes_two_digits),
         TEST_CASE(the_read_frame_addresses_the_chip_at_its_first_register),
         TEST_CASE(civil_dates_follow_the_calendar),
+        TEST_CASE(a_time_encodes_as_the_seven_time_registers),
         TEST_CASE(a_running_clock_decodes_as_a_valid_local_time),
         TEST_CASE(the_low_voltage_flag_makes_the_time_untrusted_but_still_decoded),
         TEST_CASE(a_stopped_clock_is_not_valid),
