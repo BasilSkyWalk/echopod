@@ -16,6 +16,7 @@
     {"code": "fi", "name": "Finnish"},
     {"code": "ru", "name": "Russian"},
     {"code": "uk", "name": "Ukrainian"},
-    {"code": "pl", "name": "Polish"}
+    {"code": "pl", "name": "Polish"},
+    {"code": "id", "name": "Indonesian"}
   ]
 }
