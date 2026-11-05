@@ -94,6 +94,7 @@ target_compile_definitions(test_library_builder PRIVATE ECHO_FIXTURE_DIR="${CMAK
 echo_add_unit_test(NAME test_track_tags
     SOURCES library/test_track_tags.c
     LIBRARIES echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/library
 )
 target_compile_definitions(test_track_tags PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_cover_build

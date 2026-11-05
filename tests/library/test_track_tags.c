@@ -5,6 +5,7 @@
 #include "check.h"
 #include "library/track_tags.h"
 #include "memory_source.h"
+#include "tags_internal.h"
 
 static const char TITLE[] = "Svefn-g-englar \xe2\x9c\x93";
 static const char ARTIST[] = "Sigur R\xc3\xb3s";
@@ -108,6 +109,129 @@ static void every_tagged_format_reads_its_fields_duration_and_cover(void)
     }
 }
 
+static uint8_t *decoded_picture(Fixture *fixture, TagFormat format, uint32_t *length, bool *front)
+{
+    static TrackTags tags;
+    static TagPictureReader reader;
+    ByteSource bytes;
+    ByteSource source = memory_source(&fixture->memory);
+    CHECK(track_tags_read(source, fixture->size, format, &tags));
+    CHECK_EQUAL(0, strcmp(TITLE, tags.text[TAG_TITLE]));
+    CHECK_EQUAL(0, strcmp(ALBUM, tags.text[TAG_ALBUM]));
+    CHECK_EQUAL(4, leading_number(tags.text[TAG_TRACK]));
+    CHECK(tags_open_picture(&reader, source, fixture->size, &tags.picture, &bytes));
+    CHECK_EQUAL(TAG_PICTURE_RAW, tags.picture.kind);
+    uint8_t *out = malloc(tags.picture.length);
+    uint32_t half = tags.picture.length / 2;
+    CHECK(bytes.read(bytes.context, tags.picture.offset + half, out + half,
+                     tags.picture.length - half));
+    CHECK(bytes.read(bytes.context, tags.picture.offset, out, half));
+    *length = tags.picture.length;
+    *front = tags.picture.front;
+    return out;
+}
+
+static uint8_t *picture_bytes(const char *name, uint32_t *length, bool *front)
+{
+    Fixture fixture;
+    CHECK(load(&fixture, name));
+    uint8_t *out = decoded_picture(&fixture, track_tags_format_for_name(name), length, front);
+    free(fixture.bytes);
+    return out;
+}
+
+static uint32_t page_end(const uint8_t *page)
+{
+    uint32_t end = 27 + page[26];
+    for (uint32_t index = 0; index < page[26]; index++) {
+        end += page[27 + index];
+    }
+    return end;
+}
+
+static uint32_t repage_comments(const uint8_t *ogg, uint32_t size, uint8_t *out)
+{
+    uint32_t second = page_end(ogg);
+    uint32_t third = second + page_end(ogg + second);
+    const uint8_t *packet = ogg + second + 27 + ogg[second + 26];
+    uint32_t length = third - (uint32_t)(packet - ogg);
+    memcpy(out, ogg, second);
+    uint8_t *at = out + second;
+    for (uint32_t done = 0, page = 0; done <= length; page++) {
+        uint32_t lace = length - done < 255 ? length - done : 255;
+        memcpy(at, ogg + second, 27);
+        at[5] = page > 0 ? 1 : 0;
+        at[26] = 1;
+        at[27] = (uint8_t)lace;
+        memcpy(at + 28, packet + done, lace);
+        at += 28 + lace;
+        done += lace;
+        if (lace < 255) {
+            break;
+        }
+    }
+    memcpy(at, ogg + third, size - third);
+    return (uint32_t)(at - out) + size - third;
+}
+
+static void ogg_comments_and_pictures_read_across_small_pages(void)
+{
+    uint32_t expected_length = 0;
+    uint32_t length = 0;
+    bool front = false;
+    Fixture original;
+    CHECK(load(&original, "../opus/tagged.opus"));
+    uint8_t *expected = picture_bytes("tagged.flac", &expected_length, &front);
+    uint8_t *paged = malloc(original.size * 2);
+    Fixture fixture = {.bytes = paged,
+                       .size = repage_comments(original.bytes, original.size, paged)};
+    fixture.memory = (MemorySource){.bytes = fixture.bytes, .size = fixture.size};
+    CHECK(fixture.size > original.size + 100);
+    uint8_t *bytes = decoded_picture(&fixture, TAG_FORMAT_OGG, &length, &front);
+    CHECK(front);
+    CHECK_EQUAL(expected_length, length);
+    CHECK_EQUAL(0, memcmp(expected, bytes, length));
+    free(bytes);
+    free(paged);
+    free(expected);
+    free(original.bytes);
+}
+
+static void ogg_pictures_decode_to_the_same_image_as_flac(void)
+{
+    static const char *const NAMES[] = {"tagged.ogg", "../opus/tagged.opus"};
+    uint32_t expected_length = 0;
+    bool front = false;
+    uint8_t *expected = picture_bytes("tagged.flac", &expected_length, &front);
+    CHECK(front);
+    for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
+        uint32_t length = 0;
+        uint8_t *bytes = picture_bytes(NAMES[index], &length, &front);
+        CHECK(front);
+        CHECK_EQUAL(expected_length, length);
+        CHECK_EQUAL(0, memcmp(expected, bytes, length));
+        free(bytes);
+    }
+    free(expected);
+}
+
+static void read_whole_picture(ByteSource source, uint32_t size, TrackTags *tags)
+{
+    static TagPictureReader reader;
+    static uint8_t buffer[4096];
+    ByteSource bytes;
+    if (!tags_open_picture(&reader, source, size, &tags->picture, &bytes)) {
+        return;
+    }
+    for (uint32_t done = 0; done < tags->picture.length; done += sizeof buffer) {
+        uint32_t left = tags->picture.length - done;
+        uint32_t chunk = left < sizeof buffer ? left : sizeof buffer;
+        if (!bytes.read(bytes.context, tags->picture.offset + done, buffer, chunk)) {
+            return;
+        }
+    }
+}
+
 static void an_mp3_with_only_id3v1_and_no_xing_header_still_reads(void)
 {
     static TrackTags tags;
@@ -188,6 +312,7 @@ static void damaged_files_never_read_outside_the_file(void)
             CHECK(tags.picture.kind == TAG_PICTURE_NONE ||
                   tags.picture.offset + tags.picture.length <= fixture.size ||
                   tags.picture.kind == TAG_PICTURE_BASE64_FLAC_BLOCK);
+            read_whole_picture(memory_source(&damaged), fixture.size, &tags);
         }
         free(copy);
         free(fixture.bytes);
@@ -198,6 +323,8 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(every_tagged_format_reads_its_fields_duration_and_cover),
+        TEST_CASE(ogg_pictures_decode_to_the_same_image_as_flac),
+        TEST_CASE(ogg_comments_and_pictures_read_across_small_pages),
         TEST_CASE(an_mp3_with_only_id3v1_and_no_xing_header_still_reads),
         TEST_CASE(an_untagged_flac_has_empty_fields_and_its_duration),
         TEST_CASE(formats_come_from_the_extension_in_any_case),

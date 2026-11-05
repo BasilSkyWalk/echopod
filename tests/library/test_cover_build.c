@@ -9,7 +9,7 @@
 #include "library/library_scan.h"
 
 enum {
-    MAX_FILES = 16,
+    MAX_FILES = 24,
     PATH_CAPACITY = 64,
     COVER_SIDE = 112,
     PNG_ROW = 1 + COVER_SIDE * 3,
@@ -19,7 +19,12 @@ enum {
     LIBRARY_CAPACITY = 4 * 1024 * 1024,
     COVERS_CAPACITY = 1024 * 1024,
     SCRATCH_SIZE = 16 * 1024 * 1024,
-    RECORD_SLOT = 8 + 4 + COVER_BUILD_RECORD_BYTES
+    RECORD_SLOT = 8 + 4 + COVER_BUILD_RECORD_BYTES,
+    MAX_OGGS = 14,
+    OGG_CAPACITY = 128 * 1024,
+    PAGE_SEGMENTS = 4,
+    FRONT = 3,
+    BACK = 4
 };
 
 typedef struct Color {
@@ -51,7 +56,21 @@ typedef struct Card {
     uint32_t png_count;
     uint8_t *flac;
     uint32_t flac_size;
+    uint8_t oggs[MAX_OGGS][OGG_CAPACITY];
+    uint32_t ogg_count;
 } Card;
+
+typedef struct Picture {
+    uint32_t type;
+    const Color *color;
+    int damage;
+} Picture;
+
+typedef struct OggWriter {
+    uint8_t *start;
+    uint8_t *at;
+    uint32_t sequence;
+} OggWriter;
 
 typedef struct Buffer {
     uint8_t *bytes;
@@ -241,6 +260,128 @@ static uint32_t make_png(uint8_t *png, Color color)
     return (uint32_t)(at - png);
 }
 
+static uint8_t *put_le32(uint8_t *at, uint32_t value)
+{
+    at[0] = (uint8_t)value;
+    at[1] = (uint8_t)(value >> 8);
+    at[2] = (uint8_t)(value >> 16);
+    at[3] = (uint8_t)(value >> 24);
+    return at + 4;
+}
+
+static void ogg_packet(OggWriter *writer, const uint8_t *packet, uint32_t length)
+{
+    uint32_t done = 0;
+    bool finished = false;
+    bool continued = false;
+    while (!finished) {
+        uint8_t *page = writer->at;
+        uint32_t segments = 0;
+        uint32_t body = 0;
+        while (segments < PAGE_SEGMENTS && !finished) {
+            uint32_t left = length - done - body;
+            uint32_t lace = left < 255 ? left : 255;
+            page[27 + segments++] = (uint8_t)lace;
+            body += lace;
+            finished = lace < 255;
+        }
+        memcpy(page, "OggS", 4);
+        page[4] = 0;
+        page[5] = continued ? 1 : 0;
+        memset(page + 6, 0, 8);
+        put_le32(put_le32(put_le32(page + 14, 1), writer->sequence++), 0);
+        page[26] = (uint8_t)segments;
+        memcpy(page + 27 + segments, packet + done, body);
+        writer->at = page + 27 + segments + body;
+        done += body;
+        continued = true;
+    }
+}
+
+static uint8_t *put_comment(uint8_t *at, const char *key, const char *value)
+{
+    uint32_t length = (uint32_t)(strlen(key) + 1 + strlen(value));
+    at = put_le32(at, length);
+    return at + sprintf((char *)at, "%s=%s", key, value);
+}
+
+static char *base64_encode(const uint8_t *bytes, uint32_t length, char *out)
+{
+    static const char ALPHABET[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    for (uint32_t index = 0; index < length; index += 3) {
+        uint32_t left = length - index;
+        uint32_t bits = (uint32_t)bytes[index] << 16;
+        bits |= left > 1 ? (uint32_t)bytes[index + 1] << 8 : 0;
+        bits |= left > 2 ? bytes[index + 2] : 0;
+        *out++ = ALPHABET[bits >> 18];
+        *out++ = ALPHABET[(bits >> 12) & 63];
+        *out++ = left > 1 ? ALPHABET[(bits >> 6) & 63] : '=';
+        *out++ = left > 2 ? ALPHABET[bits & 63] : '=';
+    }
+    *out = '\0';
+    return out;
+}
+
+static void picture_text(Picture picture, char *text)
+{
+    static uint8_t block[PNG_CAPACITY + 64];
+    static uint8_t png[PNG_CAPACITY];
+    uint32_t png_size = make_png(png, *picture.color);
+    uint8_t *at = put_be32(block, picture.type);
+    at = put_be32(at, 9);
+    memcpy(at, "image/png", 9);
+    at = put_be32(at + 9, 0);
+    memset(at, 0, 16);
+    at = put_be32(at + 16, png_size);
+    memcpy(at, png, png_size);
+    char *end = base64_encode(block, (uint32_t)(at + png_size - block), text);
+    if (picture.damage != 0) {
+        (picture.damage > 0 ? text : end)[picture.damage] = '*';
+    }
+}
+
+static uint32_t make_opus(uint8_t *file, const char *album, uint32_t number,
+                          const Picture *pictures, uint32_t picture_count)
+{
+    static const uint8_t HEAD[19] = {'O', 'p', 'u',  's',  'H', 'e', 'a', 'd', 1, 2,
+                                     0,   0,   0x80, 0xBB, 0,   0,   0,   0,   0};
+    static uint8_t tags[OGG_CAPACITY];
+    static char text[OGG_CAPACITY];
+    char track[16];
+    OggWriter writer = {file, file, 0};
+    ogg_packet(&writer, HEAD, sizeof HEAD);
+    memcpy(tags, "OpusTags", 8);
+    uint8_t *at = put_le32(put_le32(tags + 8, 0), 3 + picture_count);
+    snprintf(track, sizeof track, "%u", (unsigned)number);
+    at = put_comment(at, "ALBUM", album);
+    at = put_comment(at, "ALBUMARTIST", "Tester");
+    at = put_comment(at, "TRACKNUMBER", track);
+    for (uint32_t index = 0; index < picture_count; index++) {
+        picture_text(pictures[index], text);
+        at = put_comment(at, "METADATA_BLOCK_PICTURE", text);
+    }
+    ogg_packet(&writer, tags, (uint32_t)(at - tags));
+    CHECK((uint32_t)(writer.at - file) <= OGG_CAPACITY);
+    return (uint32_t)(writer.at - file);
+}
+
+static void add_file(const char *path, const uint8_t *bytes, uint32_t size);
+
+static void add_opus(const char *path, const char *album, uint32_t number, const Picture *pictures,
+                     uint32_t picture_count)
+{
+    CHECK(card.ogg_count < MAX_OGGS);
+    uint8_t *file = card.oggs[card.ogg_count++];
+    add_file(path, file, make_opus(file, album, number, pictures, picture_count));
+}
+
+static void add_png(const char *path, Color color)
+{
+    uint8_t *png = card.pngs[card.png_count++];
+    add_file(path, png, make_png(png, color));
+}
+
 static uint8_t *read_fixture(const char *name, uint32_t *size)
 {
     char path[512];
@@ -320,6 +461,7 @@ static void reset(void)
     }
     card.count = 0;
     card.png_count = 0;
+    card.ogg_count = 0;
     covers_capacity = COVERS_CAPACITY;
     memset(covers_file.bytes, 0, COVERS_CAPACITY);
 }
@@ -511,6 +653,58 @@ static void without_a_previous_file_everything_is_decoded(void)
     CHECK_EQUAL(0u, stats.reused);
 }
 
+static void opus_art_is_decoded_and_kept(void)
+{
+    CoverStats stats;
+    const Picture pictures[] = {{BACK, &GREEN, 0}, {FRONT, &RED, 0}};
+    reset();
+    add_opus("/Opus/01.opus", "Opus", 1, pictures, 2);
+    add_png("/Opus/cover.png", BLUE);
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(1u, stats.covers);
+    CHECK_EQUAL(0u, stats.missing);
+    CHECK_EQUAL(RED.pixel, cover_pixel("Opus"));
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(1u, stats.reused);
+    CHECK_EQUAL(RED.pixel, cover_pixel("Opus"));
+}
+
+static void albums_sharing_a_folder_find_art_in_later_tracks(void)
+{
+    CoverStats stats;
+    const Picture red = {FRONT, &RED, 0};
+    const Picture green = {BACK, &GREEN, 0};
+    const Picture broken_header = {FRONT, &BLUE, 21};
+    const Picture broken_image = {FRONT, &BLUE, -100};
+    reset();
+    add_opus("/Mixed/a1.opus", "A", 1, NULL, 0);
+    add_opus("/Mixed/a2.opus", "A", 2, &red, 1);
+    add_opus("/Mixed/b1.opus", "B", 1, &broken_header, 1);
+    add_opus("/Mixed/b2.opus", "B", 2, NULL, 0);
+    add_opus("/Mixed/b3.opus", "B", 3, NULL, 0);
+    add_opus("/Mixed/b4.opus", "B", 4, &green, 1);
+    add_opus("/Mixed/c1.opus", "C", 1, NULL, 0);
+    for (uint32_t number = 1; number <= 5; number++) {
+        char path[PATH_CAPACITY];
+        snprintf(path, sizeof path, "/Mixed/d%u.opus", (unsigned)number);
+        add_opus(path, "D", number, number == 5 ? &red : NULL, number == 5 ? 1 : 0);
+    }
+    add_opus("/Mixed/e1.opus", "E", 1, &broken_image, 1);
+    add_opus("/Mixed/e2.opus", "E", 2, &red, 1);
+    add_png("/Mixed/cover.png", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(5u, stats.albums);
+    CHECK_EQUAL(4u, stats.covers);
+    CHECK_EQUAL(1u, stats.missing);
+    CHECK_EQUAL(RED.pixel, cover_pixel("A"));
+    CHECK_EQUAL(GREEN.pixel, cover_pixel("B"));
+    CHECK_EQUAL(WHITE.pixel, cover_pixel("C"));
+    CHECK_EQUAL(WHITE.pixel, cover_pixel("D"));
+    CHECK_EQUAL(0u, cover_pixel("E"));
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(4u, stats.reused);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -523,6 +717,8 @@ int main(void)
         TEST_CASE(a_file_without_stamps_is_built_again),
         TEST_CASE(a_damaged_index_is_ignored),
         TEST_CASE(without_a_previous_file_everything_is_decoded),
+        TEST_CASE(opus_art_is_decoded_and_kept),
+        TEST_CASE(albums_sharing_a_folder_find_art_in_later_tracks),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

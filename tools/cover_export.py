@@ -1,4 +1,5 @@
 import argparse
+import base64
 import io
 import posixpath
 import struct
@@ -34,6 +35,8 @@ EMBEDDED_ART = 1
 FILE_ART = 2
 WORD_MASK = 0xFFFFFFFF
 UNKNOWN_STAMP = 0
+ART_TRACKS = 4
+OGG_PICTURE_KEY = "metadata_block_picture"
 
 
 @dataclass
@@ -156,8 +159,25 @@ def tag_pictures(tags):
     return []
 
 
+def ogg_picture(value):
+    from mutagen import MutagenError
+    from mutagen.flac import Picture
+    try:
+        picture = Picture(base64.b64decode(value, validate=True))
+    except (ValueError, TypeError, struct.error, MutagenError):
+        return None
+    return picture.type, picture.data
+
+
+def ogg_pictures(tags):
+    pictures = (ogg_picture(value) for value in tags.get(OGG_PICTURE_KEY, []))
+    return [picture for picture in pictures if picture is not None]
+
+
 def embedded_pictures(path):
     from mutagen import File, MutagenError
+    from mutagen.oggopus import OggOpus
+    from mutagen.oggvorbis import OggVorbis
     try:
         audio = File(path)
     except (MutagenError, OSError):
@@ -166,7 +186,9 @@ def embedded_pictures(path):
         return []
     pictures = [(picture.type, picture.data) for picture in getattr(audio, "pictures", [])]
     tags = getattr(audio, "tags", None)
-    if tags is not None:
+    if tags is not None and isinstance(audio, (OggOpus, OggVorbis)):
+        pictures += ogg_pictures(tags)
+    elif tags is not None:
         pictures += tag_pictures(tags)
     return pictures
 
@@ -206,12 +228,10 @@ def folder_art(root, relative_paths):
 
 
 def locate_art(root, relative_paths):
-    if not relative_paths:
-        return None
-    first = relative_paths[0]
-    picture = chosen_picture(embedded_pictures(root / first))
-    if picture is not None:
-        return Art(picture, root / first, first, len(picture))
+    for relative in relative_paths[:ART_TRACKS]:
+        picture = chosen_picture(embedded_pictures(root / relative))
+        if picture:
+            return Art(picture, root / relative, relative, len(picture))
     return folder_art(root, relative_paths)
 
 

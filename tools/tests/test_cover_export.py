@@ -1,4 +1,6 @@
+import base64
 import io
+import shutil
 import struct
 import sys
 import tempfile
@@ -32,6 +34,26 @@ def add_picture(path, data, picture_type):
     picture.mime = "image/png"
     picture.data = data
     audio.add_picture(picture)
+    audio.save()
+
+
+def picture_block(data, picture_type, mime="image/png"):
+    from mutagen.flac import Picture
+    picture = Picture()
+    picture.type = picture_type
+    picture.mime = mime
+    picture.data = data
+    return base64.b64encode(picture.write()).decode("ascii")
+
+
+def write_opus(path, album, number, pictures=()):
+    from mutagen.oggopus import OggOpus
+    shutil.copyfile(TOOLS_DIRECTORY.parent / "tests" / "fixtures" / "opus" / "tagged.opus", path)
+    audio = OggOpus(path)
+    audio.tags.clear()
+    audio["album"], audio["albumartist"], audio["tracknumber"] = album, "Tester", str(number)
+    if pictures:
+        audio["metadata_block_picture"] = list(pictures)
     audio.save()
 
 
@@ -98,13 +120,45 @@ class ArtSearchTest(unittest.TestCase):
     def test_an_album_without_art_has_none(self):
         self.assertIsNone(self.found_color())
 
-    def test_only_the_first_track_is_read(self):
+    def test_art_in_a_later_track_is_found(self):
+        (self.album / "cover.png").write_bytes(image_bytes((0, 0, 255)))
         second = self.album / "02 - Other.flac"
         write_silent_flac(second, 1)
         add_picture(second, image_bytes((255, 0, 0)), 3)
-        data = cover_export.find_art(self.root, ["Artist/Album/01 - Song.flac",
-                                                 "Artist/Album/02 - Other.flac"])
-        self.assertIsNone(data)
+        art = cover_export.locate_art(self.root, ["Artist/Album/01 - Song.flac",
+                                                  "Artist/Album/02 - Other.flac"])
+        self.assertEqual("Artist/Album/02 - Other.flac", art.relative)
+        self.assertEqual((255, 0, 0), Image.open(io.BytesIO(art.data)).convert("RGB").getpixel((0, 0)))
+
+    def test_only_the_first_four_tracks_are_read(self):
+        paths = ["Artist/Album/01 - Song.flac"]
+        for number in range(2, 6):
+            paths.append(f"Artist/Album/0{number}.flac")
+            write_silent_flac(self.root / paths[-1], 1)
+        add_picture(self.root / paths[4], image_bytes((255, 0, 0)), 3)
+        self.assertIsNone(cover_export.find_art(self.root, paths))
+        add_picture(self.root / paths[3], image_bytes((0, 255, 0)), 3)
+        self.assertIsNotNone(cover_export.find_art(self.root, paths))
+
+    def test_albums_sharing_a_folder_each_find_their_own_art(self):
+        (self.album / "cover.png").write_bytes(image_bytes((0, 0, 255)))
+        tracks = {"a1.flac": None, "a2.flac": (255, 0, 0), "b1.flac": (0, 255, 0), "c1.flac": None}
+        for name, color in tracks.items():
+            write_silent_flac(self.album / name, 1)
+            if color is not None:
+                add_picture(self.album / name, image_bytes(color), 3)
+        sources = [cover_export.AlbumSource(key, title, "Tester",
+                                            [f"Artist/Album/{name}" for name in names])
+                   for key, title, names in ((1, "A", ["a1.flac", "a2.flac"]), (2, "B", ["b1.flac"]),
+                                             (3, "C", ["c1.flac"]))]
+        covers = cover_export.collect_covers(self.root, sources)
+        colors = {key: image.convert("RGB").getpixel((0, 0)) for key, image in covers.records.items()}
+        self.assertEqual({1: (255, 0, 0), 2: (0, 255, 0), 3: (0, 0, 255)}, colors)
+
+    def test_an_empty_embedded_picture_counts_as_none(self):
+        add_picture(self.track, b"", 3)
+        (self.album / "cover.png").write_bytes(image_bytes((0, 0, 255)))
+        self.assertEqual((0, 0, 255), self.found_color())
 
     def test_folder_images_are_ordered_by_their_name_bytes_as_on_the_player(self):
         (self.album / "folder.jpg").write_bytes(image_bytes((0, 0, 255), image_format="JPEG"))
@@ -129,8 +183,22 @@ class FormatPictureTest(unittest.TestCase):
                 pictures = cover_export.embedded_pictures(self.TAGS / name)
                 self.assertEqual([(cover_export.FRONT_COVER, cover_jpeg())], pictures)
 
-    def test_ogg_pictures_are_left_out_as_on_the_player(self):
-        self.assertEqual([], cover_export.embedded_pictures(self.TAGS / "tagged.ogg"))
+    def test_art_inside_ogg_vorbis_and_opus_files_is_found_as_a_front_cover(self):
+        from tag_fixture import cover_jpeg
+        for path in (self.TAGS / "tagged.ogg", self.TAGS.parent / "opus" / "tagged.opus"):
+            with self.subTest(path=path.name):
+                pictures = cover_export.embedded_pictures(path)
+                self.assertEqual([(cover_export.FRONT_COVER, cover_jpeg())], pictures)
+
+    def test_ogg_pictures_keep_their_order_and_skip_bad_base64(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "song.opus"
+            back, front = image_bytes((0, 255, 0)), image_bytes((255, 0, 0))
+            write_opus(path, "Album", 1, ["not base64!", picture_block(back, 4),
+                                         base64.b64encode(b"short").decode("ascii"),
+                                         picture_block(front, 3)])
+            self.assertEqual([(4, back), (3, front)], cover_export.embedded_pictures(path))
+            self.assertEqual(front, cover_export.find_art(Path(directory), ["song.opus"]))
 
     def test_an_ape_back_cover_is_not_a_front_cover(self):
         self.assertEqual((cover_export.OTHER_PICTURE, b"jpeg"),
@@ -184,6 +252,15 @@ class ArtStampTest(unittest.TestCase):
         art = cover_export.locate_art(self.root, ["Artist/Album/01 - Song.flac"])
         numbers = (self.track.stat().st_size, len(picture), cover_export.EMBEDDED_ART)
         self.assertEqual(self.expected(b"/Artist/Album/01 - Song.flac", numbers),
+                         cover_export.stamp_for(art))
+
+    def test_ogg_art_hashes_the_decoded_picture_length(self):
+        track = self.album / "02 - Song.opus"
+        picture = image_bytes((255, 0, 0))
+        write_opus(track, "Album", 2, [picture_block(picture, 3)])
+        art = cover_export.locate_art(self.root, ["Artist/Album/02 - Song.opus"])
+        numbers = (track.stat().st_size, len(picture), cover_export.EMBEDDED_ART)
+        self.assertEqual(self.expected(b"/Artist/Album/02 - Song.opus", numbers),
                          cover_export.stamp_for(art))
 
     def test_a_cover_file_hashes_its_card_path_size_and_time(self):
