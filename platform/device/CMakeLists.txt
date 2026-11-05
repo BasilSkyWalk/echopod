@@ -210,9 +210,19 @@ add_custom_target(echo_device_image ALL
         --core1-opus ${ECHO_CORE1_OPUS_BINARY}
         ${ECHO_GLYPH_FACE_ARGUMENTS}
         --output ${ECHO_DEVICE_IMAGE}
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
+        --build ${CMAKE_BINARY_DIR} --summary
     BYPRODUCTS ${ECHO_DEVICE_IMAGE}
     DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
         ${ECHO_CORE1_AAC_BINARY} ${ECHO_CORE1_OPUS_BINARY}
         ${PROJECT_SOURCE_DIR}/tools/make_image.py
     VERBATIM
+)
+
+add_custom_target(echo_size_report
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
+        --build ${CMAKE_BINARY_DIR}
+    DEPENDS echo_device echo_rescan_overlay
+    VERBATIM
+    USES_TERMINAL
 )
