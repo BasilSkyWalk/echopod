@@ -49,21 +49,22 @@ static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'S', 'T'};
 static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30, 60, 120, 300, 0};
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
 static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
-static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {[OPTION_BATTERY] = 2,
-                                                             [OPTION_VOLUME_KEYS] = 2,
-                                                             [OPTION_ROCKER] = ROCKER_MODE_COUNT,
-                                                             [OPTION_MENU_KEY] = 2,
-                                                             [OPTION_ACCENT] = ACCENT_COUNT,
-                                                             [OPTION_HIGHLIGHT] = 2,
-                                                             [OPTION_COVER_ORDER] = 2,
-                                                             [OPTION_ARTIST_VIEW] = 2,
-                                                             [OPTION_COVER_FLOW_COVERS] = 2,
-                                                             [OPTION_ANIMATION_SPEED] =
-                                                                 ANIMATION_SPEED_COUNT,
-                                                             [OPTION_CLOCK] = 2,
-                                                             [OPTION_BLUETOOTH_LEVEL] = 2,
-                                                             [OPTION_USB_PROMPT] = 2,
-                                                             [OPTION_LISTEN_HISTORY] = 2};
+static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
+    [OPTION_BATTERY] = 2,
+    [OPTION_VOLUME_KEYS] = 2,
+    [OPTION_ROCKER] = ROCKER_MODE_COUNT,
+    [OPTION_MENU_KEY] = 2,
+    [OPTION_ACCENT] = ACCENT_COUNT,
+    [OPTION_HIGHLIGHT] = 2,
+    [OPTION_COVER_ORDER] = 2,
+    [OPTION_ARTIST_VIEW] = 2,
+    [OPTION_COVER_FLOW_COVERS] = 2,
+    [OPTION_ANIMATION_SPEED] = ANIMATION_SPEED_COUNT,
+    [OPTION_CLOCK] = 2,
+    [OPTION_BLUETOOTH_LEVEL] = 2,
+    [OPTION_USB_PROMPT] = 2,
+    [OPTION_LISTEN_HISTORY] = 2,
+    [OPTION_TIME_ZONE] = TIME_ZONE_OPTION_COUNT};
 
 _Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
                "the options must fit the file");

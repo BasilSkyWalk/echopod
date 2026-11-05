@@ -76,8 +76,19 @@ typedef enum SettingOption {
     OPTION_BLUETOOTH_LEVEL,
     OPTION_USB_PROMPT,
     OPTION_LISTEN_HISTORY,
+    OPTION_TIME_ZONE,
     SETTINGS_OPTION_COUNT
 } SettingOption;
+
+enum {
+    CLOCK_OFF,
+    CLOCK_ON
+};
+
+enum {
+    TIME_ZONE_UNSET = 0,
+    TIME_ZONE_OPTION_COUNT = 106
+};
 
 enum {
     COVER_FLOW_FIVE_COVERS,

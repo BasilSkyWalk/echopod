@@ -31,6 +31,7 @@ typedef struct StatusBarState {
     uint8_t battery_percent;
     bool charging;
     bool hide_percent;
+    const char *clock;
 } StatusBarState;
 
 Rect status_bar_playback_area(const Theme *theme);
@@ -40,4 +41,5 @@ int status_bar_battery_fill_width(uint8_t percent, int inner_width);
 void status_bar_percent_text(uint8_t percent, char *text, size_t capacity);
 Rect status_bar_bolt_area(const Theme *theme);
 Rect status_bar_percent_area(const Theme *theme, const char *text, bool charging);
+Rect status_bar_clock_area(const Theme *theme, StatusBarState state);
 void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state);

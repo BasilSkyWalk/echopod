@@ -1,6 +1,7 @@
 add_library(echo_app STATIC
     app.c
     card_files.c
+    clock_store.c
     app_screens.c
     bluetooth_link.c
     bluetooth_store.c
@@ -26,6 +27,7 @@ add_library(echo_app STATIC
     screens/bluetooth_screen.c
     screens/charge_screen.c
     screens/cover_flow_screen.c
+    screens/date_time_screen.c
     screens/equalizer_screen.c
     screens/font_sample_screen.c
     screens/now_playing_screen.c

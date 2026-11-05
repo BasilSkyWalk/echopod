@@ -3,6 +3,8 @@
 #include "app/app.h"
 #include "app_internal.h"
 #include "check.h"
+#include "clock_store.h"
+#include "core/hash.h"
 #include "default_theme.h"
 #include "fake_hal.h"
 #include "fixture_library.h"
@@ -44,6 +46,7 @@ enum {
     SETTINGS_START_INDEX = 13,
     SETTINGS_RESCAN_INDEX = 14,
     SETTINGS_LANGUAGE_INDEX = 16,
+    SETTINGS_CLOCK_INDEX = 26,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -1937,6 +1940,84 @@ static void played_songs_go_to_the_listen_history_with_a_mark_for_usb(void)
     CHECK_EQUAL(now_ms, records[count - 1].end_ms);
 }
 
+static void the_clock_and_date_time_rows_end_the_settings_list(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_CLOCK_INDEX);
+    CHECK(title_is("Clock"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(CLOCK_ON, settings.options[OPTION_CLOCK]);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Date & time"));
+    tap(KEY_BACK);
+    CHECK(title_is("Settings"));
+}
+
+static void start_app_with_clock(bool clock_on)
+{
+    static uint8_t clock_settings[SETTINGS_FILE_SIZE];
+    Settings settings = settings_defaults();
+    settings.options[OPTION_CLOCK] = clock_on ? CLOCK_ON : CLOCK_OFF;
+    settings_encode(&settings, clock_settings);
+    fake_hal_reset();
+    fake_hal_add_file("/.echo/settings.bin", clock_settings, sizeof clock_settings);
+    fake_hal_set_time((HalTime){.present = true,
+                                .valid = true,
+                                .year = 2026,
+                                .month = 11,
+                                .day = 5,
+                                .hour = 12,
+                                .minute = 34});
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+    step();
+}
+
+static void the_header_shows_the_time_only_while_the_clock_setting_is_on(void)
+{
+    StatusBarState state = {.clock = "12:34"};
+    Rect clock = status_bar_clock_area(&DEFAULT_THEME, state);
+    CHECK(clock.width > 0);
+    start_app_with_clock(true);
+    CHECK(area_has_color(clock, DEFAULT_THEME.colors.header_text));
+    start_app_with_clock(false);
+    CHECK(!area_has_color(clock, DEFAULT_THEME.colors.header_text));
+}
+
+static void a_clock_record_written_over_usb_sets_the_clock(void)
+{
+    start_app_with_library();
+    fake_hal_set_time((HalTime){.present = true, .low_voltage = true});
+    uint8_t record[CLOCK_RECORD_BYTES] = {'E', 'C', 'L', 'K', 1};
+    uint32_t unix_time = 1793880000u;
+    for (int index = 0; index < 4; index++) {
+        record[8 + index] = (uint8_t)(unix_time >> (8 * index));
+    }
+    record[12] = 60;
+    uint32_t check = hash_update(HASH_START, record, 16);
+    for (int index = 0; index < 4; index++) {
+        record[16 + index] = (uint8_t)(check >> (8 * index));
+    }
+    CHECK(hal_file_write(CLOCK_RECORD_PATH, record, sizeof record));
+    step();
+    CHECK_EQUAL(0, fake_hal_time_write_count());
+    app_request_rescan_if_music_changed();
+    step();
+    CHECK_EQUAL(1, fake_hal_time_write_count());
+    CHECK_EQUAL(13, fake_hal_time().hour);
+    CHECK_EQUAL(0, fake_hal_time().minute);
+    CHECK_EQUAL(5, fake_hal_time().day);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(wall_clock_zone_of(60), settings.options[OPTION_TIME_ZONE]);
+}
+
 static void a_listen_history_turned_off_records_nothing(void)
 {
     HistoryRecord records[16];
@@ -2090,6 +2171,9 @@ int main(void)
         TEST_CASE(play_opens_a_menu_row_while_the_key_is_still_down),
         TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
         TEST_CASE(a_listen_history_turned_off_records_nothing),
+        TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
+        TEST_CASE(the_header_shows_the_time_only_while_the_clock_setting_is_on),
+        TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

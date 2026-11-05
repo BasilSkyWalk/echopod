@@ -10,7 +10,8 @@ enum {
     STATUS_HEADER_HEIGHT = 12,
     STATUS_ICON_SIZE = 6,
     LOW_BATTERY = 10,
-    HALF_BATTERY = 50
+    HALF_BATTERY = 50,
+    CLOCK_INSET = 34
 };
 
 static Theme status_theme(void)
@@ -164,9 +165,58 @@ static void the_percentage_moves_left_of_the_bolt_while_charging(void)
     CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
 }
 
+static void the_clock_sits_after_the_left_icons_inside_the_inset(void)
+{
+    Theme theme = status_theme();
+    theme.metrics.header_inset = CLOCK_INSET;
+    StatusBarState state = {.playback = STATUS_PLAYBACK_PLAYING, .clock = "12:34"};
+    Rect clock = status_bar_clock_area(&theme, state);
+    Rect bluetooth = status_bar_bluetooth_area(&theme);
+    CHECK(clock.width > 0);
+    CHECK(clock.x > bluetooth.x + bluetooth.width);
+    CHECK(clock.x + clock.width <= theme.metrics.header_inset);
+    Canvas canvas = draw_status(&theme, state);
+    CHECK(!ui_test_area_has_only(&canvas, clock, theme.colors.header_background));
+    state.clock = NULL;
+    CHECK(rect_is_empty(status_bar_clock_area(&theme, state)));
+    Canvas without = draw_status(&theme, state);
+    CHECK(ui_test_area_has_only(&without, clock, theme.colors.header_background));
+}
+
+static void a_clock_that_does_not_fit_the_inset_is_left_out(void)
+{
+    Theme theme = status_theme();
+    theme.metrics.header_inset = CLOCK_INSET;
+    StatusBarState state = battery_at(HALF_BATTERY, false);
+    state.clock = "12:34:56 and more";
+    CHECK(rect_is_empty(status_bar_clock_area(&theme, state)));
+}
+
+static void with_a_status_band_the_clock_is_centered_between_the_icons_and_the_battery(void)
+{
+    Theme theme = status_theme();
+    theme.metrics.status_height = STATUS_HEADER_HEIGHT;
+    theme.metrics.header_inset = theme.metrics.padding;
+    StatusBarState state = battery_at(HALF_BATTERY, false);
+    state.hide_percent = true;
+    state.clock = "12:34";
+    Rect clock = status_bar_clock_area(&theme, state);
+    Rect battery = status_bar_battery_area(&theme);
+    Rect bluetooth = status_bar_bluetooth_area(&theme);
+    CHECK(clock.width > 0);
+    CHECK(clock.x > bluetooth.x + bluetooth.width);
+    CHECK(clock.x + clock.width < battery.x);
+    CHECK(clock.x - (bluetooth.x + bluetooth.width) >= battery.x - (clock.x + clock.width) - 2);
+    state.hide_percent = false;
+    CHECK(rect_is_empty(status_bar_clock_area(&theme, state)));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_clock_sits_after_the_left_icons_inside_the_inset),
+        TEST_CASE(a_clock_that_does_not_fit_the_inset_is_left_out),
+        TEST_CASE(with_a_status_band_the_clock_is_centered_between_the_icons_and_the_battery),
         TEST_CASE(the_percentage_reads_as_a_number_and_a_percent_sign),
         TEST_CASE(the_percentage_sits_just_left_of_the_battery),
         TEST_CASE(a_known_battery_shows_its_percentage),

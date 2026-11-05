@@ -161,8 +161,14 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
         .rescan_requested = context.rescan_requested,
         .bluetooth = &screens->bluetooth,
         .equalizer = &screens->equalizer,
+        .date_time = &screens->date_time,
         .sleep_option = 0,
     };
+    DateTimeConfig date_time = {.clock = context.clock,
+                                .store = context.settings,
+                                .toast = context.toast,
+                                .theme = context.theme};
+    date_time_screen_init(&screens->date_time, date_time);
     settings_screens_init(&screens->settings, settings, context.theme);
 }
 

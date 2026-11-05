@@ -341,6 +341,7 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_COVER_ORDER, COVER_ORDER_OPTIONS, OPTION_COVER_ORDER),
     OPTION_CHOICE(STR_SETTINGS_ARTIST_VIEW, ARTIST_VIEW_OPTIONS, OPTION_ARTIST_VIEW),
     OPTION_CHOICE(STR_SETTINGS_LISTEN_HISTORY, SHOWN_OPTIONS, OPTION_LISTEN_HISTORY),
+    OPTION_CHOICE(STR_SETTINGS_CLOCK, SWITCH_OPTIONS, OPTION_CLOCK),
 };
 
 static ScreenAction open_choice(void *context)
@@ -404,6 +405,11 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
                                                          .select = equalizer_screen_open,
                                                          .context = context.equalizer,
                                                          .value = equalizer_screen_summary,
+                                                         .opens = true};
+    screens->items[SETTINGS_DATE_TIME_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_DATE_TIME),
+                                                         .select = date_time_screen_open,
+                                                         .context = context.date_time,
+                                                         .value = date_time_screen_summary,
                                                          .opens = true};
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
