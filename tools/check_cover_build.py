@@ -1,4 +1,5 @@
 import argparse
+import base64
 import io
 import re
 import shutil
@@ -10,6 +11,7 @@ from pathlib import Path
 from mutagen import id3
 from mutagen.flac import FLAC, Picture
 from mutagen.mp4 import MP4, MP4Cover
+from mutagen.oggopus import OggOpus
 
 import check_cover_decode
 import cover_export
@@ -67,6 +69,41 @@ def mp4_track(path, source, album, picture):
     audio.save()
 
 
+def opus_track(path, source, album, number, pictures=()):
+    shutil.copyfile(source.parent / "opus" / "tagged.opus", path)
+    audio = OggOpus(path)
+    audio.tags.clear()
+    audio["album"], audio["albumartist"], audio["artist"] = album, "Tester", "Tester"
+    audio["title"], audio["tracknumber"] = f"{album} {number}", str(number)
+    blocks = []
+    for kind, data in pictures:
+        block = Picture()
+        block.type, block.mime, block.data = kind, "image/jpeg", data
+        blocks.append(base64.b64encode(block.write()).decode("ascii"))
+    if blocks:
+        audio["metadata_block_picture"] = blocks
+    audio.save()
+
+
+def build_flat_folder(root, source, expected):
+    first, second, shared = image(360, 360, 37), image(280, 280, 38), image(200, 200, 39)
+    (root / "Flat").mkdir()
+    flac_track(root / "Flat" / "a1.flac", source, "Flat A", 1)
+    flac_track(root / "Flat" / "a2.flac", source, "Flat A", 2, encoded(first, "JPEG"))
+    expected["Flat A"] = encoded(first, "JPEG")
+    opus_track(root / "Flat" / "b1.opus", source, "Flat B", 1)
+    opus_track(root / "Flat" / "b2.opus", source, "Flat B", 2)
+    opus_track(root / "Flat" / "b3.opus", source, "Flat B", 3, [(3, encoded(second, "JPEG"))])
+    expected["Flat B"] = encoded(second, "JPEG")
+    flac_track(root / "Flat" / "c1.flac", source, "Flat C", 1)
+    (root / "Flat" / "cover.jpg").write_bytes(encoded(shared, "JPEG"))
+    expected["Flat C"] = encoded(shared, "JPEG")
+    for number in range(1, 6):
+        flac_track(root / "Flat" / f"d{number}.flac", source, "Flat D", number,
+                   encoded(first, "JPEG") if number == 5 else None)
+    expected["Flat D"] = encoded(shared, "JPEG")
+
+
 def build_music(root, source):
     expected = {}
     front, other, folder_jpeg = image(600, 600, 31), image(300, 200, 32), image(400, 400, 33)
@@ -98,6 +135,12 @@ def build_music(root, source):
     expected["Mp4"] = encoded(mp4, "JPEG")
     (root / "None").mkdir()
     flac_track(root / "None" / "01.flac", source, "None", 1)
+    opus_front = image(640, 640, 40)
+    (root / "Opus").mkdir()
+    opus_track(root / "Opus" / "01.opus", source, "Opus", 1,
+               [(0, encoded(other, "JPEG")), (3, encoded(opus_front, "JPEG"))])
+    expected["Opus"] = encoded(opus_front, "JPEG")
+    build_flat_folder(root, source, expected)
     return expected
 
 
