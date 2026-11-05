@@ -121,6 +121,7 @@ To see whether it works on your card, let the player scan it once, then run echo
 | `--check` | Only compare the computer's fingerprint with the player's |
 | `--yes` | Create `/.echo` without asking |
 | `--verbose` | List the albums without art |
+| `--history` | Also add the songs the player played to `.scrobbler.log` (see Listen history and Last.fm) |
 
 The computer picks each album's cover the way the player does: the picture inside the album's first track (FLAC, MP3, WAV, DSF/DFF, `.m4a`, `.ape` and `.wma`; a front cover wins), otherwise a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks. Ogg pictures are skipped, as on the player. The covers can look a little different from the player's own, because the computer resizes them with a different filter. When the player rescans later (for example after you copy a new album to it), it keeps the computer's covers and only decodes art that's new or changed; on a card that isn't FAT32 or exFAT, albums whose cover is an image file are decoded again.
 
@@ -140,7 +141,7 @@ Settings → **Volume buttons** changes what the rocker does on Now Playing and 
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
-More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, and **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums. The start screen can also be Album Artists, Genres, Folders or All Songs.
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, and **Listen history** turns the log of played songs on or off (below). The start screen can also be Album Artists, Genres, Folders or All Songs.
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
 
@@ -210,6 +211,21 @@ Podcasts/
 - These folders still appear under Music (Albums, Artists, Folders and so on), as all tracks on the card do. Give them a genre such as "Audiobook" if you want to find them there.
 - Playback speed can't be changed yet.
 - To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `python tools/echo_bookmarks.py E:\ --finished` with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
+
+## Listen history and Last.fm
+
+The player keeps a log of the songs you play in `/.echo/history.bin` on the card (the last 2,000 or so), so you can add them to Last.fm or ListenBrainz from a computer. It's on by default; Settings → Listen history turns it off (the log already on the card stays until you delete it). Audiobooks and podcasts are never logged.
+
+The player has no clock, so it writes down the order of the plays and how long each one lasted, and the dates are worked out when you connect it to a computer:
+
+1. Connect the player over USB (as a drive).
+2. Run `python tools/echo_history.py E:\` with the player's card drive or mount folder. It writes the new plays to `.scrobbler.log` at the root of the card, the "Rockbox" or "old iPod" log that scrobbler uploaders read, and remembers what it exported (`/.echo/history-exported.txt`), so running it again only adds plays since the last time. If you sync with echo-sync, `--history` does this step at the end of a sync.
+3. Upload `.scrobbler.log` with a tool that submits Rockbox scrobbler logs to Last.fm or ListenBrainz (for example rb-scrobbler). Such tools usually delete or rename the log after uploading; if a log is already there, `echo_history.py` adds to it.
+
+- A song counts as listened, as Last.fm defines it, when it's longer than 30 s and you listened to at least half of it or 4 minutes. Pauses and skipped-over parts don't count. Other plays are left out; `--include-skipped` writes them too, marked as skipped (`S`).
+- A song you stopped halfway, by connecting USB or turning the player off, and carried on later counts once.
+- Dates: run the tool while the player is still connected. Plays since the player was last switched on get their exact time. For plays before a power-off, the tool doesn't know how long the player was off, so it places them just before the next start: they can show up later in the day than you really played them. `--now <unix time>` sets the reference time if you run the tool later with a card reader.
+- `--output <file>` writes the log somewhere else, `--all` exports every play on the card again, and `--json` prints the new plays instead of writing anything.
 
 ## Updating EchoPod
 
