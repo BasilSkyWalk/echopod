@@ -283,6 +283,13 @@ static void the_last_start_row_tells_cold_starts_resets_and_faults_apart(void)
             .warm = true, .starts = 2, .fault_status = 0x00020000u, .fault_pc = 0x0305ABCDu},
         text, sizeof text);
     CHECK(text_is("Fault at 0305ABCD", text));
+    diagnostics_start_text((HalStartInfo){.warm = true,
+                                          .starts = 2,
+                                          .fault_pc = 0x03051994u,
+                                          .stalled = true,
+                                          .stall_lr = 0x03053FC3u},
+                           text, sizeof text);
+    CHECK(text_is("Stall 03051994 03053FC3", text));
 }
 
 static void the_last_step_row_tells_an_unfinished_step_from_a_finished_one(void)

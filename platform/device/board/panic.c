@@ -51,15 +51,6 @@ static void append_hex(StringBuilder *builder, uint32_t value)
     }
 }
 
-static void draw_hex_line(const char *label, uint32_t value)
-{
-    char text[LINE_CAPACITY];
-    StringBuilder builder = string_builder_make(text, sizeof text);
-    string_builder_append(&builder, label);
-    append_hex(&builder, value);
-    draw_line(text);
-}
-
 static void draw_run_line(void)
 {
     BoardRunSnapshot run = board_start_record_snapshot();
@@ -82,14 +73,6 @@ static void start_screen(const char *title)
     board_backlight_full();
     line = 0;
     draw_line(title);
-}
-
-void board_panic_stall(uint32_t pc, uint32_t lr)
-{
-    start_screen("STALL");
-    draw_hex_line("PC ", pc);
-    draw_hex_line("LR ", lr);
-    draw_run_line();
 }
 
 static void draw_pair_line(const char *first_label, uint32_t first, const char *second_label,
@@ -118,9 +101,9 @@ static void draw_words_line(const uint32_t *words)
     draw_line(text);
 }
 
-void board_panic_fault(const uint32_t *frame, uint32_t status)
+void board_panic_show(const char *title, const uint32_t *frame, uint32_t status)
 {
-    start_screen("FAULT");
+    start_screen(title);
     draw_pair_line("PC ", frame[STACKED_PC_WORD], "LR ", frame[STACKED_LR_WORD]);
     draw_pair_line("CFSR ", status, "SP ", (uint32_t)(uintptr_t)frame);
     draw_words_line(frame + FRAME_WORDS);

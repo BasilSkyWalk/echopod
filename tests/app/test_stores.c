@@ -13,6 +13,7 @@ enum {
     VERSION_FIELD = 4,
     ORIENTATION_FIELD = 17,
     CHECKSUM_FIELD = 20,
+    V8_CHECKSUM_FIELD = 28,
     CHOSEN_ALBUM = 2,
     OTHER_ALBUM = 1
 };
@@ -78,6 +79,33 @@ static void a_settings_file_from_before_orientation_loads_in_landscape(void)
     settings_store_load(&settings);
     CHECK_EQUAL(BRIGHT, settings.settings.brightness);
     CHECK_EQUAL(ORIENTATION_LANDSCAPE, settings.settings.orientation);
+}
+
+static void a_32_byte_version_8_settings_file_loads_and_is_saved_as_version_9(void)
+{
+    Settings older = settings_defaults();
+    older.brightness = BRIGHT;
+    older.options[OPTION_ACCENT] = 3;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&older, bytes);
+    bytes[VERSION_FIELD] = 8;
+    uint32_t checksum = hash_update(HASH_START, bytes, V8_CHECKSUM_FIELD);
+    for (int index = 0; index < 4; index++) {
+        bytes[V8_CHECKSUM_FIELD + index] = (uint8_t)(checksum >> (8 * index));
+    }
+    fake_hal_reset();
+    fake_hal_add_file(SETTINGS_STORE_PATH, bytes, SETTINGS_V8_FILE_SIZE);
+    settings_store_load(&settings);
+    CHECK_EQUAL(BRIGHT, settings.settings.brightness);
+    CHECK_EQUAL(3, settings.settings.options[OPTION_ACCENT]);
+    CHECK_EQUAL(0, settings.settings.options[OPTION_CLOCK]);
+    int writes = fake_hal_write_count();
+    CHECK(settings_store_save(&settings));
+    CHECK_EQUAL(writes + 1, fake_hal_write_count());
+    CHECK_EQUAL(9, settings.saved[VERSION_FIELD]);
+    uint32_t size = 0;
+    fake_hal_file_bytes(SETTINGS_STORE_PATH, &size);
+    CHECK_EQUAL(SETTINGS_FILE_SIZE, size);
 }
 
 static void the_orientation_is_loaded_again(void)
@@ -148,6 +176,7 @@ int main(void)
         TEST_CASE(unchanged_settings_are_not_written_again),
         TEST_CASE(a_corrupted_settings_file_falls_back_to_the_defaults),
         TEST_CASE(a_settings_file_from_before_orientation_loads_in_landscape),
+        TEST_CASE(a_32_byte_version_8_settings_file_loads_and_is_saved_as_version_9),
         TEST_CASE(the_orientation_is_loaded_again),
         TEST_CASE(hardware_settings_reach_the_hal),
         TEST_CASE(toggling_an_album_adds_it_and_saves),

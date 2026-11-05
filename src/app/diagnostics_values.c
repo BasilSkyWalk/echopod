@@ -373,6 +373,15 @@ void diagnostics_start_text(HalStartInfo info, char *text, size_t capacity)
         i18n_format(&builder, STR_DIAG_FAULT_AT, arguments, 1);
         return;
     }
+    if (info.stalled) {
+        char pc[ARGUMENT_CAPACITY];
+        char lr[ARGUMENT_CAPACITY];
+        hex_text(pc, sizeof pc, info.fault_pc, 8);
+        hex_text(lr, sizeof lr, info.stall_lr, 8);
+        const char *arguments[] = {pc, lr};
+        i18n_format(&builder, STR_DIAG_STALL_AT, arguments, 2);
+        return;
+    }
     char starts[ARGUMENT_CAPACITY];
     char seconds[ARGUMENT_CAPACITY];
     number_text(starts, sizeof starts, info.starts);

@@ -51,6 +51,37 @@ static void a_fault_survives_into_the_next_start(void)
     CHECK_EQUAL(0u, record.fault_status);
 }
 
+static void a_stall_survives_into_the_next_start_with_its_pc_and_lr(void)
+{
+    StartRecord record = garbage();
+    start_record_boot(&record);
+    start_record_tick(&record, 69000);
+    start_record_stall(&record, 0x03051994u, 0x03053FC3u);
+    StartInfo info = start_record_boot(&record);
+    CHECK(info.warm);
+    CHECK(info.stalled);
+    CHECK_EQUAL(0x03051994u, info.fault_address);
+    CHECK_EQUAL(0x03053FC3u, info.stall_lr);
+    CHECK_EQUAL(0u, info.fault_status);
+    CHECK_EQUAL(69000u, info.previous_uptime_ms);
+    CHECK_EQUAL(0u, record.stalled);
+    CHECK_EQUAL(0u, record.stall_lr);
+    CHECK_EQUAL(0u, record.fault_address);
+}
+
+static void a_run_without_a_stall_reports_none(void)
+{
+    StartRecord record = garbage();
+    record.stalled = 1;
+    record.stall_lr = 0x03053FC3u;
+    StartInfo cold = start_record_boot(&record);
+    CHECK(!cold.stalled);
+    CHECK_EQUAL(0u, cold.stall_lr);
+    StartInfo warm = start_record_boot(&record);
+    CHECK(warm.warm);
+    CHECK(!warm.stalled);
+}
+
 static void a_clean_power_off_is_remembered(void)
 {
     StartRecord record = garbage();
@@ -112,6 +143,8 @@ int main(void)
         TEST_CASE(a_surviving_record_reads_as_a_warm_start_with_the_last_uptime),
         TEST_CASE(a_corrupted_count_reads_as_cold),
         TEST_CASE(a_fault_survives_into_the_next_start),
+        TEST_CASE(a_stall_survives_into_the_next_start_with_its_pc_and_lr),
+        TEST_CASE(a_run_without_a_stall_reports_none),
         TEST_CASE(a_clean_power_off_is_remembered),
         TEST_CASE(the_last_step_survives_with_its_start_time_and_whether_it_finished),
         TEST_CASE(a_finished_step_is_marked_finished),

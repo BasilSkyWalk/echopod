@@ -12,7 +12,10 @@ enum {
     LANGUAGE_FIELD = 18,
     CHECKSUM_FIELD = 20,
     OPTIONS_FIELD = 20,
-    OPTIONS_CHECKSUM_FIELD = 28,
+    V8_CHECKSUM_FIELD = 28,
+    OPTIONS_CHECKSUM_FIELD = 44,
+    V8_OPTION_COUNT = 8,
+    SPARE_OPTION_FIELD = 43,
     NEVER_OPTION = 6
 };
 
@@ -102,7 +105,7 @@ static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(v
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(8, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(9, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
     CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
 }
@@ -379,10 +382,178 @@ static void a_version_7_file_loads_with_the_options_off(void)
     }
 }
 
+static void put_checksum(uint8_t *bytes, int field)
+{
+    uint32_t checksum = hash_update(HASH_START, bytes, (size_t)field);
+    for (int index = 0; index < 4; index++) {
+        bytes[field + index] = (uint8_t)(checksum >> (8 * index));
+    }
+}
+
+static Settings settings_with_every_option_at_its_top(void)
+{
+    Settings settings = custom_settings();
+    settings.filter = DAC_FILTER_COUNT - 1;
+    settings.balance = SETTINGS_BALANCE_STEPS - 1;
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+        settings.options[option] = (uint8_t)(settings_option_count((SettingOption)option) - 1);
+    }
+    return settings;
+}
+
+static void version_8_bytes(const Settings *settings, uint8_t *bytes)
+{
+    settings_encode(settings, bytes);
+    bytes[VERSION_FIELD] = 8;
+    put_checksum(bytes, V8_CHECKSUM_FIELD);
+}
+
+static void check_same_values(const Settings *expected, const Settings *actual)
+{
+    CHECK_EQUAL(expected->brightness, actual->brightness);
+    CHECK_EQUAL(expected->screen_timeout, actual->screen_timeout);
+    CHECK_EQUAL(expected->gain, actual->gain);
+    CHECK_EQUAL(expected->output, actual->output);
+    CHECK_EQUAL(expected->start_screen, actual->start_screen);
+    CHECK_EQUAL(expected->shuffle, actual->shuffle);
+    CHECK_EQUAL(expected->repeat, actual->repeat);
+    CHECK_EQUAL(expected->volume, actual->volume);
+    CHECK_EQUAL(expected->auto_off, actual->auto_off);
+    CHECK_EQUAL(expected->usb_mode, actual->usb_mode);
+    CHECK_EQUAL(expected->dac_volume, actual->dac_volume);
+    CHECK_EQUAL(expected->orientation, actual->orientation);
+    CHECK_EQUAL(expected->language, actual->language);
+    CHECK_EQUAL(expected->filter, actual->filter);
+    CHECK_EQUAL(expected->balance, actual->balance);
+}
+
+static void the_new_options_default_to_their_first_choice(void)
+{
+    Settings settings = settings_defaults();
+    for (int option = OPTION_COVER_FLOW_COVERS; option < SETTINGS_OPTION_COUNT; option++) {
+        CHECK_EQUAL(0, settings.options[option]);
+    }
+    CHECK_EQUAL(COVER_FLOW_FIVE_COVERS, settings.options[OPTION_COVER_FLOW_COVERS]);
+    CHECK_EQUAL(ANIMATION_NORMAL, settings.options[OPTION_ANIMATION_SPEED]);
+    CHECK_EQUAL(BLUETOOTH_LEVEL_STANDARD, settings.options[OPTION_BLUETOOTH_LEVEL]);
+    CHECK_EQUAL(USB_PROMPT_ON, settings.options[OPTION_USB_PROMPT]);
+    CHECK_EQUAL(LISTEN_HISTORY_ON, settings.options[OPTION_LISTEN_HISTORY]);
+    CHECK_EQUAL(2, settings_option_count(OPTION_COVER_FLOW_COVERS));
+    CHECK_EQUAL(3, settings_option_count(OPTION_ANIMATION_SPEED));
+    CHECK_EQUAL(2, settings_option_count(OPTION_CLOCK));
+    CHECK_EQUAL(2, settings_option_count(OPTION_BLUETOOTH_LEVEL));
+    CHECK_EQUAL(2, settings_option_count(OPTION_USB_PROMPT));
+    CHECK_EQUAL(2, settings_option_count(OPTION_LISTEN_HISTORY));
+}
+
+static void a_version_9_file_is_48_bytes_with_the_checksum_at_the_end(void)
+{
+    Settings settings = settings_with_every_option_at_its_top();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(48, SETTINGS_FILE_SIZE);
+    CHECK_EQUAL(9, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(ANIMATION_FASTER, bytes[OPTIONS_FIELD + OPTION_ANIMATION_SPEED]);
+    CHECK_EQUAL(1, bytes[OPTIONS_FIELD + OPTION_LISTEN_HISTORY]);
+    CHECK_EQUAL(0, bytes[SPARE_OPTION_FIELD]);
+    uint32_t checksum = hash_update(HASH_START, bytes, OPTIONS_CHECKSUM_FIELD);
+    CHECK_EQUAL(checksum, (uint32_t)bytes[44] | (uint32_t)bytes[45] << 8 |
+                              (uint32_t)bytes[46] << 16 | (uint32_t)bytes[47] << 24);
+    Settings decoded;
+    CHECK(!settings_decode(bytes, SETTINGS_FILE_SIZE - 1, &decoded));
+    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    check_same_values(&settings, &decoded);
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+        CHECK_EQUAL(settings.options[option], decoded.options[option]);
+    }
+}
+
+static void a_version_8_file_keeps_every_value_and_gets_the_new_defaults(void)
+{
+    Settings settings = settings_with_every_option_at_its_top();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    version_8_bytes(&settings, bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
+    check_same_values(&settings, &decoded);
+    for (int option = 0; option < V8_OPTION_COUNT; option++) {
+        CHECK_EQUAL(settings.options[option], decoded.options[option]);
+    }
+    for (int option = V8_OPTION_COUNT; option < SETTINGS_OPTION_COUNT; option++) {
+        CHECK_EQUAL(0, decoded.options[option]);
+    }
+    Settings from_a_longer_file;
+    CHECK(settings_decode(bytes, sizeof bytes, &from_a_longer_file));
+    CHECK_EQUAL(ACCENT_COUNT - 1, from_a_longer_file.options[OPTION_ACCENT]);
+    CHECK_EQUAL(0, from_a_longer_file.options[OPTION_LISTEN_HISTORY]);
+}
+
+static void a_version_8_file_is_saved_again_as_version_9(void)
+{
+    Settings settings = settings_with_every_option_at_its_top();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    version_8_bytes(&settings, bytes);
+    Settings decoded;
+    CHECK(settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
+    uint8_t again[SETTINGS_FILE_SIZE];
+    settings_encode(&decoded, again);
+    Settings reloaded;
+    CHECK_EQUAL(9, again[VERSION_FIELD]);
+    CHECK(settings_decode(again, sizeof again, &reloaded));
+    check_same_values(&settings, &reloaded);
+    CHECK_EQUAL(ROCKER_MODE_COUNT - 1, reloaded.options[OPTION_ROCKER]);
+    CHECK_EQUAL(1, reloaded.options[OPTION_ARTIST_VIEW]);
+}
+
+static void a_short_or_corrupted_version_8_file_is_rejected(void)
+{
+    Settings settings = settings_with_every_option_at_its_top();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    version_8_bytes(&settings, bytes);
+    Settings decoded;
+    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE - 1, &decoded));
+    bytes[OPTIONS_FIELD + OPTION_ACCENT] ^= 0x01;
+    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
+    bytes[OPTIONS_FIELD + OPTION_ACCENT] = ACCENT_COUNT;
+    put_checksum(bytes, V8_CHECKSUM_FIELD);
+    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
+}
+
+static void a_value_in_a_spare_option_slot_is_ignored(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[SPARE_OPTION_FIELD] = 0xEE;
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
+}
+
+static void a_new_option_out_of_range_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[OPTIONS_FIELD + OPTION_ANIMATION_SPEED] = ANIMATION_SPEED_COUNT;
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    Settings decoded;
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_new_options_are_saved_and_read_back),
+        TEST_CASE(the_new_options_default_to_their_first_choice),
+        TEST_CASE(a_version_9_file_is_48_bytes_with_the_checksum_at_the_end),
+        TEST_CASE(a_version_8_file_keeps_every_value_and_gets_the_new_defaults),
+        TEST_CASE(a_version_8_file_is_saved_again_as_version_9),
+        TEST_CASE(a_short_or_corrupted_version_8_file_is_rejected),
+        TEST_CASE(a_value_in_a_spare_option_slot_is_ignored),
+        TEST_CASE(a_new_option_out_of_range_is_rejected),
         TEST_CASE(an_option_out_of_range_is_rejected),
         TEST_CASE(a_version_7_file_loads_with_the_options_off),
         TEST_CASE(defaults_are_comfortable),

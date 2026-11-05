@@ -109,6 +109,8 @@ typedef struct HalStartInfo {
     bool last_step_finished;
     uint32_t last_step_ms;
     uint32_t last_millivolts;
+    bool stalled;
+    uint32_t stall_lr;
 } HalStartInfo;
 
 HalStartInfo hal_system_start_info(void);
