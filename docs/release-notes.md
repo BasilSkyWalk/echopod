@@ -16,7 +16,7 @@ This release answers most of the open GitHub issues.
 - **Settings → Cover Flow order → Album title** sorts Cover Flow by album name instead of album artist (issue 18).
 - **Settings → Artist albums → Cover Flow** opens an artist, album artist or genre as a Cover Flow of only their albums (issue 27).
 - **Start screen** can also be Album Artists, Genres, Folders or All Songs (issue 22).
-- **Russian and Ukrainian** interface languages (issue 21). Written by Claude, not yet checked by a native speaker.
+- **Russian and Ukrainian** interface languages (issue 21). Not yet checked by a native speaker; corrections are welcome.
 - **`tools/echo_bookmarks.py`** lists the audiobook and podcast bookmarks on a card, or with `--finished` prints the finished episodes one per line for sync scripts (issue 16).
 - **Diagnostics → Panel** shows the screen's ID, which says which of the two screen start-up sequences the player uses (issue 15).
 
