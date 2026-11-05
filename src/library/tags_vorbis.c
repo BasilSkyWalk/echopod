@@ -16,7 +16,9 @@ enum {
     VORBIS_PACKET_PREFIX = 7,
     OPUS_PACKET_PREFIX = 8,
     OPUS_RATE = 48000,
-    OPUS_PRE_SKIP_AT = 10
+    OPUS_PRE_SKIP_AT = 10,
+    BASE64_CHUNK = 256,
+    PICTURE_DIMENSIONS = 16
 };
 
 typedef struct VorbisKey {
@@ -59,6 +61,9 @@ static int field_for_key(const uint8_t *key, uint32_t length)
 
 static int base64_value(uint8_t character)
 {
+    if (character == '=') {
+        return 0;
+    }
     if (character >= 'A' && character <= 'Z') {
         return character - 'A';
     }
@@ -242,13 +247,6 @@ bool tags_read_flac(TagReader *reader)
     return found_info;
 }
 
-typedef struct OggPage {
-    uint32_t offset;
-    uint32_t header_length;
-    uint32_t body_length;
-    uint64_t granule;
-} OggPage;
-
 static bool read_page(const TagReader *reader, uint32_t offset, OggPage *page)
 {
     uint8_t header[OGG_HEADER_SIZE];
@@ -272,11 +270,16 @@ static bool read_page(const TagReader *reader, uint32_t offset, OggPage *page)
     return true;
 }
 
-typedef struct OggStream {
-    TagReader *reader;
-    OggPage page;
-    uint32_t page_start;
-} OggStream;
+static bool open_stream(OggStream *stream, TagReader *reader, uint32_t offset)
+{
+    stream->reader = reader;
+    stream->page_start = 0;
+    if (!read_page(reader, offset, &stream->first)) {
+        return false;
+    }
+    stream->page = stream->first;
+    return true;
+}
 
 static bool stream_seek(OggStream *stream, uint32_t offset)
 {
@@ -295,7 +298,8 @@ static bool read_stream_bytes(void *context, uint32_t offset, void *buffer, uint
     OggStream *stream = context;
     uint8_t *out = buffer;
     if (offset < stream->page_start) {
-        return false;
+        stream->page = stream->first;
+        stream->page_start = 0;
     }
     while (length > 0) {
         if (!stream_seek(stream, offset)) {
@@ -359,8 +363,8 @@ bool tags_read_ogg(TagReader *reader)
     uint64_t pre_skip = opus ? (uint64_t)identification[OPUS_PRE_SKIP_AT] |
                                    (uint64_t)identification[OPUS_PRE_SKIP_AT + 1] << 8
                              : 0;
-    OggStream stream = {.reader = reader, .page_start = 0};
-    if (!read_page(reader, first.header_length + first.body_length, &stream.page)) {
+    OggStream stream;
+    if (!open_stream(&stream, reader, first.header_length + first.body_length)) {
         return false;
     }
     ByteSource source = {.read = read_stream_bytes, .context = &stream};
@@ -379,4 +383,88 @@ bool tags_read_ogg(TagReader *reader)
         tag_set_duration(reader, (double)(granule - pre_skip) / (double)rate);
     }
     return true;
+}
+
+static bool read_picture_bytes(void *context, uint32_t offset, void *buffer, uint32_t length)
+{
+    TagPictureReader *reader = context;
+    uint8_t text[BASE64_CHUNK];
+    uint8_t *out = buffer;
+    while (length > 0) {
+        uint32_t skip = offset % 3;
+        uint32_t groups = (skip + length + 2) / 3;
+        groups = groups < BASE64_CHUNK / 4 ? groups : BASE64_CHUNK / 4;
+        uint32_t at = offset / 3 * 4;
+        if (at > reader->text_length || groups * 4 > reader->text_length - at ||
+            !read_stream_bytes(&reader->stream, reader->text + at, text, groups * 4)) {
+            return false;
+        }
+        for (uint32_t group = 0; group < groups && length > 0; group++) {
+            uint32_t bits = 0;
+            for (uint32_t index = 0; index < 4; index++) {
+                int value = base64_value(text[group * 4 + index]);
+                if (value < 0) {
+                    return false;
+                }
+                bits = bits << 6 | (uint32_t)value;
+            }
+            for (; skip < 3 && length > 0; skip++, length--, offset++) {
+                *out++ = (uint8_t)(bits >> (16 - 8 * skip));
+            }
+            skip = 0;
+        }
+    }
+    return true;
+}
+
+static bool next_field(TagPictureReader *reader, uint32_t *cursor, uint32_t *length)
+{
+    uint32_t available = reader->text_length / 4 * 3;
+    uint8_t word[4];
+    if (*cursor > available || available - *cursor < 4 ||
+        !read_picture_bytes(reader, *cursor, word, 4)) {
+        return false;
+    }
+    *length = tag_be32(word);
+    *cursor += 4;
+    return *length <= available - *cursor;
+}
+
+static bool open_base64_picture(TagPictureReader *reader, TagPicture *picture)
+{
+    OggPage first;
+    uint32_t cursor = 4;
+    uint32_t length = 0;
+    reader->text = picture->offset;
+    reader->text_length = picture->length;
+    if (!read_page(&reader->file, 0, &first) ||
+        !open_stream(&reader->stream, &reader->file, first.header_length + first.body_length) ||
+        !next_field(reader, &cursor, &length)) {
+        return false;
+    }
+    cursor += length;
+    if (!next_field(reader, &cursor, &length)) {
+        return false;
+    }
+    cursor += length + PICTURE_DIMENSIONS;
+    if (!next_field(reader, &cursor, &length)) {
+        return false;
+    }
+    *picture = (TagPicture){
+        .kind = TAG_PICTURE_RAW, .front = picture->front, .offset = cursor, .length = length};
+    return true;
+}
+
+bool tags_open_picture(TagPictureReader *reader, ByteSource file, uint32_t size,
+                       TagPicture *picture, ByteSource *bytes)
+{
+    reader->file = (TagReader){.source = file, .size = size};
+    *bytes = file;
+    if (picture->kind == TAG_PICTURE_BASE64_FLAC_BLOCK) {
+        *bytes = (ByteSource){.read = read_picture_bytes, .context = reader};
+        if (!open_base64_picture(reader, picture)) {
+            return false;
+        }
+    }
+    return picture->kind == TAG_PICTURE_RAW && picture->length > 0;
 }
