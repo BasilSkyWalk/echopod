@@ -79,9 +79,35 @@ static const KeyConfig KEY_CONFIG = {
         },
 };
 
+static const KeyConfig DAC_KEY_CONFIG = {
+    .timing =
+        {
+            .long_press_ms = 600,
+            .repeat_delay_ms = 400,
+            .repeat_interval_ms = 120,
+        },
+    .behaviors =
+        {
+            [KEY_VOLUME_UP] = KEY_BEHAVIOR_TAP_HOLD_REPEAT,
+            [KEY_VOLUME_DOWN] = KEY_BEHAVIOR_TAP_HOLD_REPEAT,
+            [KEY_PLAY] = KEY_BEHAVIOR_TAP_OR_HOLD,
+            [KEY_MENU] = KEY_BEHAVIOR_TAP_OR_HOLD,
+            [KEY_BACK] = KEY_BEHAVIOR_TAP_OR_HOLD,
+            [KEY_POWER] = KEY_BEHAVIOR_TAP_OR_HOLD,
+        },
+    .long_press_ms =
+        {
+            [KEY_VOLUME_UP] = 1000,
+            [KEY_VOLUME_DOWN] = 1000,
+            [KEY_BACK] = 1000,
+            [KEY_POWER] = 2000,
+        },
+};
+
 typedef struct AppState {
     KeyTracker keys;
     bool rocker_swapped[KEY_COUNT];
+    uint32_t dac_volume_until_ms;
     Theme theme;
     int shown_theme;
     FrameStats frame_stats;
@@ -929,6 +955,66 @@ void app_remember_dac_volume(uint8_t level)
 {
     app.settings.settings.dac_volume = level;
     settings_store_save(&app.settings);
+}
+
+void app_dac_keys_start(void)
+{
+    key_tracker_init(&app.keys, &DAC_KEY_CONFIG);
+    app.dac_volume_until_ms = hal_clock_milliseconds();
+}
+
+static AppDacKey dac_key_of(NowPlayingCommand command)
+{
+    switch (command) {
+    case NOW_PLAYING_VOLUME_UP:
+        return APP_DAC_KEY_VOLUME_UP;
+    case NOW_PLAYING_VOLUME_DOWN:
+        return APP_DAC_KEY_VOLUME_DOWN;
+    case NOW_PLAYING_TOGGLE_PAUSE:
+        return APP_DAC_KEY_PLAY_PAUSE;
+    case NOW_PLAYING_NEXT:
+        return APP_DAC_KEY_NEXT;
+    case NOW_PLAYING_PREVIOUS:
+        return APP_DAC_KEY_PREVIOUS;
+    case NOW_PLAYING_HOME:
+        return APP_DAC_KEY_LEAVE;
+    default:
+        return APP_DAC_KEY_NONE;
+    }
+}
+
+static AppDacKey dac_key_for(KeyEvent event, uint32_t now_ms)
+{
+    NowPlayingControls controls = now_playing_controls_of(app.settings.settings.options);
+    controls.volume_shown = !deadline_reached(now_ms, app.dac_volume_until_ms);
+    AppDacKey key = dac_key_of(now_playing_command_with(event, false, controls));
+    if (key == APP_DAC_KEY_VOLUME_UP || key == APP_DAC_KEY_VOLUME_DOWN) {
+        app.dac_volume_until_ms = now_ms + NOW_PLAYING_VOLUME_HOLD_MS;
+    }
+    return key;
+}
+
+AppDacKey app_dac_next_key(void)
+{
+    uint32_t now_ms = hal_clock_milliseconds();
+    read_input();
+    key_tracker_update(&app.keys, now_ms);
+    KeyEvent event;
+    while (key_tracker_next_event(&app.keys, &event)) {
+        AppDacKey key = dac_key_for(event, now_ms);
+        if (key != APP_DAC_KEY_NONE) {
+            return key;
+        }
+    }
+    return APP_DAC_KEY_NONE;
+}
+
+void app_dac_keys_stop(void)
+{
+    key_tracker_init(&app.keys, &KEY_CONFIG);
+    if (screen_stack_depth(&app.stack) > 0) {
+        use_screen_key_behaviors();
+    }
 }
 
 void app_request_rescan(void)

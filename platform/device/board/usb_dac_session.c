@@ -10,22 +10,18 @@
 #include "device/usb_audio_sink.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
-#include "hal/input.h"
 #include "settings/settings.h"
 #include "usb.h"
 
 enum {
     HOST_TIMEOUT_MS = 3000,
     STREAM_IDLE_MS = 100,
-    BACK_HOLD_MS = 1000,
     POLLS_PER_SERVICE = 4,
     NOTICE_CAPACITY = 192,
     NUMBER_CAPACITY = 12,
     FORMAT_CAPACITY = 16,
     HZ_PER_KHZ = 1000,
     BITS_PER_BYTE = 8,
-    VOLUME_REPEAT_DELAY_MS = 400,
-    VOLUME_REPEAT_MS = 80,
     NOTICE_REFRESH_MS = 1000,
     FRAME_NUMBER_MASK = 0x3FFF
 };
@@ -37,14 +33,10 @@ static UsbAudio audio;
 static UsbAudioSink sink;
 static uint32_t open_rate;
 static uint32_t last_packet_ms;
-static uint32_t back_pressed_ms;
 static bool receiving;
 static bool playing;
 static uint8_t dac_volume;
 static bool dac_volume_known;
-static bool holding_volume;
-static int held_step;
-static uint32_t next_repeat_ms;
 static bool frame_known;
 static uint16_t last_frame;
 static uint32_t missed_packets;
@@ -247,68 +239,38 @@ static void step_volume(int step)
     show_state();
 }
 
-static void start_holding(int step, uint32_t now_ms)
-{
-    step_volume(step);
-    holding_volume = true;
-    held_step = step;
-    next_repeat_ms = now_ms + VOLUME_REPEAT_DELAY_MS;
-}
-
-static void repeat_volume(void)
-{
-    uint32_t now_ms = hal_clock_milliseconds();
-    if (holding_volume && (int32_t)(now_ms - next_repeat_ms) >= 0) {
-        step_volume(held_step);
-        next_repeat_ms = now_ms + VOLUME_REPEAT_MS;
-    }
-}
-
-static void follow_volume_key(HalKeyTransition key)
-{
-    int step = key.key == KEY_VOLUME_UP ? 1 : -1;
-    if (key.pressed) {
-        start_holding(step, key.time_ms);
-    } else if (holding_volume && held_step == step) {
-        holding_volume = false;
-    }
-}
-
-static bool back_released_after_hold(HalKeyTransition key)
-{
-    if (key.pressed) {
-        back_pressed_ms = key.time_ms;
-        return false;
-    }
-    return key.time_ms - back_pressed_ms >= BACK_HOLD_MS;
-}
-
 static bool user_left(void)
 {
-    HalKeyTransition key;
-    while (hal_input_next_transition(&key)) {
-        if (key.key == KEY_BACK && back_released_after_hold(key)) {
+    for (;;) {
+        switch (app_dac_next_key()) {
+        case APP_DAC_KEY_NONE:
+            return false;
+        case APP_DAC_KEY_VOLUME_UP:
+            step_volume(1);
+            break;
+        case APP_DAC_KEY_VOLUME_DOWN:
+            step_volume(-1);
+            break;
+        case APP_DAC_KEY_LEAVE:
             return true;
-        }
-        if (key.key == KEY_VOLUME_UP || key.key == KEY_VOLUME_DOWN) {
-            follow_volume_key(key);
+        default:
+            break;
         }
     }
-    return false;
 }
 
 static void serve(void)
 {
-    back_pressed_ms = hal_clock_milliseconds();
+    app_dac_keys_start();
     while (usb_vbus_present() && !user_left()) {
         serve_usb();
         hal_audio_service();
         board_display_service();
         follow_host();
         keep_output();
-        repeat_volume();
         refresh_state();
     }
+    app_dac_keys_stop();
 }
 
 static void start_session(void)
@@ -319,7 +281,6 @@ static void start_session(void)
     open_rate = 0;
     receiving = false;
     playing = false;
-    holding_volume = false;
     frame_known = false;
     missed_packets = 0;
     dac_volume = dac_volume_known ? dac_volume : (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME;

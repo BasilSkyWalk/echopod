@@ -44,6 +44,8 @@ enum {
     SETTINGS_START_INDEX = 13,
     SETTINGS_RESCAN_INDEX = 14,
     SETTINGS_LANGUAGE_INDEX = 16,
+    SETTINGS_SWAP_INDEX = 20,
+    DAC_VOLUME_WINDOW_MS = 3000,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
     COVER_CENTER_X = 160,
@@ -620,6 +622,103 @@ static void the_other_portrait_and_landscape_keep_the_rocker(void)
     tap(KEY_VOLUME_UP);
     tap(KEY_PLAY);
     CHECK(title_is("Gain"));
+}
+
+static void dac_press(Key key, uint32_t held_ms)
+{
+    fake_hal_queue_transition(key, true, now_ms);
+    now_ms += held_ms;
+    fake_hal_set_milliseconds(now_ms);
+}
+
+static void dac_release(Key key)
+{
+    fake_hal_queue_transition(key, false, now_ms);
+    now_ms += 10;
+    fake_hal_set_milliseconds(now_ms);
+}
+
+static AppDacKey dac_tap(Key key)
+{
+    dac_press(key, KEY_HOLD_MS);
+    dac_release(key);
+    return app_dac_next_key();
+}
+
+static void dac_keys_follow_the_swap_setting(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_UP));
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_DOWN));
+    CHECK_EQUAL(APP_DAC_KEY_NONE, app_dac_next_key());
+    app_dac_keys_stop();
+    open_setting(SETTINGS_SWAP_INDEX);
+    CHECK(title_is("Swap volume buttons"));
+    move_down(1);
+    tap(KEY_PLAY);
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_UP));
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_DOWN));
+    app_dac_keys_stop();
+}
+
+static void dac_keys_turn_around_in_a_swapping_portrait(void)
+{
+    start_app_with_library();
+    choose_orientation(swapping_portrait());
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_UP));
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_DOWN));
+    app_dac_keys_stop();
+}
+
+static void dac_keys_skip_on_a_held_rocker_and_play_pause_on_play(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_NEXT, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    CHECK_EQUAL(APP_DAC_KEY_NONE, app_dac_next_key());
+    dac_press(KEY_VOLUME_DOWN, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_PREVIOUS, app_dac_next_key());
+    dac_release(KEY_VOLUME_DOWN);
+    CHECK_EQUAL(APP_DAC_KEY_PLAY_PAUSE, dac_tap(KEY_PLAY));
+    CHECK_EQUAL(APP_DAC_KEY_NONE, dac_tap(KEY_MENU));
+    app_dac_keys_stop();
+}
+
+static void dac_keys_keep_changing_the_volume_when_held_right_after_a_tap(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, dac_tap(KEY_VOLUME_UP));
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, app_dac_next_key());
+    now_ms += 120;
+    fake_hal_set_milliseconds(now_ms);
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_UP, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    now_ms += DAC_VOLUME_WINDOW_MS;
+    fake_hal_set_milliseconds(now_ms);
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_NEXT, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    app_dac_keys_stop();
+}
+
+static void dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_NONE, dac_tap(KEY_BACK));
+    dac_press(KEY_BACK, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_LEAVE, app_dac_next_key());
+    dac_release(KEY_BACK);
+    app_dac_keys_stop();
+    open_setting(0);
+    CHECK(title_is("Shuffle"));
 }
 
 static bool drew_the_bottom_of_a_portrait_screen(void)
@@ -2090,6 +2189,11 @@ int main(void)
         TEST_CASE(play_opens_a_menu_row_while_the_key_is_still_down),
         TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
         TEST_CASE(a_listen_history_turned_off_records_nothing),
+        TEST_CASE(dac_keys_follow_the_swap_setting),
+        TEST_CASE(dac_keys_turn_around_in_a_swapping_portrait),
+        TEST_CASE(dac_keys_skip_on_a_held_rocker_and_play_pause_on_play),
+        TEST_CASE(dac_keys_keep_changing_the_volume_when_held_right_after_a_tap),
+        TEST_CASE(dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
