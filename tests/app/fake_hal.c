@@ -562,6 +562,18 @@ int fake_hal_audio_output(void)
     return (int)fake.audio.output;
 }
 
+static HalAudioBluetoothLevel bluetooth_level;
+
+void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level)
+{
+    bluetooth_level = level;
+}
+
+int fake_hal_audio_bluetooth_level(void)
+{
+    return (int)bluetooth_level;
+}
+
 int fake_hal_test_tone_count(void)
 {
     return fake.test_tone_count;

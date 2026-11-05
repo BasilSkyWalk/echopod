@@ -419,6 +419,28 @@ static void follow_remote(BluetoothLink *link, const HalBluetoothStatus *status,
     }
 }
 
+static void hold_output(BluetoothLink *link, uint32_t now_ms)
+{
+    link->holding = true;
+    link->hold_ms = now_ms;
+    hal_audio_pause();
+}
+
+static void follow_hold(BluetoothLink *link, const Player *player, uint32_t now_ms)
+{
+    if (!link->holding) {
+        return;
+    }
+    bool playing = player->state == PLAYER_PLAYING;
+    if (playing && link->streamed && now_ms - link->hold_ms < BLUETOOTH_LINK_OPEN_MS) {
+        return;
+    }
+    link->holding = false;
+    if (playing && hal_audio_status().state == HAL_AUDIO_PAUSED) {
+        hal_audio_resume();
+    }
+}
+
 static void follow_player(BluetoothLink *link, const Player *player, uint32_t now_ms)
 {
     if (player->state != PLAYER_PLAYING) {
@@ -431,7 +453,11 @@ static void follow_player(BluetoothLink *link, const Player *player, uint32_t no
         link->streamed = stream;
         link->changed_ms = now_ms;
         hal_bluetooth_set_stream(stream);
+        if (stream) {
+            hold_output(link, now_ms);
+        }
     }
+    follow_hold(link, player, now_ms);
 }
 
 static void doze(BluetoothLink *link, uint32_t now_ms)
@@ -447,9 +473,22 @@ static void doze(BluetoothLink *link, uint32_t now_ms)
     }
 }
 
+static void wake_for_play(BluetoothLink *link, const Player *player, uint32_t now_ms)
+{
+    bool started = player->state == PLAYER_PLAYING && link->player_state != PLAYER_PLAYING;
+    link->player_state = (uint8_t)player->state;
+    if (started && link->saved.count > 0 && hal_audio_jack() == HAL_AUDIO_JACK_NONE) {
+        wake(link, now_ms);
+    }
+}
+
 void bluetooth_link_step(BluetoothLink *link, Player *player, uint32_t now_ms)
 {
-    if (!link->saved.enabled || link->dozing) {
+    if (!link->saved.enabled) {
+        return;
+    }
+    if (link->dozing) {
+        wake_for_play(link, player, now_ms);
         return;
     }
     if (link->restarting) {

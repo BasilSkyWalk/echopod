@@ -379,6 +379,17 @@ static void the_bluetooth_curve_sits_thirteen_units_below_single_ended(void)
     CHECK_EQUAL(0x0F, dac_volume_value(50, DAC_CURVE_BLUETOOTH));
 }
 
+static void the_louder_bluetooth_curve_tops_out_where_the_wired_one_does(void)
+{
+    CHECK_EQUAL(0xFF, dac_volume_value(0, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(0x78, dac_volume_value(1, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(0x5E, dac_volume_value(12, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(dac_volume_value(50, DAC_CURVE_SINGLE_ENDED),
+                dac_volume_value(50, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(dac_volume_value(50, DAC_CURVE_BLUETOOTH) - 13,
+                dac_volume_value(50, DAC_CURVE_BLUETOOTH_LOUD));
+}
+
 static void a_volume_ramp_moves_six_units_a_step_and_lands_on_the_target(void)
 {
     CHECK_EQUAL(0xF9, dac_ramp_next(0xFF, 0x02));
@@ -408,6 +419,7 @@ int main(void)
         TEST_CASE(the_quietest_steps_start_at_stock_s_floor_and_rise_smoothly),
         TEST_CASE(the_bluetooth_curve_sits_thirteen_units_below_single_ended),
         TEST_CASE(balance_attenuates_one_chip_only),
+        TEST_CASE(the_louder_bluetooth_curve_tops_out_where_the_wired_one_does),
         TEST_CASE(a_volume_ramp_moves_six_units_a_step_and_lands_on_the_target),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

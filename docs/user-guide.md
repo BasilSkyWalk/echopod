@@ -141,7 +141,7 @@ Settings → **Volume buttons** changes what the rocker does on Now Playing and 
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
-More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, and **Listen history** turns the log of played songs on or off (below). The start screen can also be Album Artists, Genres, Folders or All Songs.
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), and **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones). The start screen can also be Album Artists, Genres, Folders or All Songs.
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
 
@@ -183,9 +183,11 @@ Settings → Bluetooth shows whether Bluetooth is on and which headphones are co
 
 **Every day:** with Bluetooth on, the player connects to your most recent headphones by itself when it starts and whenever they come back in range. If a connection stalls, it resets and tries again within about 15 seconds. To switch to other remembered headphones, select them and press ▶. To disconnect, select the connected headphones and press ▶: they stay disconnected until you press ▶ on them again or restart the player. To forget headphones, hold ▶ on them.
 
-Music plays through the headphones whenever nothing is plugged into either jack. To switch to wired headphones, pause, plug them in and press play: while music is going to Bluetooth the player can't see the jack. After you unplug, the next play goes back to Bluetooth.
+Music plays through the headphones whenever nothing is plugged into either jack. To switch to wired headphones, pause, plug them in and press play: while music is going to Bluetooth the player can't see the jack. After you unplug, the next play goes back to Bluetooth. Each play or resume waits a moment (about half a second) before the music starts, so the headphones don't miss the opening.
 
-The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery until you open its screen again or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
+**Too quiet?** Settings → **Bluetooth level** (the last row of the Settings list) has *Standard* and *Louder*. Standard is the level earlier versions used; Louder raises the signal sent to the Bluetooth module by 6.5 dB, to the same top level as the 3.5 mm jack. If Louder distorts at full volume with your headphones, go back to Standard. The headphones' own volume control is separate from the player's.
+
+The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery; it comes back when you open its screen, press play with nothing plugged in, or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
 
 ## Audiobooks and podcasts
 
