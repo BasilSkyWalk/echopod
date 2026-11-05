@@ -165,6 +165,7 @@ static void sleep_while_idle(void)
 void board_main(void)
 {
     board_start_record_boot();
+    board_stack_paint();
     board_power_hold();
     board_bluetooth_off();
     board_clock_record_boot();

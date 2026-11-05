@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "app/update_record.h"
 #include "bluetooth_store.h"
 #include "cover_cache.h"
 #include "equalizer_store.h"
@@ -35,7 +36,7 @@ static const CardFile CARD_FILES[] = {
     {PLAYER_UP_NEXT_PATH, SMALL_FILE_BYTES},    {SPOKEN_STORE_PATH, SMALL_FILE_BYTES},
     {LIBRARY_SCRATCH_PATH, SCRATCH_FILE_BYTES}, {RESCAN_TIMES_PATH, SMALL_FILE_BYTES},
     {BLUETOOTH_STORE_PATH, SMALL_FILE_BYTES},   {EQUALIZER_STORE_PATH, SMALL_FILE_BYTES},
-    {LISTEN_HISTORY_PATH, HISTORY_FILE_BYTES},
+    {LISTEN_HISTORY_PATH, HISTORY_FILE_BYTES},  {UPDATE_RECORD_PATH, SMALL_FILE_BYTES},
 };
 
 CardFilesReport card_files_prepare(void (*creating)(void))

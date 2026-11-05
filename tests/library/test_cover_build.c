@@ -705,9 +705,47 @@ static void albums_sharing_a_folder_find_art_in_later_tracks(void)
     CHECK_EQUAL(4u, stats.reused);
 }
 
+static void add_apple_double(const char *path)
+{
+    static const uint8_t HEADER[] = {0x00, 0x05, 0x16, 0x07, 0x00, 0x02, 0x00, 0x00,
+                                     'M',  'a',  'c',  ' ',  'O',  'S',  ' ',  'X'};
+    add_file(path, HEADER, sizeof HEADER);
+}
+
+static void mac_litter(void)
+{
+    static const uint8_t JUNK[64] = {0};
+    add_file("/.fseventsd/fseventsd-uuid", JUNK, sizeof JUNK);
+    add_file("/.Spotlight-V100/Store-V2/0/store.db", JUNK, sizeof JUNK);
+    add_file("/.Trashes/501/old.flac", card.flac, card.flac_size);
+    add_file("/Alpha/.DS_Store", JUNK, sizeof JUNK);
+    add_apple_double("/Alpha/._01.flac");
+    add_apple_double("/Alpha/._cover.png");
+    add_apple_double("/._Beta");
+    add_file("/Beta/._02.flac", card.flac, card.flac_size);
+}
+
+static void a_card_written_on_a_mac_keeps_the_covers_the_computer_made(void)
+{
+    CoverStats stats;
+    three_albums();
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(3u, stats.covers);
+    mac_litter();
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(3u, stats.albums);
+    CHECK_EQUAL(3u, stats.covers);
+    CHECK_EQUAL(3u, stats.reused);
+    CHECK_EQUAL(0u, stats.missing);
+    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+    CHECK_EQUAL(GREEN.pixel, cover_pixel("Beta"));
+    CHECK_EQUAL(BLUE.pixel, cover_pixel("Gamma"));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(a_card_written_on_a_mac_keeps_the_covers_the_computer_made),
         TEST_CASE(the_first_build_decodes_every_album),
         TEST_CASE(an_unchanged_card_reuses_every_cover),
         TEST_CASE(a_new_album_is_the_only_one_decoded),

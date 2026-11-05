@@ -136,6 +136,22 @@ Favorites outlive a re-index, so they don't store album indices. An album's key 
 
 Each bookmark is `u32 key`, `u32 track key`, `u32 position_ms`, `u16 chapter`, `u8 flags` (bit 0: finished), `u8 reserved`. The key is the FNV-1a hash of the book's folder path relative to the music root (`Audiobooks/The Long Road`), or of the track's own path for a single-file book or a podcast episode; the track key hashes the track's path. `chapter` is the track's place among its folder's tracks, checked against the track key before it's used. A zero-filled or damaged file reads as no bookmarks.
 
+## Update record
+
+`/.echo/update.bin` (4 KB, reserved by the player) keeps what the firmware installer last did, so Diagnostics → Last update can show it after the player has been switched off (`app/update_record`, written by `board/update.c` at the end of a USB session that found a `HIFIECnn.IMG`). Every value is little-endian.
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | `char[4]` | magic `EUPD` |
+| 4 | `u8` | result: 0 none, 1 installed, 2 failed, 3 refused, 4 already installed |
+| 5 | `u8` | detail: the last progress mark shown (5 % steps) for installed and failed, the refusal code (`E` number) for refused |
+| 6 | `u8` | 1 when the internal storage answered CMD13 after the install |
+| 7 | `u8` | reserved (0) |
+| 8 | `u32` | the eMMC status word that CMD13 returned (card state in bits 12:9, ready-for-data in bit 8) |
+| 12 | `u32` | checksum: the bitwise complement of a 31-multiplier sum over the first 12 bytes |
+
+A zero-filled or damaged file reads as no record.
+
 ## Listen history file
 
 `/.echo/history.bin` (1 MiB, reserved by the player) logs the songs the player played, for `tools/echo_history.py` to turn into a `.scrobbler.log` (see `docs/user-guide.md`, Listen history). It's a ring of 2,048 slots of 512 bytes; the player works out the slot count from the file's size, so a smaller or larger file works too. A record with sequence number `n` always sits in slot `(n − 1) mod slots`, so when the ring is full the newest record overwrites the oldest. Every value is little-endian.

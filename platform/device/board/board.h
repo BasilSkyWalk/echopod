@@ -81,6 +81,9 @@ void board_start_record_power_off(void);
 void board_start_record_step(HalStartStep step);
 void board_start_record_step_done(void);
 void board_start_record_battery(uint32_t millivolts);
+void board_start_record_update(HalUpdateRecord update);
+void board_stack_paint(void);
+uint32_t board_stack_used(void);
 
 typedef struct BoardRunSnapshot {
     uint32_t uptime_ms;

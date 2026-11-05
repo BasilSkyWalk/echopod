@@ -818,6 +818,11 @@ HalStartInfo hal_system_start_info(void)
     return (HalStartInfo){.warm = false, .starts = 1};
 }
 
+HalStackUsage hal_system_stack_usage(void)
+{
+    return (HalStackUsage){.used = 0, .capacity = 0};
+}
+
 HalBluetoothStatus *fake_hal_bluetooth(void)
 {
     return &fake.bluetooth;
