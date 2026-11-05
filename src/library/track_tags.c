@@ -152,6 +152,7 @@ static void put_code_point(TextBuilder *builder, uint32_t code_point)
     if (builder->length + size >= TRACK_TAG_TEXT_CAPACITY) {
         return;
     }
+    bool space = is_space(code_point);
     for (uint32_t index = size - 1; index > 0; index--) {
         builder->text[builder->length + index] = (char)(0x80 | (code_point & 0x3F));
         code_point >>= 6;
@@ -159,7 +160,7 @@ static void put_code_point(TextBuilder *builder, uint32_t code_point)
     builder->text[builder->length] = (char)(LEADS[size] | code_point);
     builder->length += size;
     builder->started = true;
-    if (!is_space(code_point)) {
+    if (!space) {
         builder->content_end = builder->length;
     }
 }
@@ -220,6 +221,10 @@ static uint32_t visible(uint32_t code_point)
 {
     if (code_point >= 0x80 && code_point < 0xA0) {
         return WINDOWS_1252[code_point - 0x80];
+    }
+    if ((code_point >= 0x2000 && code_point <= 0x200A) || code_point == 0x2028 ||
+        code_point == 0x2029 || code_point == 0x202F || code_point == 0x205F) {
+        return ' ';
     }
     bool hidden = (code_point < 0x20 && !is_space(code_point)) || code_point == 0x7F ||
                   code_point == 0xFEFF || (code_point >= 0x200B && code_point <= 0x200F) ||

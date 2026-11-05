@@ -396,6 +396,12 @@ class UnicodeFormTest(unittest.TestCase):
         self.assertEqual("It\u2019s \u2026", library_index.tag_text("It\x92s \x85"))
         self.assertEqual("Tab\tkept", library_index.tag_text("Tab\tkept"))
 
+    def test_odd_spaces_become_plain_spaces(self):
+        self.assertEqual(" A B C D E F ", library_index.tag_text(
+            "\u2003A\u2002B\u202fC\u205fD\u200aE\u2028F\u2009"))
+        self.assertEqual("x y", library_index.tag_text("x\u2000y"))
+        self.assertEqual("\u5468\u2027\u502b", library_index.tag_text("\u5468\u2027\u502b"))
+
     def test_decomposed_playlist_entries_and_folders_are_composed(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
