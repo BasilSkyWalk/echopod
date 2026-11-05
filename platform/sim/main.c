@@ -15,6 +15,7 @@
 #include "sim_power.h"
 #include "sim_script.h"
 #include "sim_storage.h"
+#include "sim_time.h"
 
 enum {
     EXIT_USAGE = 2,
@@ -41,7 +42,7 @@ static void print_usage(void)
     fputs("usage: echo_sim [--scale N] [--frames N] [--headless] [--screenshot FILE.bmp]\n"
           "                [--keys up,down,play,menu,back,power[:long],...]\n"
           "                [--card MUSIC_DIR] [--system-dir DIR_WITH_LIBRARY_DB]\n"
-          "                [--battery PERCENT] [--charging]\n",
+          "                [--battery PERCENT] [--charging] [--no-clock] [--clock-unset]\n",
           stderr);
 }
 
@@ -194,6 +195,7 @@ int main(int argument_count, char **arguments)
     sim_storage_configure(session.options.card_directory, session.options.system_directory);
     sim_audio_start(session.options.headless);
     sim_power_configure(session.options.battery_percent, session.options.battery_charging);
+    sim_time_configure(session.options.clock_absent, session.options.clock_unset);
     sim_glyphs_attach();
     app_start();
     app_show_splash();

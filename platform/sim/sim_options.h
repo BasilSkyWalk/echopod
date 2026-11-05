@@ -20,6 +20,8 @@ typedef struct SimOptions {
     const char *system_directory;
     uint8_t battery_percent;
     bool battery_charging;
+    bool clock_absent;
+    bool clock_unset;
 } SimOptions;
 
 bool sim_options_parse(int argument_count, char **arguments, SimOptions *options);

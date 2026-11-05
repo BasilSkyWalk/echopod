@@ -10,6 +10,7 @@
 #include "hal/bluetooth.h"
 #include "hal/power.h"
 #include "hal/storage.h"
+#include "hal/time.h"
 
 void fake_hal_reset(void);
 void fake_hal_set_version(const char *version);
@@ -77,6 +78,8 @@ bool fake_hal_display_on(void);
 int fake_hal_presents_at_power_on(void);
 uint8_t fake_hal_display_brightness(void);
 void fake_hal_set_battery(HalBattery battery);
+void fake_hal_set_time(HalTime time);
+int fake_hal_time_read_count(void);
 int fake_hal_power_off_count(void);
 void fake_hal_set_usb_start(bool started);
 int fake_hal_audio_gain(void);

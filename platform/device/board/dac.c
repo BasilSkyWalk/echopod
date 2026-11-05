@@ -10,22 +10,12 @@
 #include "gpio.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
+#include "i2c.h"
 #include "registers.h"
 
 #define I2C0_BASE 0x40040000u
 #define I2S1_BASE 0x40030000u
 #define ACODEC_BASE 0x40090000u
-
-#define I2C_CON (I2C0_BASE + 0x00u)
-#define I2C_CLKDIV (I2C0_BASE + 0x04u)
-#define I2C_MRXADDR (I2C0_BASE + 0x08u)
-#define I2C_MRXRADDR (I2C0_BASE + 0x0Cu)
-#define I2C_MTXCNT (I2C0_BASE + 0x10u)
-#define I2C_MRXCNT (I2C0_BASE + 0x14u)
-#define I2C_IEN (I2C0_BASE + 0x18u)
-#define I2C_IPD (I2C0_BASE + 0x1Cu)
-#define I2C_TXDATA (I2C0_BASE + 0x100u)
-#define I2C_RXDATA (I2C0_BASE + 0x200u)
 
 #define I2S_TXCR (I2S1_BASE + 0x00u)
 #define I2S_RXCR (I2S1_BASE + 0x04u)
@@ -60,23 +50,11 @@
 #define I2S_UNDERRUN 0x00000002u
 #define I2S_CLEAR_UNDERRUN 0x00000004u
 #define I2S_DMA_TX 0x00000110u
-#define I2C_MRXADDR_VALID 0x01000000u
 
 enum {
     GATE_GPIO1 = 0x95,
     RESET_I2C0 = 0x1A,
     RESET_I2S1 = 0x04,
-    I2C_ENABLE = 0x01,
-    I2C_MODE_RECEIVE = 0x02,
-    I2C_START = 0x08,
-    I2C_STOP = 0x10,
-    I2C_NAK_LAST = 0x20,
-    I2C_ALL_PENDING = 0x7F,
-    I2C_TX_DONE = 0x04,
-    I2C_RX_DONE = 0x08,
-    I2C_START_DONE = 0x10,
-    I2C_STOP_DONE = 0x20,
-    I2C_NAK = 0x40,
     I2C_TIMEOUT_MS = 10,
     FIFO_TIMEOUT_MS = 10,
     I2C_BUS_KHZ = 100,
@@ -96,15 +74,6 @@ enum {
     ACODEC_SETTLE_MS = 5,
     FADE_STEP_US = 2000
 };
-
-typedef enum I2cStage {
-    I2C_STAGE_NONE,
-    I2C_STAGE_START,
-    I2C_STAGE_SEND,
-    I2C_STAGE_NAK,
-    I2C_STAGE_STOP,
-    I2C_STAGE_RECEIVE
-} I2cStage;
 
 static const uint32_t SOC_AUDIO_GATES[] = {0x0E, 0x10, 0x11, 0x12, 0x13, 0x82, 0x83, 0x96};
 typedef struct AudioRate {
@@ -129,7 +98,7 @@ static const GpioPin DAC_PINS[] = {
     [DAC_PIN_RESET] = {2, 1}, [DAC_PIN_AMP] = {1, 4},
 };
 
-static HalToneDetail detail;
+static I2cPort port;
 static uint8_t volume_value;
 static bool volume_known;
 static bool gain_high;
@@ -141,74 +110,9 @@ static bool muted;
 static uint8_t applied_volume;
 static void (*fade_service)(void);
 
-static void note_failure(I2cStage stage)
-{
-    if (detail.stage == 0) {
-        detail =
-            (HalToneDetail){.stage = (uint8_t)stage, .pending = (uint8_t)register_read(I2C_IPD)};
-    }
-}
-
-static bool wait_pending(uint32_t bits, I2cStage stage)
-{
-    uint32_t start = hal_clock_milliseconds();
-    while ((register_read(I2C_IPD) & bits) == 0) {
-        if (hal_clock_milliseconds() - start >= I2C_TIMEOUT_MS) {
-            note_failure(stage);
-            return false;
-        }
-    }
-    return true;
-}
-
 HalToneDetail hal_audio_tone_detail(void)
 {
-    return detail;
-}
-
-static bool i2c_start(uint32_t mode)
-{
-    register_write(I2C_IPD, I2C_ALL_PENDING);
-    register_write(I2C_CON, I2C_ENABLE | mode | I2C_START);
-    if (!wait_pending(I2C_START_DONE, I2C_STAGE_START)) {
-        return false;
-    }
-    register_write(I2C_IPD, I2C_START_DONE);
-    register_write(I2C_CON, I2C_ENABLE | mode);
-    return true;
-}
-
-static bool i2c_stop(void)
-{
-    register_write(I2C_IPD, I2C_ALL_PENDING);
-    register_write(I2C_CON, I2C_ENABLE | I2C_STOP);
-    bool stopped = wait_pending(I2C_STOP_DONE, I2C_STAGE_STOP);
-    register_write(I2C_IPD, I2C_ALL_PENDING);
-    register_write(I2C_CON, 0);
-    return stopped;
-}
-
-static bool i2c_send(const uint8_t *bytes, uint32_t count)
-{
-    if (!i2c_start(0)) {
-        i2c_stop();
-        return false;
-    }
-    for (uint32_t word = 0; word * 4 < count; word++) {
-        uint32_t value = 0;
-        for (uint32_t byte = 0; byte < 4 && word * 4 + byte < count; byte++) {
-            value |= (uint32_t)bytes[word * 4 + byte] << (8 * byte);
-        }
-        register_write(I2C_TXDATA + 4 * word, value);
-    }
-    register_write(I2C_IPD, I2C_ALL_PENDING);
-    register_write(I2C_MTXCNT, count);
-    bool sent = wait_pending(I2C_TX_DONE | I2C_NAK, I2C_STAGE_SEND);
-    if (sent && (register_read(I2C_IPD) & I2C_NAK) != 0) {
-        note_failure(I2C_STAGE_NAK);
-        sent = false;
-    }
-    return i2c_stop() && sent;
+    return (HalToneDetail){.stage = port.stage, .pending = port.pending};
 }
 
 static uint32_t frame_header(uint8_t *frame, uint8_t address, uint32_t map)
@@ -227,30 +131,14 @@ static bool dac_write(void *context, uint8_t address, uint32_t map, uint8_t valu
     uint8_t frame[FRAME_CAPACITY];
     uint32_t length = frame_header(frame, address, map);
     frame[length++] = value;
-    return i2c_send(frame, length);
+    return i2c_send(&port, frame, length);
 }
 
 static bool dac_read(void *context, uint8_t address, uint32_t map, uint8_t *value)
 {
     (void)context;
     uint8_t frame[FRAME_CAPACITY];
-    if (!i2c_send(frame, frame_header(frame, address, map))) {
-        return false;
-    }
-    register_write(I2C_IPD, I2C_ALL_PENDING);
-    register_write(I2C_IEN, 0);
-    register_write(I2C_MRXADDR, I2C_MRXADDR_VALID + address + 1u);
-    register_write(I2C_MRXRADDR, 0);
-    if (!i2c_start(I2C_MODE_RECEIVE)) {
-        i2c_stop();
-        return false;
-    }
-    register_write(I2C_IPD, I2C_ALL_PENDING);
-    register_write(I2C_CON, register_read(I2C_CON) | I2C_NAK_LAST);
-    register_write(I2C_MRXCNT, 1);
-    bool received = wait_pending(I2C_RX_DONE, I2C_STAGE_RECEIVE);
-    *value = (uint8_t)register_read(I2C_RXDATA);
-    return i2c_stop() && received;
+    return i2c_receive(&port, frame, frame_header(frame, address, map), value, 1);
 }
 
 static void dac_set_pin(void *context, DacPin pin, bool level)
@@ -285,8 +173,7 @@ static void start_i2c(void)
     cru_reset(RESET_I2C0, true);
     board_delay_us(200);
     cru_reset(RESET_I2C0, false);
-    register_write(I2C_CON, 0);
-    register_write(I2C_CLKDIV, i2c_clock_divider(board_pclk_hz(), I2C_BUS_KHZ));
+    i2c_port_start(&port, I2C0_BASE, I2C_TIMEOUT_MS, I2C_BUS_KHZ);
 }
 
 static void set_bits(uint32_t address, uint32_t mask, uint32_t bits)
@@ -441,7 +328,6 @@ static const AudioRate *rate_of(uint32_t rate)
 static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, uint32_t format,
                                       uint32_t interrupts, bool transfer)
 {
-    detail = (HalToneDetail){.stage = I2C_STAGE_NONE, .pending = 0};
     cru_gate(GATE_GPIO1, true);
     use_dac_pins_as_gpio();
     dac_power_pins(&BUS);

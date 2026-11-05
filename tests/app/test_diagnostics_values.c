@@ -127,6 +127,63 @@ static void the_boot_pll_shows_its_fields_and_core_speed(void)
     CHECK(text_is("1078 1546 96 MHz", text));
 }
 
+static void the_time_row_says_when_the_clock_chip_does_not_answer(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_time_text((HalTime){.present = false}, text, sizeof text);
+    CHECK(text_is("No reply", text));
+}
+
+static void the_time_row_shows_the_date_and_time_with_zero_padding(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalTime time = {.present = true,
+                    .valid = true,
+                    .year = 2025,
+                    .month = 5,
+                    .day = 7,
+                    .hour = 4,
+                    .minute = 37,
+                    .second = 2};
+    diagnostics_time_text(time, text, sizeof text);
+    CHECK(text_is("2025-05-07 04:37:02", text));
+}
+
+static void the_time_row_adds_the_chip_flags(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalTime time = {.present = true,
+                    .valid = false,
+                    .low_voltage = true,
+                    .year = 2025,
+                    .month = 5,
+                    .day = 7,
+                    .hour = 4,
+                    .minute = 37,
+                    .second = 22};
+    diagnostics_time_text(time, text, sizeof text);
+    CHECK(text_is("2025-05-07 04:37:22 VL", text));
+    time.stopped = true;
+    time.century = true;
+    diagnostics_time_text(time, text, sizeof text);
+    CHECK(text_is("2025-05-07 04:37:22 VL STOP C", text));
+}
+
+static void the_time_row_marks_an_out_of_range_time_with_a_question_mark(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalTime time = {.present = true,
+                    .valid = false,
+                    .year = 2000,
+                    .month = 13,
+                    .day = 0,
+                    .hour = 24,
+                    .minute = 0,
+                    .second = 0};
+    diagnostics_time_text(time, text, sizeof text);
+    CHECK(text_is("2000-13-00 24:00:00 ?", text));
+}
+
 static void the_clock_row_steps_up_from_the_current_speed_then_wraps(void)
 {
     CHECK_EQUAL(96u, diagnostics_next_clock_mhz(48));
@@ -389,6 +446,10 @@ int main(void)
         TEST_CASE(the_last_usb_row_says_when_no_computer_answered),
         TEST_CASE(the_clock_row_steps_up_from_the_current_speed_then_wraps),
         TEST_CASE(the_clock_row_shows_the_actual_speed),
+        TEST_CASE(the_time_row_says_when_the_clock_chip_does_not_answer),
+        TEST_CASE(the_time_row_shows_the_date_and_time_with_zero_padding),
+        TEST_CASE(the_time_row_adds_the_chip_flags),
+        TEST_CASE(the_time_row_marks_an_out_of_range_time_with_a_question_mark),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

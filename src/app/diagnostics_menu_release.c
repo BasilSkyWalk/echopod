@@ -6,12 +6,18 @@
 #include "diagnostics_rows.h"
 
 enum {
-    RELEASE_DIAGNOSTICS_COUNT = 10
+    RELEASE_DIAGNOSTICS_COUNT = 11
 };
 
 static MenuItem value_item(StringId label, const char *(*value)(const void *context))
 {
     return (MenuItem){.label = i18n_text(label), .select = NULL, .context = NULL, .value = value};
+}
+
+static MenuItem action_item(StringId label, ScreenAction (*select)(void *context),
+                            const char *(*value)(const void *context))
+{
+    return (MenuItem){.label = i18n_text(label), .select = select, .context = NULL, .value = value};
 }
 
 void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Theme *theme)
@@ -29,6 +35,7 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
     items[7] = value_item(STR_DIAG_JACK_SINGLE_ENDED, diagnostics_row_jack_single_ended);
     items[8] = value_item(STR_DIAG_JACK_BALANCED, diagnostics_row_jack_balanced);
     items[9] = value_item(STR_DIAG_PANEL, diagnostics_row_panel);
+    items[10] = action_item(STR_DIAG_CLOCK, diagnostics_row_clock_read, diagnostics_row_clock);
     app_screens_build_menu(&screens->diagnostics, i18n_text(STR_DIAG_TITLE), items,
                            RELEASE_DIAGNOSTICS_COUNT, theme);
 }

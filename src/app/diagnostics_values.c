@@ -46,6 +46,40 @@ void diagnostics_panel_text(uint32_t id, char *text, size_t capacity)
     append_hex(&builder, id, 6);
 }
 
+static void append_two_digits(StringBuilder *builder, char separator, uint8_t value)
+{
+    string_builder_append_char(builder, separator);
+    string_builder_append_char(builder, (char)('0' + value / 10 % 10));
+    string_builder_append_char(builder, (char)('0' + value % 10));
+}
+
+void diagnostics_time_text(HalTime time, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!time.present) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_NO_REPLY));
+        return;
+    }
+    string_builder_append_unsigned(&builder, time.year);
+    append_two_digits(&builder, '-', time.month);
+    append_two_digits(&builder, '-', time.day);
+    append_two_digits(&builder, ' ', time.hour);
+    append_two_digits(&builder, ':', time.minute);
+    append_two_digits(&builder, ':', time.second);
+    if (time.low_voltage) {
+        string_builder_append(&builder, " VL");
+    }
+    if (time.stopped) {
+        string_builder_append(&builder, " STOP");
+    }
+    if (time.century) {
+        string_builder_append(&builder, " C");
+    }
+    if (!time.valid && !time.low_voltage && !time.stopped) {
+        string_builder_append(&builder, " ?");
+    }
+}
+
 static void hex_text(char *text, size_t capacity, uint32_t value, int digits)
 {
     StringBuilder builder = string_builder_make(text, capacity);
