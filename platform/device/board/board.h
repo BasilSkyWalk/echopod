@@ -24,6 +24,7 @@ bool board_display_lit(void);
 void board_display_clear(void);
 void board_input_start(void);
 void board_glyphs_start(void);
+bool board_resident_load(void);
 bool board_glyphs_entry(uint32_t entry, uint32_t *offset, uint32_t *size);
 void board_input_sample(uint32_t now_ms);
 BatteryGauge board_battery_gauge(void);

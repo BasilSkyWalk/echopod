@@ -1,6 +1,7 @@
 #include "settings_screens.h"
 
 #include "core/i18n.h"
+#include "core/resident.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
 
@@ -303,7 +304,7 @@ static void choose_slot(void *context, int index)
 #define OPTION_CHOICE(title, options, option)                                                      \
     {title, options, NULL, (int)(sizeof options / sizeof options[0]), NULL, NULL, NULL, option + 1}
 
-static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
+ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {STR_SETTINGS_SHUFFLE, SHUFFLE_OPTIONS, NULL, SHUFFLE_MODE_COUNT, current_shuffle,
      choose_shuffle, NULL, 0},
     {STR_SETTINGS_REPEAT, REPEAT_OPTIONS, NULL, REPEAT_MODE_COUNT, current_repeat, choose_repeat,

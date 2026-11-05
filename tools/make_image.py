@@ -25,6 +25,11 @@ CORE1_MP3_OFFSET = 0x240000
 CORE1_FLAC_OFFSET = 0x280000
 CORE1_AAC_OFFSET = 0x2A0200
 CORE1_OPUS_OFFSET = 0x218000
+RESIDENT_OFFSET = 0x238200
+RESIDENT_BASE = 0x0309A800
+RESIDENT_CAPACITY = 0x4800
+RESIDENT_HEADER_SIZE = 16
+RESIDENT_MAGIC = b"ERES"
 CORE1_MODULE_CAPACITY = 0x20000
 CORE1_MODULE_HEADER_SIZE = 512
 CORE1_MODULE_MAGIC = b"EC1M"
@@ -37,7 +42,7 @@ GLYPH_PAYLOAD_LIMIT = 0x30000
 GLYPH_REGIONS = (
     (GLYPH_PAYLOAD_LIMIT, OVERLAY_OFFSET),
     (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, FW_SIZE),
-    (CORE1_OPUS_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_MP3_OFFSET),
+    (RESIDENT_OFFSET + RESIDENT_CAPACITY, CORE1_MP3_OFFSET),
     (CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_FLAC_OFFSET),
 )
 TABLE_CAPACITY = 91
@@ -73,7 +78,7 @@ ELF_HEADER = struct.Struct("<16sHHIIIIIHHHHHH")
 ELF_SECTION = struct.Struct("<10I")
 SHF_ALLOC = 2
 SHT_NOBITS = 8
-FIRMWARE_SECTIONS = (".code", ".data", ".bss")
+FIRMWARE_SECTIONS = (".code", ".data", ".bss", ".resident")
 
 
 class ImageError(Exception):
@@ -85,6 +90,7 @@ class Firmware:
     code: bytes
     data: bytes
     bss_size: int
+    resident: bytes = b""
 
 
 @dataclass(frozen=True)
@@ -99,6 +105,7 @@ class ImageParts:
     glyph_faces: tuple = ()
     core1_aac: bytes = b""
     core1_opus: bytes = b""
+    resident: bytes = b""
 
 
 def crc_table():
@@ -188,6 +195,7 @@ def assemble(parts):
     image[FW_SIZE:FW_SIZE + HEADER_SIZE] = image[:HEADER_SIZE]
     image[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE] = parts.marker
     place_overlay(image, parts)
+    place_resident(image, parts.resident)
     place_core1_module(image, parts.core1_mp3, CORE1_MP3_OFFSET)
     place_core1_module(image, parts.core1_flac, CORE1_FLAC_OFFSET)
     place_core1_module(image, parts.core1_aac, CORE1_AAC_OFFSET, CORE1_AAC_CAPACITY)
@@ -208,6 +216,17 @@ def place_overlay(image, parts):
         raise ImageError("the payload reaches the overlay")
     header = OVERLAY_MAGIC + struct.pack("<III", len(overlay), crc32(overlay[OVERLAY_HEADER_SIZE:]), 0)
     image[OVERLAY_OFFSET:OVERLAY_OFFSET + len(overlay)] = header + overlay[OVERLAY_HEADER_SIZE:]
+
+
+def place_resident(image, resident):
+    if not resident:
+        return
+    if len(resident) > RESIDENT_CAPACITY or len(resident) < RESIDENT_HEADER_SIZE:
+        raise ImageError(f"the resident tables must be {RESIDENT_HEADER_SIZE} to "
+                         f"{RESIDENT_CAPACITY:#x} bytes")
+    header = RESIDENT_MAGIC + struct.pack("<III", len(resident),
+                                          crc32(resident[RESIDENT_HEADER_SIZE:]), 0)
+    image[RESIDENT_OFFSET:RESIDENT_OFFSET + len(resident)] = header + resident[RESIDENT_HEADER_SIZE:]
 
 
 def place_core1_module(image, program, offset, capacity=CORE1_MODULE_CAPACITY):
@@ -281,6 +300,9 @@ def check_firmware(firmware):
         raise ImageError("code and data must each start with an 8-byte vector table")
     if len(data) > MAX_DATA_SIZE:
         raise ImageError(f".data is {len(data)} bytes; only up to {MAX_DATA_SIZE} is proven")
+    if firmware.resident and (len(firmware.resident) % 4 or
+                              len(firmware.resident) < RESIDENT_HEADER_SIZE):
+        raise ImageError("the resident tables must start with a 16-byte header, in whole words")
     stack, reset = struct.unpack_from("<II", data)
     if stack != DATA_BASE:
         raise ImageError(f"the entry stack must be {DATA_BASE:#010x}")
@@ -355,8 +377,8 @@ def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", co
     ]
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     return assemble(ImageParts(bytes(header), tuple(rows), payload, bytes(MARKER_SIZE), overlay,
-                               core1_mp3,
-                               core1_flac, tuple(glyph_faces), core1_aac, core1_opus))
+                               core1_mp3, core1_flac, tuple(glyph_faces), core1_aac, core1_opus,
+                               firmware.resident))
 
 
 def validate_image(image):
@@ -415,6 +437,9 @@ def check_sections(sections):
         raise ImageError("loaded sections the image would drop: " + ", ".join(sorted(stray)))
     if sections[".code"].address != CODE_BASE or sections[".data"].address != DATA_BASE:
         raise ImageError(f".code must be at {CODE_BASE:#010x} and .data at {DATA_BASE:#010x}")
+    resident = sections.get(".resident")
+    if resident is not None and resident.size and resident.address != RESIDENT_BASE:
+        raise ImageError(f".resident must be at {RESIDENT_BASE:#010x}")
 
 
 def firmware_from_elf(elf):
@@ -424,7 +449,9 @@ def firmware_from_elf(elf):
     bss = sections.get(".bss")
     if bss is not None and bss.size and bss.address != DATA_BASE + len(data):
         raise ImageError(".bss must directly follow .data")
-    return Firmware(code=code, data=data, bss_size=bss.size if bss is not None else 0)
+    resident = sections.get(".resident")
+    return Firmware(code=code, data=data, bss_size=bss.size if bss is not None else 0,
+                    resident=resident.content if resident is not None else b"")
 
 
 def overlay_from_elf(elf):
@@ -520,7 +547,8 @@ def main(argv=None):
     arguments.output.write_bytes(image)
     print(f"wrote {arguments.output} ({build_tag}): "
           f"code {len(firmware.code):,} bytes, "
-          f"overlay {len(overlay):,} bytes, core 1 MP3 {len(core1_mp3):,} bytes, "
+          f"overlay {len(overlay):,} bytes, resident {len(firmware.resident):,} bytes, "
+          f"core 1 MP3 {len(core1_mp3):,} bytes, "
           f"core 1 FLAC {len(core1_flac):,} bytes, core 1 AAC {len(core1_aac):,} bytes, core 1 Opus {len(core1_opus):,} bytes, "
           f"glyph faces {sum(len(face) for face in glyph_faces):,} bytes, "
           f".data {len(firmware.data)} bytes, .bss {firmware.bss_size:,} bytes, "

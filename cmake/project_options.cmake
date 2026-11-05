@@ -37,3 +37,8 @@ if(ECHO_ADDRESS_SANITIZER)
     target_compile_options(echo_options INTERFACE -fsanitize=address)
     target_link_options(echo_options INTERFACE -fsanitize=address)
 endif()
+
+add_library(echo_lto INTERFACE)
+if(CMAKE_CROSSCOMPILING)
+    target_compile_options(echo_lto INTERFACE -flto -ffat-lto-objects -g)
+endif()

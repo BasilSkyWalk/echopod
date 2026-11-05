@@ -120,11 +120,11 @@ def font_source(font):
     glyph_lines, bitmap = glyph_table(font.glyphs)
     bitmap_lines = list(byte_lines(bitmap)) or ["    0x00,"]
     return "\n".join([
-        f"static const uint8_t {prefix}_BITMAP[] = {{",
+        f"ECHO_RESIDENT static const uint8_t {prefix}_BITMAP[] = {{",
         *bitmap_lines,
         "};",
         "",
-        f"static const Glyph {prefix}_GLYPHS[] = {{",
+        f"ECHO_RESIDENT static const Glyph {prefix}_GLYPHS[] = {{",
         *glyph_lines,
         "};",
         "",
@@ -148,7 +148,8 @@ def header_source(names):
 
 
 def fonts_source(fonts):
-    parts = ['#include "fonts/fonts.h"', "", "#include <stdint.h>", ""]
+    parts = ['#include "fonts/fonts.h"', "", "#include <stdint.h>", "",
+             '#include "core/resident.h"', ""]
     parts += [font_source(font) for font in fonts]
     return "\n".join(parts)
 

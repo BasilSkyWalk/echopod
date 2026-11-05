@@ -22,6 +22,7 @@ add_executable(echo_device
     board/overlay.c
     board/panic.c
     board/power.c
+    board/resident.c
     board/sd.c
     board/start_info.c
     board/watchdog.c
@@ -48,6 +49,7 @@ set_target_properties(echo_core1 PROPERTIES
 target_include_directories(echo_core1 PRIVATE board)
 target_link_libraries(echo_core1 PRIVATE echo_codec echo_device_logic echo_options)
 target_link_options(echo_core1 PRIVATE
+    -fno-lto
     -T${ECHO_CORE1_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1.map
 )
@@ -65,6 +67,7 @@ set_target_properties(echo_core1_mp3 PROPERTIES
 target_include_directories(echo_core1_mp3 PRIVATE board)
 target_link_libraries(echo_core1_mp3 PRIVATE echo_device_logic echo_libmad echo_options gcc)
 target_link_options(echo_core1_mp3 PRIVATE
+    -fno-lto
     -T${ECHO_CORE1_MP3_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1_mp3.map
 )
@@ -89,6 +92,7 @@ set_target_properties(echo_core1_aac PROPERTIES
 target_include_directories(echo_core1_aac PRIVATE board)
 target_link_libraries(echo_core1_aac PRIVATE echo_device_logic echo_faad2 echo_options gcc)
 target_link_options(echo_core1_aac PRIVATE
+    -fno-lto
     -T${ECHO_CORE1_AAC_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1_aac.map
 )
@@ -114,6 +118,7 @@ set_target_properties(echo_core1_opus PROPERTIES
 target_include_directories(echo_core1_opus PRIVATE board)
 target_link_libraries(echo_core1_opus PRIVATE echo_device_logic echo_opus echo_options gcc)
 target_link_options(echo_core1_opus PRIVATE
+    -fno-lto
     -T${ECHO_CORE1_OPUS_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1_opus.map
 )
@@ -140,7 +145,7 @@ set_target_properties(echo_device PROPERTIES
     LINK_DEPENDS ${ECHO_DEVICE_LINKER_SCRIPT}
 )
 set_source_files_properties(board/libc.c board/startup.c PROPERTIES
-    COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns"
+    COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns;-fno-lto"
 )
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
@@ -160,6 +165,8 @@ if(CMAKE_CROSSCOMPILING)
         board/overlay.c
         board/panic.c
         board/power.c
+        board/resident.c
+        board/sd.c
         board/start_info.c
         board/storage.c
         board/system.c
@@ -170,8 +177,9 @@ if(CMAKE_CROSSCOMPILING)
         PROPERTIES COMPILE_OPTIONS -Os
     )
 endif()
-target_link_libraries(echo_device PRIVATE echo_app echo_device_logic echo_options)
+target_link_libraries(echo_device PRIVATE echo_app echo_device_logic echo_options echo_lto)
 target_link_options(echo_device PRIVATE
+    -flto -flto-partition=one
     -T${ECHO_DEVICE_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_device.map
 )
@@ -185,6 +193,7 @@ set_target_properties(echo_rescan_overlay PROPERTIES
 add_dependencies(echo_rescan_overlay echo_device)
 target_link_libraries(echo_rescan_overlay PRIVATE echo_library_scan echo_options gcc)
 target_link_options(echo_rescan_overlay PRIVATE
+    -fno-lto
     -T${ECHO_OVERLAY_LINKER_SCRIPT}
     -Wl,--just-symbols=$<TARGET_FILE:echo_device>
     -Wl,--allow-multiple-definition
@@ -210,9 +219,19 @@ add_custom_target(echo_device_image ALL
         --core1-opus ${ECHO_CORE1_OPUS_BINARY}
         ${ECHO_GLYPH_FACE_ARGUMENTS}
         --output ${ECHO_DEVICE_IMAGE}
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
+        --build ${CMAKE_BINARY_DIR} --summary --nm ${CMAKE_NM}
     BYPRODUCTS ${ECHO_DEVICE_IMAGE}
     DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
         ${ECHO_CORE1_AAC_BINARY} ${ECHO_CORE1_OPUS_BINARY}
         ${PROJECT_SOURCE_DIR}/tools/make_image.py
     VERBATIM
+)
+
+add_custom_target(echo_size_report
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
+        --build ${CMAKE_BINARY_DIR} --nm ${CMAKE_NM}
+    DEPENDS echo_device echo_rescan_overlay
+    VERBATIM
+    USES_TERMINAL
 )

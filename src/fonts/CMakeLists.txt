@@ -1,8 +1,11 @@
 add_library(echo_fonts STATIC fonts.c)
 target_include_directories(echo_fonts PUBLIC include)
+if(CMAKE_CROSSCOMPILING)
+    target_compile_definitions(echo_fonts PRIVATE ECHO_RESIDENT_TABLES)
+endif()
 target_link_libraries(echo_fonts
     PUBLIC echo_gfx
-    PRIVATE echo_options
+    PRIVATE echo_options echo_lto
 )
 
 file(READ ${PROJECT_SOURCE_DIR}/assets/fonts/glyph_pack.json ECHO_GLYPH_PACK_CONFIG)
