@@ -54,7 +54,7 @@ BoardRunSnapshot board_start_record_snapshot(void)
                               .millivolts = record.millivolts};
 }
 
-void device_fault_handler(const uint32_t *frame)
+__attribute__((used)) void device_fault_handler(const uint32_t *frame)
 {
     start_record_fault(&record, register_read(SCB_CFSR), register_read(SCB_HFSR),
                        frame[STACKED_PC_WORD]);

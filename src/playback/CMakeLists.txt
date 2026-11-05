@@ -8,5 +8,5 @@ add_library(echo_playback STATIC
 target_include_directories(echo_playback PUBLIC include)
 target_link_libraries(echo_playback
     PUBLIC echo_core echo_library
-    PRIVATE echo_options echo_compact
+    PRIVATE echo_options echo_compact echo_lto
 )

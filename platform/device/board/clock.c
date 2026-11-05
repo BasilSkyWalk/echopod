@@ -70,7 +70,7 @@ __attribute__((naked)) void device_systick_entry(void)
     __asm__ volatile("mrs r0, msp\n\tb board_systick_handler");
 }
 
-void board_systick_handler(const uint32_t *frame)
+__attribute__((used)) void board_systick_handler(const uint32_t *frame)
 {
     tick_clock_reload(&clock);
     periods_since_scan++;

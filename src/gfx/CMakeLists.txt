@@ -15,5 +15,5 @@ if(CMAKE_CROSSCOMPILING)
 endif()
 target_link_libraries(echo_gfx
     PUBLIC echo_core
-    PRIVATE echo_options
+    PRIVATE echo_options echo_lto
 )
