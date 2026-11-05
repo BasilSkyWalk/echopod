@@ -473,9 +473,22 @@ static void doze(BluetoothLink *link, uint32_t now_ms)
     }
 }
 
+static void wake_for_play(BluetoothLink *link, const Player *player, uint32_t now_ms)
+{
+    bool started = player->state == PLAYER_PLAYING && link->player_state != PLAYER_PLAYING;
+    link->player_state = (uint8_t)player->state;
+    if (started && link->saved.count > 0 && hal_audio_jack() == HAL_AUDIO_JACK_NONE) {
+        wake(link, now_ms);
+    }
+}
+
 void bluetooth_link_step(BluetoothLink *link, Player *player, uint32_t now_ms)
 {
-    if (!link->saved.enabled || link->dozing) {
+    if (!link->saved.enabled) {
+        return;
+    }
+    if (link->dozing) {
+        wake_for_play(link, player, now_ms);
         return;
     }
     if (link->restarting) {

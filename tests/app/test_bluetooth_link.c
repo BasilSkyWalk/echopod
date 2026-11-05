@@ -603,6 +603,45 @@ static void browsing_wakes_a_dozing_module(void)
     CHECK(fake_hal_bluetooth_powered());
 }
 
+static void pressing_play_wakes_a_dozing_module(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    step(START_MS + BLUETOOTH_LINK_IDLE_OFF_MS);
+    CHECK(!fake_hal_bluetooth_powered());
+    play();
+    step(START_MS + BLUETOOTH_LINK_IDLE_OFF_MS + 100);
+    CHECK(fake_hal_bluetooth_powered());
+    CHECK(summary_is("Starting…"));
+    ready();
+    step(START_MS + BLUETOOTH_LINK_IDLE_OFF_MS + 200);
+    CHECK_EQUAL(1, fake_hal_bluetooth_connect_count());
+}
+
+static void playing_on_wired_headphones_leaves_a_dozing_module_off(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    step(START_MS + BLUETOOTH_LINK_IDLE_OFF_MS);
+    fake_hal_audio_set_jack(HAL_AUDIO_JACK_SINGLE_ENDED);
+    play();
+    step(START_MS + BLUETOOTH_LINK_IDLE_OFF_MS + 100);
+    CHECK(!fake_hal_bluetooth_powered());
+}
+
+static void a_dozing_module_without_remembered_headphones_stays_off_on_play(void)
+{
+    fresh();
+    save(true, NULL);
+    start();
+    step(START_MS + BLUETOOTH_LINK_IDLE_OFF_MS);
+    play();
+    step(START_MS + BLUETOOTH_LINK_IDLE_OFF_MS + 100);
+    CHECK(!fake_hal_bluetooth_powered());
+}
+
 static void browsing_searches_for_devices(void)
 {
     fresh();
@@ -816,6 +855,9 @@ int main(void)
         TEST_CASE(losing_the_buds_pauses_playback),
         TEST_CASE(an_unused_module_switches_itself_off),
         TEST_CASE(browsing_wakes_a_dozing_module),
+        TEST_CASE(pressing_play_wakes_a_dozing_module),
+        TEST_CASE(playing_on_wired_headphones_leaves_a_dozing_module_off),
+        TEST_CASE(a_dozing_module_without_remembered_headphones_stays_off_on_play),
         TEST_CASE(browsing_searches_for_devices),
         TEST_CASE(pairing_connects_the_chosen_device),
         TEST_CASE(a_search_that_finds_remembered_headphones_connects_them),

@@ -187,7 +187,7 @@ Music plays through the headphones whenever nothing is plugged into either jack.
 
 **Too quiet?** Settings → **Bluetooth level** (the last row of the Settings list) has *Standard* and *Louder*. Standard is the level earlier versions used; Louder raises the signal sent to the Bluetooth module by 6.5 dB, to the same top level as the 3.5 mm jack. If Louder distorts at full volume with your headphones, go back to Standard. The headphones' own volume control is separate from the player's.
 
-The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery until you open its screen again or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
+The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery; it comes back when you open its screen, press play with nothing plugged in, or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
 
 ## Audiobooks and podcasts
 
