@@ -214,8 +214,9 @@ static void the_memory_holds_whole_sets_of_slots(void)
     uint32_t slots = font_pack_attach(READER, memory, sizeof memory);
     CHECK(slots >= FONT_PACK_WAYS);
     CHECK_EQUAL(0, slots % FONT_PACK_WAYS);
-    uint32_t sets = slots / FONT_PACK_WAYS;
-    CHECK_EQUAL(0, sets & (sets - 1));
+    uint32_t smaller = font_pack_attach(READER, memory, sizeof memory - 1024);
+    CHECK(smaller < slots);
+    CHECK(smaller + 3 * FONT_PACK_WAYS >= slots);
 }
 
 static void a_font_falls_back_to_its_pack(void)

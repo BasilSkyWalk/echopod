@@ -17,6 +17,7 @@ from pathlib import Path
 CODE_WINDOW = 0x2666C
 LOADED_LIMIT = 437600
 OVERLAY_CAPACITY = 0x15000
+RESIDENT_CAPACITY = 0x4800
 CODE_SECTIONS = (".code",)
 RAM_SECTIONS = (".data", ".bss", ".noinit")
 INPUT_LINE = re.compile(r"^ (\S+)\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)\s+(\S.*)$")
@@ -181,6 +182,8 @@ def summary(device_map, overlay_map=None):
     bss = sizes.get(".bss", 0)
     lines = [limit_line("code window", code, CODE_WINDOW),
              limit_line("loaded total (code + .data + .bss)", code + data + bss, LOADED_LIMIT)]
+    if ".resident" in sizes:
+        lines.append(limit_line("resident tables", sizes[".resident"], RESIDENT_CAPACITY))
     if overlay_map is not None:
         overlay = output_sizes(overlay_map).get(".overlay", 0)
         lines.append(limit_line("rescan overlay", overlay, OVERLAY_CAPACITY))

@@ -52,10 +52,7 @@ uint32_t font_pack_attach(FontPackReader reader, void *memory, size_t bytes)
     if (reader.read == NULL || memory == NULL || bytes < sizeof(PackState) + set_bytes) {
         return 0;
     }
-    uint32_t sets = 1;
-    while ((size_t)sets * 2 * set_bytes <= bytes - sizeof(PackState)) {
-        sets *= 2;
-    }
+    uint32_t sets = (uint32_t)((bytes - sizeof(PackState)) / set_bytes);
     pack_reader = reader;
     state = memory;
     slots = (PackSlot *)(state + 1);
@@ -195,7 +192,7 @@ static bool load_glyph(uint32_t index, uint32_t codepoint, PackSlot *slot)
 
 static uint32_t set_of(uint32_t key)
 {
-    return (key * 2654435761u >> 16) & (slot_count / FONT_PACK_WAYS - 1);
+    return (key * 2654435761u >> 16) % (slot_count / FONT_PACK_WAYS);
 }
 
 const Glyph *font_pack_find(uint32_t face, uint32_t codepoint)

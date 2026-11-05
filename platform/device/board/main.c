@@ -175,8 +175,8 @@ void board_main(void)
     uint32_t boot_millivolts = battery_millivolts(board_battery_boot_reading());
     board_input_start();
     board_display_start();
-    switch_off_when_empty(boot_millivolts);
     board_glyphs_start();
+    switch_off_when_empty(boot_millivolts);
     app_start();
     app_show_splash();
     board_stall_pause(false);

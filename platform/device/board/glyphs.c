@@ -14,7 +14,7 @@
 enum {
     SECTOR_BYTES = 512,
     SECTOR_WORDS = SECTOR_BYTES / 4,
-    GLYPH_RAM_BYTES = 0xD000,
+    GLYPH_RAM_BYTES = 0x8800,
     CACHE_WORDS = (GLYPH_RAM_BYTES - 2 * SECTOR_BYTES) / 4,
     MAX_ENTRIES = (SECTOR_BYTES - 8) / 8
 };
@@ -87,6 +87,7 @@ void board_glyphs_start(void)
     face_count = 0;
     entry_count = 0;
     sector_lba = NO_SECTOR;
+    board_resident_load();
     if (!emmc_start(&info) ||
         !emmc_read(NULL, info.layout.slot_1 + GLYPH_TABLE_OFFSET / SECTOR_BYTES, 1, table) ||
         table[0] != GLYPH_TABLE_MAGIC) {

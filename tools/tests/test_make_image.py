@@ -31,11 +31,11 @@ def vector_table(stack=0x03004000, reset=RESET, size=256):
 
 
 def firmware(code_tail=b"\xAA" * 64, data_tail=b"", bss_size=0x100, stack=0x03004000,
-             reset=RESET, code_reset=RESET):
+             reset=RESET, code_reset=RESET, resident=b""):
     return make_image.Firmware(
         code=vector_table(reset=code_reset) + code_tail,
         data=struct.pack("<II", stack, reset) + data_tail,
-        bss_size=bss_size)
+        bss_size=bss_size, resident=resident)
 
 
 def build(firmware_parts=None, **options):
@@ -461,6 +461,61 @@ class OverlayTest(unittest.TestCase):
                         (".data", SHT_PROGBITS, SHF_ALLOC | 1, 0x0307B000, b"\x01", 1)])
         with self.assertRaises(make_image.ImageError):
             make_image.overlay_from_elf(elf)
+
+
+class ResidentTablesTest(unittest.TestCase):
+    def resident(self, body=b"\x3C" * 100):
+        return bytes(16) + body
+
+    def test_the_tables_land_at_their_offset_with_size_and_crc(self):
+        resident = self.resident()
+        image = build(firmware(resident=resident))
+        offset = make_image.RESIDENT_OFFSET
+        self.assertEqual(b"ERES", image[offset:offset + 4])
+        self.assertEqual(len(resident), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(resident[16:]), word(image, offset + 8))
+        self.assertEqual(resident[16:], image[offset + 16:offset + len(resident)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_the_tables_sit_after_the_opus_program_and_before_the_mp3_slot(self):
+        opus_end = (make_image.CORE1_OPUS_OFFSET + make_image.CORE1_MODULE_HEADER_SIZE
+                    + make_image.CORE1_MODULE_CAPACITY)
+        self.assertEqual(opus_end, make_image.RESIDENT_OFFSET)
+        self.assertLessEqual(make_image.RESIDENT_OFFSET + make_image.RESIDENT_CAPACITY,
+                             make_image.CORE1_MP3_OFFSET)
+        self.assertIn((make_image.RESIDENT_OFFSET + make_image.RESIDENT_CAPACITY,
+                       make_image.CORE1_MP3_OFFSET), make_image.GLYPH_REGIONS)
+
+    def test_the_tables_are_not_loaded_at_start(self):
+        with_tables = build(firmware(resident=self.resident()))
+        without = build()
+        self.assertEqual(row(without, 0), row(with_tables, 0))
+        self.assertEqual(row(without, 1), row(with_tables, 1))
+        self.assertEqual(word(without, make_image.FW1_END_OFFSET),
+                         word(with_tables, make_image.FW1_END_OFFSET))
+
+    def test_tables_bigger_than_their_ram_are_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(resident=self.resident(bytes(make_image.RESIDENT_CAPACITY))))
+
+    def test_tables_without_a_header_or_in_odd_bytes_are_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(resident=b"\x01" * 8))
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(resident=self.resident(b"\x01" * 7)))
+
+    def test_the_tables_come_from_the_elf_resident_section(self):
+        parts = firmware(resident=self.resident(b"\x01\x02\x03\x04"))
+        section = (".resident", SHT_PROGBITS, SHF_ALLOC, 0x0309A800, parts.resident,
+                   len(parts.resident))
+        self.assertEqual(parts, make_image.firmware_from_elf(firmware_elf(parts, [section])))
+
+    def test_a_resident_section_elsewhere_is_refused(self):
+        parts = firmware(resident=self.resident())
+        section = (".resident", SHT_PROGBITS, SHF_ALLOC, 0x03092000, parts.resident,
+                   len(parts.resident))
+        with self.assertRaises(make_image.ImageError):
+            make_image.firmware_from_elf(firmware_elf(parts, [section]))
 
 
 class Core1ModuleTest(unittest.TestCase):

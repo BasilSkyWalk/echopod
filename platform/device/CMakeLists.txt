@@ -22,6 +22,7 @@ add_executable(echo_device
     board/overlay.c
     board/panic.c
     board/power.c
+    board/resident.c
     board/sd.c
     board/start_info.c
     board/watchdog.c
@@ -164,6 +165,8 @@ if(CMAKE_CROSSCOMPILING)
         board/overlay.c
         board/panic.c
         board/power.c
+        board/resident.c
+        board/sd.c
         board/start_info.c
         board/storage.c
         board/system.c
@@ -217,7 +220,7 @@ add_custom_target(echo_device_image ALL
         ${ECHO_GLYPH_FACE_ARGUMENTS}
         --output ${ECHO_DEVICE_IMAGE}
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
-        --build ${CMAKE_BINARY_DIR} --summary
+        --build ${CMAKE_BINARY_DIR} --summary --nm ${CMAKE_NM}
     BYPRODUCTS ${ECHO_DEVICE_IMAGE}
     DEPENDS echo_device echo_rescan_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
         ${ECHO_CORE1_AAC_BINARY} ${ECHO_CORE1_OPUS_BINARY}
@@ -227,7 +230,7 @@ add_custom_target(echo_device_image ALL
 
 add_custom_target(echo_size_report
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
-        --build ${CMAKE_BINARY_DIR}
+        --build ${CMAKE_BINARY_DIR} --nm ${CMAKE_NM}
     DEPENDS echo_device echo_rescan_overlay
     VERBATIM
     USES_TERMINAL
