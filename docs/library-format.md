@@ -162,7 +162,24 @@ The names are copied from the library when the play starts, not stored as indexe
 
 A slot is a record when its magic, its checksum and its place (`(sequence − 1) mod slots`) all agree; anything else (zeros, a record torn by a power cut, data left on the card from before the file was made) is skipped. To find where to write, the player reads slot 0 and then bisects for the first slot that doesn't hold the next sequence number. If slot 0 isn't a record, it checks the last slot, so a torn write over slot 0 after a wrap continues from the right number; otherwise it starts at 1. The session is one more than the newest record's.
 
-Dating the records. The Unix-time field is 0 until the player has a clock, so the tool dates a session from its newest record with a time when there is one; otherwise it counts back from the moment it runs (`--now`), taken as the time of the newest record. That's exact for the session the player is in when it's connected (the "connected to a computer" record is written at that moment) and for every play in that session. An earlier session is placed so that its last record ends when the next session started: the time the player was off between them is unknown and counted as none, so those plays can be dated later than they really happened (by however long the player was off).
+Dating the records. The Unix-time field holds the UTC time the record was written (the player's local clock minus its time zone setting) and is 0 while the clock or the zone is unknown; the tool dates a session from its newest record with a time when there is one (earlier records of the same session, written before the clock was set, follow from it); otherwise it counts back from the moment it runs (`--now`), taken as the time of the newest record. That's exact for the session the player is in when it's connected (the "connected to a computer" record is written at that moment) and for every play in that session. An earlier session is placed so that its last record ends when the next session started: the time the player was off between them is unknown and counted as none, so those plays can be dated later than they really happened (by however long the player was off).
+
+## Clock record
+
+`/.echo/clock.bin` (20 bytes, little-endian) is written by echo-sync as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends (see `docs/architecture.md`, Clock). The player never writes it.
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 | `ECLK` |
+| 4 | 1 | version, 1 |
+| 5 | 1 | flags, 0 |
+| 6 | 2 | reserved, 0 |
+| 8 | 4 | the computer's time as Unix seconds (UTC) |
+| 12 | 2 | the computer's UTC offset in minutes, signed (`time.localtime().tm_gmtoff`) |
+| 14 | 2 | reserved, 0 |
+| 16 | 4 | FNV-1a of bytes 0–15 |
+
+The player accepts a record whose magic, version and checksum agree and whose time falls in 2024–2099, and only when its time differs from the record it saw when it started: it sets the chip to the time plus the offset (the chip keeps local time), stores the offset as its time zone setting (rounded to 15 minutes), and ignores the same record from then on.
 
 ## Covers file
 

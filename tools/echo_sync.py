@@ -22,6 +22,13 @@ WRITE_CHUNK_BYTES = MEBIBYTE
 SCAN_MAGIC = b"MESC"
 SCAN_RECORD = struct.Struct("<4sIII16s")
 SCAN_PRINT_BYTES = 16
+CLOCK_NAME = "clock.bin"
+CLOCK_MAGIC = b"ECLK"
+CLOCK_VERSION = 1
+CLOCK_RECORD = struct.Struct("<4sBBHIhHI")
+CLOCK_CHECKED_BYTES = 16
+CLOCK_FIRST_YEAR = 2024
+CLOCK_LAST_YEAR = 2099
 WORD_MASK = 0xFFFFFFFF
 SECOND_SEED = cover_export.FNV_OFFSET ^ 0x5BD1E995
 PATH_CAPACITY = 1024
@@ -94,6 +101,7 @@ class SyncOptions:
     library: bool = True
     covers: bool = True
     fingerprint: bool = True
+    clock: bool = True
     dry_run: bool = False
     verbose: bool = False
 
@@ -217,6 +225,50 @@ def stored_fingerprint(data):
         return None
     magic, first, second, entries, _ = SCAN_RECORD.unpack_from(data)
     return Fingerprint(True, first, second, entries) if magic == SCAN_MAGIC else None
+
+
+def clock_record(utc_seconds, offset_minutes):
+    body = CLOCK_RECORD.pack(CLOCK_MAGIC, CLOCK_VERSION, 0, 0, int(utc_seconds),
+                             int(offset_minutes), 0, 0)[:CLOCK_CHECKED_BYTES]
+    return body + struct.pack("<I", cover_export.fnv1a(body, cover_export.FNV_OFFSET))
+
+
+def stored_clock(data):
+    if len(data) < CLOCK_RECORD.size:
+        return None
+    magic, version, _, _, utc_seconds, offset_minutes, _, check = CLOCK_RECORD.unpack_from(data)
+    body = bytes(data[:CLOCK_CHECKED_BYTES])
+    if (magic, version) != (CLOCK_MAGIC, CLOCK_VERSION):
+        return None
+    if check != cover_export.fnv1a(body, cover_export.FNV_OFFSET):
+        return None
+    return utc_seconds, offset_minutes
+
+
+def clock_text(utc_seconds, offset_minutes):
+    local = UNIX_EPOCH + timedelta(seconds=utc_seconds + offset_minutes * 60)
+    sign = "-" if offset_minutes < 0 else "+"
+    hours, minutes = divmod(abs(offset_minutes), 60)
+    return f"{local:%Y-%m-%d %H:%M} UTC{sign}{hours:02d}:{minutes:02d}"
+
+
+def write_clock(echo, options, now=None, offset_minutes=None):
+    utc_seconds = int(time.time()) if now is None else int(now)
+    offset_minutes = current_offset() // 60 if offset_minutes is None else offset_minutes
+    local_year = (UNIX_EPOCH + timedelta(seconds=utc_seconds + offset_minutes * 60)).year
+    if not CLOCK_FIRST_YEAR <= local_year <= CLOCK_LAST_YEAR:
+        print(f"  {CLOCK_NAME:<11} not written: this computer's clock says {local_year}")
+        return False
+    text = clock_text(utc_seconds, offset_minutes)
+    if options.dry_run:
+        print(f"  would write {CLOCK_NAME}: {text}")
+        return False
+    try:
+        (echo / CLOCK_NAME).write_bytes(clock_record(utc_seconds, offset_minutes))
+    except OSError as error:
+        raise SyncError(f"couldn't write {echo / CLOCK_NAME}: {error.strerror or error}") from error
+    print(f"  {CLOCK_NAME:<11} {text}")
+    return True
 
 
 def stored_version(data):
@@ -593,9 +645,10 @@ def sync(card, volume, options):
         write_or_report(library_path, library_data, LIBRARY_FILE, options)
     if covers_data is not None:
         write_or_report(echo / COVERS_FILE.name, covers_data, COVERS_FILE, options)
-    if before is None:
-        return False
-    return record_fingerprint(echo, card, volume, before, options)
+    recorded = before is not None and record_fingerprint(echo, card, volume, before, options)
+    if options.clock:
+        write_clock(echo, options)
+    return recorded
 
 
 def print_next_steps(options, recorded, volume, seconds):
@@ -604,6 +657,8 @@ def print_next_steps(options, recorded, volume, seconds):
         print("Nothing was written (--dry-run).")
         return
     print("Next: eject the card safely, then put it back in the player.")
+    if options.clock:
+        print("The player sets its clock from this computer's when the USB session ends.")
     if recorded:
         print("The player will use this library without scanning the card again.")
         if volume.caveat:
@@ -655,8 +710,8 @@ def describe(fingerprint):
 
 def options_from(arguments):
     return SyncOptions(library=not arguments.covers_only, covers=not arguments.no_covers,
-                       fingerprint=not arguments.no_fingerprint, dry_run=arguments.dry_run,
-                       verbose=arguments.verbose)
+                       fingerprint=not arguments.no_fingerprint, clock=not arguments.no_clock,
+                       dry_run=arguments.dry_run, verbose=arguments.verbose)
 
 
 def parse_arguments(argv):
@@ -674,6 +729,8 @@ def parse_arguments(argv):
     parser.add_argument("--no-fingerprint", action="store_true",
                         help="leave scan.bin alone, so the player decides itself whether to "
                              "rescan")
+    parser.add_argument("--no-clock", action="store_true",
+                        help="don't write clock.bin, so the player keeps its own time")
     parser.add_argument("--check", action="store_true",
                         help="only compare this computer's music fingerprint with the player's")
     parser.add_argument("--dry-run", action="store_true",

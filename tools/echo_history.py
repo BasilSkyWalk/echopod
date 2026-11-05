@@ -1,13 +1,15 @@
 """Turns the listen history EchoPod keeps on a card into a .scrobbler.log for Last.fm uploaders.
 
 The player writes /.echo/history.bin, a ring of 512-byte records (see docs/library-format.md).
-It has no clock, so a record says when a play started and ended in milliseconds since the player
-was switched on, plus a session number that goes up once per start. The player also writes a
-"computer" mark whenever it connects to a computer over USB. This tool dates the records by
-counting back from now: the newest record is taken to have happened at the moment the tool runs
-(or at --now), which is right when the tool runs while the player is connected. Within one
-session the times are exact; across a power-off the gap is unknown, so earlier sessions are placed
-back to back, ending where the next one started.
+A record says when a play started and ended in milliseconds since the player was switched on,
+plus a session number that goes up once per start, and, when the player's clock was set (by
+echo-sync, or by hand in Settings with a time zone), the Unix time the record was written. The
+player also writes a "computer" mark whenever it connects to a computer over USB. A session with
+a timed record is dated from it exactly. The rest is dated by counting back from now: the newest
+record is taken to have happened at the moment the tool runs (or at --now), which is right when
+the tool runs while the player is connected. Within one session the times are exact; across a
+power-off the gap is unknown, so earlier sessions are placed back to back, ending where the next
+one started.
 
 The output is the Rockbox/iPod AudioScrobbler 1.1 log that existing uploaders read. Plays already
 exported are remembered in /.echo/history-exported.txt, so running the tool again only adds new

@@ -118,6 +118,7 @@ To see whether it works on your card, let the player scan it once, then run echo
 | `--no-covers` | Build the library only; `covers.bin` stays as it is, so new albums show without covers until the next rescan on the player |
 | `--covers-only` | Rebuild `covers.bin` from the card's `library.db` |
 | `--no-fingerprint` | Leave `scan.bin` alone, so the player compares the music with its own last scan |
+| `--no-clock` | Don't write `clock.bin`, so the player keeps its own time (see Clock below) |
 | `--check` | Only compare the computer's fingerprint with the player's |
 | `--yes` | Create `/.echo` without asking |
 | `--verbose` | List the albums without art |
@@ -141,7 +142,18 @@ Settings → **Volume buttons** changes what the rocker does on Now Playing and 
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
-More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, and **Listen history** turns the log of played songs on or off (below). The start screen can also be Album Artists, Genres, Folders or All Songs.
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, and **Listen history** turns the log of played songs on or off (below). **Clock** shows the time in the status bar and **Date & time** sets it (see Clock below). The start screen can also be Album Artists, Genres, Folders or All Songs.
+
+## Clock
+
+The player has a clock chip that keeps time while it's off. EchoPod reads it when it starts and every ten minutes, and sets it in two ways:
+
+- **echo-sync** writes the computer's time and time zone to the card (`/.echo/clock.bin`) at the end of every sync, and the player takes it when the USB session ends (eject the card safely, or unplug): a toast says "Clock set from the computer". The clock then matches the computer's to within the seconds between the end of the sync and the eject. A card synced in a card reader doesn't set the clock, because the player can't tell how long ago that was; sync with the player plugged in, or set the time by hand. `--no-clock` leaves the clock alone.
+- **Settings → Date & time** sets it by hand: vol± choose a row (year, month, day, hour, minute, time zone), ▶ starts changing it (vol± change the value, ▶ finishes), Back leaves and sets the clock. The time zone is only used to date the listen history (below); the clock itself shows the local time you set.
+
+**Settings → Clock** (Off by default) shows the time, `HH:MM`, in the status bar next to the play icon. It's left out when it doesn't fit (in portrait, next to a full battery percentage). Until the clock has been set, the status bar shows no time and Date & time says "Not set". Diagnostics → Clock shows what the chip itself holds, with ` VL` while it has never been set.
+
+Whether the chip keeps time on every player hasn't been confirmed yet; if yours loses the time when switched off, set it again or sync.
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
 
@@ -216,7 +228,7 @@ Podcasts/
 
 The player keeps a log of the songs you play in `/.echo/history.bin` on the card (the last 2,000 or so), so you can add them to Last.fm or ListenBrainz from a computer. It's on by default; Settings → Listen history turns it off (the log already on the card stays until you delete it). Audiobooks and podcasts are never logged.
 
-The player has no clock, so it writes down the order of the plays and how long each one lasted, and the dates are worked out when you connect it to a computer:
+While the clock is set and has a time zone (a sync sets both; Date & time asks for the zone), each play is dated exactly. Before that the player only writes down the order of the plays and how long each one lasted, and the dates are worked out when you connect it to a computer:
 
 1. Connect the player over USB (as a drive).
 2. Run `python tools/echo_history.py E:\` with the player's card drive or mount folder. It writes the new plays to `.scrobbler.log` at the root of the card, the "Rockbox" or "old iPod" log that scrobbler uploaders read, and remembers what it exported (`/.echo/history-exported.txt`), so running it again only adds plays since the last time. If you sync with echo-sync, `--history` does this step at the end of a sync.
