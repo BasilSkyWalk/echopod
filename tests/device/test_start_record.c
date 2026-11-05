@@ -6,6 +6,15 @@ static StartRecord garbage(void)
     return (StartRecord){.magic = 0x12345678u, .starts = 99, .check = 7, .uptime_ms = 5000};
 }
 
+static StallSnapshot reddit_stall(void)
+{
+    return (StallSnapshot){.pc = 0x03051994u,
+                           .lr = 0x03053FC3u,
+                           .sp = 0x03003D80u,
+                           .words = {0x03051995u, 0x0307A010u, 0x00000007u},
+                           .stack_used = 2740};
+}
+
 static void a_record_without_its_magic_reads_as_a_cold_start(void)
 {
     StartRecord record = garbage();
@@ -54,9 +63,10 @@ static void a_fault_survives_into_the_next_start(void)
 static void a_stall_survives_into_the_next_start_with_its_pc_and_lr(void)
 {
     StartRecord record = garbage();
+    StallSnapshot stall = reddit_stall();
     start_record_boot(&record);
     start_record_tick(&record, 69000);
-    start_record_stall(&record, 0x03051994u, 0x03053FC3u);
+    start_record_stall(&record, &stall);
     StartInfo info = start_record_boot(&record);
     CHECK(info.warm);
     CHECK(info.stalled);
@@ -67,6 +77,23 @@ static void a_stall_survives_into_the_next_start_with_its_pc_and_lr(void)
     CHECK_EQUAL(0u, record.stalled);
     CHECK_EQUAL(0u, record.stall_lr);
     CHECK_EQUAL(0u, record.fault_address);
+}
+
+static void a_stall_keeps_the_stack_pointer_the_words_above_the_frame_and_the_depth(void)
+{
+    StartRecord record = garbage();
+    StallSnapshot stall = reddit_stall();
+    start_record_boot(&record);
+    start_record_stall(&record, &stall);
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(0x03003D80u, info.stall_sp);
+    CHECK_EQUAL(0x03051995u, info.stall_words[0]);
+    CHECK_EQUAL(0x0307A010u, info.stall_words[1]);
+    CHECK_EQUAL(7u, info.stall_words[2]);
+    CHECK_EQUAL(2740u, info.stall_stack_used);
+    CHECK_EQUAL(0u, record.stall_sp);
+    CHECK_EQUAL(0u, record.stall_words[0]);
+    CHECK_EQUAL(0u, record.stall_stack_used);
 }
 
 static void a_run_without_a_stall_reports_none(void)
@@ -80,6 +107,7 @@ static void a_run_without_a_stall_reports_none(void)
     StartInfo warm = start_record_boot(&record);
     CHECK(warm.warm);
     CHECK(!warm.stalled);
+    CHECK_EQUAL(0u, warm.stall_sp);
 }
 
 static void a_clean_power_off_is_remembered(void)
@@ -136,6 +164,48 @@ static void a_cold_start_has_no_last_step(void)
     CHECK_EQUAL(0u, info.last_millivolts);
 }
 
+static void an_installed_update_survives_with_the_emmc_state_it_left(void)
+{
+    StartRecord record = garbage();
+    start_record_boot(&record);
+    start_record_update(&record, (HalUpdateRecord){.result = HAL_UPDATE_INSTALLED,
+                                                   .detail = 100,
+                                                   .emmc_replied = true,
+                                                   .emmc_status = 0x00000900u});
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(HAL_UPDATE_INSTALLED, info.last_update.result);
+    CHECK_EQUAL(100, info.last_update.detail);
+    CHECK(info.last_update.emmc_replied);
+    CHECK_EQUAL(0x00000900u, info.last_update.emmc_status);
+    CHECK_EQUAL(HAL_UPDATE_NONE, record.update_result);
+    CHECK_EQUAL(0xFFFFFFFFu, record.update_emmc);
+}
+
+static void a_failed_update_without_an_emmc_reply_says_so(void)
+{
+    StartRecord record = garbage();
+    start_record_boot(&record);
+    start_record_update(&record, (HalUpdateRecord){.result = HAL_UPDATE_FAILED,
+                                                   .detail = 37,
+                                                   .emmc_replied = false,
+                                                   .emmc_status = 0x12345678u});
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(HAL_UPDATE_FAILED, info.last_update.result);
+    CHECK_EQUAL(37, info.last_update.detail);
+    CHECK(!info.last_update.emmc_replied);
+}
+
+static void a_run_without_an_update_reports_none_and_a_bad_result_reads_as_none(void)
+{
+    StartRecord record = garbage();
+    start_record_boot(&record);
+    StartInfo info = start_record_boot(&record);
+    CHECK_EQUAL(HAL_UPDATE_NONE, info.last_update.result);
+    record.update_result = 99;
+    info = start_record_boot(&record);
+    CHECK_EQUAL(HAL_UPDATE_NONE, info.last_update.result);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -144,12 +214,16 @@ int main(void)
         TEST_CASE(a_corrupted_count_reads_as_cold),
         TEST_CASE(a_fault_survives_into_the_next_start),
         TEST_CASE(a_stall_survives_into_the_next_start_with_its_pc_and_lr),
+        TEST_CASE(a_stall_keeps_the_stack_pointer_the_words_above_the_frame_and_the_depth),
         TEST_CASE(a_run_without_a_stall_reports_none),
         TEST_CASE(a_clean_power_off_is_remembered),
         TEST_CASE(the_last_step_survives_with_its_start_time_and_whether_it_finished),
         TEST_CASE(a_finished_step_is_marked_finished),
         TEST_CASE(the_last_battery_reading_survives),
         TEST_CASE(a_cold_start_has_no_last_step),
+        TEST_CASE(an_installed_update_survives_with_the_emmc_state_it_left),
+        TEST_CASE(a_failed_update_without_an_emmc_reply_says_so),
+        TEST_CASE(a_run_without_an_update_reports_none_and_a_bad_result_reads_as_none),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -349,6 +349,65 @@ static void the_last_start_row_tells_cold_starts_resets_and_faults_apart(void)
     CHECK(text_is("Stall 03051994 03053FC3", text));
 }
 
+static void the_last_stack_row_shows_the_stalled_stack_pointer_and_the_words_above_the_frame(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_last_stack_text((HalStartInfo){.warm = false}, text, sizeof text);
+    CHECK(text_is("None", text));
+    diagnostics_last_stack_text((HalStartInfo){.warm = true, .stalled = false}, text, sizeof text);
+    CHECK(text_is("None", text));
+    diagnostics_last_stack_text((HalStartInfo){.warm = true,
+                                               .stalled = true,
+                                               .stall_sp = 0x03003D80u,
+                                               .stall_stack = {0x03051995u, 0x0307A010u, 7}},
+                                text, sizeof text);
+    CHECK(text_is("03003D80 03051995 0307A010", text));
+}
+
+static void the_stack_row_shows_the_high_water_mark_and_the_depth_at_a_stall(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_stack_text((HalStackUsage){.used = 0, .capacity = 0}, (HalStartInfo){.warm = false},
+                           text, sizeof text);
+    CHECK(text_is("Not on this player", text));
+    diagnostics_stack_text((HalStackUsage){.used = 2740, .capacity = 16384},
+                           (HalStartInfo){.warm = true, .stalled = false}, text, sizeof text);
+    CHECK(text_is("2740/16384 B", text));
+    diagnostics_stack_text((HalStackUsage){.used = 2740, .capacity = 16384},
+                           (HalStartInfo){.warm = true, .stalled = true, .stall_stack_used = 3100},
+                           text, sizeof text);
+    CHECK(text_is("2740/16384 B, stall 3100", text));
+}
+
+static void the_last_update_row_tells_each_outcome_and_the_emmc_state_apart(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_update_text((HalUpdateRecord){.result = HAL_UPDATE_NONE}, text, sizeof text);
+    CHECK(text_is("None", text));
+    diagnostics_update_text((HalUpdateRecord){.result = HAL_UPDATE_INSTALLED,
+                                              .detail = 100,
+                                              .emmc_replied = true,
+                                              .emmc_status = 0x00000900u},
+                            text, sizeof text);
+    CHECK(text_is("Installed, eMMC ready", text));
+    diagnostics_update_text((HalUpdateRecord){.result = HAL_UPDATE_INSTALLED,
+                                              .detail = 100,
+                                              .emmc_replied = true,
+                                              .emmc_status = 0x00000C00u},
+                            text, sizeof text);
+    CHECK(text_is("Installed, eMMC state 6", text));
+    diagnostics_update_text(
+        (HalUpdateRecord){.result = HAL_UPDATE_FAILED, .detail = 35, .emmc_replied = false}, text,
+        sizeof text);
+    CHECK(text_is("Failed at 35%, eMMC no reply", text));
+    diagnostics_update_text((HalUpdateRecord){.result = HAL_UPDATE_REFUSED, .detail = 3}, text,
+                            sizeof text);
+    CHECK(text_is("Refused E3", text));
+    diagnostics_update_text((HalUpdateRecord){.result = HAL_UPDATE_ALREADY_INSTALLED}, text,
+                            sizeof text);
+    CHECK(text_is("Already installed", text));
+}
+
 static void the_last_step_row_tells_an_unfinished_step_from_a_finished_one(void)
 {
     char text[DIAGNOSTICS_VALUE_CAPACITY];
@@ -420,6 +479,9 @@ int main(void)
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
         TEST_CASE(the_last_start_row_tells_cold_starts_resets_and_faults_apart),
+        TEST_CASE(the_last_stack_row_shows_the_stalled_stack_pointer_and_the_words_above_the_frame),
+        TEST_CASE(the_stack_row_shows_the_high_water_mark_and_the_depth_at_a_stall),
+        TEST_CASE(the_last_update_row_tells_each_outcome_and_the_emmc_state_apart),
         TEST_CASE(the_last_step_row_tells_an_unfinished_step_from_a_finished_one),
         TEST_CASE(the_last_battery_row_shows_the_reading_before_the_start),
         TEST_CASE(the_high_ram_row_reports_each_outcome),

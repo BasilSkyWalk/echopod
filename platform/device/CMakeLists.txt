@@ -26,6 +26,7 @@ add_executable(echo_device
     board/resident.c
     board/rtc.c
     board/sd.c
+    board/stack.c
     board/start_info.c
     board/watchdog.c
     board/startup.c
@@ -171,6 +172,7 @@ if(CMAKE_CROSSCOMPILING)
         board/resident.c
         board/rtc.c
         board/sd.c
+        board/stack.c
         board/start_info.c
         board/storage.c
         board/system.c

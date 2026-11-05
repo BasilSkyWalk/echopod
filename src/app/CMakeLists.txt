@@ -24,6 +24,7 @@ add_library(echo_app STATIC
     settings_screens.c
     settings_store.c
     spoken_store.c
+    update_record.c
     screens/bluetooth_screen.c
     screens/charge_screen.c
     screens/cover_flow_screen.c

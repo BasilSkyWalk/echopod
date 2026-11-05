@@ -98,6 +98,26 @@ typedef enum HalStartStep {
     HAL_START_STEP_COUNT
 } HalStartStep;
 
+typedef enum HalUpdateResult {
+    HAL_UPDATE_NONE,
+    HAL_UPDATE_INSTALLED,
+    HAL_UPDATE_FAILED,
+    HAL_UPDATE_REFUSED,
+    HAL_UPDATE_ALREADY_INSTALLED,
+    HAL_UPDATE_RESULT_COUNT
+} HalUpdateResult;
+
+typedef struct HalUpdateRecord {
+    HalUpdateResult result;
+    uint8_t detail;
+    bool emmc_replied;
+    uint32_t emmc_status;
+} HalUpdateRecord;
+
+enum {
+    HAL_STALL_STACK_WORDS = 3
+};
+
 typedef struct HalStartInfo {
     bool warm;
     uint32_t starts;
@@ -112,9 +132,20 @@ typedef struct HalStartInfo {
     uint32_t last_millivolts;
     bool stalled;
     uint32_t stall_lr;
+    uint32_t stall_sp;
+    uint32_t stall_stack[HAL_STALL_STACK_WORDS];
+    uint32_t stall_stack_used;
+    HalUpdateRecord last_update;
 } HalStartInfo;
 
 HalStartInfo hal_system_start_info(void);
+
+typedef struct HalStackUsage {
+    uint32_t used;
+    uint32_t capacity;
+} HalStackUsage;
+
+HalStackUsage hal_system_stack_usage(void);
 
 typedef enum HalCore1Status {
     HAL_CORE1_RAN,
