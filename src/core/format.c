@@ -9,7 +9,6 @@ enum {
     SECONDS_PER_MINUTE = 60,
     SECONDS_PER_HOUR = 3600,
     SMALLEST_TWO_DIGIT = 10,
-    HERTZ_PER_TENTH_KHZ = 100,
     TENTHS_PER_KHZ = 10,
     THOUSAND = 1000,
     BITS_PER_BYTE = 8
@@ -52,12 +51,15 @@ void format_duration(uint32_t milliseconds, char *buffer, size_t capacity)
 
 void format_sample_rate(uint32_t hertz, char *buffer, size_t capacity)
 {
-    uint32_t tenths = (hertz + HERTZ_PER_TENTH_KHZ / 2) / HERTZ_PER_TENTH_KHZ;
     StringBuilder builder = string_builder_make(buffer, capacity);
-    string_builder_append_unsigned(&builder, tenths / TENTHS_PER_KHZ);
-    if (tenths % TENTHS_PER_KHZ != 0) {
+    string_builder_append_unsigned(&builder, hertz / THOUSAND);
+    uint32_t rest = hertz % THOUSAND;
+    if (rest != 0) {
         string_builder_append_char(&builder, '.');
-        string_builder_append_unsigned(&builder, tenths % TENTHS_PER_KHZ);
+    }
+    for (uint32_t place = THOUSAND / TENTHS_PER_KHZ; rest != 0; place /= TENTHS_PER_KHZ) {
+        string_builder_append_char(&builder, (char)('0' + rest / place));
+        rest %= place;
     }
     string_builder_append(&builder, " kHz");
 }

@@ -78,6 +78,10 @@ static void sample_rates_show_kilohertz_with_a_decimal_only_when_needed(void)
     CHECK(rate_formats_as(88200, "88.2 kHz"));
     CHECK(rate_formats_as(96000, "96 kHz"));
     CHECK(rate_formats_as(192000, "192 kHz"));
+    CHECK(rate_formats_as(176400, "176.4 kHz"));
+    CHECK(rate_formats_as(22050, "22.05 kHz"));
+    CHECK(rate_formats_as(11025, "11.025 kHz"));
+    CHECK(rate_formats_as(8000, "8 kHz"));
 }
 
 static void bitrates_group_thousands(void)
