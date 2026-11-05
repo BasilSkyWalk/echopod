@@ -13,6 +13,7 @@ add_executable(echo_device
     board/gpio.c
     board/jack.c
     board/high_ram.c
+    board/i2c.c
     board/language.c
     board/input.c
     board/libc.c
@@ -23,6 +24,7 @@ add_executable(echo_device
     board/panic.c
     board/power.c
     board/resident.c
+    board/rtc.c
     board/sd.c
     board/start_info.c
     board/watchdog.c
@@ -158,6 +160,7 @@ if(CMAKE_CROSSCOMPILING)
         board/emmc.c
         board/glyphs.c
         board/high_ram.c
+        board/i2c.c
         board/input.c
         board/jack.c
         board/language.c
@@ -166,6 +169,7 @@ if(CMAKE_CROSSCOMPILING)
         board/panic.c
         board/power.c
         board/resident.c
+        board/rtc.c
         board/sd.c
         board/start_info.c
         board/storage.c

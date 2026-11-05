@@ -40,6 +40,18 @@ static void the_battery_level_and_charging_are_read(void)
     CHECK(options.battery_charging);
 }
 
+static void the_clock_can_be_absent_or_unset(void)
+{
+    char *given[] = {"--no-clock", "--clock-unset"};
+    SimOptions options;
+    CHECK(parse(NULL, 0, &options));
+    CHECK(!options.clock_absent);
+    CHECK(!options.clock_unset);
+    CHECK(parse(given, 2, &options));
+    CHECK(options.clock_absent);
+    CHECK(options.clock_unset);
+}
+
 static void a_battery_level_above_full_is_rejected(void)
 {
     char *given[] = {"--battery", "101"};
@@ -121,6 +133,7 @@ int main(void)
         TEST_CASE(storage_directories_are_read),
         TEST_CASE(the_battery_level_and_charging_are_read),
         TEST_CASE(a_battery_level_above_full_is_rejected),
+        TEST_CASE(the_clock_can_be_absent_or_unset),
         TEST_CASE(an_unknown_option_is_rejected),
         TEST_CASE(an_option_missing_its_value_is_rejected),
         TEST_CASE(non_numeric_values_are_rejected),

@@ -1,10 +1,13 @@
 #include "diagnostics_rows.h"
 
+#include <stddef.h>
+
 #include "diagnostics_values.h"
 #include "hal/audio.h"
 #include "hal/display.h"
 #include "hal/power.h"
 #include "hal/system.h"
+#include "hal/time.h"
 
 const char *diagnostics_row_firmware(const void *context)
 {
@@ -84,4 +87,26 @@ const char *diagnostics_row_panel(const void *context)
     (void)context;
     diagnostics_panel_text(hal_display_panel_id(), panel_text, sizeof panel_text);
     return panel_text;
+}
+
+static HalTime clock_time;
+static bool clock_read;
+static char clock_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+ScreenAction diagnostics_row_clock_read(void *context)
+{
+    (void)context;
+    hal_time_read(&clock_time);
+    clock_read = true;
+    return screen_action_none();
+}
+
+const char *diagnostics_row_clock(const void *context)
+{
+    (void)context;
+    if (!clock_read) {
+        diagnostics_row_clock_read(NULL);
+    }
+    diagnostics_time_text(clock_time, clock_text, sizeof clock_text);
+    return clock_text;
 }

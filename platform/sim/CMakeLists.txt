@@ -36,6 +36,7 @@ add_executable(echo_sim
     sim_input.c
     sim_power.c
     sim_system.c
+    sim_time.c
 )
 target_compile_definitions(echo_sim PRIVATE SDL_MAIN_HANDLED)
 target_link_libraries(echo_sim PRIVATE echo_app echo_sim_glyphs echo_sim_language echo_library_scan echo_sim_options echo_sim_decoder echo_sim_storage echo_options SDL2::SDL2)

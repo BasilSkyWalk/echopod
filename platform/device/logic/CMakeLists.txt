@@ -101,6 +101,7 @@ add_library(echo_device_logic STATIC
     msc.c
     panel.c
     panic_text.c
+    pcf8563.c
     pll.c
     start_record.c
     sd_card.c
@@ -134,6 +135,7 @@ if(CMAKE_CROSSCOMPILING)
         msc.c
         panel.c
         panic_text.c
+        pcf8563.c
         pll.c
         sd_card.c
         start_record.c

@@ -107,6 +107,20 @@ static bool read_charging(ArgumentCursor *cursor, SimOptions *options)
     return true;
 }
 
+static bool read_no_clock(ArgumentCursor *cursor, SimOptions *options)
+{
+    (void)cursor;
+    options->clock_absent = true;
+    return true;
+}
+
+static bool read_clock_unset(ArgumentCursor *cursor, SimOptions *options)
+{
+    (void)cursor;
+    options->clock_unset = true;
+    return true;
+}
+
 static const OptionSpec OPTION_SPECS[] = {
     {"--scale", read_scale},
     {"--frames", read_frames},
@@ -117,6 +131,8 @@ static const OptionSpec OPTION_SPECS[] = {
     {"--system-dir", read_system_directory},
     {"--battery", read_battery},
     {"--charging", read_charging},
+    {"--no-clock", read_no_clock},
+    {"--clock-unset", read_clock_unset},
 };
 
 static bool read_option(ArgumentCursor *cursor, SimOptions *options)

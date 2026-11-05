@@ -3,6 +3,7 @@
 #include "app_screens.h"
 #include "check.h"
 #include "default_theme.h"
+#include "fake_hal.h"
 
 static AppScreens screens;
 static AppOptions options;
@@ -28,9 +29,9 @@ static void the_release_menu_keeps_only_the_safe_rows(void)
 {
     static const char *const SAFE[] = {"Key test",     "Firmware", "Battery",  "Last start",
                                        "Last step",    "Last USB", "Jack 3.5", "Jack 4.4",
-                                       "Last battery", "Panel"};
+                                       "Last battery", "Panel",    "Clock"};
     const MenuConfig *menu = built();
-    CHECK_EQUAL(10, menu->item_count);
+    CHECK_EQUAL(11, menu->item_count);
     for (size_t index = 0; index < sizeof SAFE / sizeof SAFE[0]; index++) {
         CHECK(has_row(menu, SAFE[index]));
     }
@@ -53,11 +54,43 @@ static void every_value_row_reads_without_a_selection(void)
     for (int index = 0; index < menu->item_count; index++) {
         const MenuItem *item = &menu->items[index];
         if (!item->opens) {
-            CHECK(item->select == NULL);
+            CHECK(item->select == NULL || strcmp(item->label, "Clock") == 0);
             CHECK(item->value != NULL);
             CHECK(item->value(item->context) != NULL);
         }
     }
+}
+
+static const MenuItem *clock_row(const MenuConfig *menu)
+{
+    for (int index = 0; index < menu->item_count; index++) {
+        if (strcmp(menu->items[index].label, "Clock") == 0) {
+            return &menu->items[index];
+        }
+    }
+    return NULL;
+}
+
+static void the_clock_row_only_reads_the_clock_and_reads_again_when_pressed(void)
+{
+    fake_hal_reset();
+    const MenuConfig *menu = built();
+    const MenuItem *clock = clock_row(menu);
+    CHECK(clock != NULL);
+    CHECK(strcmp("No reply", clock->value(clock->context)) == 0);
+    int reads = fake_hal_time_read_count();
+    fake_hal_set_time((HalTime){.present = true,
+                                .valid = true,
+                                .year = 2026,
+                                .month = 11,
+                                .day = 5,
+                                .hour = 9,
+                                .minute = 8,
+                                .second = 7});
+    CHECK(strcmp("No reply", clock->value(clock->context)) == 0);
+    CHECK_EQUAL(SCREEN_ACTION_NONE, clock->select(clock->context).type);
+    CHECK(strcmp("2026-11-05 09:08:07", clock->value(clock->context)) == 0);
+    CHECK_EQUAL(reads + 1, fake_hal_time_read_count());
 }
 
 int main(void)
@@ -66,6 +99,7 @@ int main(void)
         TEST_CASE(the_release_menu_keeps_only_the_safe_rows),
         TEST_CASE(the_release_menu_has_no_tests_that_act_on_the_hardware),
         TEST_CASE(every_value_row_reads_without_a_selection),
+        TEST_CASE(the_clock_row_only_reads_the_clock_and_reads_again_when_pressed),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

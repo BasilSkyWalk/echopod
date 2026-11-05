@@ -10,6 +10,7 @@
 #include "hal/language.h"
 #include "hal/power.h"
 #include "hal/storage.h"
+#include "hal/time.h"
 #include "library/library_scan.h"
 #include <stdlib.h>
 #include <string.h>
@@ -123,6 +124,8 @@ typedef struct FakeHal {
     int bluetooth_disconnect_count;
     HalUsbMode usb_mode;
     uint8_t dac_volume;
+    HalTime time;
+    int time_reads;
 } FakeHal;
 
 static FakeHal fake;
@@ -137,6 +140,23 @@ void fake_hal_reset(void)
 void fake_hal_set_version(const char *version)
 {
     fake.version = version;
+}
+
+void fake_hal_set_time(HalTime time)
+{
+    fake.time = time;
+}
+
+int fake_hal_time_read_count(void)
+{
+    return fake.time_reads;
+}
+
+bool hal_time_read(HalTime *time)
+{
+    fake.time_reads++;
+    *time = fake.time;
+    return fake.time.present;
 }
 
 const char *hal_system_version(void)
