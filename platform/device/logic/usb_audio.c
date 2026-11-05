@@ -21,8 +21,18 @@ enum {
     REQUEST_GET_MIN = 0x82,
     REQUEST_GET_MAX = 0x83,
     REQUEST_GET_RES = 0x84,
+    REQUEST_HID_GET_REPORT = 0x01,
+    REQUEST_HID_GET_IDLE = 0x02,
+    REQUEST_HID_GET_PROTOCOL = 0x03,
+    REQUEST_HID_SET_IDLE = 0x0A,
+    REQUEST_HID_SET_PROTOCOL = 0x0B,
     DESCRIPTOR_DEVICE = 1,
     DESCRIPTOR_CONFIGURATION = 2,
+    DESCRIPTOR_HID = 0x21,
+    DESCRIPTOR_HID_REPORT = 0x22,
+    HID_DESCRIPTOR_OFFSET = 168,
+    HID_DESCRIPTOR_LENGTH = 9,
+    HID_REPORT_PROTOCOL = 1,
     STREAMING_INTERFACE = 1,
     LAST_ALT = 2,
     FEATURE_UNIT_TARGET = 0x0200,
@@ -46,19 +56,198 @@ static const uint32_t RATES[] = {44100, 48000};
 
 static const uint8_t DEVICE_DESCRIPTOR[] = {
     18,   1,    0x10, 0x01, 0x00, 0x00, 0x00, USB_PACKET_SIZE, 0x09, 0x12, 0x02,
-    0x00, 0x00, 0x01, 1,    2,    0,    1};
+    0x00, 0x01, 0x01, 1,    2,    0,    1};
 
-static const uint8_t CONFIGURATION_DESCRIPTOR[] = {
-    9,    2,    159,  0,    2,    1,    0,    0x80, 50,   9,    4,    0,    0,    0,    1,    1,
-    0,    0,    9,    0x24, 1,    0x00, 0x01, 40,   0,    1,    1,    12,   0x24, 2,    1,    0x01,
-    0x01, 0,    2,    0x03, 0x00, 0,    0,    10,   0x24, 6,    2,    1,    1,    0x03, 0x00, 0x00,
-    0,    9,    0x24, 3,    3,    0x02, 0x03, 0,    2,    0,    9,    4,    1,    0,    0,    1,
-    2,    0,    0,    9,    4,    1,    1,    1,    1,    2,    0,    0,    7,    0x24, 1,    1,
-    1,    0x01, 0x00, 14,   0x24, 2,    1,    2,    2,    16,   2,    0x44, 0xAC, 0x00, 0x80, 0xBB,
-    0x00, 9,    5,    0x01, 0x09, 0xC4, 0x00, 1,    0,    0,    7,    0x25, 1,    0x01, 0,    0,
-    0,    9,    4,    1,    2,    1,    1,    2,    0,    0,    7,    0x24, 1,    1,    1,    0x01,
-    0x00, 14,   0x24, 2,    1,    2,    3,    24,   2,    0x44, 0xAC, 0x00, 0x80, 0xBB, 0x00, 9,
-    5,    0x01, 0x09, 0x26, 0x01, 1,    0,    0,    7,    0x25, 1,    0x01, 0,    0,    0};
+static const uint8_t REPORT_DESCRIPTOR[] = {
+    0x05, 0x0C, 0x09, 0x01, 0xA1, 0x01, 0x15, 0x00, 0x25, 0x01, 0x09, 0xCD, 0x09, 0xB5, 0x09,
+    0xB6, 0x75, 0x01, 0x95, 0x03, 0x81, 0x02, 0x75, 0x05, 0x95, 0x01, 0x81, 0x03, 0xC0};
+
+static const uint8_t CONFIGURATION_DESCRIPTOR[] = {9,
+                                                   2,
+                                                   184,
+                                                   0,
+                                                   3,
+                                                   1,
+                                                   0,
+                                                   0x80,
+                                                   50,
+                                                   9,
+                                                   4,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   1,
+                                                   1,
+                                                   0,
+                                                   0,
+                                                   9,
+                                                   0x24,
+                                                   1,
+                                                   0x00,
+                                                   0x01,
+                                                   40,
+                                                   0,
+                                                   1,
+                                                   1,
+                                                   12,
+                                                   0x24,
+                                                   2,
+                                                   1,
+                                                   0x01,
+                                                   0x01,
+                                                   0,
+                                                   2,
+                                                   0x03,
+                                                   0x00,
+                                                   0,
+                                                   0,
+                                                   10,
+                                                   0x24,
+                                                   6,
+                                                   2,
+                                                   1,
+                                                   1,
+                                                   0x03,
+                                                   0x00,
+                                                   0x00,
+                                                   0,
+                                                   9,
+                                                   0x24,
+                                                   3,
+                                                   3,
+                                                   0x02,
+                                                   0x03,
+                                                   0,
+                                                   2,
+                                                   0,
+                                                   9,
+                                                   4,
+                                                   1,
+                                                   0,
+                                                   0,
+                                                   1,
+                                                   2,
+                                                   0,
+                                                   0,
+                                                   9,
+                                                   4,
+                                                   1,
+                                                   1,
+                                                   1,
+                                                   1,
+                                                   2,
+                                                   0,
+                                                   0,
+                                                   7,
+                                                   0x24,
+                                                   1,
+                                                   1,
+                                                   1,
+                                                   0x01,
+                                                   0x00,
+                                                   14,
+                                                   0x24,
+                                                   2,
+                                                   1,
+                                                   2,
+                                                   2,
+                                                   16,
+                                                   2,
+                                                   0x44,
+                                                   0xAC,
+                                                   0x00,
+                                                   0x80,
+                                                   0xBB,
+                                                   0x00,
+                                                   9,
+                                                   5,
+                                                   0x01,
+                                                   0x09,
+                                                   0xC4,
+                                                   0x00,
+                                                   1,
+                                                   0,
+                                                   0,
+                                                   7,
+                                                   0x25,
+                                                   1,
+                                                   0x01,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   9,
+                                                   4,
+                                                   1,
+                                                   2,
+                                                   1,
+                                                   1,
+                                                   2,
+                                                   0,
+                                                   0,
+                                                   7,
+                                                   0x24,
+                                                   1,
+                                                   1,
+                                                   1,
+                                                   0x01,
+                                                   0x00,
+                                                   14,
+                                                   0x24,
+                                                   2,
+                                                   1,
+                                                   2,
+                                                   3,
+                                                   24,
+                                                   2,
+                                                   0x44,
+                                                   0xAC,
+                                                   0x00,
+                                                   0x80,
+                                                   0xBB,
+                                                   0x00,
+                                                   9,
+                                                   5,
+                                                   0x01,
+                                                   0x09,
+                                                   0x26,
+                                                   0x01,
+                                                   1,
+                                                   0,
+                                                   0,
+                                                   7,
+                                                   0x25,
+                                                   1,
+                                                   0x01,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   9,
+                                                   4,
+                                                   USB_HID_INTERFACE,
+                                                   0,
+                                                   1,
+                                                   3,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   HID_DESCRIPTOR_LENGTH,
+                                                   DESCRIPTOR_HID,
+                                                   0x11,
+                                                   0x01,
+                                                   0,
+                                                   1,
+                                                   DESCRIPTOR_HID_REPORT,
+                                                   sizeof REPORT_DESCRIPTOR,
+                                                   0,
+                                                   7,
+                                                   5,
+                                                   USB_HID_ENDPOINT,
+                                                   3,
+                                                   USB_HID_PACKET_SIZE,
+                                                   0,
+                                                   USB_HID_INTERVAL_MS};
+
+_Static_assert(sizeof CONFIGURATION_DESCRIPTOR == 184, "the configuration is 184 bytes");
 
 void usb_audio_init(UsbAudio *audio, UsbDevice *device)
 {
@@ -176,7 +365,46 @@ static UsbReply set_interface(UsbAudio *audio, UsbSetup setup)
         set_alt(audio, (uint8_t)setup.value);
         return status(USB_ACTION_STREAM, setup.value);
     }
-    return setup.index == 0 && setup.value == 0 ? status(USB_ACTION_NONE, 0) : stall();
+    bool fixed = setup.index == 0 || setup.index == USB_HID_INTERFACE;
+    return fixed && setup.value == 0 ? status(USB_ACTION_NONE, 0) : stall();
+}
+
+static bool for_hid(UsbSetup setup)
+{
+    return (setup.index & 0xFF) == USB_HID_INTERFACE;
+}
+
+static UsbReply hid_descriptor(UsbSetup setup)
+{
+    uint8_t type = (uint8_t)(setup.value >> 8);
+    if (type == DESCRIPTOR_HID_REPORT) {
+        return data_reply(REPORT_DESCRIPTOR, sizeof REPORT_DESCRIPTOR, setup);
+    }
+    if (type == DESCRIPTOR_HID) {
+        return data_reply(CONFIGURATION_DESCRIPTOR + HID_DESCRIPTOR_OFFSET, HID_DESCRIPTOR_LENGTH,
+                          setup);
+    }
+    return stall();
+}
+
+static UsbReply hid_class_in(UsbAudio *audio, UsbSetup setup)
+{
+    switch (setup.request) {
+    case REQUEST_HID_GET_REPORT:
+        return little_endian(audio, audio->report, USB_HID_REPORT_LENGTH, setup);
+    case REQUEST_HID_GET_IDLE:
+        return little_endian(audio, 0, 1, setup);
+    case REQUEST_HID_GET_PROTOCOL:
+        return little_endian(audio, HID_REPORT_PROTOCOL, 1, setup);
+    default:
+        return stall();
+    }
+}
+
+static UsbReply hid_class_out(UsbSetup setup)
+{
+    bool known = setup.request == REQUEST_HID_SET_IDLE || setup.request == REQUEST_HID_SET_PROTOCOL;
+    return known ? status(USB_ACTION_NONE, 0) : stall();
 }
 
 static bool own_descriptor(UsbSetup setup)
@@ -211,12 +439,17 @@ UsbReply usb_audio_setup(UsbAudio *audio, UsbSetup setup)
     }
     switch (setup.request_type) {
     case TYPE_CLASS_INTERFACE_IN:
+        return for_hid(setup) ? hid_class_in(audio, setup) : class_in(audio, setup);
     case TYPE_CLASS_ENDPOINT_IN:
         return class_in(audio, setup);
     case TYPE_CLASS_INTERFACE_OUT:
+        return for_hid(setup) ? hid_class_out(setup) : class_out(setup);
     case TYPE_CLASS_ENDPOINT_OUT:
         return class_out(setup);
     case TYPE_STANDARD_INTERFACE_IN:
+        if (setup.request == REQUEST_GET_DESCRIPTOR && for_hid(setup)) {
+            return hid_descriptor(setup);
+        }
         return setup.request == REQUEST_GET_INTERFACE
                    ? little_endian(audio, setup.index == STREAMING_INTERFACE ? audio->alt : 0, 1,
                                    setup)
@@ -287,6 +520,11 @@ uint8_t usb_audio_take_changes(UsbAudio *audio)
 uint8_t usb_audio_sample_bytes(const UsbAudio *audio)
 {
     return audio->alt == 0 ? 0 : (uint8_t)(audio->alt + 1);
+}
+
+void usb_audio_set_report(UsbAudio *audio, uint8_t report)
+{
+    audio->report = report;
 }
 
 uint8_t usb_audio_attenuation(const UsbAudio *audio)

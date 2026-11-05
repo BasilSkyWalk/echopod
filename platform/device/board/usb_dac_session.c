@@ -24,6 +24,7 @@ enum {
     HZ_PER_KHZ = 1000,
     BITS_PER_BYTE = 8,
     NOTICE_REFRESH_MS = 1000,
+    REPORT_QUEUE_CAPACITY = 8,
     FRAME_NUMBER_MASK = 0x3FFF
 };
 
@@ -43,6 +44,9 @@ static uint16_t last_frame;
 static uint32_t missed_packets;
 static uint32_t notice_refreshed_ms;
 static char shown_text[NOTICE_CAPACITY];
+static uint8_t reports[REPORT_QUEUE_CAPACITY];
+static uint8_t report_start;
+static uint8_t report_count;
 
 void hal_system_set_dac_volume(uint8_t level)
 {
@@ -255,6 +259,23 @@ static void step_volume(int step)
     show_state();
 }
 
+static void queue_report(uint8_t report)
+{
+    if (report_count + 2 > REPORT_QUEUE_CAPACITY) {
+        return;
+    }
+    reports[(report_start + report_count++) % REPORT_QUEUE_CAPACITY] = report;
+    reports[(report_start + report_count++) % REPORT_QUEUE_CAPACITY] = 0;
+}
+
+static void send_reports(void)
+{
+    if (report_count > 0 && usb_send_report(&port, reports[report_start])) {
+        report_start = (uint8_t)((report_start + 1) % REPORT_QUEUE_CAPACITY);
+        report_count--;
+    }
+}
+
 static bool user_left(void)
 {
     for (;;) {
@@ -267,10 +288,17 @@ static bool user_left(void)
         case APP_DAC_KEY_VOLUME_DOWN:
             step_volume(-1);
             break;
+        case APP_DAC_KEY_PLAY_PAUSE:
+            queue_report(USB_HID_PLAY_PAUSE);
+            break;
+        case APP_DAC_KEY_NEXT:
+            queue_report(USB_HID_NEXT);
+            break;
+        case APP_DAC_KEY_PREVIOUS:
+            queue_report(USB_HID_PREVIOUS);
+            break;
         case APP_DAC_KEY_LEAVE:
             return true;
-        default:
-            break;
         }
     }
 }
@@ -284,6 +312,7 @@ static void serve(void)
         board_display_service();
         follow_host();
         keep_output();
+        send_reports();
         refresh_state();
     }
     app_dac_keys_stop();
@@ -299,6 +328,7 @@ static void start_session(void)
     playing = false;
     frame_known = false;
     missed_packets = 0;
+    report_count = 0;
     dac_volume = dac_volume_known ? dac_volume : (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME;
     hal_audio_set_volume(dac_volume);
 }
