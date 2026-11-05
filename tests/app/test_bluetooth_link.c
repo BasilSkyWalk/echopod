@@ -350,6 +350,75 @@ static void playing_with_nothing_plugged_in_streams(void)
     CHECK(!fake_hal_bluetooth()->streaming);
 }
 
+static void the_opening_waits_for_the_headphones_to_take_the_stream(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    connect_to(&BUDS);
+    play();
+    step(START_MS + 100);
+    CHECK(fake_hal_bluetooth()->streaming);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+    CHECK_EQUAL(PLAYER_PLAYING, player.state);
+    step(START_MS + 100 + BLUETOOTH_LINK_OPEN_MS - 1);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+    step(START_MS + 100 + BLUETOOTH_LINK_OPEN_MS);
+    CHECK_EQUAL(HAL_AUDIO_PLAYING, fake_hal_audio_state());
+    CHECK_EQUAL(PLAYER_PLAYING, player.state);
+}
+
+static void a_resume_waits_for_the_headphones_again(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    connect_to(&BUDS);
+    play();
+    step(START_MS + 100);
+    step(START_MS + 100 + BLUETOOTH_LINK_OPEN_MS);
+    player_toggle_pause(&player);
+    step(START_MS + 2000);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+    player_toggle_pause(&player);
+    step(START_MS + 3000);
+    CHECK(fake_hal_bluetooth()->streaming);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+    step(START_MS + 3000 + BLUETOOTH_LINK_OPEN_MS);
+    CHECK_EQUAL(HAL_AUDIO_PLAYING, fake_hal_audio_state());
+}
+
+static void a_pause_during_the_opening_wait_stays_paused(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    connect_to(&BUDS);
+    play();
+    step(START_MS + 100);
+    player_toggle_pause(&player);
+    step(START_MS + 200);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+    step(START_MS + 100 + BLUETOOTH_LINK_OPEN_MS);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+    CHECK_EQUAL(PLAYER_PAUSED, player.state);
+}
+
+static void wired_headphones_end_the_opening_wait_at_once(void)
+{
+    fresh();
+    save(true, &BUDS);
+    start();
+    connect_to(&BUDS);
+    play();
+    step(START_MS + 100);
+    CHECK_EQUAL(HAL_AUDIO_PAUSED, fake_hal_audio_state());
+    fake_hal_audio_set_jack(HAL_AUDIO_JACK_SINGLE_ENDED);
+    step(START_MS + 200);
+    CHECK(!fake_hal_bluetooth()->streaming);
+    CHECK_EQUAL(HAL_AUDIO_PLAYING, fake_hal_audio_state());
+}
+
 static void headphones_take_the_sound_back(void)
 {
     fresh();
@@ -731,6 +800,10 @@ int main(void)
         TEST_CASE(turning_bluetooth_off_during_a_restart_keeps_it_off),
         TEST_CASE(connecting_saves_the_device_and_says_so),
         TEST_CASE(playing_with_nothing_plugged_in_streams),
+        TEST_CASE(the_opening_waits_for_the_headphones_to_take_the_stream),
+        TEST_CASE(a_resume_waits_for_the_headphones_again),
+        TEST_CASE(a_pause_during_the_opening_wait_stays_paused),
+        TEST_CASE(wired_headphones_end_the_opening_wait_at_once),
         TEST_CASE(headphones_take_the_sound_back),
         TEST_CASE(the_buds_wait_for_the_next_play_after_headphones),
         TEST_CASE(the_buds_pause_and_resume_playback),

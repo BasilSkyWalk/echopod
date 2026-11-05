@@ -435,6 +435,9 @@ void hal_audio_queue_next(const char *path, uint32_t token)
 void hal_audio_pause(void)
 {
     ensure_engine();
+    if (audio_engine_status(&engine).state != AUDIO_ENGINE_PLAYING) {
+        return;
+    }
     if (transferring) {
         dac_path_set_muted(true);
         dmac_suspend();
@@ -445,6 +448,9 @@ void hal_audio_pause(void)
 void hal_audio_resume(void)
 {
     ensure_engine();
+    if (audio_engine_status(&engine).state != AUDIO_ENGINE_PAUSED) {
+        return;
+    }
     if (transferring) {
         dmac_resume();
         dac_path_set_muted(false);

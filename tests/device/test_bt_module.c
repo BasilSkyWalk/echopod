@@ -640,33 +640,117 @@ static bool frame_bytes_are(const BtModuleFrame *frame, const uint8_t *bytes, ui
     return frame->length == length && memcmp(frame->bytes, bytes, length) == 0;
 }
 
-static void the_first_stream_start_sends_only_cy0_1e(void)
-{
-    static const uint8_t STREAM_ON[] = {'C', 'Y', '0', 0x1E, 0x00};
-    BtModuleFrame frame;
-    connected_for(START_MS + 400);
-    CHECK(bt_module_set_stream(&module, true, START_MS + 500, &frame));
-    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
-    CHECK(module.status.streaming);
-    CHECK(!poll(START_MS + 500 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
-    CHECK(!poll(START_MS + 500 + 2 * BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
-}
-
 static const uint8_t STREAM_ON[] = {'C', 'Y', '0', 0x1E, 0x00};
 static const uint8_t STREAM_OFF[] = {'C', 'Y', '0', 0x00, 0x00};
 static const uint8_t PLAY_NOTICE[] = {'C', 0x86, '0', '0', 0x00};
 static const uint8_t PAUSE_NOTICE[] = {'C', 0x87, '0', '0', 0x00};
 
-static void a_player_pause_and_resume_send_only_cy0(void)
+enum {
+    LINK_MS = START_MS + 400 + BT_MODULE_SILENCE_MS,
+    SETTLED_MS = LINK_MS + BT_MODULE_LINK_SETTLE_MS
+};
+
+static void settled_link(void)
 {
     BtModuleFrame frame;
     connected_for(START_MS + 400);
-    bt_module_set_stream(&module, true, START_MS + 500, &frame);
-    CHECK(bt_module_set_stream(&module, false, START_MS + 600, &frame));
-    CHECK(frame_bytes_are(&frame, STREAM_OFF, sizeof STREAM_OFF));
-    CHECK(bt_module_set_stream(&module, true, START_MS + 900, &frame));
+    poll(SETTLED_MS, &frame);
+}
+
+static void the_first_stream_start_on_a_settled_link_sends_only_cy0_1e(void)
+{
+    BtModuleFrame frame;
+    settled_link();
+    CHECK(bt_module_set_stream(&module, true, SETTLED_MS + 100, &frame));
     CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
-    CHECK(!poll(START_MS + 900 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(module.status.streaming);
+    CHECK(!poll(SETTLED_MS + 100 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(!poll(SETTLED_MS + 100 + 2 * BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+}
+
+static void the_first_stream_start_on_a_fresh_link_waits_a_second(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    CHECK(!bt_module_set_stream(&module, true, LINK_MS + 100, &frame));
+    CHECK(module.status.streaming);
+    CHECK(!poll(SETTLED_MS - 1, &frame));
+    CHECK(poll(SETTLED_MS, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
+    CHECK(!poll(SETTLED_MS + 1, &frame));
+}
+
+static void a_play_report_releases_a_held_stream_start(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, LINK_MS + 100, &frame);
+    receive_text("CC", LINK_MS + 300);
+    CHECK(poll(LINK_MS + 300, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
+    CHECK(!poll(SETTLED_MS, &frame));
+}
+
+static void a_pause_report_releases_a_held_stream_start_with_the_play_notice(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, LINK_MS + 100, &frame);
+    receive_text("CP", LINK_MS + 300);
+    CHECK(poll(LINK_MS + 300, &frame));
+    CHECK(frame_bytes_are(&frame, PLAY_NOTICE, sizeof PLAY_NOTICE));
+    CHECK(!poll(LINK_MS + 300 + BT_MODULE_PLAY_NOTICE_DELAY_MS - 1, &frame));
+    CHECK(poll(LINK_MS + 300 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
+    CHECK(!poll(SETTLED_MS, &frame));
+}
+
+static void a_stop_while_the_start_is_held_sends_only_cy0_00(void)
+{
+    BtModuleFrame frame;
+    connected_for(START_MS + 400);
+    bt_module_set_stream(&module, true, LINK_MS + 100, &frame);
+    CHECK(bt_module_set_stream(&module, false, LINK_MS + 200, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_OFF, sizeof STREAM_OFF));
+    CHECK(!poll(SETTLED_MS, &frame));
+}
+
+static void a_pause_report_right_after_a_stream_start_is_answered_with_play(void)
+{
+    BtModuleFrame frame;
+    settled_link();
+    bt_module_set_stream(&module, true, SETTLED_MS + 100, &frame);
+    receive_text("CP", SETTLED_MS + 600);
+    CHECK(poll(SETTLED_MS + 600, &frame));
+    CHECK(frame_bytes_are(&frame, PLAY_NOTICE, sizeof PLAY_NOTICE));
+    CHECK(!poll(SETTLED_MS + 600 + BT_MODULE_PLAY_NOTICE_DELAY_MS - 1, &frame));
+    CHECK(poll(SETTLED_MS + 600 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
+    CHECK(module.status.streaming);
+    CHECK_EQUAL(1, module.status.remote.pauses);
+}
+
+static void a_pause_report_three_seconds_after_a_stream_start_is_left_alone(void)
+{
+    BtModuleFrame frame;
+    settled_link();
+    bt_module_set_stream(&module, true, SETTLED_MS + 100, &frame);
+    receive_text("CP", SETTLED_MS + 100 + BT_MODULE_REASSERT_MS);
+    CHECK(!poll(SETTLED_MS + 100 + BT_MODULE_REASSERT_MS, &frame));
+    CHECK(!poll(SETTLED_MS + 200 + BT_MODULE_REASSERT_MS, &frame));
+    CHECK_EQUAL(1, module.status.remote.pauses);
+}
+
+static void a_player_pause_and_resume_send_only_cy0(void)
+{
+    BtModuleFrame frame;
+    settled_link();
+    bt_module_set_stream(&module, true, SETTLED_MS + 100, &frame);
+    CHECK(bt_module_set_stream(&module, false, SETTLED_MS + 200, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_OFF, sizeof STREAM_OFF));
+    CHECK(bt_module_set_stream(&module, true, SETTLED_MS + 500, &frame));
+    CHECK(frame_bytes_are(&frame, STREAM_ON, sizeof STREAM_ON));
+    CHECK(!poll(SETTLED_MS + 500 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
 }
 
 static void a_start_after_the_module_reported_paused_sends_the_play_notice_first(void)
@@ -686,14 +770,14 @@ static void a_start_after_the_module_reported_paused_sends_the_play_notice_first
 static void a_stop_after_the_module_reported_playing_sends_the_pause_notice_first(void)
 {
     BtModuleFrame frame;
-    connected_for(START_MS + 400);
-    bt_module_set_stream(&module, true, START_MS + 500, &frame);
-    receive_text("CC", START_MS + 600);
-    settle(START_MS + 600);
-    CHECK(bt_module_set_stream(&module, false, START_MS + 800, &frame));
+    settled_link();
+    bt_module_set_stream(&module, true, SETTLED_MS + 100, &frame);
+    receive_text("CC", SETTLED_MS + 200);
+    settle(SETTLED_MS + 200);
+    CHECK(bt_module_set_stream(&module, false, SETTLED_MS + 400, &frame));
     CHECK(frame_bytes_are(&frame, PAUSE_NOTICE, sizeof PAUSE_NOTICE));
     CHECK(!module.status.streaming);
-    CHECK(poll(START_MS + 800 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
+    CHECK(poll(SETTLED_MS + 400 + BT_MODULE_PLAY_NOTICE_DELAY_MS, &frame));
     CHECK(frame_bytes_are(&frame, STREAM_OFF, sizeof STREAM_OFF));
 }
 
@@ -887,15 +971,16 @@ static void messages_record_the_seconds_since_the_last_one(void)
 static void buds_controls_are_counted_without_sending_anything(void)
 {
     BtModuleFrame frame;
-    connected_for(START_MS + 400);
-    bt_module_set_stream(&module, true, START_MS + 500, &frame);
-    receive_text("CP", START_MS + 600);
-    CHECK(!poll(START_MS + 600 + BT_MODULE_SILENCE_MS, &frame));
-    receive_text("CC", START_MS + 700);
-    receive_text("CA", START_MS + 700);
-    receive_text("CB", START_MS + 700);
-    receive_text("CB", START_MS + 700);
-    CHECK(!poll(START_MS + 700 + BT_MODULE_SILENCE_MS, &frame));
+    settled_link();
+    bt_module_set_stream(&module, true, SETTLED_MS, &frame);
+    uint32_t later_ms = SETTLED_MS + BT_MODULE_REASSERT_MS;
+    receive_text("CP", later_ms + 100);
+    CHECK(!poll(later_ms + 100 + BT_MODULE_SILENCE_MS, &frame));
+    receive_text("CC", later_ms + 200);
+    receive_text("CA", later_ms + 200);
+    receive_text("CB", later_ms + 200);
+    receive_text("CB", later_ms + 200);
+    CHECK(!poll(later_ms + 200 + BT_MODULE_SILENCE_MS, &frame));
     CHECK_EQUAL(1, module.status.remote.pauses);
     CHECK_EQUAL(1, module.status.remote.plays);
     CHECK_EQUAL(1, module.status.remote.previouses);
@@ -934,11 +1019,11 @@ static void streaming_needs_a_connection(void)
 static void a_dropped_link_ends_the_stream(void)
 {
     BtModuleFrame frame;
-    connected_for(START_MS + 400);
-    bt_module_set_stream(&module, true, START_MS + 500, &frame);
-    poll(START_MS + 700, &frame);
-    receive_text("CQI", START_MS + 800);
-    settle(START_MS + 800);
+    settled_link();
+    bt_module_set_stream(&module, true, SETTLED_MS + 100, &frame);
+    poll(SETTLED_MS + 300, &frame);
+    receive_text("CQI", SETTLED_MS + 400);
+    settle(SETTLED_MS + 400);
     CHECK(!module.status.streaming);
 }
 
@@ -1006,7 +1091,13 @@ int main(void)
         TEST_CASE(a_paired_link_is_checked_every_half_second),
         TEST_CASE(messages_record_the_seconds_since_the_last_one),
         TEST_CASE(a_play_report_without_a_stream_is_not_answered),
-        TEST_CASE(the_first_stream_start_sends_only_cy0_1e),
+        TEST_CASE(the_first_stream_start_on_a_settled_link_sends_only_cy0_1e),
+        TEST_CASE(the_first_stream_start_on_a_fresh_link_waits_a_second),
+        TEST_CASE(a_play_report_releases_a_held_stream_start),
+        TEST_CASE(a_pause_report_releases_a_held_stream_start_with_the_play_notice),
+        TEST_CASE(a_stop_while_the_start_is_held_sends_only_cy0_00),
+        TEST_CASE(a_pause_report_right_after_a_stream_start_is_answered_with_play),
+        TEST_CASE(a_pause_report_three_seconds_after_a_stream_start_is_left_alone),
         TEST_CASE(a_player_pause_and_resume_send_only_cy0),
         TEST_CASE(a_start_after_the_module_reported_paused_sends_the_play_notice_first),
         TEST_CASE(a_stop_after_the_module_reported_playing_sends_the_pause_notice_first),
