@@ -378,32 +378,74 @@ static void mono_plays_on_both_channels(void)
     free(pcm.bytes);
 }
 
-static void an_unsupported_rate_is_refused(void)
-{
-    start_engine();
-    CHECK(!audio_engine_play(&engine, "independent_16", 0, 1));
-    CHECK_EQUAL(AUDIO_ENGINE_STOPPED, audio_engine_status(&engine).state);
-    AudioRefusal refusal = audio_engine_refusal(&engine);
-    CHECK_EQUAL(AUDIO_REFUSAL_RATE, refusal.problem);
-    CHECK_EQUAL(22050u, refusal.sample_rate);
-}
-
-static void a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate(void)
-{
-    start_engine();
-    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
-    audio_engine_queue_next(&engine, "independent_16", 4);
-    pump_until_full(0);
-    audio_engine_pump(&engine, 3001);
-    CHECK(audio_engine_status(&engine).failed);
-    CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
-}
-
 static bool scripted_rate_plays(uint32_t rate)
 {
     start_scripted_engine(0, 1);
     scripted.rate = rate;
     return audio_engine_play(&engine, "scripted", 0, 1);
+}
+
+static void an_unsupported_rate_is_refused(void)
+{
+    CHECK(!scripted_rate_plays(7000));
+    CHECK_EQUAL(AUDIO_ENGINE_STOPPED, audio_engine_status(&engine).state);
+    AudioRefusal refusal = audio_engine_refusal(&engine);
+    CHECK_EQUAL(AUDIO_REFUSAL_RATE, refusal.problem);
+    CHECK_EQUAL(7000u, refusal.sample_rate);
+}
+
+static void a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate(void)
+{
+    start_scripted_engine(0, 1);
+    CHECK(audio_engine_play(&engine, "scripted", 0, 3));
+    scripted.rate = 7000;
+    scripted.frames_left = 1;
+    audio_engine_queue_next(&engine, "scripted", 4);
+    pump_until_full(0);
+    CHECK(audio_engine_status(&engine).failed);
+    CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
+    CHECK_EQUAL(7000u, audio_engine_refusal(&engine).sample_rate);
+}
+
+static void low_rates_play_at_a_rate_they_divide(void)
+{
+    static const uint32_t RATES[][2] = {{8000, 48000},  {11025, 44100}, {12000, 48000},
+                                        {16000, 48000}, {22050, 44100}, {24000, 48000},
+                                        {32000, 96000}};
+    for (size_t index = 0; index < sizeof RATES / sizeof RATES[0]; index++) {
+        CHECK(scripted_rate_plays(RATES[index][0]));
+        CHECK_EQUAL(RATES[index][1], audio_engine_rate(&engine));
+    }
+}
+
+static int32_t sample_24(const Fixture *pcm, uint32_t index)
+{
+    return index < 2 ? 0 : expected_at(pcm, index - 2) * 256;
+}
+
+static void a_22_khz_track_fills_in_every_other_sample(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "independent_16", 0, 1));
+    CHECK_EQUAL(44100u, audio_engine_rate(&engine));
+    pump_until_full(0);
+    Fixture pcm = load("independent_16", "pcm");
+    bool ok = pcm.size > 0;
+    for (uint32_t frame = 0; ok && frame < 2000; frame++) {
+        for (uint32_t channel = 0; channel < 2; channel++) {
+            uint32_t index = 2 * frame + channel;
+            int32_t before = sample_24(&pcm, index);
+            int32_t now = expected_at(&pcm, index) * 256;
+            int32_t between = before + (now - before) / 2;
+            ok = ok && ring[2 * (2 * frame) + channel] == (uint32_t)between << 8 &&
+                 ring[2 * (2 * frame + 1) + channel] == (uint32_t)now << 8;
+        }
+    }
+    CHECK(ok);
+    free(pcm.bytes);
+    audio_engine_observe(&engine, 44100);
+    CHECK_EQUAL(1000u, audio_engine_status(&engine).position_ms);
+    CHECK_EQUAL(22050u, audio_engine_status(&engine).track.stream.sample_rate);
 }
 
 static void rates_up_to_192_khz_play_and_higher_ones_are_refused(void)
@@ -530,6 +572,8 @@ int main(void)
         TEST_CASE(seeking_restarts_the_ring_at_the_new_place),
         TEST_CASE(volume_scales_the_samples),
         TEST_CASE(mono_plays_on_both_channels),
+        TEST_CASE(low_rates_play_at_a_rate_they_divide),
+        TEST_CASE(a_22_khz_track_fills_in_every_other_sample),
         TEST_CASE(an_unsupported_rate_is_refused),
         TEST_CASE(rates_up_to_192_khz_play_and_higher_ones_are_refused),
         TEST_CASE(a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate),

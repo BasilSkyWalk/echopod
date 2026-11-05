@@ -58,10 +58,16 @@ __attribute__((used)) void device_fault_handler(const uint32_t *frame)
 {
     start_record_fault(&record, register_read(SCB_CFSR), register_read(SCB_HFSR),
                        frame[STACKED_PC_WORD]);
-    board_panic_fault(frame, register_read(SCB_CFSR));
+    board_panic_show("FAULT", frame, register_read(SCB_CFSR));
     for (;;) {
         board_watchdog_kick();
     }
+}
+
+void board_stall_report(const uint32_t *frame)
+{
+    start_record_stall(&record, frame[STACKED_PC_WORD], frame[STACKED_LR_WORD]);
+    board_panic_show("STALL", frame, register_read(SCB_CFSR));
 }
 
 __attribute__((naked)) void device_fault_entry(void)
@@ -81,5 +87,7 @@ HalStartInfo hal_system_start_info(void)
                           .last_step = info.last_step,
                           .last_step_finished = info.last_step_finished,
                           .last_step_ms = info.last_step_ms,
-                          .last_millivolts = info.last_millivolts};
+                          .last_millivolts = info.last_millivolts,
+                          .stalled = info.stalled,
+                          .stall_lr = info.stall_lr};
 }

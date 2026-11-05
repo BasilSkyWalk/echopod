@@ -23,7 +23,9 @@ static StartInfo warm_info(const StartRecord *record)
                        .last_step = step_of(record->step),
                        .last_step_finished = record->step_finished != 0,
                        .last_step_ms = record->step_ms,
-                       .last_millivolts = record->millivolts};
+                       .last_millivolts = record->millivolts,
+                       .stalled = record->stalled != 0,
+                       .stall_lr = record->stall_lr};
 }
 
 static void clear_run(StartRecord *record)
@@ -37,6 +39,8 @@ static void clear_run(StartRecord *record)
     record->step_finished = 0;
     record->step_ms = 0;
     record->millivolts = 0;
+    record->stalled = 0;
+    record->stall_lr = 0;
 }
 
 StartInfo start_record_boot(StartRecord *record)
@@ -71,6 +75,13 @@ void start_record_fault(StartRecord *record, uint32_t fault_status, uint32_t har
     record->fault_status = fault_status;
     record->hard_fault_status = hard_fault_status;
     record->fault_address = fault_address;
+}
+
+void start_record_stall(StartRecord *record, uint32_t pc, uint32_t lr)
+{
+    record->stalled = 1;
+    record->fault_address = pc;
+    record->stall_lr = lr;
 }
 
 void start_record_step_begin(StartRecord *record, HalStartStep step)

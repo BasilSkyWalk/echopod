@@ -11,9 +11,7 @@
 
 enum {
     MICROSECONDS_PER_PERIOD = 1000,
-    PERIODS_PER_KEY_SCAN = 5,
-    STACKED_LR_WORD = 5,
-    STACKED_PC_WORD = 6
+    PERIODS_PER_KEY_SCAN = 5
 };
 
 static TickClock clock;
@@ -83,7 +81,7 @@ __attribute__((used)) void board_systick_handler(const uint32_t *frame)
     board_input_sample(now_ms);
     board_start_record_tick(now_ms);
     if (stall_watch_check(&stall_watch, now_ms)) {
-        board_panic_stall(frame[STACKED_PC_WORD], frame[STACKED_LR_WORD]);
+        board_stall_report(frame);
     }
     if (stall_watch.tripped) {
         board_panic_poll_power(now_ms);

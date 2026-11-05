@@ -1,5 +1,17 @@
 # EchoPod release notes
 
+## 0.10.1
+
+### Fixed
+
+- **Audiobooks and podcasts at 22 kHz play** (issue 37). Files at 8, 11.025, 12, 16, 22.05, 24 and 32 kHz used to be refused with "22.1 kHz isn't supported". The player now plays them at a rate it supports (2 to 6 times theirs), filling in the new samples smoothly between the real ones. Now Playing still shows the file's own rate.
+- **Sample rates show exactly**, for example 22.05 kHz instead of 22.1 kHz.
+
+### When you update
+
+- Your library, settings and everything else stay as they are.
+- Delete the update file from the player once it has installed, or it installs again.
+
 ## 0.10.0
 
 This release answers most of the open GitHub issues.

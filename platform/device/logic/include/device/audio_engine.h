@@ -9,7 +9,8 @@
 enum {
     AUDIO_ENGINE_PATH_CAPACITY = 256,
     AUDIO_ENGINE_SEGMENTS = 4,
-    AUDIO_ENGINE_VOLUME_MAX = 50
+    AUDIO_ENGINE_VOLUME_MAX = 50,
+    AUDIO_ENGINE_MAX_REPEAT = 6
 };
 
 typedef enum AudioEngineState {
@@ -106,6 +107,9 @@ typedef struct AudioEngine {
     int segment_count;
     bool decoding;
     uint32_t decode_rate;
+    uint32_t source_rate;
+    uint32_t repeat;
+    int32_t held[2];
     AudioTrackInfo decode_track;
     AudioFrame frame;
     bool holding_frame;

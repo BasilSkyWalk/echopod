@@ -10,7 +10,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 
 ## What it does
 
-- **Plays** FLAC, ALAC, MP3, AAC, Opus and WAV, from 44.1 to 192 kHz with 24-bit output, gapless.
+- **Plays** FLAC, ALAC, MP3, AAC, Opus and WAV, from 8 to 192 kHz with 24-bit output, gapless.
 - **Cover Flow**, with every album and a Random album tile, and **Now Playing** with the cover, progress and seeking.
 - **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **echo-sync**.
 - **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.

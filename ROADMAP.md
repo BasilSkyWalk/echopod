@@ -10,7 +10,7 @@ Version 0.10.0 adds Play all / Shuffle all, button and colour settings, Russian 
 
 | Feature | Status | Notes |
 |---|---|---|
-| FLAC, MP3 and WAV playback | device | Our own FLAC decoder on the second core with the hardware LPC accelerator; libmad for MP3; 24-bit output at 44.1–192 kHz |
+| FLAC, MP3 and WAV playback | device | Our own FLAC decoder on the second core with the hardware LPC accelerator; libmad for MP3; 24-bit output at 44.1–192 kHz; 8–32 kHz files are raised 2–6× to one of those |
 | Gapless playback and fades | device | DAC fades around play, pause, seek, skip and rate changes; MP3s trimmed by their LAME tag's encoder delay and padding (tested on a computer, not yet heard on the player) |
 | Resume after power-off | device | The exact queue and position come back |
 | Library built on the player | device | At first start, after music changes over USB, and from Settings → Rescan library; tested up to 6,558 tracks on the player and 20,000 on a computer; 1,563 tracks and 144 albums in about 1 min 45 s |
