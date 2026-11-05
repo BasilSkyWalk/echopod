@@ -9,6 +9,7 @@ enum {
 
 typedef struct UsbFallback {
     bool watching;
+    bool fired;
     uint32_t started_ms;
 } UsbFallback;
 
