@@ -60,7 +60,7 @@ Sort keys are case-insensitive and accent-insensitive (Unicode NFKD with combini
 
 ## Files and tags
 
-The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` (AAC or ALAC), `.wav`, `.wma`, `.ape`, `.dsf` and `.dff`, and also `.opus`, skipping hidden files and folders (a name starting with `.`). Each field takes the first non-empty value, trimmed:
+The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` (AAC or ALAC), `.wav`, `.wma`, `.ape`, `.dsf` and `.dff`, and also `.opus` and `.qoa`, skipping hidden files and folders (a name starting with `.`). QOA carries no tags, so its fields come from its path and its length from its header. Each field takes the first non-empty value, trimmed:
 
 | Field | Vorbis comment (FLAC, Ogg, Opus) | ID3 (MP3, WAV, DSF, DFF) | MP4 atom | APEv2 (any case) | ASF (WMA) |
 |---|---|---|---|---|---|

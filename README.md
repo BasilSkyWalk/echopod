@@ -10,7 +10,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 
 ## What it does
 
-- **Plays** FLAC, ALAC, MP3, AAC, Opus and WAV, from 8 to 192 kHz with 24-bit output, gapless.
+- **Plays** FLAC, ALAC, MP3, AAC, Opus, QOA and WAV, from 8 to 192 kHz with 24-bit output, gapless.
 - **Cover Flow**, with every album and a Random album tile, and **Now Playing** with the cover, progress and seeking.
 - **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **echo-sync**.
 - **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.
@@ -125,4 +125,4 @@ See `docs/architecture.md`.
 
 ## License
 
-GPL-3.0-or-later. See `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`), and so are the Chinese, Japanese and Korean glyph packs made from Noto Sans CJK SC (`assets/fonts/noto-cjk/OFL.txt`). The simulator's decoders (dr_flac, dr_mp3, dr_wav) are public domain or MIT-0 (`third_party/dr_libs/LICENSE`). The player's MP3 decoder is libmad, GPL-2.0-or-later (`third_party/libmad/COPYING`).
+GPL-3.0-or-later. See `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`), and so are the Chinese, Japanese and Korean glyph packs made from Noto Sans CJK SC (`assets/fonts/noto-cjk/OFL.txt`). The simulator's decoders (dr_flac, dr_mp3, dr_wav) are public domain or MIT-0 (`third_party/dr_libs/LICENSE`). The player's MP3 decoder is libmad, GPL-2.0-or-later (`third_party/libmad/COPYING`). The QOA decoder is Dominic Szablewski's reference implementation, MIT (`third_party/qoa/LICENSE`).

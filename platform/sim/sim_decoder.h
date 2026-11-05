@@ -2,7 +2,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
+#include "codec/qoa.h"
 #include "dr_flac.h"
 #include "dr_mp3.h"
 #include "dr_wav.h"
@@ -16,7 +18,8 @@ typedef enum SimCodec {
     SIM_CODEC_MP3,
     SIM_CODEC_WAV,
     SIM_CODEC_MP4,
-    SIM_CODEC_OPUS
+    SIM_CODEC_OPUS,
+    SIM_CODEC_QOA
 } SimCodec;
 
 typedef struct SimDecoder {
@@ -26,6 +29,12 @@ typedef struct SimDecoder {
     drwav wav;
     SimMp4 mp4;
     SimOpus opus;
+    FILE *qoa_file;
+    QoaDecoder qoa;
+    const int16_t *qoa_left;
+    const int16_t *qoa_right;
+    uint32_t qoa_stride;
+    uint32_t qoa_pending;
     uint32_t sample_rate;
     uint32_t channels;
     uint32_t bits_per_sample;

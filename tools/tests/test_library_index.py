@@ -366,6 +366,28 @@ class ReadTrackTest(unittest.TestCase):
         self.assertEqual(("Tagged Title", "Tagged Artist"), (track.title, track.artist))
         self.assertEqual(3000, track.duration_ms)
 
+    def test_a_qoa_file_without_a_valid_header_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "bad.qoa"
+            path.write_bytes(b"qoaf" + bytes(12))
+            with self.assertRaises(ValueError):
+                library_index.read_track(root, path)
+
+    def test_a_qoa_file_has_no_tags_and_takes_its_length_from_the_header(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "Artist" / "Album" / "01 - Song.QOA"
+            path.parent.mkdir(parents=True)
+            frame_header = (2 << 56) | (44100 << 32) | (5120 << 16) | 4136
+            path.write_bytes(b"qoaf" + struct.pack(">I", 44100) +
+                             struct.pack(">Q", frame_header) + bytes(4128))
+            track = library_index.read_track(root, path)
+        self.assertEqual("Artist/Album/01 - Song.QOA", track.path)
+        self.assertEqual("Song", track.title)
+        self.assertEqual(("Unknown Artist", "Album"), (track.artist, track.album))
+        self.assertEqual(1000, track.duration_ms)
+
 
 class UnicodeFormTest(unittest.TestCase):
     def test_decomposed_file_names_are_stored_composed(self):

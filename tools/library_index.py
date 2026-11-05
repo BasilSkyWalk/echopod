@@ -20,7 +20,7 @@ UNKNOWN_ARTIST = "Unknown Artist"
 UNKNOWN_ALBUM = "Unknown Album"
 UNKNOWN_GENRE = "Unknown Genre"
 AUDIO_SUFFIXES = {".flac", ".ogg", ".opus", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf",
-                  ".dff"}
+                  ".dff", ".qoa"}
 PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
 URL_MARKER = "://"
 SPOKEN_FOLDERS = {b"audiobooks", b"audiobook", b"podcasts", b"podcast"}
@@ -266,13 +266,28 @@ def normalized_tags(audio):
     return {key: [tag_text(value) for value in values] for key, values in raw_tag_values(audio.tags).items()}
 
 
+def qoa_duration(path):
+    with open(path, "rb") as handle:
+        data = handle.read(16)
+    if len(data) < 16 or data[:4] != b"qoaf":
+        raise ValueError("not a QOA file")
+    samples = struct.unpack(">I", data[4:8])[0]
+    rate = int.from_bytes(data[9:12], "big")
+    if samples == 0 or data[8] == 0 or rate == 0:
+        raise ValueError("invalid QOA header")
+    return samples / rate
+
+
 def read_track(root, path):
+    relative = nfc(path.relative_to(root).as_posix())
+    if path.suffix.casefold() == ".qoa":
+        return track_from_tags(relative, {}, qoa_duration(path))
     from mutagen import File
     from tag_skim import open_skimming
     with open_skimming(path) as handle:
         audio = File(handle)
     duration = audio.info.length if audio is not None else 0.0
-    return track_from_tags(nfc(path.relative_to(root).as_posix()), normalized_tags(audio), duration)
+    return track_from_tags(relative, normalized_tags(audio), duration)
 
 
 def parse_m3u(text):

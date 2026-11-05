@@ -91,8 +91,8 @@ class PlayerFingerprintTest(unittest.TestCase):
 
     def test_the_counted_names_are_the_players(self):
         counted = ["a.flac", "a.ogg", "a.opus", "a.mp3", "a.m4a", "a.wav", "a.wma", "a.ape", "a.dsf",
-                   "a.dff", "A.FLAC", "b.m3u", "b.M3U8", "Folder.JPG", "front.png",
-                   "albumart.jpeg", "cover.png"]
+                   "a.dff", "a.qoa", "A.FLAC", "A.QOA", "b.m3u", "b.M3U8", "Folder.JPG",
+                   "front.png", "albumart.jpeg", "cover.png"]
         ignored = ["x.aac", "x.txt", "x.aiff", "x.mp4", "x.flac.txt", "scan 01.jpg",
                    "covers.jpg", "folder.gif"]
         for name in counted:
