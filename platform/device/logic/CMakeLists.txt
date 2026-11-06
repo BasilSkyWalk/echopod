@@ -157,6 +157,7 @@ target_link_libraries(echo_device_logic
 )
 
 if(CMAKE_CROSSCOMPILING)
+    target_compile_definitions(echo_device_logic PRIVATE ECHO_RESIDENT_TABLES)
     add_library(echo_device_logic_plain STATIC ${ECHO_DEVICE_LOGIC_SOURCES})
     target_include_directories(echo_device_logic_plain PUBLIC include)
     target_link_libraries(echo_device_logic_plain

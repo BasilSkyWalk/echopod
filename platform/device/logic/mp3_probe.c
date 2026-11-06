@@ -1,5 +1,7 @@
 #include "device/mp3_probe.h"
 
+#include "core/resident.h"
+
 enum {
     TAG_HEADER_BYTES = 10,
     TAG_FOOTER_FLAG = 0x10,
@@ -30,12 +32,12 @@ enum {
     KILO = 1000
 };
 
-static const uint16_t MPEG_1_BITRATES[3][15] = {
+ECHO_RESIDENT static const uint16_t MPEG_1_BITRATES[3][15] = {
     {0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448},
     {0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384},
     {0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320},
 };
-static const uint16_t MPEG_2_BITRATES[2][15] = {
+ECHO_RESIDENT static const uint16_t MPEG_2_BITRATES[2][15] = {
     {0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256},
     {0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160},
 };

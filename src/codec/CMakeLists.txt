@@ -8,6 +8,7 @@ set(ECHO_CODEC_SOURCES
 add_library(echo_codec STATIC ${ECHO_CODEC_SOURCES})
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(mp4.c ogg.c PROPERTIES COMPILE_OPTIONS -Os)
+    target_compile_definitions(echo_codec PRIVATE ECHO_RESIDENT_TABLES)
 endif()
 target_include_directories(echo_codec PUBLIC include)
 target_link_libraries(echo_codec

@@ -239,6 +239,7 @@ if(CMAKE_CROSSCOMPILING)
         board/storage.c
         board/system.c
         board/update.c
+        board/usb.c
         board/usb_dac_session.c
         board/usb_listen.c
         board/usb_report.c
