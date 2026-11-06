@@ -32,6 +32,7 @@ void hal_system_set_power_savings(uint32_t wanted)
 {
     savings_changed = wanted ^ HAL_SAVINGS_DEFAULT;
     board_core1_follow_savings();
+    dac_path_follow_route();
 }
 
 HalPowerInfo hal_system_power_info(void)

@@ -10,6 +10,7 @@ void dac_path_stop(void);
 void dac_path_stop_if_up(void);
 bool dac_path_is_up(void);
 bool dac_path_amp_on(void);
+void dac_path_follow_route(void);
 void dac_path_set_fade_service(void (*service)(void));
 void dac_path_set_fades(bool fades);
 void dac_path_output_on(void);
