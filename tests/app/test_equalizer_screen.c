@@ -290,11 +290,11 @@ static void the_file_list_lists_txt_presets(void)
 {
     open_files();
     CHECK_EQUAL(1, equalizer.files.count);
-    CHECK(strcmp("A.txt", equalizer.files.names[0]) == 0);
+    CHECK(strcmp("A", equalizer.model.label(&equalizer, EQUALIZER_PRESET_FILE)) == 0);
     CHECK_EQUAL(EQUALIZER_PRESET_FILE, equalizer.list.selected);
 }
 
-static void the_settings_summary_uses_seven_characters_but_the_list_keeps_the_full_name(void)
+static void the_settings_summary_uses_seven_characters_and_the_list_the_whole_name(void)
 {
     fake_hal_reset();
     fake_hal_add_directory_entry("/EQ", "LongPresetName.txt", false, false);
@@ -303,11 +303,43 @@ static void the_settings_summary_uses_seven_characters_but_the_list_keeps_the_fu
     toast = (Toast){0};
     equalizer_screen_init(
         &equalizer, (EqualizerConfig){.store = &store, .toast = &toast, .theme = &DEFAULT_THEME});
+    equalizer_screen_open(&equalizer);
     EqualizerTextError error;
     CHECK(equalizer_store_select_file(&store, "LongPresetName.txt", &error));
     CHECK_EQUAL(1, equalizer.files.count);
     CHECK(strcmp("LongPre", equalizer_screen_summary(&equalizer)) == 0);
-    CHECK(strcmp("LongPresetName.txt", equalizer.files.names[0]) == 0);
+    CHECK(strcmp("LongPresetName", equalizer.model.label(&equalizer, EQUALIZER_PRESET_FILE)) == 0);
+    CHECK(equalizer.model.detail(&equalizer, EQUALIZER_PRESET_FILE) != NULL);
+}
+
+static void opening_the_picker_finds_files_added_since_the_last_time(void)
+{
+    Screen *picker = open_files();
+    tap(picker, KEY_BACK);
+    fake_hal_add_directory_entry("/EQ", "B.txt", false, false);
+    add_preset("B.txt", PRESET_B);
+    equalizer_screen_open(&equalizer);
+    picker->enter(picker->context, START_MS);
+    CHECK_EQUAL(2, equalizer.files.count);
+    CHECK(strcmp("B", equalizer.model.label(&equalizer, EQUALIZER_PRESET_FILE + 1)) == 0);
+}
+
+static void a_rejected_file_says_why(void)
+{
+    fake_hal_reset();
+    fake_hal_add_directory_entry("/EQ", "Bad.txt", false, false);
+    add_preset("Bad.txt", PRESET_BAD);
+    equalizer_store_load(&store);
+    toast = (Toast){0};
+    Screen *picker = equalizer_screen_init(
+        &equalizer, (EqualizerConfig){.store = &store, .toast = &toast, .theme = &DEFAULT_THEME});
+    equalizer_screen_open(&equalizer);
+    picker->enter(picker->context, START_MS);
+    for (int step = 0; step < EQUALIZER_PRESET_FILE; step++) {
+        tap(picker, KEY_VOLUME_UP);
+    }
+    CHECK(toast.visible);
+    CHECK(strcmp("Line 1: gain over 12 dB", equalizer.notice) == 0);
 }
 
 static void entering_the_picker_does_not_rescan_the_card(void)
@@ -410,7 +442,9 @@ int main(void)
         TEST_CASE(the_saved_choice_comes_back_at_start),
         TEST_CASE(an_unchanged_choice_is_not_written_again),
         TEST_CASE(the_file_list_lists_txt_presets),
-        TEST_CASE(the_settings_summary_uses_seven_characters_but_the_list_keeps_the_full_name),
+        TEST_CASE(the_settings_summary_uses_seven_characters_and_the_list_the_whole_name),
+        TEST_CASE(opening_the_picker_finds_files_added_since_the_last_time),
+        TEST_CASE(a_rejected_file_says_why),
         TEST_CASE(entering_the_picker_does_not_rescan_the_card),
         TEST_CASE(choosing_a_valid_file_applies_and_saves_it),
         TEST_CASE(highlighting_a_file_previews_it),

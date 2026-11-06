@@ -12,7 +12,7 @@
 
 enum {
     EQUALIZER_TEXT_CAPACITY = 24,
-    EQUALIZER_NOTICE_CAPACITY = 32
+    EQUALIZER_NOTICE_CAPACITY = 48
 };
 
 typedef struct EqualizerConfig {

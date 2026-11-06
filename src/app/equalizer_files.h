@@ -12,3 +12,5 @@ typedef struct EqualizerFileList {
 } EqualizerFileList;
 
 void equalizer_files_scan(EqualizerFileList *list);
+void equalizer_files_name(const EqualizerFileList *list, int index, char *name);
+uint32_t equalizer_files_stem_length(const char *name);

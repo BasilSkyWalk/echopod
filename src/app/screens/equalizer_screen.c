@@ -105,6 +105,16 @@ static void use_preset(const EqualizerConfig *config, EqualizerPreset preset)
 static bool preview_file(EqualizerScreen *equalizer, int index);
 static bool same_name(const char *first, const char *second);
 
+static bool file_is(const EqualizerScreen *equalizer, int file, const char *name)
+{
+    if (file < 0 || file >= equalizer->files.count) {
+        return false;
+    }
+    char full[EQUALIZER_PRESET_NAME_CAPACITY];
+    equalizer_files_name(&equalizer->files, file, full);
+    return same_name(full, name);
+}
+
 static int preset_count(const void *context)
 {
     const EqualizerScreen *equalizer = context;
@@ -129,8 +139,7 @@ static const char *preset_mark(const void *context, int index)
         return (int)choice->preset == index ? CHECK_MARK : NULL;
     }
     int file = index - EQUALIZER_PRESET_FILE;
-    return choice->preset == EQUALIZER_PRESET_FILE && file < equalizer->files.count &&
-                   same_name(choice->preset_name, equalizer->files.names[file])
+    return choice->preset == EQUALIZER_PRESET_FILE && file_is(equalizer, file, choice->preset_name)
                ? CHECK_MARK
                : NULL;
 }
@@ -182,18 +191,37 @@ static bool same_name(const char *first, const char *second)
     return first[index] == second[index];
 }
 
+typedef struct ProblemText {
+    uint8_t problem;
+    uint8_t has_line;
+    uint16_t text;
+} ProblemText;
+
+static const ProblemText PROBLEM_TEXTS[] = {
+    {EQUALIZER_TEXT_TOO_LARGE, 0, STR_SETTINGS_EQ_FILE_TOO_BIG},
+    {EQUALIZER_TEXT_EMPTY, 0, STR_SETTINGS_EQ_FILE_EMPTY},
+    {EQUALIZER_TEXT_TOO_MANY_FILTERS, 0, STR_SETTINGS_EQ_TOO_MANY},
+    {EQUALIZER_TEXT_GAIN, 1, STR_SETTINGS_EQ_GAIN_ERROR},
+    {EQUALIZER_TEXT_Q, 1, STR_SETTINGS_EQ_Q_ERROR},
+    {EQUALIZER_TEXT_FREQUENCY, 1, STR_SETTINGS_EQ_RANGE_ERROR},
+    {EQUALIZER_TEXT_PREAMP, 1, STR_SETTINGS_EQ_RANGE_ERROR},
+};
+
 static void show_preset_error(EqualizerScreen *equalizer, EqualizerTextError error)
 {
-    StringBuilder notice = string_builder_make(equalizer->notice, sizeof equalizer->notice);
-    if (error.line > 0) {
-        char line[16];
-        StringBuilder line_text = string_builder_make(line, sizeof line);
-        string_builder_append_unsigned(&line_text, error.line);
-        const char *arguments[] = {line};
-        i18n_format(&notice, STR_SETTINGS_EQ_PRESET_ERROR, arguments, 1);
-    } else {
-        string_builder_append(&notice, i18n_text(STR_SETTINGS_EQ_PRESET_FAILED));
+    StringId text = error.line > 0 ? STR_SETTINGS_EQ_PRESET_ERROR : STR_SETTINGS_EQ_PRESET_FAILED;
+    for (size_t index = 0; index < sizeof PROBLEM_TEXTS / sizeof PROBLEM_TEXTS[0]; index++) {
+        if (PROBLEM_TEXTS[index].problem == error.problem &&
+            (PROBLEM_TEXTS[index].has_line == 0 || error.line > 0)) {
+            text = (StringId)PROBLEM_TEXTS[index].text;
+        }
     }
+    char line[16];
+    StringBuilder line_text = string_builder_make(line, sizeof line);
+    string_builder_append_unsigned(&line_text, error.line);
+    const char *arguments[] = {line};
+    StringBuilder notice = string_builder_make(equalizer->notice, sizeof equalizer->notice);
+    i18n_format(&notice, text, arguments, 1);
     toast_show(equalizer->config.toast, equalizer->notice, equalizer->now_ms);
 }
 
@@ -221,7 +249,7 @@ static void enter_picker(void *context, uint32_t now_ms)
     if (choice->preset == EQUALIZER_PRESET_FILE) {
         selected = EQUALIZER_PRESET_FILE;
         for (int index = 0; index < equalizer->files.count; index++) {
-            if (same_name(choice->preset_name, equalizer->files.names[index])) {
+            if (file_is(equalizer, index, choice->preset_name)) {
                 selected = EQUALIZER_PRESET_FILE + index;
             }
         }
@@ -253,7 +281,8 @@ static bool preview_file(EqualizerScreen *equalizer, int index)
     if (file < 0 || file >= equalizer->files.count) {
         return false;
     }
-    const char *name = equalizer->files.names[file];
+    char name[EQUALIZER_PRESET_NAME_CAPACITY];
+    equalizer_files_name(&equalizer->files, file, name);
     EqualizerChoice *choice = choice_of(&equalizer->config);
     if (choice->preset == EQUALIZER_PRESET_FILE && same_name(choice->preset_name, name)) {
         return true;
@@ -581,7 +610,6 @@ static void init_editor(EqualizerEditor *editor, EqualizerConfig config)
 Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config)
 {
     *equalizer = (EqualizerScreen){.config = config};
-    equalizer_files_scan(&equalizer->files);
     equalizer->model = (ListModel){.context = equalizer,
                                    .count = preset_count,
                                    .label = preset_label,
@@ -603,6 +631,7 @@ Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config
 ScreenAction equalizer_screen_open(void *context)
 {
     EqualizerScreen *equalizer = context;
+    equalizer_files_scan(&equalizer->files);
     return screen_action_push(&equalizer->screen);
 }
 
@@ -615,7 +644,8 @@ const char *equalizer_screen_summary(const void *context)
     }
     static char summary[SUMMARY_CHARACTERS + 1];
     size_t length = 0;
-    while (length < SUMMARY_CHARACTERS && choice->preset_name[length] != '\0') {
+    size_t stem = equalizer_files_stem_length(choice->preset_name);
+    while (length < SUMMARY_CHARACTERS && length < stem) {
         length++;
     }
     length = utf8_complete_length(choice->preset_name, length);
