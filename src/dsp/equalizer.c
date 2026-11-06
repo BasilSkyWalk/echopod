@@ -62,7 +62,8 @@ typedef struct Run {
     uint32_t stride;
 } Run;
 
-static void filter_channel(EqualizerStage stage, int32_t *history, Run run)
+static inline __attribute__((always_inline)) void filter_run(EqualizerStage stage, int32_t *history,
+                                                             Run run, bool shelf)
 {
     int32_t band = history[0];
     int32_t low = history[1];
@@ -76,12 +77,22 @@ static void filter_channel(EqualizerStage stage, int32_t *history, Run run)
         int32_t next_low = plus(low, scaled_carried(stage.g, next_band, &carry_low));
         band = doubled_minus(next_band, band);
         low = doubled_minus(next_low, low);
-        samples[index] = plus(x, scaled_by(stage.m1, next_band, M1_BITS));
+        int32_t y = plus(x, scaled_by(stage.m1, next_band, M1_BITS));
+        samples[index] = shelf ? plus(y, scaled(stage.m2, next_low)) : y;
     }
     history[0] = band;
     history[1] = low;
     history[2] = (int32_t)carry_band;
     history[3] = (int32_t)carry_low;
+}
+
+static void filter_channel(EqualizerStage stage, int32_t *history, Run run)
+{
+    if (stage.m2 != 0) {
+        filter_run(stage, history, run, true);
+    } else {
+        filter_run(stage, history, run, false);
+    }
 }
 
 static void to_internal(Run run, int32_t preamp)

@@ -10,6 +10,8 @@ _Static_assert(CORE1_STREAM_SAMPLES + sizeof(int32_t[STREAM_SAMPLE_WORDS]) <= CO
 _Static_assert(CORE1_STREAM_CONTROL + sizeof(StreamControl) <=
                    CORE1_SHARED_BASE + CORE1_SHARED_BYTES,
                "the stream control block must fit in the shared block");
+_Static_assert(CORE1_SHARED_EQUALIZER + sizeof(Core1EqualizerShare) <= CORE1_STREAM_CONTROL,
+               "the equalizer curve must fit below the stream control block");
 _Static_assert(CORE1_FLAC_SLOTS_START +
                        sizeof(int32_t[STREAM_SLOTS][FLAC_MAX_CHANNELS][CORE1_FLAC_SLOT_SAMPLES]) <=
                    CORE1_STREAM_RING,

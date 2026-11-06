@@ -256,7 +256,11 @@ static const char PRESET_A[] = "Preamp: -1 dB\n"
                                "Filter 1: ON PK Fc 1000 Hz Gain 2 dB Q 1.5\n";
 static const char PRESET_B[] = "Preamp: -2 dB\n"
                                "Filter 1: ON PK Fc 2000 Hz Gain -3 dB Q 0.8\n";
-static const char PRESET_BAD[] = "Filter 1: ON LS Fc 100 Hz Gain 3 dB Q 0.7\n";
+static const char PRESET_BAD[] = "Filter 1: ON PK Fc 100 Hz Gain 13 dB Q 0.7\n";
+static const char PRESET_SKIPPING[] = "Preamp: -2 dB\n"
+                                      "Filter 1: ON LP Fc 18000 Hz Q 0.7\n"
+                                      "Filter 2: ON PK Fc 1000 Hz Gain -2 dB Q 1\n"
+                                      "Filter 3: ON HP Fc 20 Hz\n";
 
 static void add_preset(const char *name, const char *text)
 {
@@ -367,6 +371,26 @@ static void an_invalid_file_is_not_applied_or_saved(void)
     CHECK_EQUAL(EQUALIZER_CUSTOM_BANDS, fake_hal_equalizer().band_count);
 }
 
+static void a_file_with_unsupported_filters_plays_the_rest_and_says_so(void)
+{
+    fake_hal_reset();
+    fake_hal_add_directory_entry("/EQ", "Mixed.txt", false, false);
+    add_preset("Mixed.txt", PRESET_SKIPPING);
+    equalizer_store_load(&store);
+    toast = (Toast){0};
+    Screen *picker = equalizer_screen_init(
+        &equalizer, (EqualizerConfig){.store = &store, .toast = &toast, .theme = &DEFAULT_THEME});
+    equalizer_screen_open(&equalizer);
+    picker->enter(picker->context, START_MS);
+    for (int step = 0; step < EQUALIZER_PRESET_FILE; step++) {
+        tap(picker, KEY_VOLUME_UP);
+    }
+    CHECK_EQUAL(EQUALIZER_PRESET_FILE, store.choice.preset);
+    CHECK_EQUAL(1, fake_hal_equalizer().band_count);
+    CHECK(toast.visible);
+    CHECK(strcmp("2 filters skipped", equalizer.notice) == 0);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -391,6 +415,7 @@ int main(void)
         TEST_CASE(choosing_a_valid_file_applies_and_saves_it),
         TEST_CASE(highlighting_a_file_previews_it),
         TEST_CASE(an_invalid_file_is_not_applied_or_saved),
+        TEST_CASE(a_file_with_unsupported_filters_plays_the_rest_and_says_so),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

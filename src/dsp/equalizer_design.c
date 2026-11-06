@@ -17,7 +17,10 @@ enum {
     COSINE_LAST_TERM = 13,
     AUDIBLE_NUMERATOR = 9,
     AUDIBLE_DENOMINATOR = 20,
-    TENTHS = 10
+    TENTHS = 10,
+    HUNDREDTHS = 100,
+    TABLE_LAST = 36,
+    PREAMP_FLOOR_TENTHS = -480
 };
 
 static const int64_t ONE = INT64_C(1) << TABLE_BITS;
@@ -64,11 +67,11 @@ static int clamped_gain(int gain_tenths)
                                                      : gain_tenths;
 }
 
-static int clamped_q(int q_tenths)
+static int clamped_q(int q_hundredths)
 {
-    return q_tenths < EQUALIZER_Q_MIN_TENTHS   ? EQUALIZER_Q_MIN_TENTHS
-           : q_tenths > EQUALIZER_Q_MAX_TENTHS ? EQUALIZER_Q_MAX_TENTHS
-                                               : q_tenths;
+    return q_hundredths < EQUALIZER_Q_MIN_HUNDREDTHS   ? EQUALIZER_Q_MIN_HUNDREDTHS
+           : q_hundredths > EQUALIZER_Q_MAX_HUNDREDTHS ? EQUALIZER_Q_MAX_HUNDREDTHS
+                                                       : q_hundredths;
 }
 
 static int clamped_preamp(int preamp_tenths)
@@ -78,22 +81,30 @@ static int clamped_preamp(int preamp_tenths)
                                                          : preamp_tenths;
 }
 
-static int64_t amplitude_for_gain_tenths(int gain_tenths)
+static int64_t amplitude_for_hundredths(int hundredths)
 {
-    int scaled = clamped_gain(gain_tenths) + GAIN_TABLE_OFFSET * TENTHS;
-    int index = scaled / TENTHS;
-    int fraction = scaled % TENTHS;
+    int scaled = hundredths + GAIN_TABLE_OFFSET * HUNDREDTHS;
+    scaled = scaled < 0 ? 0 : scaled > TABLE_LAST * HUNDREDTHS ? TABLE_LAST * HUNDREDTHS : scaled;
+    int index = scaled / HUNDREDTHS;
+    int fraction = scaled % HUNDREDTHS;
     int64_t low = GAIN_Q30[index];
     if (fraction == 0) {
         return low;
     }
     int64_t high = GAIN_Q30[index + 1];
-    return low + divided((high - low) * fraction, TENTHS);
+    return low + divided((high - low) * fraction, HUNDREDTHS);
+}
+
+static int64_t amplitude_for_gain_tenths(int gain_tenths)
+{
+    return amplitude_for_hundredths(clamped_gain(gain_tenths) * TENTHS);
 }
 
 static int64_t linear_for_preamp_tenths(int preamp_tenths)
 {
-    int value = clamped_preamp(preamp_tenths);
+    int value = preamp_tenths < PREAMP_FLOOR_TENTHS ? PREAMP_FLOOR_TENTHS
+                : preamp_tenths > 0                 ? 0
+                                                    : preamp_tenths;
     int64_t lower = multiply(amplitude_for_gain_tenths(EQUALIZER_GAIN_MIN_TENTHS),
                              amplitude_for_gain_tenths(EQUALIZER_GAIN_MIN_TENTHS));
     int64_t factor = ONE;
@@ -124,7 +135,8 @@ static Angle half_angle_of(uint32_t frequency, uint32_t rate)
 
 bool equalizer_band_audible(EqualizerBand band, uint32_t rate)
 {
-    return band.gain_tenths != 0 && band.frequency_hz > 0 && band.q_tenths > 0 &&
+    return band.gain_tenths != 0 && band.frequency_hz > 0 && band.q_hundredths > 0 &&
+           band.filter <= EQUALIZER_HIGH_SHELF &&
            (uint32_t)band.frequency_hz * AUDIBLE_DENOMINATOR < rate * AUDIBLE_NUMERATOR;
 }
 
@@ -179,19 +191,46 @@ static int64_t effective_damping(int32_t a1, int64_t g)
 static EqualizerStage design_stage(EqualizerBand band, uint32_t rate)
 {
     Angle half = half_angle_of(band.frequency_hz, rate);
-    int64_t amplitude = amplitude_for_gain_tenths(band.gain_tenths);
-    int q_tenths = clamped_q(band.q_tenths);
-    int64_t damping = divided(ONE << TABLE_BITS, divided(amplitude * q_tenths, TENTHS));
-    int32_t g = coefficient(divided(half.sine << TABLE_BITS, half.cosine));
+    int64_t tangent = divided(half.sine << TABLE_BITS, half.cosine);
+    int gain = clamped_gain(band.gain_tenths);
+    if (band.filter == EQUALIZER_HIGH_SHELF) {
+        gain = -gain;
+    }
+    int64_t amplitude = amplitude_for_gain_tenths(gain);
+    int q_hundredths = clamped_q(band.q_hundredths);
+    bool shelf = band.filter != EQUALIZER_PEAK;
+    int64_t width = shelf ? divided(ONE * q_hundredths, HUNDREDTHS)
+                          : divided(amplitude * q_hundredths, HUNDREDTHS);
+    int64_t damping = divided(ONE << TABLE_BITS, width);
+    if (shelf) {
+        tangent = multiply(tangent, amplitude_for_hundredths(-gain * TENTHS / 2));
+    }
+    int32_t g = coefficient(tangent);
     int64_t g_wide = widened(g);
     int64_t denominator = ONE + product(g_wide, g_wide + damping);
     int32_t a1 = (int32_t)divided(INT64_C(1) << (TABLE_BITS + COEFFICIENT_BITS), denominator);
     int64_t squared_minus_one = product(amplitude, amplitude) - ONE;
-    return (EqualizerStage){
-        .g = g,
-        .a1 = a1,
-        .m1 = coefficient_m1(product(effective_damping(a1, g_wide), squared_minus_one)),
-    };
+    int64_t effective = effective_damping(a1, g_wide);
+    if (!shelf) {
+        return (EqualizerStage){
+            .g = g, .a1 = a1, .m1 = coefficient_m1(product(effective, squared_minus_one))};
+    }
+    return (EqualizerStage){.g = g,
+                            .a1 = a1,
+                            .m1 = coefficient_m1(product(effective, amplitude - ONE)),
+                            .m2 = coefficient(squared_minus_one)};
+}
+
+static int shelf_lift_tenths(const EqualizerCurve *curve, uint32_t rate)
+{
+    int lift = 0;
+    for (int index = 0; index < curve->band_count; index++) {
+        EqualizerBand band = curve->bands[index];
+        if (band.filter == EQUALIZER_HIGH_SHELF && equalizer_band_audible(band, rate)) {
+            lift += clamped_gain(band.gain_tenths);
+        }
+    }
+    return lift;
 }
 
 static void clear_histories(EqualizerChain *chain)
@@ -227,7 +266,7 @@ static Shape shape_of(const EqualizerStage *stage)
     return (Shape){.g = g >> (TABLE_BITS - RESPONSE_BITS),
                    .k = effective_damping(stage->a1, g) >> (TABLE_BITS - RESPONSE_BITS),
                    .m1 = (int64_t)stage->m1 * (1 << (RESPONSE_BITS - M1_BITS)),
-                   .m2 = 0};
+                   .m2 = (int64_t)stage->m2 * (1 << (RESPONSE_BITS - COEFFICIENT_BITS))};
 }
 
 static int64_t response_squared(const Shape *shape, int64_t tangent)
@@ -326,8 +365,9 @@ static void design_chain(EqualizerChain *chain, const EqualizerCurve *curve, uin
         *stage = design_stage(chain->curve.bands[band], rate);
         stage->band = (uint8_t)band;
     }
-    chain->preamp = within_headroom(
-        chain, linear_for_preamp_tenths(equalizer_preamp_tenths(&chain->curve, rate)));
+    int preamp =
+        equalizer_preamp_tenths(&chain->curve, rate) + shelf_lift_tenths(&chain->curve, rate);
+    chain->preamp = within_headroom(chain, linear_for_preamp_tenths(preamp));
 }
 
 static bool same_layout(const EqualizerCurve *first, const EqualizerCurve *second)
@@ -336,7 +376,8 @@ static bool same_layout(const EqualizerCurve *first, const EqualizerCurve *secon
         return false;
     }
     for (int index = 0; index < first->band_count; index++) {
-        if (first->bands[index].frequency_hz != second->bands[index].frequency_hz) {
+        if (first->bands[index].frequency_hz != second->bands[index].frequency_hz ||
+            first->bands[index].filter != second->bands[index].filter) {
             return false;
         }
     }

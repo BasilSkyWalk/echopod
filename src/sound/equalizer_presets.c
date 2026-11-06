@@ -4,8 +4,8 @@
 
 enum {
     PRESET_MAX_BANDS = 5,
-    PRESET_Q_TENTHS = 14,
-    CUSTOM_Q_TENTHS = 10,
+    PRESET_Q_HUNDREDTHS = 140,
+    CUSTOM_Q_HUNDREDTHS = 100,
     DB_TENTHS = 10
 };
 
@@ -38,7 +38,7 @@ static EqualizerCurve custom_curve(const int8_t *gains)
     for (int index = 0; index < EQUALIZER_CUSTOM_BANDS; index++) {
         curve.bands[index] = (EqualizerBand){.frequency_hz = EQUALIZER_CUSTOM_FREQUENCIES[index],
                                              .gain_tenths = (int16_t)(gains[index] * DB_TENTHS),
-                                             .q_tenths = CUSTOM_Q_TENTHS};
+                                             .q_hundredths = CUSTOM_Q_HUNDREDTHS};
     }
     return curve;
 }
@@ -58,7 +58,7 @@ EqualizerCurve equalizer_presets_curve(EqualizerPreset preset, const int8_t *cus
         curve.bands[index] =
             (EqualizerBand){.frequency_hz = shape->bands[index].frequency_hz,
                             .gain_tenths = (int16_t)(shape->bands[index].gain_db * DB_TENTHS),
-                            .q_tenths = PRESET_Q_TENTHS};
+                            .q_hundredths = PRESET_Q_HUNDREDTHS};
     }
     return curve;
 }

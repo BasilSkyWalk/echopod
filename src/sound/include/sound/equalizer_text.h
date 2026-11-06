@@ -33,6 +33,7 @@ typedef enum EqualizerTextProblem {
 typedef struct EqualizerTextError {
     uint32_t line;
     EqualizerTextProblem problem;
+    uint32_t skipped;
 } EqualizerTextError;
 
 bool equalizer_text_parse(const char *text, uint32_t length, EqualizerCurve *curve,

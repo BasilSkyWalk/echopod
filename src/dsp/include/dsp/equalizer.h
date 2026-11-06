@@ -4,13 +4,13 @@
 #include <stdint.h>
 
 enum {
-    EQUALIZER_MAX_BANDS = 8,
+    EQUALIZER_MAX_BANDS = 10,
     EQUALIZER_GAIN_MIN_DB = -12,
     EQUALIZER_GAIN_MAX_DB = 12,
     EQUALIZER_GAIN_MIN_TENTHS = -120,
     EQUALIZER_GAIN_MAX_TENTHS = 120,
-    EQUALIZER_Q_MIN_TENTHS = 1,
-    EQUALIZER_Q_MAX_TENTHS = 100,
+    EQUALIZER_Q_MIN_HUNDREDTHS = 10,
+    EQUALIZER_Q_MAX_HUNDREDTHS = 1000,
     EQUALIZER_PREAMP_MIN_TENTHS = -240,
     EQUALIZER_PREAMP_MAX_TENTHS = 120,
     EQUALIZER_MAX_RATE = 96000,
@@ -19,10 +19,17 @@ enum {
     EQUALIZER_FADE_CHUNK = 32
 };
 
+typedef enum EqualizerFilter {
+    EQUALIZER_PEAK,
+    EQUALIZER_LOW_SHELF,
+    EQUALIZER_HIGH_SHELF
+} EqualizerFilter;
+
 typedef struct EqualizerBand {
     uint16_t frequency_hz;
     int16_t gain_tenths;
-    uint8_t q_tenths;
+    uint16_t q_hundredths;
+    uint8_t filter;
 } EqualizerBand;
 
 typedef struct EqualizerCurve {
@@ -36,6 +43,7 @@ typedef struct EqualizerStage {
     int32_t g;
     int32_t a1;
     int32_t m1;
+    int32_t m2;
     uint8_t band;
 } EqualizerStage;
 

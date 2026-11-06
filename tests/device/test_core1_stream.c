@@ -273,13 +273,21 @@ static bool plays_exactly(const char *name, int channels)
 static Equalizer core1_equalizer;
 static Core1EqualizerShare share;
 
-static EqualizerCurve two_bands(int8_t low_gain, int8_t high_gain)
+static EqualizerCurve bells_and_shelves(int8_t low_gain, int8_t high_gain)
 {
-    EqualizerCurve curve = {.band_count = 2};
+    EqualizerCurve curve = {.band_count = 4};
     curve.bands[0] = (EqualizerBand){
-        .frequency_hz = 160, .gain_tenths = (int16_t)(low_gain * 10), .q_tenths = 10};
+        .frequency_hz = 160, .gain_tenths = (int16_t)(low_gain * 10), .q_hundredths = 100};
     curve.bands[1] = (EqualizerBand){
-        .frequency_hz = 2500, .gain_tenths = (int16_t)(high_gain * 10), .q_tenths = 10};
+        .frequency_hz = 2500, .gain_tenths = (int16_t)(high_gain * 10), .q_hundredths = 100};
+    curve.bands[2] = (EqualizerBand){.frequency_hz = 80,
+                                     .gain_tenths = (int16_t)(low_gain * 4),
+                                     .q_hundredths = 70,
+                                     .filter = EQUALIZER_LOW_SHELF};
+    curve.bands[3] = (EqualizerBand){.frequency_hz = 8000,
+                                     .gain_tenths = (int16_t)(high_gain * 8),
+                                     .q_hundredths = 70,
+                                     .filter = EQUALIZER_HIGH_SHELF};
     return curve;
 }
 
@@ -306,11 +314,11 @@ static void core_1_equalizes_exactly_like_the_main_core(void)
 {
     start(BIG_RING_BYTES);
     core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
-    share_curve(two_bands(6, -4), true);
+    share_curve(bells_and_shelves(6, -4), true);
     Equalizer reference;
     equalizer_init(&reference);
     equalizer_set_rate(&reference, 44100);
-    EqualizerCurve curve = two_bands(6, -4);
+    EqualizerCurve curve = bells_and_shelves(6, -4);
     equalizer_set_curve(&reference, &curve);
     Fixture pcm = load("lpc_16_44k_stereo", "pcm");
     AudioTrackInfo info;
@@ -332,11 +340,11 @@ static void core_1_leaves_the_audio_alone_unless_asked(void)
 {
     start(BIG_RING_BYTES);
     core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
-    share_curve(two_bands(6, -4), false);
+    share_curve(bells_and_shelves(6, -4), false);
     CHECK(plays_exactly("lpc_16_44k_stereo", 2));
     start(BIG_RING_BYTES);
     core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
-    share_curve(two_bands(0, 0), true);
+    share_curve(bells_and_shelves(0, 0), true);
     CHECK(plays_exactly("lpc_16_44k_stereo", 2));
 }
 
@@ -823,11 +831,11 @@ static void core_1_equalizes_pieces_exactly_like_the_main_core(void)
     start(FULL_RING_BYTES);
     use_the_flac_program_slots();
     core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
-    share_curve(two_bands(6, -4), true);
+    share_curve(bells_and_shelves(6, -4), true);
     Equalizer reference;
     equalizer_init(&reference);
     equalizer_set_rate(&reference, 48000);
-    EqualizerCurve curve = two_bands(6, -4);
+    EqualizerCurve curve = bells_and_shelves(6, -4);
     equalizer_set_curve(&reference, &curve);
     Fixture pcm = load("made", "pcm");
     AudioTrackInfo info;

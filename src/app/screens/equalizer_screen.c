@@ -197,6 +197,21 @@ static void show_preset_error(EqualizerScreen *equalizer, EqualizerTextError err
     toast_show(equalizer->config.toast, equalizer->notice, equalizer->now_ms);
 }
 
+static void show_skipped(EqualizerScreen *equalizer, uint32_t skipped)
+{
+    StringBuilder notice = string_builder_make(equalizer->notice, sizeof equalizer->notice);
+    if (skipped == 1) {
+        string_builder_append(&notice, i18n_text(STR_SETTINGS_EQ_SKIPPED_ONE));
+    } else {
+        char count[16];
+        StringBuilder count_text = string_builder_make(count, sizeof count);
+        string_builder_append_unsigned(&count_text, skipped);
+        const char *arguments[] = {count};
+        i18n_format(&notice, STR_SETTINGS_EQ_SKIPPED, arguments, 1);
+    }
+    toast_show(equalizer->config.toast, equalizer->notice, equalizer->now_ms);
+}
+
 static void enter_picker(void *context, uint32_t now_ms)
 {
     EqualizerScreen *equalizer = context;
@@ -247,6 +262,9 @@ static bool preview_file(EqualizerScreen *equalizer, int index)
     if (!equalizer_store_select_file(equalizer->config.store, name, &error)) {
         show_preset_error(equalizer, error);
         return false;
+    }
+    if (error.skipped > 0) {
+        show_skipped(equalizer, error.skipped);
     }
     return true;
 }

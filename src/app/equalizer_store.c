@@ -89,7 +89,7 @@ static bool unchanged(const EqualizerStore *store, const uint8_t *bytes)
 
 bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, EqualizerTextError *error)
 {
-    EqualizerTextError local = {MISSING_NONE, EQUALIZER_TEXT_UNREADABLE};
+    EqualizerTextError local = {MISSING_NONE, EQUALIZER_TEXT_UNREADABLE, 0};
     if (error == NULL) {
         error = &local;
     }
