@@ -130,16 +130,7 @@ bool equalizer_band_audible(EqualizerBand band, uint32_t rate)
 
 bool equalizer_curve_valid(const EqualizerCurve *curve, uint32_t rate)
 {
-    if (curve->band_count > EQUALIZER_MAX_BANDS || rate == 0 || rate > EQUALIZER_MAX_RATE) {
-        return false;
-    }
-    for (int index = 0; index < curve->band_count; index++) {
-        EqualizerBand band = curve->bands[index];
-        if (band.gain_tenths != 0 && !equalizer_band_audible(band, rate)) {
-            return false;
-        }
-    }
-    return true;
+    return curve->band_count <= EQUALIZER_MAX_BANDS && rate > 0 && rate <= EQUALIZER_MAX_RATE;
 }
 
 int equalizer_preamp_tenths(const EqualizerCurve *curve, uint32_t rate)

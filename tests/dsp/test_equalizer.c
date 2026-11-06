@@ -267,15 +267,19 @@ static void a_file_preamp_never_removes_automatic_headroom(void)
     CHECK_EQUAL(-100, equalizer_preamp_tenths(&curve, 48000));
 }
 
-static void an_invalid_band_at_the_current_rate_is_rejected_whole(void)
+static void a_band_too_high_for_the_rate_is_skipped_alone(void)
 {
-    EqualizerCurve curve = one_band(30000, 6, 14);
+    EqualizerCurve curve = {.band_count = 2};
+    curve.bands[0] = (EqualizerBand){1000, -60, 14};
+    curve.bands[1] = (EqualizerBand){30000, 60, 14};
     Equalizer equalizer = equalizer_for(curve, 44100);
-    CHECK(!equalizer_active(&equalizer));
-    CHECK(!equalizer_valid(&equalizer));
-    equalizer_set_rate(&equalizer, 96000);
-    CHECK(equalizer_active(&equalizer));
     CHECK(equalizer_valid(&equalizer));
+    CHECK_EQUAL(1, equalizer.current.stage_count);
+    CHECK_EQUAL(0, equalizer_preamp_tenths(&curve, 44100));
+    CHECK(near(-6.0, gain_at(&equalizer, 1000.0, 44100), 0.2));
+    equalizer_set_rate(&equalizer, 96000);
+    CHECK_EQUAL(2, equalizer.current.stage_count);
+    CHECK_EQUAL(-60, equalizer_preamp_tenths(&curve, 96000));
 }
 
 static int32_t saturated(double value)
@@ -387,7 +391,7 @@ int main(void)
         TEST_CASE(a_very_low_q_is_honoured),
         TEST_CASE(a_preamp_only_curve_is_active),
         TEST_CASE(a_file_preamp_never_removes_automatic_headroom),
-        TEST_CASE(an_invalid_band_at_the_current_rate_is_rejected_whole),
+        TEST_CASE(a_band_too_high_for_the_rate_is_skipped_alone),
         TEST_CASE(a_deep_file_preamp_is_honoured),
         TEST_CASE(a_band_at_the_q_cap_holds_a_full_scale_tone_at_its_centre),
         TEST_CASE(stacked_boosts_at_the_q_cap_never_wrap),
