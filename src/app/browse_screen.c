@@ -342,17 +342,24 @@ static ScreenAction play_all(BrowseScreen *browse, bool shuffled)
 static bool opens_flow(const BrowseScreen *browse, BrowseItem item)
 {
     const BrowsePoolConfig *config = &browse->pool->config;
-    return item.kind == BROWSE_ITEM_GROUP && item.group != LIBRARY_PLAYLISTS &&
-           config->open_flow != NULL && config->options != NULL &&
-           config->options[OPTION_ARTIST_VIEW] != 0;
+    if (config->open_flow == NULL || config->options == NULL || browse->in_flow) {
+        return false;
+    }
+    if (item.kind == BROWSE_ITEM_GROUP) {
+        bool playlist = item.group == LIBRARY_PLAYLISTS;
+        return config->options[playlist ? OPTION_FOLDER_VIEW : OPTION_ARTIST_VIEW] != 0;
+    }
+    return item.kind == BROWSE_ITEM_FOLDER && browse->shelf == SPOKEN_NONE &&
+           config->options[OPTION_FOLDER_VIEW] != 0;
 }
 
 static ScreenAction open_child(BrowseScreen *browse, BrowseItem item)
 {
     if (opens_flow(browse, item)) {
         BrowsePoolConfig *config = &browse->pool->config;
+        LibrarySection group = item.kind == BROWSE_ITEM_FOLDER ? LIBRARY_FOLDERS : item.group;
         Screen *flow =
-            config->open_flow(config->flow_context, item.group, item.index, browse->level + 1);
+            config->open_flow(config->flow_context, group, item.index, browse->level + 1);
         if (flow != NULL) {
             return screen_action_push(flow);
         }
@@ -366,6 +373,7 @@ static ScreenAction open_child(BrowseScreen *browse, BrowseItem item)
         return screen_action_none();
     }
     browse->pool->screens[browse->level + 1].shelf = browse->shelf;
+    browse->pool->screens[browse->level + 1].in_flow = browse->in_flow;
     return screen_action_push(next);
 }
 
@@ -623,6 +631,7 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     browse->favorites_only = false;
     browse->shelf = SPOKEN_NONE;
     browse->shelf_root = false;
+    browse->in_flow = false;
     browse->count = browse_count(pool->config.library, query);
     browse->extra = 0;
     if (browse->count > 0 && pool->config.player != NULL) {

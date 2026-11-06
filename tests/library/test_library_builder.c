@@ -272,6 +272,17 @@ static void the_fixture_playlist_resolves_like_the_pc_indexer(void)
     for (size_t index = 0; index < sizeof entries / sizeof entries[0]; index++) {
         CHECK_EQUAL(BUILDER_OK, library_builder_playlist_entry(&builder, entries[index]));
     }
+    CHECK_EQUAL(BUILDER_OK, library_builder_begin_playlist(&builder, "Weekend", "Playlists"));
+    const char *weekend[] = {
+        "../AC DC/Back In Black/1-01 - Hells Bells.flac",
+        "../AC DC/Back In Black/1-02 - Shoot to Thrill.flac",
+        "../Bj\xc3\xb6rk/Homogenic/01 - Hunter.flac",
+        "../Bj\xc3\xb6rk/Homogenic/02 - J\xc3\xb3ga.flac",
+        "../AC DC/Back In Black/1-02 - Shoot to Thrill.flac",
+    };
+    for (size_t index = 0; index < sizeof weekend / sizeof weekend[0]; index++) {
+        CHECK_EQUAL(BUILDER_OK, library_builder_playlist_entry(&builder, weekend[index]));
+    }
     Built built;
     finish(&builder, &built);
     check_means_fixture(&built, "small_library.db");

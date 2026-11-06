@@ -78,6 +78,7 @@ typedef enum SettingOption {
     OPTION_USB_PROMPT,
     OPTION_LISTEN_HISTORY,
     OPTION_TIME_ZONE,
+    OPTION_FOLDER_VIEW,
     SETTINGS_OPTION_COUNT
 } SettingOption;
 

@@ -13,14 +13,31 @@
 #include "ui/toast.h"
 
 enum {
-    COVER_FLOW_TEXT_CAPACITY = 128
+    COVER_FLOW_TEXT_CAPACITY = 128,
+    COVER_FLOW_TILES = COVER_CACHE_SLOTS
 };
+
+typedef enum CoverFlowKind {
+    COVER_FLOW_ALBUMS,
+    COVER_FLOW_PLAYLIST,
+    COVER_FLOW_FOLDERS
+} CoverFlowKind;
 
 typedef struct CoverFlowOrder {
     uint32_t first_link;
     uint32_t count;
     bool linked;
+    CoverFlowKind kind;
+    uint32_t links;
+    uint16_t folder;
 } CoverFlowOrder;
+
+typedef struct CoverFlowTile {
+    int position;
+    uint16_t album;
+    uint16_t item;
+    uint32_t link;
+} CoverFlowTile;
 
 typedef struct CoverFlowConfig {
     const Library *library;
@@ -40,6 +57,8 @@ typedef struct CoverFlowScreen {
     CoverFlowOrder artist_order;
     BrowseQuery parent;
     int32_t order_key;
+    uint16_t origin;
+    int first;
     int album_level;
     int held_repeats;
     int count;
@@ -52,6 +71,7 @@ typedef struct CoverFlowScreen {
     uint32_t text_changed_ms;
     char title[COVER_FLOW_TEXT_CAPACITY];
     char artist[COVER_FLOW_TEXT_CAPACITY];
+    CoverFlowTile tiles[COVER_FLOW_TILES];
 } CoverFlowScreen;
 
 Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config);
