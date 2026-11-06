@@ -242,7 +242,7 @@ echo_add_unit_test(NAME test_test_pattern_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
-foreach(device_test audio_math backlight battery_gauge watchdog panic_text stall_watch bt_module card_write core1_control start_record stack_mark dac_sequence dma_loop flac_accel jack_sense key_ladder key_scanner msc panel pcf8563 pll sd_card sleep_meter stream_drift tick_clock updater usb_audio usb_audio_sink usb_device usb_fallback wav_source vbus_debounce)
+foreach(device_test audio_math backlight image_date battery_gauge watchdog panic_text stall_watch bt_module card_write core1_control start_record stack_mark dac_sequence dma_loop flac_accel jack_sense key_ladder key_scanner msc panel pcf8563 pll sd_card sleep_meter stream_drift tick_clock updater usb_audio usb_audio_sink usb_device usb_fallback wav_source vbus_debounce)
     echo_add_unit_test(NAME test_${device_test}
         SOURCES device/test_${device_test}.c
         LIBRARIES echo_device_logic

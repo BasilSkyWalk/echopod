@@ -43,7 +43,8 @@ static void print_usage(void)
           "                [--keys up,down,play,menu,back,power[:long],...]\n"
           "                [--card MUSIC_DIR] [--system-dir DIR_WITH_LIBRARY_DB]\n"
           "                [--internal INTERNAL_MUSIC_DIR]\n"
-          "                [--battery PERCENT] [--charging] [--no-clock] [--clock-unset]\n",
+          "                [--battery PERCENT] [--charging] [--no-clock] [--clock-unset]\n"
+          "                [--clock-date YYYY-MM-DD]\n",
           stderr);
 }
 
@@ -198,6 +199,10 @@ int main(int argument_count, char **arguments)
     sim_audio_start(session.options.headless);
     sim_power_configure(session.options.battery_percent, session.options.battery_charging);
     sim_time_configure(session.options.clock_absent, session.options.clock_unset);
+    if (session.options.clock_year != 0) {
+        sim_time_start_on(session.options.clock_year, session.options.clock_month,
+                          session.options.clock_day);
+    }
     sim_glyphs_attach();
     app_start();
     app_show_splash();

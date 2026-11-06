@@ -136,6 +136,8 @@ typedef struct AppState {
     bool usb_power;
     bool rescan_requested;
     bool music_check_requested;
+    bool clock_question;
+    bool open_date_time;
     bool light_after_frame;
     bool frame_changed;
     bool frame_stable;
@@ -150,6 +152,7 @@ typedef struct AppState {
     AppScreens screens;
     MessageScreen notice;
     ChoiceScreen prompt;
+    ChoiceScreen clock_prompt;
     int prompt_default;
     int prompt_result;
     FrameDiff frame_diff;
@@ -855,6 +858,7 @@ static void report_card_files(CardFilesReport files, uint32_t now_ms)
         app.rescan_requested = true;
     } else if (music_check_firmware_is_new()) {
         app.music_check_requested = true;
+        app.clock_question = true;
     }
 }
 
@@ -1145,6 +1149,54 @@ void app_request_rescan_if_music_changed(void)
     app.usb_written = true;
 }
 
+static const StringId CLOCK_PROMPT_OPTIONS[] = {STR_SETTINGS_SET_NOW, STR_SETTINGS_LATER};
+
+static int clock_prompt_current(const void *context)
+{
+    (void)context;
+    return 0;
+}
+
+static void clock_prompt_choose(void *context, int index)
+{
+    AppState *state = context;
+    state->open_date_time = index == 0;
+}
+
+static void push_screen(Screen *screen, uint32_t now_ms)
+{
+    if (screen_stack_apply(&app.stack, screen_action_push(screen), now_ms)) {
+        use_screen_key_behaviors();
+    }
+}
+
+static void ask_for_the_clock(uint32_t now_ms)
+{
+    app.clock_question = false;
+    if (app.clock.clock.known) {
+        return;
+    }
+    ChoiceConfig config = {.title = i18n_text(STR_SETTINGS_CLOCK_PROMPT),
+                           .option_ids = CLOCK_PROMPT_OPTIONS,
+                           .option_count = 2,
+                           .current = clock_prompt_current,
+                           .choose = clock_prompt_choose,
+                           .context = &app,
+                           .theme = &app.theme};
+    push_screen(choice_screen_init(&app.clock_prompt, config), now_ms);
+}
+
+static void follow_clock_prompt(uint32_t now_ms)
+{
+    if (app.clock_question && !app.music_check_requested && !fade_running()) {
+        ask_for_the_clock(now_ms);
+    }
+    if (app.open_date_time) {
+        app.open_date_time = false;
+        push_screen(&app.screens.date_time.screen, now_ms);
+    }
+}
+
 static void take_computer_clock(void)
 {
     if (!app.usb_written) {
@@ -1243,6 +1295,7 @@ void app_step(void)
     } else {
         dispatch_key_events(now_ms);
     }
+    follow_clock_prompt(now_ms);
     follow_orientation();
     if (app.saying_goodbye && fade_finished(&app.goodbye, now_ms)) {
         finish_shut_down();
@@ -1355,4 +1408,9 @@ const char *app_diagnostics_value(int index)
 {
     const MenuItem *item = &app.screens.diagnostics_items[index];
     return item->value != NULL ? item->value(item->context) : NULL;
+}
+
+void app_forget_clock(void)
+{
+    app.clock.started = false;
 }

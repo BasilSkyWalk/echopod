@@ -77,6 +77,7 @@ static uint32_t large_size;
 
 typedef struct FakeHal {
     const char *version;
+    uint32_t build_day;
     uint16_t panel[HAL_DISPLAY_LONG_SIDE][HAL_DISPLAY_LONG_SIDE];
     HalDisplayRotation rotation;
     long pixels_written;
@@ -164,6 +165,11 @@ void fake_hal_set_version(const char *version)
     fake.version = version;
 }
 
+void fake_hal_set_build_day(uint32_t day)
+{
+    fake.build_day = day;
+}
+
 void fake_hal_set_time(HalTime time)
 {
     fake.time = time;
@@ -208,6 +214,11 @@ HalTime fake_hal_time(void)
 const char *hal_system_version(void)
 {
     return fake.version != NULL ? fake.version : "test";
+}
+
+uint32_t hal_system_build_day(void)
+{
+    return fake.build_day;
 }
 
 void fake_hal_refuse_clock_switch(void)

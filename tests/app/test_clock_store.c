@@ -96,6 +96,53 @@ static void a_chip_that_lost_power_leaves_the_clock_unknown(void)
     CHECK(!clock_store_now(&store, START_MS, &civil));
 }
 
+static uint32_t day_of(uint32_t year, uint32_t month, uint32_t day)
+{
+    return wall_clock_days_from_civil(year, month, day);
+}
+
+static void a_chip_dated_before_the_firmware_build_is_not_trusted(void)
+{
+    start();
+    fake_hal_set_build_day(day_of(2026, 11, 1));
+    fake_hal_set_time(chip_at(2026, 1, 14, 9, 0, 0));
+    clock_store_start(&store, &settings, START_MS);
+    WallCivil civil;
+    CHECK(store.chip_answered);
+    CHECK(!store.chip_valid);
+    CHECK(!clock_store_now(&store, START_MS, &civil));
+}
+
+static void a_chip_from_the_day_before_the_build_on_is_used(void)
+{
+    start();
+    fake_hal_set_build_day(day_of(2026, 11, 1));
+    fake_hal_set_time(chip_at(2026, 10, 31, 23, 0, 0));
+    clock_store_start(&store, &settings, START_MS);
+    CHECK(store.chip_valid);
+    CHECK_EQUAL(31, now_at(START_MS).day);
+    fake_hal_set_time(chip_at(2026, 10, 30, 23, 59, 0));
+    store = (ClockStore){0};
+    clock_store_start(&store, &settings, START_MS);
+    CHECK(!store.chip_valid);
+}
+
+static void setting_the_time_by_hand_wins_over_an_early_chip(void)
+{
+    start();
+    fake_hal_set_build_day(day_of(2026, 11, 1));
+    fake_hal_set_time(chip_at(2026, 1, 14, 9, 0, 0));
+    clock_store_start(&store, &settings, START_MS);
+    WallCivil wanted = {2026, 11, 6, 20, 15, 0};
+    CHECK(clock_store_set(&store, &settings, &wanted, WALL_CLOCK_ZONE_UTC, START_MS));
+    clock_store_step(&store, START_MS + TEN_MINUTES_MS);
+    CHECK(store.chip_valid);
+    WallCivil civil = now_at(START_MS + TEN_MINUTES_MS);
+    CHECK_EQUAL(11, civil.month);
+    CHECK_EQUAL(6, civil.day);
+    CHECK_EQUAL(20, civil.hour);
+}
+
 static void a_silent_chip_leaves_the_clock_unknown(void)
 {
     start();
@@ -269,6 +316,9 @@ int main(void)
         TEST_CASE(a_valid_chip_sets_the_clock_at_start),
         TEST_CASE(a_chip_that_lost_power_leaves_the_clock_unknown),
         TEST_CASE(a_silent_chip_leaves_the_clock_unknown),
+        TEST_CASE(a_chip_dated_before_the_firmware_build_is_not_trusted),
+        TEST_CASE(a_chip_from_the_day_before_the_build_on_is_used),
+        TEST_CASE(setting_the_time_by_hand_wins_over_an_early_chip),
         TEST_CASE(the_chip_is_read_again_every_ten_minutes),
         TEST_CASE(a_software_clock_keeps_running_when_the_chip_stops_answering),
         TEST_CASE(a_record_seen_at_start_is_not_applied),

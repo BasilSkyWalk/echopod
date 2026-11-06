@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "device/image_date.h"
 #include "emmc.h"
 #include "hal/system.h"
 
@@ -12,6 +13,7 @@ enum {
 };
 
 static char tag[TAG_LENGTH + 1];
+static uint32_t build_day;
 static bool tried;
 
 static bool is_printable(uint8_t value)
@@ -26,17 +28,29 @@ static void read_tag(void)
     if (!emmc_start(&info) || !emmc_read(NULL, info.layout.slot_1, 1, header)) {
         return;
     }
+    build_day = image_date_day(header[0]);
     const uint8_t *bytes = (const uint8_t *)header + TAG_OFFSET;
     for (int index = 0; index < TAG_LENGTH && is_printable(bytes[index]); index++) {
         tag[index] = (char)bytes[index];
     }
 }
 
-const char *hal_system_version(void)
+static void read_header(void)
 {
     if (!tried) {
         tried = true;
         read_tag();
     }
+}
+
+const char *hal_system_version(void)
+{
+    read_header();
     return tag[0] != '\0' ? tag : "unknown";
+}
+
+uint32_t hal_system_build_day(void)
+{
+    read_header();
+    return build_day;
 }

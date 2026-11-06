@@ -93,6 +93,7 @@ set(ECHO_DEVICE_LOGIC_SOURCES
     fat_reserve.c
     flac_accel.c
     image_crc.c
+    image_date.c
     jack_sense.c
     key_ladder.c
     key_scanner.c
@@ -135,6 +136,7 @@ if(CMAKE_CROSSCOMPILING)
         flac_source.c
         fat_reserve.c
         image_crc.c
+        image_date.c
         mp3_probe.c
         msc.c
         panel.c

@@ -20,6 +20,24 @@ void sim_time_configure(bool absent, bool unset)
     clock_shift = 0;
 }
 
+void sim_time_start_on(uint16_t year, uint8_t month, uint8_t day)
+{
+    time_t now = time(NULL);
+    const struct tm *local = localtime(&now);
+    if (local == NULL) {
+        return;
+    }
+    struct tm wanted = *local;
+    wanted.tm_year = year - TM_YEAR_BASE;
+    wanted.tm_mon = month - 1;
+    wanted.tm_mday = day;
+    wanted.tm_isdst = -1;
+    time_t shifted = mktime(&wanted);
+    if (shifted != (time_t)-1) {
+        clock_shift = shifted - now;
+    }
+}
+
 bool hal_time_read(HalTime *reading)
 {
     *reading = (HalTime){.present = false};
