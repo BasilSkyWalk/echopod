@@ -38,6 +38,7 @@ static const Mp4Item ITEMS[] = {
      TAG_DATE, false},
     {"disk", TAG_DISC, true},
     {"trkn", TAG_TRACK, true},
+    {"----", TAG_ALBUM_VERSION, false},
 };
 
 static bool read_atom(const TagReader *reader, uint32_t offset, uint32_t limit, Atom *atom)
@@ -202,11 +203,26 @@ static void read_cover(TagReader *reader, const Atom *data)
     }
 }
 
+static bool named_album_version(const TagReader *reader, const Atom *item_atom)
+{
+    Atom name;
+    char text[16];
+    if (!find_child(reader, item_atom, 0, "name", &name) || name.end - name.body < 4 ||
+        name.end - name.body - 4 > sizeof text) {
+        return false;
+    }
+    uint32_t length = name.end - name.body - 4;
+    return tag_read(reader, name.body + 4, text, length) &&
+           tag_same_text_folded(text, length, "albumversion");
+}
+
 static void read_item(TagReader *reader, const Atom *item_atom, const Atom *genre_fallback)
 {
     const Mp4Item *item = item_for(item_atom->type);
     bool cover = tag_same_text(item_atom->type, 4, "covr");
-    if (item == NULL && !cover && genre_fallback == NULL) {
+    if ((item == NULL && !cover && genre_fallback == NULL) ||
+        (item != NULL && item->field == TAG_ALBUM_VERSION &&
+         !named_album_version(reader, item_atom))) {
         return;
     }
     uint32_t cursor = item_atom->body;

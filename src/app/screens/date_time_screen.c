@@ -197,7 +197,8 @@ static void draw(void *context, Canvas *canvas)
         char value[VALUE_CAPACITY];
         Rect row = {content.x, content.y + field * row_height, content.width, row_height};
         bool selected = field == screen->field;
-        Color text_color = selected ? theme->colors.selection_text : theme->colors.text;
+        Color text_color =
+            selected && screen->editing ? theme->colors.selection_text : theme->colors.text;
         if (selected) {
             canvas_fill_rect(canvas, row,
                              screen->editing ? theme->colors.selection_background

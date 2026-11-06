@@ -42,6 +42,13 @@ class SortKeyTest(unittest.TestCase):
 
 
 class TagParsingTest(unittest.TestCase):
+    def test_an_album_version_follows_the_album_title(self):
+        track = library_index.track_from_tags("A/B/01 - x.flac", {"album": ["Abbey Road"],
+                                              "albumversion": ["", "2019 Remix"]}, 1.0)
+        self.assertEqual("Abbey Road (2019 Remix)", track.album)
+        track = library_index.track_from_tags("A/B/01 - x.flac", {"albumversion": ["Live"]}, 1.0)
+        self.assertEqual("B", track.album)
+
     def test_numbers_take_the_leading_integer(self):
         self.assertEqual(1, library_index.parse_number("1/10"))
         self.assertEqual(7, library_index.parse_number("07"))

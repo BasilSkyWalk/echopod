@@ -112,13 +112,31 @@ static void numbers_over_255_are_capped(void)
     CHECK_EQUAL(255, fields.track.disc);
 }
 
+static void an_album_version_follows_the_album_title(void)
+{
+    TrackTags tags = empty_tags();
+    static TrackFields fields;
+    strcpy(tags.text[TAG_ALBUM], "Abbey Road");
+    strcpy(tags.text[TAG_ALBUM_VERSION], "2019 Remix");
+    track_fields_from_tags("a/b/c.flac", &tags, &fields);
+    CHECK_EQUAL(0, strcmp("Abbey Road (2019 Remix)", fields.track.album));
+    tags = empty_tags();
+    strcpy(tags.text[TAG_ALBUM_VERSION], "2019 Remix");
+    track_fields_from_tags("a/Folder/c.flac", &tags, &fields);
+    CHECK_EQUAL(0, strcmp("Folder", fields.track.album));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(numbers_take_the_leading_integer), TEST_CASE(years_take_the_first_four_digits),
-        TEST_CASE(tags_are_used_when_present),       TEST_CASE(missing_tags_fall_back_to_the_path),
-        TEST_CASE(artists_fill_in_for_each_other),   TEST_CASE(file_names_give_titles_and_numbers),
+        TEST_CASE(numbers_take_the_leading_integer),
+        TEST_CASE(years_take_the_first_four_digits),
+        TEST_CASE(tags_are_used_when_present),
+        TEST_CASE(missing_tags_fall_back_to_the_path),
+        TEST_CASE(artists_fill_in_for_each_other),
+        TEST_CASE(file_names_give_titles_and_numbers),
         TEST_CASE(numbers_over_255_are_capped),
+        TEST_CASE(an_album_version_follows_the_album_title),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

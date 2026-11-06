@@ -78,6 +78,8 @@ typedef enum SettingOption {
     OPTION_USB_PROMPT,
     OPTION_LISTEN_HISTORY,
     OPTION_TIME_ZONE,
+    OPTION_THEME,
+    OPTION_LYRICS,
     OPTION_FOLDER_VIEW,
     SETTINGS_OPTION_COUNT
 } SettingOption;
@@ -117,6 +119,16 @@ enum {
 enum {
     LISTEN_HISTORY_ON,
     LISTEN_HISTORY_OFF
+};
+
+enum {
+    THEME_DARK,
+    THEME_LIGHT
+};
+
+enum {
+    LYRICS_ON,
+    LYRICS_OFF
 };
 
 typedef enum RockerMode {

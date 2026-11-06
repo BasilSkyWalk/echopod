@@ -182,7 +182,7 @@ static void scanning_folders_and_playlists_matches_the_pc_indexer(void)
     Progress progress = {.calls = 0};
     ScanStats stats;
     CHECK_EQUAL(SCAN_OK, scan_folder(ECHO_FIXTURE_DIR "/scan_music", &output, &progress, &stats));
-    CHECK_EQUAL(4u, stats.tracks);
+    CHECK_EQUAL(8u, stats.tracks);
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("scan_music.db", &expected_size);
     CHECK(library_compare(expected, expected_size, output.bytes, stats.length));
