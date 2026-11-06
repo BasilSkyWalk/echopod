@@ -896,6 +896,7 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
+    hal_power_confirm_start(app.settings.settings.options[OPTION_POWER_ON] == POWER_ON_HOLD);
     clock_store_start(&app.clock, &app.settings.settings, now_ms);
     app.history.clock = &app.clock.clock;
     apply_language(app.settings.settings.language);

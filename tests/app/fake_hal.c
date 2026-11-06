@@ -891,6 +891,17 @@ HalPowerHold hal_power_boot_hold(void)
 }
 
 static bool usb_start;
+static bool start_hold_required;
+
+void hal_power_confirm_start(bool hold_required)
+{
+    start_hold_required = hold_required;
+}
+
+bool fake_hal_start_hold_required(void)
+{
+    return start_hold_required;
+}
 
 void fake_hal_set_usb_start(bool started)
 {

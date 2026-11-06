@@ -29,6 +29,7 @@ static BatteryGauge gauge;
 static bool conversion_started;
 static bool battery_pending;
 static uint32_t scans;
+static bool power_released;
 
 static void start_conversion(uint32_t channel)
 {
@@ -41,7 +42,9 @@ static void start_conversion(uint32_t channel)
 static uint8_t pressed_keys(uint16_t reading)
 {
     uint8_t mask = key_ladder_mask(reading);
-    return gpio_read(POWER_KEY) ? (uint8_t)(mask | (1u << KEY_POWER)) : mask;
+    bool power = gpio_read(POWER_KEY);
+    power_released = power_released || !power;
+    return power && power_released ? (uint8_t)(mask | (1u << KEY_POWER)) : mask;
 }
 
 static void record_battery(void)

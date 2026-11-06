@@ -52,6 +52,7 @@ enum {
     SETTINGS_INTERNAL_STORAGE_INDEX = 33,
     SETTINGS_CLOCK_INDEX = 34,
     SETTINGS_STATUS_BAR_INDEX = 35,
+    SETTINGS_POWER_ON_INDEX = 36,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -2260,7 +2261,7 @@ static void the_clock_and_date_time_rows_end_the_settings_list(void)
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(CLOCK_ON, settings.options[OPTION_CLOCK]);
-    move_down(SETTINGS_STATUS_BAR_INDEX - SETTINGS_CLOCK_INDEX + 1);
+    move_down(SETTINGS_POWER_ON_INDEX - SETTINGS_CLOCK_INDEX + 1);
     tap(KEY_PLAY);
     CHECK(title_is("Date & time"));
     tap(KEY_BACK);
@@ -2311,6 +2312,22 @@ static void a_large_status_bar_grows_the_portrait_status_band(void)
     CHECK_EQUAL(landscape.metrics.header_height, unchanged.metrics.header_height);
     CHECK_EQUAL(landscape.metrics.status_icon_size, unchanged.metrics.status_icon_size);
     CHECK(unchanged.fonts.status == NULL);
+}
+
+static void power_on_hold_is_asked_for_at_the_next_start(void)
+{
+    start_app_with_library();
+    CHECK(!fake_hal_start_hold_required());
+    open_setting(SETTINGS_POWER_ON_INDEX);
+    CHECK(title_is("Power on"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(POWER_ON_HOLD, settings.options[OPTION_POWER_ON]);
+    restart_app();
+    CHECK(fake_hal_start_hold_required());
 }
 
 static const uint8_t HELLS_BELLS_LYRICS[] = "[ti:Hells Bells]\n[00:00.50]I'm a rolling thunder\n"
@@ -2586,6 +2603,7 @@ int main(void)
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
         TEST_CASE(the_light_theme_lightens_the_screens_and_keeps_the_accent),
         TEST_CASE(a_large_status_bar_grows_the_portrait_status_band),
+        TEST_CASE(power_on_hold_is_asked_for_at_the_next_start),
         TEST_CASE(synced_lyrics_beside_a_track_follow_its_position),
         TEST_CASE(lyrics_in_capitals_are_found_and_the_setting_hides_them),
         TEST_CASE(a_track_without_lyrics_shows_none),
