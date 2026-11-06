@@ -8,6 +8,7 @@
 #define FLAC_ACCEL_BASE 0x01060000u
 #define FLAC_ACCEL_DMAC 0x01070000u
 #define FLAC_ACCEL_COEFFICIENTS 0x0106B000u
+#define FLAC_ACCEL_CODE_RAM_END 0x01020000u
 
 enum {
     FLAC_ACCEL_MAX_JOB = 4088,
@@ -36,6 +37,8 @@ typedef struct AccelHook {
     uint32_t window_address;
     bool narrow;
     bool wide;
+    bool code_narrow;
+    bool code_wide;
     uint32_t restored;
     uint32_t timeouts;
 } AccelHook;

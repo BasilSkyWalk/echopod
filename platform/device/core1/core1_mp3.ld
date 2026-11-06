@@ -43,3 +43,5 @@ SECTIONS
 ASSERT(ADDR(.text) == 0, "core 1 code must start at its address 0")
 ASSERT(SIZEOF(.data) == 0, "core 1 has no initialised data: make globals const")
 ASSERT(core1_bss_end <= 0x0102B000, "the MP3 program needs 12 KB of stack below 0x0102E000 for libmad")
+
+core1_stack_top = 0x0102E000;

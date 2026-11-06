@@ -3,35 +3,40 @@
 #include "core1_ticks.h"
 #include "registers.h"
 
-#define CORE1_STACK_TOP 0x0102E000u
 #define ALL_INTERRUPTS 0xFFFFFFFFu
 
 typedef void (*Handler)(void);
 
 extern uint32_t core1_bss_start;
 extern uint32_t core1_bss_end;
+extern uint32_t core1_stack_top;
 
 void core1_reset(void);
 void core1_default_handler(void);
 void core1_main(void);
 
-__attribute__((section(".core1_vectors"), used)) static const Handler CORE1_VECTORS[16] = {
-    (Handler)CORE1_STACK_TOP,
-    core1_reset,
-    core1_default_handler,
-    core1_default_handler,
-    core1_default_handler,
-    core1_default_handler,
-    core1_default_handler,
-    0,
-    0,
-    0,
-    0,
-    core1_default_handler,
-    core1_default_handler,
-    0,
-    core1_default_handler,
-    core1_systick,
+typedef union Vector {
+    const void *stack;
+    Handler handler;
+} Vector;
+
+__attribute__((section(".core1_vectors"), used)) static const Vector CORE1_VECTORS[16] = {
+    {.stack = &core1_stack_top},
+    {.handler = core1_reset},
+    {.handler = core1_default_handler},
+    {.handler = core1_default_handler},
+    {.handler = core1_default_handler},
+    {.handler = core1_default_handler},
+    {.handler = core1_default_handler},
+    {.handler = 0},
+    {.handler = 0},
+    {.handler = 0},
+    {.handler = 0},
+    {.handler = core1_default_handler},
+    {.handler = core1_default_handler},
+    {.handler = 0},
+    {.handler = core1_default_handler},
+    {.handler = core1_systick},
 };
 
 volatile uint32_t core1_tick_periods;

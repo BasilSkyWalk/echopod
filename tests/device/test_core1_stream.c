@@ -11,6 +11,7 @@
 #include "device/core1_opus.h"
 #include "device/core1_stream.h"
 #include "device/mp3_probe.h"
+#include "flac_writer.h"
 
 enum {
     BIG_RING_BYTES = 64 * 1024,
@@ -26,7 +27,11 @@ typedef struct Fixture {
 } Fixture;
 
 static StreamControl control;
-static int32_t samples[STREAM_SLOTS][FLAC_MAX_CHANNELS][FLAC_MAX_BLOCK];
+static int32_t samples[STREAM_SAMPLE_WORDS];
+static int32_t first_bank[FLAC_MAX_BLOCK];
+static int32_t second_bank[FLAC_MAX_BLOCK];
+static FlacBlockBuffer core0_block;
+static FlacWriterOutput made;
 static uint8_t ring[FULL_RING_BYTES];
 static FlacDecoder core0_decoder;
 static FlacDecoder core1_decoder;
@@ -53,8 +58,19 @@ static int core1_naps;
 static int core1_wakes;
 static int held_rounds;
 
+static Fixture copy_of(const void *bytes, uint32_t size)
+{
+    Fixture fixture = {malloc(size), size};
+    memcpy(fixture.bytes, bytes, size);
+    return fixture;
+}
+
 static Fixture load(const char *name, const char *extension)
 {
+    if (strcmp(name, "made") == 0) {
+        return strcmp(extension, "pcm") == 0 ? copy_of(made.samples, made.sample_bytes)
+                                             : copy_of(made.bytes, made.size);
+    }
     char path[512];
     if (strncmp(name, "opus/", 5) == 0) {
         const char *suffix = strcmp(extension, "flac") == 0 ? "opus" : extension;
@@ -118,6 +134,7 @@ static void start_with(uint32_t ring_bytes, bool mp3)
     close_count = 0;
     StreamRegion region = {
         .control = &control, .samples = samples, .ring = ring, .ring_bytes = ring_bytes};
+    flac_use_block_buffer(&core0_decoder, &core0_block);
     core1_source_init(&source, region,
                       (FlacFileOpener){.open = open_file, .close = close_file, .context = NULL},
                       &core0_decoder, FILL_BUDGET);
@@ -125,7 +142,8 @@ static void start_with(uint32_t ring_bytes, bool mp3)
         core1_stream_init(&stream, region, core1_mp3_decoder(&core1_mp3, &mp3_decoder));
         interface = core1_source_mp3_interface(&source);
     } else {
-        core1_stream_init(&stream, region, core1_flac_decoder(&core1_flac, &core1_decoder));
+        Core1FlacBanks banks = {first_bank, second_bank};
+        core1_stream_init(&stream, region, core1_flac_decoder(&core1_flac, &core1_decoder, banks));
         interface = core1_source_interface(&source);
     }
 }
@@ -722,6 +740,120 @@ static void an_alac_track_opened_part_way_starts_on_its_frame(void)
     free(pcm.bytes);
 }
 
+static void use_the_flac_program_slots(void)
+{
+    core1_stream_set_slots(&stream, CORE1_FLAC_SLOT_OFFSET, CORE1_FLAC_SLOT_SAMPLES);
+}
+
+static bool made_track_streams_exactly(FlacWriterSpec spec, bool sleeping)
+{
+    made = flac_writer_make(spec);
+    start(FULL_RING_BYTES);
+    use_the_flac_program_slots();
+    if (sleeping) {
+        let_core1_sleep(true);
+    }
+    bool ok = plays_exactly("made", (int)spec.channels);
+    flac_writer_free(&made);
+    return ok;
+}
+
+static void blocks_of_16384_samples_stream_through_core_1_in_pieces(void)
+{
+    CHECK(made_track_streams_exactly((FlacWriterSpec){192000, 2, 24, 16384, 50000, 3}, false));
+    CHECK(core1_decoder.samples[0] == first_bank);
+    CHECK(core1_decoder.samples[1] == second_bank);
+    CHECK(made_track_streams_exactly((FlacWriterSpec){176400, 1, 16, 16384, 40000, 4}, true));
+    CHECK(core1_naps > 0);
+}
+
+static void blocks_up_to_8192_samples_keep_both_channels_in_the_second_bank(void)
+{
+    CHECK(made_track_streams_exactly((FlacWriterSpec){96000, 2, 24, 8192, 30000, 5}, false));
+    CHECK(core1_decoder.samples[0] == second_bank);
+    CHECK(core1_decoder.samples[1] == second_bank + FLAC_MAX_BLOCK / 2);
+    CHECK(streams_exactly("big_blocks_16", 2, FULL_RING_BYTES));
+}
+
+static void a_block_is_handed_over_in_pieces_no_larger_than_a_slot(void)
+{
+    made = flac_writer_make((FlacWriterSpec){192000, 2, 16, 16384, 20000, 6});
+    start(FULL_RING_BYTES);
+    use_the_flac_program_slots();
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "made", 0, &info));
+    uint32_t sizes[8] = {0};
+    AudioFrame frame;
+    for (int piece = 0; piece < 6 && next_frame(&frame) == AUDIO_FRAME_READY; piece++) {
+        sizes[piece] = frame.samples;
+        CHECK(frame.left >= samples + CORE1_FLAC_SLOT_OFFSET);
+        CHECK(frame.right + frame.samples <= samples + STREAM_SAMPLE_WORDS);
+        interface.release(interface.context);
+    }
+    CHECK_EQUAL(CORE1_FLAC_SLOT_SAMPLES, sizes[0]);
+    CHECK_EQUAL(CORE1_FLAC_SLOT_SAMPLES, sizes[3]);
+    CHECK_EQUAL(16384u - 4u * CORE1_FLAC_SLOT_SAMPLES, sizes[4]);
+    CHECK_EQUAL(20000u - 16384u, sizes[5]);
+    interface.close(interface.context);
+    flac_writer_free(&made);
+}
+
+static void a_16384_sample_track_opened_part_way_starts_on_its_frame(void)
+{
+    made = flac_writer_make((FlacWriterSpec){192000, 2, 24, 16384, 60000, 8});
+    start(FULL_RING_BYTES);
+    use_the_flac_program_slots();
+    Fixture pcm = load("made", "pcm");
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "made", 200, &info));
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    CHECK_EQUAL(32768u, frame.first_sample);
+    CHECK(frame_matches(&pcm, &frame, 2));
+    interface.close(interface.context);
+    free(pcm.bytes);
+    flac_writer_free(&made);
+}
+
+static void core_1_equalizes_pieces_exactly_like_the_main_core(void)
+{
+    made = flac_writer_make((FlacWriterSpec){48000, 2, 16, 16384, 40000, 10});
+    start(FULL_RING_BYTES);
+    use_the_flac_program_slots();
+    core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
+    share_curve(two_bands(6, -4), true);
+    Equalizer reference;
+    equalizer_init(&reference);
+    equalizer_set_rate(&reference, 48000);
+    EqualizerCurve curve = two_bands(6, -4);
+    equalizer_set_curve(&reference, &curve);
+    Fixture pcm = load("made", "pcm");
+    AudioTrackInfo info;
+    bool ok = interface.open(interface.context, "made", 0, &info);
+    AudioFrame frame;
+    uint32_t played = 0;
+    while (ok && next_frame(&frame) == AUDIO_FRAME_READY) {
+        ok = frame.first_sample == played && equalized_frames_match(&pcm, &reference, &frame);
+        played += frame.samples;
+        interface.release(interface.context);
+    }
+    interface.close(interface.context);
+    free(pcm.bytes);
+    flac_writer_free(&made);
+    CHECK(ok);
+    CHECK_EQUAL(40000u, played);
+}
+
+static void alac_streams_exactly_through_the_flac_program_slots(void)
+{
+    start_mp4(SMALL_RING_BYTES);
+    use_the_flac_program_slots();
+    CHECK(plays_exactly("alac/stereo_24_96k", 2));
+    start_mp4(SMALL_RING_BYTES);
+    use_the_flac_program_slots();
+    CHECK(plays_exactly("alac/mono_16_22k", 1));
+}
+
 static void flac_and_alac_tracks_take_turns_on_one_program(void)
 {
     start_mp4(BIG_RING_BYTES);
@@ -962,6 +1094,12 @@ int main(void)
         TEST_CASE(an_alac_track_describes_its_stream),
         TEST_CASE(an_alac_track_opened_part_way_starts_on_its_frame),
         TEST_CASE(flac_and_alac_tracks_take_turns_on_one_program),
+        TEST_CASE(blocks_of_16384_samples_stream_through_core_1_in_pieces),
+        TEST_CASE(blocks_up_to_8192_samples_keep_both_channels_in_the_second_bank),
+        TEST_CASE(a_block_is_handed_over_in_pieces_no_larger_than_a_slot),
+        TEST_CASE(a_16384_sample_track_opened_part_way_starts_on_its_frame),
+        TEST_CASE(core_1_equalizes_pieces_exactly_like_the_main_core),
+        TEST_CASE(alac_streams_exactly_through_the_flac_program_slots),
         TEST_CASE(a_program_without_the_codec_reports_an_error),
         TEST_CASE(an_aac_track_streams_through_core_1_like_ffmpeg_decodes_it),
         TEST_CASE(an_aac_track_opened_part_way_starts_on_the_frame_with_the_target),

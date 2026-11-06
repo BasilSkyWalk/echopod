@@ -44,7 +44,15 @@ bool flac_source_open_at(FlacSource *source, const char *path, uint32_t start_ms
 
 static bool open_source(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
-    return flac_source_open_at(context, path, start_ms, track);
+    FlacSource *source = context;
+    if (!flac_source_open_at(source, path, start_ms, track)) {
+        return false;
+    }
+    if (source->decoder->info.max_block > source->decoder->capacity) {
+        flac_source_close(source);
+        return false;
+    }
+    return true;
 }
 
 static AudioFrameResult next_frame(void *context, AudioFrame *frame)

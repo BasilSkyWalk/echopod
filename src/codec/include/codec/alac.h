@@ -9,7 +9,8 @@ enum {
     ALAC_CONFIG_BYTES = 24,
     ALAC_MAX_COEFFICIENTS = 32,
     ALAC_READER_BYTES = 4096,
-    ALAC_READER_PADDING = 8
+    ALAC_READER_PADDING = 8,
+    ALAC_MAX_FRAME = 4608
 };
 
 typedef enum AlacResult {
@@ -43,7 +44,7 @@ typedef struct AlacDecoder {
     AlacReader reader;
     AlacConfig config;
     uint32_t block_samples;
-    int32_t samples[FLAC_MAX_CHANNELS][FLAC_MAX_BLOCK];
+    int32_t samples[FLAC_MAX_CHANNELS][ALAC_MAX_FRAME];
 } AlacDecoder;
 
 bool alac_parse_config(const uint8_t *bytes, uint32_t length, AlacConfig *config);
