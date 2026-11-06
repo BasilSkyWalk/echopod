@@ -73,6 +73,8 @@ static const StringId COVER_COUNT_OPTIONS[2] = {STR_SETTINGS_FIVE_COVERS,
 static const StringId ANIMATION_OPTIONS[ANIMATION_SPEED_COUNT] = {
     STR_SETTINGS_NORMAL, STR_SETTINGS_SLOWER, STR_SETTINGS_FASTER};
 static const StringId THEME_OPTIONS[2] = {STR_SETTINGS_DARK, STR_SETTINGS_LIGHT};
+static const StringId STATUS_BAR_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LARGE};
+static const StringId POWER_ON_OPTIONS[2] = {STR_SETTINGS_PRESS, STR_SETTINGS_HOLD};
 static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
 static const StringId USB_MODE_MESSAGES[USB_MODE_COUNT] = {STR_SETTINGS_USB_DRIVES,
                                                            STR_SETTINGS_USB_SOUND};
@@ -314,11 +316,17 @@ static int current_slot(const void *context)
 static void choose_slot(void *context, int index)
 {
     SettingsEntry *entry = context;
+    SettingsContext *settings = &entry->owner->context;
+    int option = entry->choice->slot - 1;
+    bool changed = *option_of(entry) != (uint8_t)index;
     *option_of(entry) = (uint8_t)index;
-    if (entry->choice->slot - 1 == OPTION_USB_PROMPT) {
-        apply_and_save(&entry->owner->context);
+    if (option == OPTION_INTERNAL_STORAGE && changed && settings->rescan_requested != NULL) {
+        *settings->rescan_requested = true;
+    }
+    if (option == OPTION_USB_PROMPT || option == OPTION_INTERNAL_STORAGE) {
+        apply_and_save(settings);
     } else {
-        save(&entry->owner->context);
+        save(settings);
     }
 }
 
@@ -370,7 +378,10 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_THEME, THEME_OPTIONS, OPTION_THEME),
     OPTION_CHOICE(STR_SETTINGS_LYRICS, SHOWN_OPTIONS, OPTION_LYRICS),
     OPTION_CHOICE(STR_SETTINGS_FOLDER_VIEW, ARTIST_VIEW_OPTIONS, OPTION_FOLDER_VIEW),
+    OPTION_CHOICE(STR_LIBRARY_INTERNAL_STORAGE, SWITCH_OPTIONS, OPTION_INTERNAL_STORAGE),
     OPTION_CHOICE(STR_SETTINGS_CLOCK, SWITCH_OPTIONS, OPTION_CLOCK),
+    OPTION_CHOICE(STR_SETTINGS_STATUS_BAR, STATUS_BAR_OPTIONS, OPTION_STATUS_BAR),
+    OPTION_CHOICE(STR_SETTINGS_POWER_ON, POWER_ON_OPTIONS, OPTION_POWER_ON),
 };
 
 static ScreenAction open_choice(void *context)

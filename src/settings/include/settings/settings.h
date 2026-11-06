@@ -81,6 +81,9 @@ typedef enum SettingOption {
     OPTION_THEME,
     OPTION_LYRICS,
     OPTION_FOLDER_VIEW,
+    OPTION_INTERNAL_STORAGE,
+    OPTION_STATUS_BAR,
+    OPTION_POWER_ON,
     SETTINGS_OPTION_COUNT
 } SettingOption;
 
@@ -129,6 +132,21 @@ enum {
 enum {
     LYRICS_ON,
     LYRICS_OFF
+};
+
+enum {
+    INTERNAL_STORAGE_OFF,
+    INTERNAL_STORAGE_ON
+};
+
+enum {
+    STATUS_BAR_STANDARD,
+    STATUS_BAR_LARGE
+};
+
+enum {
+    POWER_ON_PRESS,
+    POWER_ON_HOLD
 };
 
 typedef enum RockerMode {

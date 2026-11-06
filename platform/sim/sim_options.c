@@ -90,6 +90,12 @@ static bool read_system_directory(ArgumentCursor *cursor, SimOptions *options)
     return options->system_directory != NULL;
 }
 
+static bool read_internal_directory(ArgumentCursor *cursor, SimOptions *options)
+{
+    options->internal_directory = next_value(cursor);
+    return options->internal_directory != NULL;
+}
+
 static bool read_battery(ArgumentCursor *cursor, SimOptions *options)
 {
     unsigned long percent = 0;
@@ -129,6 +135,7 @@ static const OptionSpec OPTION_SPECS[] = {
     {"--keys", read_keys},
     {"--card", read_card},
     {"--system-dir", read_system_directory},
+    {"--internal", read_internal_directory},
     {"--battery", read_battery},
     {"--charging", read_charging},
     {"--no-clock", read_no_clock},

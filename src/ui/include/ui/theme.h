@@ -28,6 +28,7 @@ typedef struct ThemeFonts {
     const Font *title;
     const Font *body;
     const Font *small;
+    const Font *status;
 } ThemeFonts;
 
 typedef struct ThemeMetrics {

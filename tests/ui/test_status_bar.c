@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "check.h"
+#include "tiny_font.h"
 #include "ui/header.h"
 #include "ui/status_bar.h"
 #include "ui_test_canvas.h"
@@ -211,6 +212,60 @@ static void with_a_status_band_the_clock_is_centered_between_the_icons_and_the_b
     CHECK(rect_is_empty(status_bar_clock_area(&theme, state)));
 }
 
+static void a_status_font_replaces_the_small_font(void)
+{
+    Theme theme = status_theme();
+    CHECK_EQUAL(6, status_bar_percent_area(&theme, "50%", false).width);
+    theme.fonts.status = &TINY_FONT_WITHOUT_FALLBACK;
+    CHECK_EQUAL(0, status_bar_percent_area(&theme, "50%", false).width);
+}
+
+static void a_clock_too_wide_to_center_sits_after_the_left_icons(void)
+{
+    Theme theme = status_theme();
+    theme.metrics.status_height = STATUS_HEADER_HEIGHT;
+    theme.metrics.header_inset = theme.metrics.padding;
+    StatusBarState state = battery_at(HALF_BATTERY, false);
+    state.hide_percent = true;
+    state.clock = "AAA";
+    Rect clock = status_bar_clock_area(&theme, state);
+    Rect bluetooth = status_bar_bluetooth_area(&theme);
+    CHECK_EQUAL(12, clock.width);
+    CHECK_EQUAL(bluetooth.x + bluetooth.width + 1, clock.x);
+    CHECK(clock.x + clock.width < status_bar_battery_area(&theme).x);
+    state.clock = "AAAA";
+    CHECK(rect_is_empty(status_bar_clock_area(&theme, state)));
+}
+
+static void the_percentage_gives_way_to_a_clock_that_does_not_fit_beside_it(void)
+{
+    Theme theme = status_theme();
+    theme.metrics.status_height = STATUS_HEADER_HEIGHT;
+    theme.metrics.header_inset = theme.metrics.padding;
+    StatusBarState state = battery_at(HALF_BATTERY, false);
+    state.clock = "AAA";
+    CHECK(rect_is_empty(status_bar_clock_area(&theme, state)));
+    Canvas canvas = draw_status(&theme, state);
+    Color shown[TEST_SCREEN_WIDTH * STATUS_HEADER_HEIGHT];
+    for (int y = 0; y < STATUS_HEADER_HEIGHT; y++) {
+        for (int x = 0; x < TEST_SCREEN_WIDTH; x++) {
+            shown[y * TEST_SCREEN_WIDTH + x] = canvas_pixel_at(&canvas, x, y);
+        }
+    }
+    state.hide_percent = true;
+    Rect clock = status_bar_clock_area(&theme, state);
+    CHECK(!rect_is_empty(clock));
+    Canvas expected = draw_status(&theme, state);
+    int differences = 0;
+    for (int y = 0; y < STATUS_HEADER_HEIGHT; y++) {
+        for (int x = 0; x < TEST_SCREEN_WIDTH; x++) {
+            differences += shown[y * TEST_SCREEN_WIDTH + x] != canvas_pixel_at(&expected, x, y);
+        }
+    }
+    CHECK_EQUAL(0, differences);
+    CHECK(!ui_test_area_has_only(&expected, clock, theme.colors.header_background));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -230,6 +285,9 @@ int main(void)
         TEST_CASE(a_charging_battery_is_drawn_in_the_success_color),
         TEST_CASE(a_charging_battery_has_a_bolt_beside_it),
         TEST_CASE(the_percentage_moves_left_of_the_bolt_while_charging),
+        TEST_CASE(a_status_font_replaces_the_small_font),
+        TEST_CASE(a_clock_too_wide_to_center_sits_after_the_left_icons),
+        TEST_CASE(the_percentage_gives_way_to_a_clock_that_does_not_fit_beside_it),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

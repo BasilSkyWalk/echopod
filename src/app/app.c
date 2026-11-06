@@ -40,6 +40,7 @@
 #include "ui/fade.h"
 #include "ui/header.h"
 #include "ui/label.h"
+#include "ui/marquee.h"
 #include "ui/message_screen.h"
 #include "ui/screen_stack.h"
 #include "ui/slide.h"
@@ -209,7 +210,8 @@ static HalDisplayRotation rotation_for(Orientation orientation)
 static int theme_key(const Settings *settings)
 {
     return (int)settings->orientation | settings->options[OPTION_ACCENT] << 2 |
-           settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_THEME] << 6;
+           settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_THEME] << 6 |
+           settings->options[OPTION_STATUS_BAR] << 7;
 }
 
 static void apply_orientation(void)
@@ -223,6 +225,10 @@ static void apply_orientation(void)
     app.theme = default_theme_styled(portrait, accent, flat,
                                      settings->options[OPTION_THEME] == THEME_LIGHT);
     app.stage_theme = default_theme_styled(portrait, accent, flat, false);
+    if (settings->options[OPTION_STATUS_BAR] == STATUS_BAR_LARGE) {
+        default_theme_enlarge_status(&app.theme);
+        default_theme_enlarge_status(&app.stage_theme);
+    }
     hal_display_set_rotation(rotation_for(orientation));
     frame_diff_init(&app.frame_diff, row_hashes, app.theme.metrics.screen_height);
 }
@@ -757,6 +763,7 @@ static void render_frame(void)
     app.frame_changed = false;
     app.status_bar = current_status_bar();
     bool screen_paints = top_screen()->paints_every_pixel && !fade_running() && !slide_running();
+    marquee_frame_start();
     render((FrameDrawer){.draw = draw_frame, .context = &app}, screen_paints);
     uint32_t render_us = hal_clock_microseconds() - started_us;
     frame_stats_record(&app.send_stats, app.send_us);
@@ -764,6 +771,11 @@ static void render_frame(void)
     draw_profile_finish_frame();
     app.frame_stable = !app.frame_changed;
     app.idle_render_ms = hal_clock_milliseconds() + IDLE_RENDER_MS;
+    uint32_t marquee_wait_ms = marquee_frame_wait_ms();
+    if (marquee_wait_ms > 0 &&
+        !deadline_reached(app.now_ms + marquee_wait_ms, app.idle_render_ms)) {
+        app.idle_render_ms = app.now_ms + marquee_wait_ms;
+    }
 }
 
 static bool frame_needed(uint32_t now_ms)
@@ -884,6 +896,7 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
+    hal_power_confirm_start(app.settings.settings.options[OPTION_POWER_ON] == POWER_ON_HOLD);
     clock_store_start(&app.clock, &app.settings.settings, now_ms);
     app.history.clock = &app.clock.clock;
     apply_language(app.settings.settings.language);

@@ -17,6 +17,7 @@ echo_add_unit_test(NAME test_deadline SOURCES core/test_deadline.c LIBRARIES ech
 echo_add_unit_test(NAME test_frame_stats SOURCES core/test_frame_stats.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_key_tracker SOURCES core/test_key_tracker.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_utf8 SOURCES core/test_utf8.c LIBRARIES echo_core)
+echo_add_unit_test(NAME test_volume_path SOURCES core/test_volume_path.c LIBRARIES echo_core)
 echo_add_unit_test(NAME test_i18n SOURCES core/test_i18n.c LIBRARIES echo_core)
 string(REPLACE ";" "|" ECHO_LANGUAGE_PACK_PATHS "${ECHO_LANGUAGE_PACK_FILES}")
 echo_add_unit_test(NAME test_language_packs SOURCES core/test_language_packs.c LIBRARIES echo_core echo_settings)
@@ -486,6 +487,16 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             -DMUSIC=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music
             -DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music.db
             -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/scan_music.db
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_library_index.cmake
+    )
+    add_test(NAME two_drives_up_to_date
+        COMMAND ${CMAKE_COMMAND}
+            -DPYTHON=${ECHO_TOOLS_PYTHON}
+            -DINDEXER=${PROJECT_SOURCE_DIR}/tools/library_index.py
+            -DMUSIC=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music
+            -DINTERNAL=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tags
+            -DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/two_drives.db
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/two_drives.db
             -P ${CMAKE_CURRENT_SOURCE_DIR}/check_library_index.cmake
     )
     add_test(NAME builder_fixture_up_to_date

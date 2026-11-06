@@ -46,7 +46,8 @@ enum {
     RX_BYTES_PER_TICK = 64,
     RX_RING_CAPACITY = 256,
     RX_RING_MASK = RX_RING_CAPACITY - 1,
-    ROUTE_SETTLE_MS = 500
+    ROUTE_SETTLE_MS = 500,
+    UNROUTE_DELAY_MS = 1000
 };
 
 static const GpioPin MODULE_POWER = {2, 7};
@@ -60,6 +61,7 @@ static BtModule module;
 static bool powered;
 static bool routed;
 static uint32_t rerouted_ms;
+static uint32_t streamed_ms;
 static bool matched_stock;
 static volatile bool listening;
 static volatile uint8_t rx_ring[RX_RING_CAPACITY];
@@ -192,9 +194,11 @@ bool board_bluetooth_settling(void)
 
 static void follow_stream(void)
 {
+    uint32_t now_ms = hal_clock_milliseconds();
     if (module.status.streaming) {
+        streamed_ms = now_ms;
         route_to_module(true);
-    } else if (routed) {
+    } else if (routed && now_ms - streamed_ms >= UNROUTE_DELAY_MS) {
         route_to_module(false);
     }
 }

@@ -99,6 +99,39 @@ class TrackFromTagsTest(unittest.TestCase):
         self.assertEqual("Y", only_artist.album_artist)
 
 
+class InternalStorageTest(unittest.TestCase):
+    def test_internal_paths_map_to_the_internal_drive(self):
+        roots = library_index.MusicRoots(Path("card"), Path("flash"))
+        self.assertEqual(Path("flash") / "Band" / "x.flac", roots / ":internal/Band/x.flac")
+        self.assertEqual(Path("flash"), roots / ":internal")
+        self.assertEqual(Path("card") / "Band" / "x.flac", roots / "Band/x.flac")
+        self.assertEqual(Path("card") / ":internal" / "x.flac",
+                         library_index.MusicRoots(Path("card")) / ":internal/x.flac")
+
+    def test_a_track_at_the_top_of_internal_storage_has_no_folder_album(self):
+        top = library_index.track_from_tags(":internal/Song.flac", {}, 1.0)
+        inside = library_index.track_from_tags(":internal/Band/Song.flac", {}, 1.0)
+        self.assertEqual("Unknown Album", top.album)
+        self.assertEqual("Band", inside.album)
+
+    def test_both_drives_scan_in_the_players_order(self):
+        with tempfile.TemporaryDirectory() as card_directory, \
+                tempfile.TemporaryDirectory() as internal_directory:
+            card, internal = Path(card_directory), Path(internal_directory)
+            for root, relative in ((card, "Zed/01.flac"), (card, "0 Start/01.flac"),
+                                   (internal, "Band/01.flac"), (internal, "Top.flac")):
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                write_silent_flac(root / relative, 1)
+            (internal / "Band" / "Mix.m3u").write_text("01.flac\n", encoding="utf-8")
+            tracks, playlists, failures = library_index.scan(card, internal)
+        self.assertEqual([], failures)
+        self.assertEqual(["0 Start/01.flac", ":internal/Band/01.flac", ":internal/Top.flac",
+                          "Zed/01.flac"], [track.path for track in tracks])
+        self.assertEqual(":internal/Band", playlists[0].folder)
+        model = library_index.build_library(tracks, playlists)
+        self.assertEqual([1], model.playlists[0].tracks)
+
+
 class BuildLibraryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

@@ -22,6 +22,16 @@ from test_library_index import write_silent_flac
 SCAN_RECORD = struct.Struct("<4sIII16s")
 MEBIBYTE = 1024 * 1024
 FIXED_UTC = echo_sync.CardVolume("FAT32", True, False, 0, "")
+SETTINGS_INTERNAL_AT = 38
+
+
+def settings_bytes(internal_on, version=9):
+    data = bytearray(48)
+    data[0:4] = b"EMST"
+    data[4] = version
+    data[SETTINGS_INTERNAL_AT] = 1 if internal_on else 0
+    struct.pack_into("<I", data, 44, cover_export.fnv1a(bytes(data[:44]), cover_export.FNV_OFFSET))
+    return bytes(data)
 EXFAT = echo_sync.CardVolume("exFAT", True, True, 0, "")
 
 
@@ -63,6 +73,16 @@ class PlayerFingerprintTest(unittest.TestCase):
     def test_the_players_test_card_gives_the_fingerprint_the_player_stores(self):
         self.assertEqual(echo_sync.Fingerprint(True, 3518657026, 2077149385, 6),
                          players_test_card().fingerprint())
+
+    def test_internal_storage_folds_in_as_the_last_root_folder_as_on_the_player(self):
+        card = players_test_card()
+        card.add("/", ":internal", True, 0, 0)
+        card.add("/:internal", "Artist", True, 0, 11)
+        card.add("/:internal/Artist", "01 - Song.flac", False, 5000000, 12)
+        card.add("/:internal", "System Volume Information", True, 0, 13)
+        card.add("/:internal", "HIFIEC90.IMG", False, 9000000, 14)
+        self.assertEqual(echo_sync.Fingerprint(True, 1993034583, 148508692, 9),
+                         card.fingerprint())
 
     def test_folders_that_cannot_be_opened_count_as_empty_as_on_the_player(self):
         card = players_test_card()
@@ -262,6 +282,40 @@ class HostCardTest(unittest.TestCase):
         computed = echo_sync.card_fingerprint(self.root, FIXED_UTC)
         self.assertEqual(self.listed_card().fingerprint(), computed)
         self.assertEqual(5, computed.entries)
+
+
+    def test_two_drives_list_the_internal_drive_as_the_last_root_folder(self):
+        self.make("Artist/Album/01 - Song.flac", b"12345")
+        with tempfile.TemporaryDirectory() as other:
+            internal = Path(other)
+            song = internal / "Band" / "02 - Tune.mp3"
+            song.parent.mkdir()
+            song.write_bytes(b"abc")
+            seconds = datetime(2024, 5, 6, 7, 8, 10, tzinfo=timezone.utc).timestamp()
+            os.utime(song, (seconds, seconds))
+            os.utime(song.parent, (seconds, seconds))
+            drive = echo_sync.InternalDrive(internal, FIXED_UTC)
+            computed = echo_sync.card_fingerprint(self.root, FIXED_UTC, drive)
+        stamp = echo_sync.dos_stamp(int(seconds))
+        expected = self.listed_card()
+        expected.add("/", ":internal", True, 0, 0)
+        expected.add("/:internal", "Band", True, 0, stamp)
+        expected.add("/:internal/Band", "02 - Tune.mp3", False, 3, stamp)
+        self.assertEqual(expected.fingerprint(), computed)
+        self.assertEqual(6, computed.entries)
+        self.assertNotEqual(echo_sync.card_fingerprint(self.root, FIXED_UTC), computed)
+
+
+class InternalSettingTest(unittest.TestCase):
+    def test_the_players_internal_storage_setting_is_read_from_settings_bin(self):
+        self.assertTrue(echo_sync.player_includes_internal(settings_bytes(True)))
+        self.assertFalse(echo_sync.player_includes_internal(settings_bytes(False)))
+        self.assertFalse(echo_sync.player_includes_internal(b""))
+        self.assertFalse(echo_sync.player_includes_internal(settings_bytes(True)[:47]))
+        self.assertFalse(echo_sync.player_includes_internal(settings_bytes(True, version=8)))
+        damaged = bytearray(settings_bytes(True))
+        damaged[10] ^= 1
+        self.assertFalse(echo_sync.player_includes_internal(bytes(damaged)))
 
 
 class CardFileTest(unittest.TestCase):
@@ -486,6 +540,57 @@ class SyncTest(unittest.TestCase):
             library_index.scan = original
         self.assertEqual(0, status, output)
         self.assertEqual(b"EMCV", (self.echo / "covers.bin").read_bytes()[:4])
+
+    def make_internal(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        internal = Path(directory.name)
+        album = internal / "Band" / "Live"
+        album.mkdir(parents=True)
+        write_silent_flac(album / "01 - Tune.flac", 1)
+        (album / "cover.png").write_bytes(image_bytes((0, 255, 0)))
+        return internal
+
+    def test_with_internal_storage_on_both_drives_make_one_library(self):
+        self.prepare_echo()
+        (self.echo / "settings.bin").write_bytes(settings_bytes(True))
+        internal = self.make_internal()
+        status, output = self.run_sync("--internal", str(internal))
+        self.assertEqual(0, status, output)
+        library = (self.echo / "library.db").read_bytes()
+        expected = library_index.encode_library(library_index.build_library(
+            *library_index.scan(self.card, internal)[:2]))
+        self.assertEqual(expected, library[:len(expected)])
+        self.assertIn(b":internal/Band/Live/01 - Tune.flac", library)
+        covers = (self.echo / "covers.bin").read_bytes()
+        self.assertEqual((b"EMCV", 1, 2), struct.unpack_from("<4sHH", covers))
+        drive = echo_sync.InternalDrive(internal, echo_sync.detect_volume(internal))
+        self.assertEqual(echo_sync.card_fingerprint(self.card, echo_sync.detect_volume(self.card),
+                                                    drive),
+                         echo_sync.stored_fingerprint((self.echo / "scan.bin").read_bytes()))
+        self.assertIn("will use this library", output)
+        self.assertEqual(0, self.run_sync("--internal", str(internal), "--check")[0])
+        self.assertEqual(1, self.run_sync("--check")[0])
+
+    def test_with_internal_storage_on_but_no_drive_the_player_scans_again(self):
+        self.prepare_echo()
+        (self.echo / "settings.bin").write_bytes(settings_bytes(True))
+        (self.echo / "scan.bin").write_bytes(SCAN_RECORD.pack(b"MESC", 1, 2, 3, bytes(16)))
+        status, output = self.run_sync()
+        self.assertEqual(0, status, output)
+        self.assertIn("no --internal drive", output)
+        self.assertIn("scan the card once more", output)
+        self.assertEqual(bytes(4), (self.echo / "scan.bin").read_bytes()[:4])
+        self.assertNotIn(b":internal", (self.echo / "library.db").read_bytes())
+
+    def test_with_internal_storage_off_the_internal_drive_is_left_out(self):
+        self.prepare_echo()
+        internal = self.make_internal()
+        status, output = self.run_sync("--internal", str(internal))
+        self.assertEqual(0, status, output)
+        self.assertIn("--internal is ignored", output)
+        self.assertNotIn(b":internal", (self.echo / "library.db").read_bytes())
+        self.assertIn("will use this library", output)
 
     def test_a_folder_that_is_not_a_card_is_refused(self):
         status, output = self.run_sync()

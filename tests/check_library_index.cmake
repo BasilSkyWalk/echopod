@@ -1,5 +1,9 @@
+set(internal_arguments "")
+if(DEFINED INTERNAL)
+    set(internal_arguments --internal ${INTERNAL})
+endif()
 execute_process(
-    COMMAND ${PYTHON} ${INDEXER} --music ${MUSIC} --output ${OUTPUT}
+    COMMAND ${PYTHON} ${INDEXER} --music ${MUSIC} ${internal_arguments} --output ${OUTPUT}
     RESULT_VARIABLE indexed
     OUTPUT_QUIET
 )

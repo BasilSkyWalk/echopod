@@ -23,4 +23,5 @@ typedef struct HalPowerHold {
 
 HalPowerHold hal_power_boot_hold(void);
 bool hal_power_take_usb_start(void);
+void hal_power_confirm_start(bool hold_required);
 void hal_power_off(void);

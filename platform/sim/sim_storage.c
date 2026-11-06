@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "core/volume_path.h"
 #include "hal/storage.h"
 
 enum {
@@ -21,8 +22,11 @@ static const char SYSTEM_PREFIX[] = "/.echo/";
 typedef struct SimStorage {
     const char *card_directory;
     const char *system_directory;
+    const char *internal_directory;
+    bool internal_shown;
     FILE *files[OPEN_FILE_CAPACITY];
     DIR *dirs[OPEN_DIR_CAPACITY];
+    bool owes_internal[OPEN_DIR_CAPACITY];
     char dir_paths[OPEN_DIR_CAPACITY][PATH_CAPACITY];
 } SimStorage;
 
@@ -32,13 +36,31 @@ void sim_storage_configure(const char *card_directory, const char *system_direct
 {
     storage.card_directory = card_directory;
     storage.system_directory = system_directory;
+    storage.internal_directory = NULL;
+    storage.internal_shown = false;
+}
+
+void sim_storage_configure_internal(const char *internal_directory)
+{
+    storage.internal_directory = internal_directory;
+}
+
+void hal_storage_show_internal(bool shown)
+{
+    storage.internal_shown = shown;
 }
 
 bool sim_storage_host_path(const char *path, char *buffer, size_t capacity)
 {
     size_t prefix_length = sizeof SYSTEM_PREFIX - 1;
+    const char *inside = volume_internal_path(path);
     int written = -1;
-    if (storage.system_directory != NULL && strncmp(path, SYSTEM_PREFIX, prefix_length) == 0) {
+    if (inside != NULL) {
+        if (storage.internal_directory != NULL) {
+            written = snprintf(buffer, capacity, "%s%s", storage.internal_directory, inside);
+        }
+    } else if (storage.system_directory != NULL &&
+               strncmp(path, SYSTEM_PREFIX, prefix_length) == 0) {
         written =
             snprintf(buffer, capacity, "%s/%s", storage.system_directory, path + prefix_length);
     } else if (storage.card_directory != NULL) {
@@ -237,6 +259,8 @@ bool hal_dir_open(HalDir *dir, const char *path)
     if (storage.dirs[slot] == NULL) {
         return false;
     }
+    storage.owes_internal[slot] =
+        storage.internal_shown && storage.internal_directory != NULL && strcmp(path, "/") == 0;
     dir->handle = slot;
     return true;
 }
@@ -275,7 +299,13 @@ bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
             return true;
         }
     }
-    return false;
+    if (!storage.owes_internal[dir->handle]) {
+        return false;
+    }
+    storage.owes_internal[dir->handle] = false;
+    *entry = (HalDirEntry){.directory = true, .hidden = false, .size = 0, .modified = 0};
+    strcpy(entry->name, VOLUME_INTERNAL_NAME);
+    return true;
 }
 
 void hal_dir_close(HalDir *dir)

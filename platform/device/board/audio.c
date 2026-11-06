@@ -43,7 +43,15 @@ enum {
     MILLISECONDS_PER_SECOND = 1000,
     JACK_POLL_MS = 10,
     SNIFF_BYTES = 12,
-    LIGHT_SNIFF_BYTES = 28
+    LIGHT_SNIFF_BYTES = 28,
+    COLD_LEAD_MS = 60,
+    COLD_SETTLE_MS = 40,
+    WARM_LEAD_MS = 20,
+    WARM_SETTLE_MS = 6,
+    START_RAMP_MS = 2,
+    RESUME_RAMP_MS = 10,
+    LEAD_GUARD_MS = 4,
+    SETTLE_TIMEOUT_MS = 300
 };
 
 typedef enum SourceKind {
@@ -109,6 +117,7 @@ static uint32_t queued_token;
 static char queued_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint32_t rest_position_ms;
 static uint32_t paused_since_ms;
+static uint32_t lead_frames;
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
@@ -354,12 +363,32 @@ static void serve_fade(void)
     }
 }
 
+static uint32_t frames_in(uint32_t milliseconds)
+{
+    return audio_engine_rate(&engine) * milliseconds / MILLISECONDS_PER_SECOND;
+}
+
+static bool in_lead(void)
+{
+    update_consumed();
+    return transferring && consumed + frames_in(LEAD_GUARD_MS) <= lead_frames;
+}
+
+static void set_muted(bool mute)
+{
+    if (in_lead()) {
+        dac_path_set_muted_now(mute);
+    } else {
+        dac_path_set_muted(mute);
+    }
+}
+
 static void stop_transfer(void)
 {
     if (!transferring) {
         return;
     }
-    dac_path_set_muted(true);
+    set_muted(true);
     dac_path_stop_transfer();
     dmac_stop();
     transferring = false;
@@ -394,6 +423,7 @@ static bool start_transfer(uint32_t words, bool audible)
     ring_words = words;
     consumed = 0;
     last_position = 0;
+    lead_frames = 0;
     uint32_t blocks = words / BLOCK_WORDS;
     if (!dma_ring_items(items, blocks, ring_address(), BLOCK_WORDS, (uint32_t)(uintptr_t)items) ||
         !dmac_start_loop(&items[0])) {
@@ -408,13 +438,28 @@ static bool start_transfer(uint32_t words, bool audible)
     return true;
 }
 
+static void unmute_after(uint32_t settle_frames)
+{
+    uint32_t started_ms = hal_clock_milliseconds();
+    while (consumed < settle_frames && hal_clock_milliseconds() - started_ms < SETTLE_TIMEOUT_MS) {
+        update_consumed();
+        pump(consumed);
+    }
+    set_muted(false);
+}
+
 static bool start_output(bool audible)
 {
-    if (!ensure_path(audio_engine_rate(&engine))) {
+    uint32_t rate = audio_engine_rate(&engine);
+    bool cold = !path_up || path_rate != rate;
+    if (!ensure_path(rate)) {
         return false;
     }
+    bool from_start = audio_engine_status(&engine).position_ms == 0;
+    uint32_t lead = frames_in(cold ? COLD_LEAD_MS : WARM_LEAD_MS);
+    audio_engine_lead_in(&engine, lead, frames_in(from_start ? START_RAMP_MS : RESUME_RAMP_MS));
     uint32_t started_ms = hal_clock_milliseconds();
-    uint32_t prefill = audio_engine_rate(&engine) / PREFILL_DIVISOR;
+    uint32_t prefill = rate / PREFILL_DIVISOR + lead;
     prefill = prefill < RING_FRAMES * 3 / 4 ? prefill : RING_FRAMES * 3 / 4;
     while (audio_engine_buffered(&engine, 0) < prefill &&
            hal_clock_milliseconds() - started_ms < PREFILL_TIMEOUT_MS) {
@@ -423,7 +468,14 @@ static bool start_output(bool audible)
     stats = (HalAudioStats){0};
     output_started_us = hal_clock_microseconds();
     stopped_waiting = false;
-    return start_transfer(RING_WORDS, audible);
+    if (!start_transfer(RING_WORDS, false)) {
+        return false;
+    }
+    lead_frames = lead;
+    if (audible) {
+        unmute_after(frames_in(cold ? COLD_SETTLE_MS : WARM_SETTLE_MS));
+    }
+    return true;
 }
 
 static void stop_tone(void)
@@ -576,7 +628,7 @@ void hal_audio_pause(void)
         return;
     }
     if (transferring) {
-        dac_path_set_muted(true);
+        set_muted(true);
         dmac_suspend();
     }
     audio_engine_pause(&engine);
@@ -597,7 +649,7 @@ static void seek_to(uint32_t position_ms, bool paused, bool choose)
     }
     if (paused) {
         audio_engine_pause(&engine);
-        dac_path_set_muted(true);
+        set_muted(true);
         dmac_suspend();
         paused_since_ms = hal_clock_milliseconds();
     }
@@ -615,7 +667,7 @@ void hal_audio_resume(void)
     }
     if (transferring) {
         dmac_resume();
-        dac_path_set_muted(false);
+        set_muted(false);
     }
     audio_engine_resume(&engine);
 }

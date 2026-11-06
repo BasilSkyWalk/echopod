@@ -327,6 +327,72 @@ static void a_next_track_at_another_rate_waits_for_the_ring_to_drain(void)
     CHECK_EQUAL(96000u, audio_engine_rate(&engine));
 }
 
+static void waiting_for_a_new_rate_plays_silence_not_old_audio(void)
+{
+    start_engine();
+    memset(ring, 0x55, sizeof ring);
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_24_96k_stereo", 4);
+    pump_until_full(0);
+    for (uint32_t frame = 3001; frame < RING_FRAMES; frame++) {
+        CHECK(frame_is(frame, 0, 0, 16));
+    }
+    audio_engine_pump(&engine, 6000);
+    CHECK_EQUAL(0u, audio_engine_stats(&engine).underruns);
+    for (uint32_t frame = 0; frame < 6000; frame++) {
+        CHECK(frame_is(RING_FRAMES + frame, 0, 0, 16));
+    }
+    uint32_t rate = 0;
+    CHECK(audio_engine_wants_rate(&engine, &rate));
+}
+
+static void a_lead_in_plays_silence_before_the_track(void)
+{
+    start_engine();
+    memset(ring, 0x55, sizeof ring);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+    audio_engine_lead_in(&engine, 100, 0);
+    pump_until_full(0);
+    for (uint32_t frame = 0; frame < 100; frame++) {
+        CHECK(frame_is(frame, 0, 0, 16));
+    }
+    CHECK(ring_holds("lpc_16_44k_stereo", 0, 100, 4000, 16));
+    audio_engine_pump(&engine, 50);
+    CHECK_EQUAL(0u, audio_engine_status(&engine).position_ms);
+    audio_engine_pump(&engine, 100 + 4410);
+    CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+    CHECK_EQUAL(7u, audio_engine_status(&engine).token);
+}
+
+static void a_lead_in_ramps_the_first_frames_up(void)
+{
+    start_scripted_engine(0, 4);
+    for (int index = 0; index < 16; index++) {
+        scripted.left[index] = 2000;
+        scripted.right[index] = -2000;
+    }
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    audio_engine_lead_in(&engine, 10, 8);
+    pump_until_full(0);
+    for (uint32_t step = 0; step < 8; step++) {
+        CHECK(frame_is(10 + step, (int32_t)(250 * step), -(int32_t)(250 * step), 16));
+    }
+    for (uint32_t frame = 18; frame < 10 + 64; frame++) {
+        CHECK(frame_is(frame, 2000, -2000, 16));
+    }
+}
+
+static void a_lead_in_only_applies_before_anything_was_written(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+    pump_until_full(0);
+    audio_engine_lead_in(&engine, 100, 0);
+    CHECK(ring_holds("lpc_16_44k_stereo", 0, 0, 1000, 16));
+    audio_engine_pump(&engine, 4410);
+    CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+}
+
 static void starting_part_way_skips_to_that_sample(void)
 {
     start_engine();
@@ -616,6 +682,10 @@ int main(void)
         TEST_CASE(the_status_describes_the_playing_tracks_stream),
         TEST_CASE(the_stream_description_follows_the_audio_into_the_next_track),
         TEST_CASE(a_next_track_at_another_rate_waits_for_the_ring_to_drain),
+        TEST_CASE(waiting_for_a_new_rate_plays_silence_not_old_audio),
+        TEST_CASE(a_lead_in_plays_silence_before_the_track),
+        TEST_CASE(a_lead_in_ramps_the_first_frames_up),
+        TEST_CASE(a_lead_in_only_applies_before_anything_was_written),
         TEST_CASE(starting_part_way_skips_to_that_sample),
         TEST_CASE(seeking_restarts_the_ring_at_the_new_place),
         TEST_CASE(seeking_after_the_next_track_opened_queues_it_again),
