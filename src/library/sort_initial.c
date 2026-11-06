@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "core/resident.h"
 #include "core/utf8.h"
 #include "library/sort_key.h"
 
@@ -11,7 +12,7 @@ enum {
     UNMAPPED = '~'
 };
 
-static const char LATIN_INITIALS[] =
+ECHO_RESIDENT static const char LATIN_INITIALS[] =
     "aaaaaa~ceeeeiiii~nooooo~~uuuuy~saaaaaa~ceeeeiiii~nooooo~~uuuuy~y"
     "aaaaaaccccccccdd~~eeeeeeeeeegggggggghh~~iiiiiiiii~iijjkk~lllllll"
     "l~~nnnnnn~~~oooooo~~rrrrrrsssssssstttt~~uuuuuuuuuuuuwwyyyzzzzzzs";

@@ -1,5 +1,7 @@
 #include "sound/equalizer_presets.h"
 
+#include "core/resident.h"
+
 enum {
     PRESET_MAX_BANDS = 5,
     PRESET_Q_TENTHS = 14,
@@ -19,7 +21,7 @@ typedef struct PresetShape {
 const uint16_t EQUALIZER_CUSTOM_FREQUENCIES[EQUALIZER_CUSTOM_BANDS] = {63,   160,  400,  1000,
                                                                        2500, 6300, 16000};
 
-static const PresetShape SHAPES[EQUALIZER_PRESET_CUSTOM] = {
+ECHO_RESIDENT static const PresetShape SHAPES[EQUALIZER_PRESET_CUSTOM] = {
     [EQUALIZER_PRESET_OFF] = {0, {{0, 0}}},
     [EQUALIZER_PRESET_RETRO] = {4, {{100, 1}, {315, 1}, {1000, 1}, {10000, -6}}},
     [EQUALIZER_PRESET_BASS] = {2, {{63, 5}, {125, 3}}},

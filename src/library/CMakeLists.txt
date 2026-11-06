@@ -9,6 +9,9 @@ add_library(echo_library STATIC
     spoken_path.c
 )
 target_include_directories(echo_library PUBLIC include)
+if(CMAKE_CROSSCOMPILING)
+    target_compile_definitions(echo_library PRIVATE ECHO_RESIDENT_TABLES)
+endif()
 target_link_libraries(echo_library
     PUBLIC echo_core
     PRIVATE echo_options echo_compact
@@ -45,3 +48,4 @@ target_link_libraries(echo_library_scan
     PUBLIC echo_core echo_image echo_library
     PRIVATE echo_options
 )
+target_link_libraries(echo_library PRIVATE echo_lto)

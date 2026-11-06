@@ -31,13 +31,17 @@ typedef struct UsbProbe {
     uint32_t tx_fifo_size;
 } UsbProbe;
 
-typedef struct UsbPort {
-    UsbConnectStep connect_step;
+typedef struct UsbLink {
+    UsbConnectStep step;
+    bool high_speed_allowed;
     bool dedicated_fifos;
+} UsbLink;
+
+typedef struct UsbPort {
+    UsbLink link;
     bool configured;
     bool in_busy;
     bool setup_pending;
-    bool high_speed_allowed;
     uint16_t bulk_packet;
     uint32_t setup[2];
     bool control_out_pending;
@@ -57,7 +61,9 @@ void usb_power_up(void);
 void usb_power_down(void);
 void usb_silence_audio(void);
 bool usb_host_reset_pending(void);
-bool usb_connect(UsbPort *port);
+bool usb_connect(UsbLink *link);
+bool usb_flush_fifos(void);
+bool usb_port_connect(UsbPort *port);
 bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms);
 void usb_poll(UsbPort *port);
 UsbProbe usb_probe(void);

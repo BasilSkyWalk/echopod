@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "codec/alac.h"
+#include "core/resident.h"
 
 enum {
     TYPE_FTYP = 0x66747970,
@@ -76,8 +77,8 @@ enum {
     MORE_BIT = 0x80
 };
 
-static const uint32_t AAC_RATES[RATE_INDEXES] = {96000, 88200, 64000, 48000, 44100, 32000, 24000,
-                                                 22050, 16000, 12000, 11025, 8000,  7350};
+ECHO_RESIDENT static const uint32_t AAC_RATES[RATE_INDEXES] = {
+    96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350};
 
 typedef struct Atom {
     uint32_t type;

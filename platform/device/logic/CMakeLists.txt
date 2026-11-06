@@ -66,7 +66,7 @@ if(CMAKE_CROSSCOMPILING)
     target_include_directories(echo_opus SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
 endif()
 
-add_library(echo_device_logic STATIC
+set(ECHO_DEVICE_LOGIC_SOURCES
     audio_engine.c
     audio_math.c
     backlight.c
@@ -118,6 +118,7 @@ add_library(echo_device_logic STATIC
     vbus_debounce.c
     wav_source.c
 )
+add_library(echo_device_logic STATIC ${ECHO_DEVICE_LOGIC_SOURCES})
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
         audio_math.c
@@ -152,5 +153,15 @@ endif()
 target_include_directories(echo_device_logic PUBLIC include)
 target_link_libraries(echo_device_logic
     PUBLIC echo_core echo_hal echo_codec echo_libmad echo_faad2 echo_opus
-    PRIVATE echo_options
+    PRIVATE echo_options echo_lto
 )
+
+if(CMAKE_CROSSCOMPILING)
+    target_compile_definitions(echo_device_logic PRIVATE ECHO_RESIDENT_TABLES)
+    add_library(echo_device_logic_plain STATIC ${ECHO_DEVICE_LOGIC_SOURCES})
+    target_include_directories(echo_device_logic_plain PUBLIC include)
+    target_link_libraries(echo_device_logic_plain
+        PUBLIC echo_core_plain echo_hal_plain echo_codec_plain echo_libmad echo_faad2 echo_opus
+        PRIVATE echo_options
+    )
+endif()

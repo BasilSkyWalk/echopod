@@ -8,10 +8,9 @@
 #include "hal/clock.h"
 #include "hal/power.h"
 #include "hal/system.h"
+#include "overlay.h"
 #include "storage_reset.h"
-#include "update.h"
 #include "usb.h"
-#include "usb_dac_session.h"
 #include "usb_report.h"
 #include "usb_session.h"
 
@@ -72,27 +71,39 @@ static void raise_clock_for_usb(void)
     }
 }
 
+static const UsbOverlayEntry *load_usb_code(void)
+{
+    app_release_audio();
+    board_audio_shut_down();
+    bool restart_pending = hal_system_restart_pending();
+    const UsbOverlayEntry *entry = board_usb_overlay_load();
+    if (entry != NULL && entry->magic == USB_OVERLAY_MAGIC) {
+        return entry;
+    }
+    usb_power_down();
+    app_show_notice("USB",
+                    i18n_text(restart_pending ? STR_RESCAN_RESTART_NEEDED : STR_USB_NO_CODE));
+    board_wait_for_key();
+    return NULL;
+}
+
 static void run_usb_session(void)
 {
     board_stall_pause(true);
     raise_clock_for_usb();
-    UsbSessionEnd end = usb_session_run();
-    bool cable_back = end == USB_SESSION_UNPLUGGED && usb_vbus_present();
-    if (end == USB_SESSION_UNPLUGGED && !cable_back && hal_system_usb_last().left_mounted != 0) {
-        app_show_notice(i18n_text(STR_USB_UNPLUGGED_TITLE), i18n_text(STR_USB_UNPLUGGED_MESSAGE));
-        board_wait_for_key();
+    const UsbOverlayEntry *usb = load_usb_code();
+    UsbStorageOutcome outcome = {.cable_back = false, .card_changed = false};
+    if (usb != NULL) {
+        outcome = usb->storage(usb_session_shared());
     }
-    if (end == USB_SESSION_EJECTED || end == USB_SESSION_UNPLUGGED) {
-        update_after_usb();
-    }
-    if (usb_session_card_changed()) {
+    if (outcome.card_changed) {
         storage_reset();
         app_start();
         app_request_rescan_if_music_changed();
     }
     app_wake();
     board_stall_pause(false);
-    if (cable_back) {
+    if (outcome.cable_back) {
         resume_storage = true;
         usb_state = USB_STATE_UNPLUGGED;
     }
@@ -102,7 +113,10 @@ static void run_dac_session(void)
 {
     board_stall_pause(true);
     raise_clock_for_usb();
-    usb_dac_session_run();
+    const UsbOverlayEntry *usb = load_usb_code();
+    if (usb != NULL) {
+        usb->dac(usb_session_shared());
+    }
     app_wake();
     board_stall_pause(false);
 }

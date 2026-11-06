@@ -1,4 +1,4 @@
-add_library(echo_core STATIC
+set(ECHO_CORE_SOURCES
     deadline.c
     format.c
     frame_stats.c
@@ -13,9 +13,16 @@ add_library(echo_core STATIC
     utf8.c
     wall_clock.c
 )
+add_library(echo_core STATIC ${ECHO_CORE_SOURCES})
 target_include_directories(echo_core PUBLIC include)
-target_link_libraries(echo_core PRIVATE echo_options)
+target_link_libraries(echo_core PRIVATE echo_options echo_lto)
 if(NOT CMAKE_CROSSCOMPILING)
     target_compile_definitions(echo_core PRIVATE ECHO_BUILTIN_ENGLISH)
 endif()
 set_source_files_properties(i18n.c string_builder.c format.c key_tracker.c low_battery.c permutation.c power_policy.c wall_clock.c PROPERTIES COMPILE_OPTIONS "$<$<BOOL:${CMAKE_CROSSCOMPILING}>:-Os>")
+
+if(CMAKE_CROSSCOMPILING)
+    add_library(echo_core_plain STATIC ${ECHO_CORE_SOURCES})
+    target_include_directories(echo_core_plain PUBLIC include)
+    target_link_libraries(echo_core_plain PRIVATE echo_options)
+endif()

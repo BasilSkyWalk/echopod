@@ -18,6 +18,7 @@ CODE_WINDOW = 0x2666C
 LOADED_LIMIT = 437600
 OVERLAY_CAPACITY = 0x15000
 RESIDENT_CAPACITY = 0x4800
+USB_OVERLAY_IMAGE_CAPACITY = 0x10000
 CODE_SECTIONS = (".code",)
 RAM_SECTIONS = (".data", ".bss", ".noinit")
 INPUT_LINE = re.compile(r"^ (\S+)\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)\s+(\S.*)$")
@@ -175,7 +176,7 @@ def limit_line(label, used, limit):
     return f"{label}: {used:,} of {limit:,} bytes, {free:,} free{state}"
 
 
-def summary(device_map, overlay_map=None):
+def summary(device_map, overlay_map=None, usb_overlay_map=None):
     sizes = output_sizes(device_map)
     code = sizes.get(".code", 0)
     data = sizes.get(".data", 0)
@@ -187,13 +188,19 @@ def summary(device_map, overlay_map=None):
     if overlay_map is not None:
         overlay = output_sizes(overlay_map).get(".overlay", 0)
         lines.append(limit_line("rescan overlay", overlay, OVERLAY_CAPACITY))
+    if usb_overlay_map is not None:
+        usb = output_sizes(usb_overlay_map)
+        code = usb.get(".overlay", 0)
+        lines.append(limit_line("USB overlay code", code, USB_OVERLAY_IMAGE_CAPACITY))
+        lines.append(limit_line("USB overlay code + .bss", code + usb.get(".bss", 0),
+                                OVERLAY_CAPACITY))
     return lines
 
 
-def report(device_map, overlay_map=None, nm_text="", top=25, objects=40):
+def report(device_map, overlay_map=None, nm_text="", top=25, objects=40, usb_overlay_map=None):
     pieces = parse_map(device_map)
     nm_files = parse_nm(nm_text)
-    lines = summary(device_map, overlay_map)
+    lines = summary(device_map, overlay_map, usb_overlay_map)
     lines.append("")
     code_pieces = in_sections(pieces, CODE_SECTIONS)
     ram_pieces = in_sections(pieces, RAM_SECTIONS)
@@ -256,10 +263,11 @@ def parse_arguments(argv):
         description="Report what fills the device code window from the linker maps")
     parser.add_argument("--build", type=Path,
                         help="a build directory such as build/release (reads its device ELF "
-                             "and map and the rescan overlay map)")
+                             "and map and the overlay maps)")
     parser.add_argument("--map", type=Path, help="the device map file (instead of --build)")
     parser.add_argument("--elf", type=Path, help="the device ELF, for attributing LTO code")
     parser.add_argument("--overlay-map", type=Path, help="the rescan overlay map file")
+    parser.add_argument("--usb-overlay-map", type=Path, help="the USB overlay map file")
     parser.add_argument("--nm", default="arm-none-eabi-nm", help="the nm to run on the ELF")
     parser.add_argument("--top", type=int, default=25, help="how many symbols to list")
     parser.add_argument("--objects", type=int, default=40, help="how many objects to list")
@@ -272,6 +280,9 @@ def parse_arguments(argv):
         overlay = directory / "echo_rescan_overlay.map"
         if arguments.overlay_map is None and overlay.exists():
             arguments.overlay_map = overlay
+        usb_overlay = directory / "echo_usb_overlay.map"
+        if arguments.usb_overlay_map is None and usb_overlay.exists():
+            arguments.usb_overlay_map = usb_overlay
     if arguments.map is None:
         parser.error("give --build or --map")
     return arguments
@@ -283,11 +294,15 @@ def main(argv=None):
     overlay_map = None
     if arguments.overlay_map is not None:
         overlay_map = arguments.overlay_map.read_text(encoding="utf-8", errors="replace")
+    usb_overlay_map = None
+    if arguments.usb_overlay_map is not None:
+        usb_overlay_map = arguments.usb_overlay_map.read_text(encoding="utf-8", errors="replace")
     if arguments.summary:
-        print("\n".join(summary(device_map, overlay_map)))
+        print("\n".join(summary(device_map, overlay_map, usb_overlay_map)))
         return 0
     nm_text = run_nm(arguments.elf, arguments.nm)
-    print(report(device_map, overlay_map, nm_text, arguments.top, arguments.objects))
+    print(report(device_map, overlay_map, nm_text, arguments.top, arguments.objects,
+                 usb_overlay_map))
     return 0
 
 
