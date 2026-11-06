@@ -45,6 +45,7 @@ typedef struct BrowseScreen {
     int extra;
     SpokenKind shelf;
     bool shelf_root;
+    bool in_flow;
     char title[BROWSE_TITLE_CAPACITY];
     ListModel model;
     ListView list;

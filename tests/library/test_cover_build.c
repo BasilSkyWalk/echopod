@@ -602,6 +602,26 @@ static void a_removed_album_frees_its_place_for_a_new_one(void)
     CHECK_EQUAL(BLUE.pixel, cover_pixel("Gamma"));
 }
 
+static void a_grown_file_is_built_again_with_room_for_every_album(void)
+{
+    CoverStats stats;
+    three_albums();
+    covers_capacity = COVERS_HEADER_SIZE + 2 * RECORD_SLOT;
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(2u, stats.covers);
+    CHECK_EQUAL(1u, stats.missing);
+    covers_capacity = COVERS_CAPACITY;
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(3u, stats.covers);
+    CHECK_EQUAL(0u, stats.reused);
+    CHECK_EQUAL(0u, stats.missing);
+    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+    CHECK_EQUAL(GREEN.pixel, cover_pixel("Beta"));
+    CHECK_EQUAL(BLUE.pixel, cover_pixel("Gamma"));
+    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(3u, stats.reused);
+}
+
 static void an_album_without_art_loses_its_cover(void)
 {
     CoverStats stats;
@@ -751,6 +771,7 @@ int main(void)
         TEST_CASE(a_new_album_is_the_only_one_decoded),
         TEST_CASE(replaced_art_is_decoded_again),
         TEST_CASE(a_removed_album_frees_its_place_for_a_new_one),
+        TEST_CASE(a_grown_file_is_built_again_with_room_for_every_album),
         TEST_CASE(an_album_without_art_loses_its_cover),
         TEST_CASE(a_file_without_stamps_is_built_again),
         TEST_CASE(a_damaged_index_is_ignored),

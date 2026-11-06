@@ -48,7 +48,8 @@ enum {
     SETTINGS_LANGUAGE_INDEX = 16,
     SETTINGS_THEME_INDEX = 30,
     SETTINGS_LYRICS_INDEX = 31,
-    SETTINGS_CLOCK_INDEX = 32,
+    SETTINGS_FOLDER_VIEW_INDEX = 32,
+    SETTINGS_CLOCK_INDEX = 33,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -1709,6 +1710,118 @@ static void holding_play_in_cover_flow_toggles_a_favorite(void)
     CHECK(title_is("Cover Flow"));
 }
 
+static void start_with_folder_flows(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_FOLDER_VIEW_INDEX);
+    CHECK(title_is("Folders & playlists"));
+    move_down(1);
+    tap(KEY_PLAY);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(1, settings.options[OPTION_FOLDER_VIEW]);
+    restart_app();
+}
+
+static void folders_open_as_cover_flow_of_their_subfolders(void)
+{
+    start_with_folder_flows();
+    open_music_entry(MUSIC_FOLDERS_INDEX);
+    CHECK(title_is("Cover Flow"));
+    settle();
+    CHECK_EQUAL(RED_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+    tap(KEY_PLAY);
+    CHECK(title_is("Cover Flow"));
+    move_down(1);
+    settle();
+    CHECK_EQUAL(BLUE_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+    tap(KEY_PLAY);
+    CHECK(title_is("High Voltage"));
+    tap(KEY_BACK);
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_BACK);
+    CHECK(title_is("Cover Flow"));
+    move_down(2);
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    CHECK(title_is("Music"));
+}
+
+static void folders_stay_lists_by_default(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_FOLDERS_INDEX);
+    CHECK(title_is("Folders"));
+}
+
+static void playlists_open_as_cover_flow_of_their_albums(void)
+{
+    start_with_folder_flows();
+    open_music_entry(MUSIC_PLAYLISTS_INDEX);
+    CHECK(title_is("Playlists"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_PLAY);
+    CHECK(title_is("This Won't Be The Last Time"));
+    tap(KEY_BACK);
+    move_down(1);
+    settle();
+    CHECK_EQUAL(RED_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    tap(KEY_BACK);
+    move_down(5);
+    settle();
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    CHECK(title_is("Playlists"));
+}
+
+static void a_playlist_flow_joins_neighbouring_tracks_of_one_album(void)
+{
+    start_with_folder_flows();
+    open_music_entry(MUSIC_PLAYLISTS_INDEX);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    tap(KEY_BACK);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+    tap(KEY_BACK);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    tap(KEY_BACK);
+    move_down(3);
+    settle();
+    move_up(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+}
+
+static void a_playlist_flow_starts_at_the_playing_album(void)
+{
+    start_with_folder_flows();
+    play_first_album_track();
+    hold_back();
+    tap(KEY_PLAY);
+    move_down(MUSIC_PLAYLISTS_INDEX - MUSIC_ALBUMS_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("Playlists"));
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+}
+
 static bool area_has_color(Rect area, Color color)
 {
     for (int y = area.y; y < area.y + area.height; y++) {
@@ -2399,6 +2512,11 @@ int main(void)
         TEST_CASE(cover_flow_starts_at_the_playing_album),
         TEST_CASE(holding_play_in_cover_flow_toggles_a_favorite),
         TEST_CASE(cover_flow_starts_with_a_random_album),
+        TEST_CASE(folders_open_as_cover_flow_of_their_subfolders),
+        TEST_CASE(folders_stay_lists_by_default),
+        TEST_CASE(playlists_open_as_cover_flow_of_their_albums),
+        TEST_CASE(a_playlist_flow_starts_at_the_playing_album),
+        TEST_CASE(a_playlist_flow_joins_neighbouring_tracks_of_one_album),
         TEST_CASE(stopping_the_app_saves_the_session),
         TEST_CASE(each_step_records_its_duration),
         TEST_CASE(a_calm_frame_is_not_drawn_again_for_a_while),

@@ -97,6 +97,8 @@ typedef struct FakeHal {
     const char *reserved_paths[FILE_CAPACITY];
     uint32_t reserved_sizes[FILE_CAPACITY];
     int reserve_count;
+    int grow_count;
+    uint32_t grow_limit;
     int scratch_borrows;
     bool empty_card;
     int dir_opens;
@@ -1154,6 +1156,33 @@ HalReserveResult hal_file_reserve(const char *path, uint32_t size)
         fake_hal_add_file(path, NULL, size);
     }
     return fake.reserve_result;
+}
+
+HalReserveResult hal_file_grow(const char *path, uint32_t size)
+{
+    FakeFile *file = fake_file(path);
+    fake.grow_count++;
+    if (file == NULL) {
+        return HAL_RESERVE_FAILED;
+    }
+    if (file->size >= size) {
+        return HAL_RESERVE_EXISTS;
+    }
+    if (fake.grow_limit != 0 && size > fake.grow_limit) {
+        return HAL_RESERVE_NO_SPACE;
+    }
+    file->size = size;
+    return HAL_RESERVE_CREATED;
+}
+
+void fake_hal_set_grow_limit(uint32_t limit)
+{
+    fake.grow_limit = limit;
+}
+
+int fake_hal_grow_count(void)
+{
+    return fake.grow_count;
 }
 
 int fake_hal_reserve_count(void)

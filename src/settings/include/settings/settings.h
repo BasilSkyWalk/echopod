@@ -80,6 +80,7 @@ typedef enum SettingOption {
     OPTION_TIME_ZONE,
     OPTION_THEME,
     OPTION_LYRICS,
+    OPTION_FOLDER_VIEW,
     SETTINGS_OPTION_COUNT
 } SettingOption;
 

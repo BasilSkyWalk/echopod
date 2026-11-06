@@ -1,3 +1,4 @@
+#include "card_files.h"
 #include "check.h"
 #include "core/hash.h"
 #include "fake_hal.h"
@@ -6,6 +7,7 @@
 #include "hal/audio.h"
 #include "hal/storage.h"
 #include "hal/system.h"
+#include "library/cover_build.h"
 #include "settings_store.h"
 
 enum {
@@ -172,6 +174,66 @@ static void an_empty_favorites_list_answers_without_reading_the_library(void)
     CHECK_EQUAL(0, fixture.memory.reads);
 }
 
+static const char COVERS_PATH[] = "/.echo/covers.bin";
+
+enum {
+    COVER_SLOT = 8 + 4 + COVER_BUILD_RECORD_BYTES,
+    DEFAULT_COVERS_BYTES = 80 * 1024 * 1024,
+    DEFAULT_COVER_SLOTS = 2673
+};
+
+static uint32_t covers_size(void)
+{
+    HalFile file;
+    CHECK(hal_file_open(&file, COVERS_PATH));
+    uint32_t size = file.size;
+    hal_file_close(&file);
+    return size;
+}
+
+static void the_covers_file_is_sized_with_room_to_spare(void)
+{
+    CHECK_EQUAL(16 + 3840u * COVER_SLOT, card_files_covers_size(3000));
+    CHECK_EQUAL(16 + 3584u * COVER_SLOT, card_files_covers_size(DEFAULT_COVER_SLOTS));
+    CHECK_EQUAL(16 + 8192u * COVER_SLOT, card_files_covers_size(20000));
+}
+
+static void a_covers_file_that_fits_the_albums_is_left_alone(void)
+{
+    fake_hal_reset();
+    fake_hal_add_file(COVERS_PATH, NULL, DEFAULT_COVERS_BYTES);
+    card_files_fit_covers(DEFAULT_COVER_SLOTS);
+    CHECK_EQUAL(0, fake_hal_grow_count());
+    CHECK_EQUAL(DEFAULT_COVERS_BYTES, covers_size());
+}
+
+static void a_covers_file_grows_for_more_albums(void)
+{
+    fake_hal_reset();
+    fake_hal_add_file(COVERS_PATH, NULL, DEFAULT_COVERS_BYTES);
+    card_files_fit_covers(DEFAULT_COVER_SLOTS + 1);
+    CHECK_EQUAL(card_files_covers_size(DEFAULT_COVER_SLOTS + 1), covers_size());
+    card_files_fit_covers(20000);
+    CHECK_EQUAL(16 + 8192u * COVER_SLOT, covers_size());
+}
+
+static void a_card_without_room_to_spare_gets_room_for_just_the_albums(void)
+{
+    fake_hal_reset();
+    fake_hal_add_file(COVERS_PATH, NULL, DEFAULT_COVERS_BYTES);
+    fake_hal_set_grow_limit(16 + 3000u * COVER_SLOT);
+    card_files_fit_covers(3000);
+    CHECK_EQUAL(16 + 3000u * COVER_SLOT, covers_size());
+    CHECK_EQUAL(2, fake_hal_grow_count());
+}
+
+static void without_a_covers_file_nothing_grows(void)
+{
+    fake_hal_reset();
+    card_files_fit_covers(3000);
+    CHECK_EQUAL(0, fake_hal_grow_count());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -186,6 +248,11 @@ int main(void)
         TEST_CASE(toggling_an_album_adds_it_and_saves),
         TEST_CASE(favorites_are_loaded_again),
         TEST_CASE(an_empty_favorites_list_answers_without_reading_the_library),
+        TEST_CASE(the_covers_file_is_sized_with_room_to_spare),
+        TEST_CASE(a_covers_file_that_fits_the_albums_is_left_alone),
+        TEST_CASE(a_covers_file_grows_for_more_albums),
+        TEST_CASE(a_card_without_room_to_spare_gets_room_for_just_the_albums),
+        TEST_CASE(without_a_covers_file_nothing_grows),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
