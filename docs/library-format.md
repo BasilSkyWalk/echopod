@@ -42,7 +42,7 @@ Each section directory entry is `u32 offset`, `u32 count`, `u16 record size`, `u
 
 Field notes:
 - `u32` string fields hold an offset into the strings section.
-- Track `path` is relative to the music root and uses `/`. Every string is Unicode NFC (composed). FAT cards store names in NFC, but macOS lists them decomposed (NFD), so the indexer recomposes paths, playlist names, playlist entries and tags. The device then matches paths against the card's names without any Unicode tables. Track `artist` indexes the artists section, and `genre` indexes genres.
+- Track `path` is relative to the music root and uses `/`. A track on the player's internal storage (Settings → Internal storage) has a path under `:internal/`, a top-level folder no FAT or exFAT card can hold (`:` isn't allowed in names): `:internal/Artist/Album/01.flac` is `Artist/Album/01.flac` on internal storage. The folder is sorted among the root's names by its bytes like any other, and its folder record is named `:internal` (the player shows it as "Internal storage"). A library without internal storage has no such paths. Every string is Unicode NFC (composed). FAT cards store names in NFC, but macOS lists them decomposed (NFD), so the indexer recomposes paths, playlist names, playlist entries and tags. The device then matches paths against the card's names without any Unicode tables. Track `artist` indexes the artists section, and `genre` indexes genres.
 - An album's tracks are `tracks[first_track .. first_track + track_count)`. Album `cover` is reserved and always `0xFFFF`. Covers live in their own file, keyed by album key (see Covers file).
 - A group's albums are `links[first_link .. first_link + link_count)`. Artists list every album containing at least one of their tracks. Artist and album-artist albums are ordered by year, then title; genre albums are ordered by title. Within each section the groups' links are consecutive and in group order (group `n + 1` starts where group `n` ends). Cover Flow relies on this for album artists to read its order straight from `links`; a file that breaks it gets Cover Flow in album order instead.
 - A playlist's links are track indices in playlist order. Its name is the file name without `.m3u` or `.m3u8`.
@@ -50,7 +50,7 @@ Field notes:
 
 ## Spoken word
 
-A track is spoken word when its first folder is `Audiobooks`, `Audiobook`, `Podcasts` or `Podcast` (ASCII case-insensitive; `library/spoken_path`, `spoken_of` in the indexer). Spoken word is kept out of the Music lists and lives on the Audiobooks and Podcasts shelves, which browse its folders.
+A track is spoken word when its first folder is `Audiobooks`, `Audiobook`, `Podcasts` or `Podcast` (ASCII case-insensitive; `library/spoken_path`, `spoken_of` in the indexer). Tracks on internal storage have `:internal` as their first folder, so they are always music. Spoken word is kept out of the Music lists and lives on the Audiobooks and Podcasts shelves, which browse its folders.
 
 Every sort and grouping key of a spoken track starts with a spoken flag that sorts after music, so spoken word never shares an album, artist, album artist or genre with music: an author with music too appears twice, once among the music groups and once among the spoken ones. Each of those sections and the title order therefore hold their music entries first, then the spoken ones, and the header's music count says where the music ends. Tracks follow album order, so spoken tracks come last too. The Music lists (Cover Flow, Albums, Artists, Album Artists, Genres, Songs, shuffle) only read the first `music count` entries; folders and playlists show everything. Covers are built for every album, spoken ones included.
 
@@ -99,7 +99,7 @@ On the device, `track_tags_read` reads through a `ByteSource` with small bounded
 | title | file name without its number prefix |
 | artist | album artist, then "Unknown Artist" |
 | album artist | artist, then shared per album (below) |
-| album | folder name |
+| album | folder name (not for the card root or the `:internal` folder: "Unknown Album") |
 | genre | "Unknown Genre" |
 | disc and number | `<disc>-<track> - ` or `<track> - ` file-name prefixes, otherwise disc 1, track 0 |
 | year | first four digits of `date`, otherwise 0 |

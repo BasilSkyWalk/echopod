@@ -42,13 +42,14 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
 - Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
 - EchoPod keeps its own files in a hidden `/.echo` folder on the card, about 110 MB of them. Don't delete it unless you want the library rebuilt.
+- Music can also go on the player's internal storage (the drive called ECHO MINI, about 8 GB on the 8 GB model): turn on Settings → **Internal storage** (it's off at first). The library then holds the music of both: albums, artists, genres, songs and playlists mix the two, and under Folders the internal storage is one more folder, **Internal storage**, next to the card's own folders. An SD card is still needed, because the library and EchoPod's other files stay in `/.echo` on the card; the player never writes to internal storage. Turning the setting on or off rebuilds the library. Audiobooks and podcasts on internal storage play as music: the Audiobooks and Podcasts shelves only read the card's top-level `Audiobooks` and `Podcasts` folders.
 
 ## Copying music over USB
 
 1. Connect the player. Two drives appear: internal storage and the SD card.
-2. Copy music to the SD card.
+2. Copy music to the SD card (or to internal storage, with Settings → Internal storage on).
 3. **Eject both drives before you unplug.** If you unplug first, recent changes may be lost, and the player warns you.
-4. When music changed, the player rebuilds its library by itself. Copying other files doesn't trigger a rebuild. Settings → Rescan library rebuilds it on demand.
+4. When music changed, the player rebuilds its library by itself (on internal storage too when Settings → Internal storage is on). Copying other files doesn't trigger a rebuild. Settings → Rescan library rebuilds it on demand.
 
 During a long copy the screen goes dark after 30 seconds; any button lights it again. If the drives disappear from the computer on their own while the cable stays in, the player connects again by itself (without asking Storage or DAC) and the computer may warn that a drive was removed without ejecting. Afterwards, Home → Diagnostics → **USB errors** shows what happened in the last session, or *None*:
 
@@ -110,6 +111,8 @@ From a command prompt, `echo-sync-windows-x64.exe E:` does the same without aski
 
 It reads the whole card, as the player does, and writes `library.db`, `covers.bin` and `scan.bin` into the card's `/.echo` folder. If the player has never used the card, it asks before creating `/.echo` (`--yes` creates it without asking). Files the player made are overwritten in place and keep their size; missing ones are made at the player's sizes (4 MB, 80 MB and 4 KB). It then prints what it found, for example "1,402 tracks, 120 albums, 3 playlists" and "115 covers, 5 without art".
 
+**Internal storage.** With Settings → Internal storage on, the player's library also holds the music on internal storage. echo-sync reads that setting from the card (`/.echo/settings.bin`). Give it the internal storage drive too, the other drive that shows up while the player is connected: `echo-sync-windows-x64.exe E: --internal F:` (on a Mac, for example `--internal "/Volumes/ECHO MINI"`). When it asks for the card instead, it asks for the internal storage drive next (Enter leaves it out). Without that drive it builds the library from the card only, says so, and the player rescans after the sync. With the setting off, `--internal` is ignored.
+
 **Why the player doesn't rescan.** After a USB session the player checks for changes: it compares the names, sizes and modification times of the music, playlists and cover images on the card with a fingerprint it keeps in `scan.bin`. The computer writes the same fingerprint, so the check finds nothing new and the player keeps the computer's library. With a card reader there's no USB session, so the player uses the new library straight away.
 
 **When the player rescans anyway.** If the fingerprints differ, the player rescans as it would without the computer, and nothing is lost. That happens when:
@@ -130,6 +133,7 @@ To see whether it works on your card, let the player scan it once, then run echo
 | `--no-covers` | Build the library only; `covers.bin` stays as it is, so new albums show without covers until the next rescan on the player |
 | `--covers-only` | Rebuild `covers.bin` from the card's `library.db` |
 | `--no-fingerprint` | Leave `scan.bin` alone, so the player compares the music with its own last scan |
+| `--internal DRIVE` | The player's internal storage drive, for when Settings → Internal storage is on (see above) |
 | `--no-clock` | Don't write `clock.bin`, so the player keeps its own time (see Clock below) |
 | `--check` | Only compare the computer's fingerprint with the player's |
 | `--yes` | Create `/.echo` without asking |
@@ -154,7 +158,7 @@ Settings → **Volume buttons** changes what the rocker does on Now Playing and 
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
-More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), **Cover Flow** shows 5 covers (the centre one and two each side) or 3 (one each side), **Animations** makes screen slides and Cover Flow scrolling Slower (1.5× as long) or Faster (0.6×), **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones), **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC), **Theme** switches between Dark and Light (light menus, lists and Now Playing with dark text; Cover Flow and the cover panel on Home stay dark, and the accent color works in both), **Lyrics** shows or hides lyrics on Now Playing (see Lyrics below), and **Folders & playlists** → Cover Flow opens a playlist as a Cover Flow of its albums and a folder of folders as a Cover Flow of those folders (below). The start screen can also be Album Artists, Genres, Folders or All Songs. **Clock** shows the time in the status bar and **Date & time** sets it (see Clock below). **Portrait status bar** → Large makes the status bar's icons and text bigger when the screen is in portrait (it has no effect in landscape).
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), **Cover Flow** shows 5 covers (the centre one and two each side) or 3 (one each side), **Animations** makes screen slides and Cover Flow scrolling Slower (1.5× as long) or Faster (0.6×), **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones), **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC), **Theme** switches between Dark and Light (light menus, lists and Now Playing with dark text; Cover Flow and the cover panel on Home stay dark, and the accent color works in both), **Lyrics** shows or hides lyrics on Now Playing (see Lyrics below), **Folders & playlists** → Cover Flow opens a playlist as a Cover Flow of its albums and a folder of folders as a Cover Flow of those folders (below), and **Internal storage** adds the music on the player's internal storage to the library (see Your music). The start screen can also be Album Artists, Genres, Folders or All Songs. **Clock** shows the time in the status bar and **Date & time** sets it (see Clock below). **Portrait status bar** → Large makes the status bar's icons and text bigger when the screen is in portrait (it has no effect in landscape).
 
 ## Lyrics
 

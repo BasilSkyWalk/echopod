@@ -64,8 +64,13 @@ typedef enum SourceKind {
     SOURCE_UNKNOWN
 } SourceKind;
 
+typedef struct FlacMemory {
+    FlacDecoder decoder;
+    FlacBlockBuffer block;
+} FlacMemory;
+
 static union {
-    FlacDecoder flac;
+    FlacMemory flac;
     WavBuffers wav;
 } decoding __attribute__((section(".high_ram")));
 static uint32_t music_ring[RING_WORDS];
@@ -261,6 +266,7 @@ static bool open_chosen(void *context, const char *path, uint32_t start_ms, Audi
         return false;
     }
     if (source_kind == SOURCE_FLAC) {
+        flac_use_block_buffer(&decoding.flac.decoder, &decoding.flac.block);
         using_core1 = board_core1_start_stream(CORE1_PROGRAM_FLAC);
     }
     if (source_kind != SOURCE_FLAC && source_kind != SOURCE_WAV) {
@@ -311,8 +317,9 @@ static void ensure_engine(void)
         return;
     }
     FlacFileOpener files = {.open = open_file, .close = close_file, .context = NULL};
-    flac_source_init(&software_source, files, &decoding.flac);
-    core1_source_init(&core1_source, core1_region(), files, &decoding.flac, FILL_BUDGET_BYTES);
+    flac_source_init(&software_source, files, &decoding.flac.decoder);
+    core1_source_init(&core1_source, core1_region(), files, &decoding.flac.decoder,
+                      FILL_BUDGET_BYTES);
     core1_source_set_wake(&core1_source, signal_core1);
     wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};

@@ -11,7 +11,9 @@
 enum {
     STREAM_SLOTS = 2,
     STREAM_SLOT_EMPTY = 0,
-    STREAM_SLOT_FULL = 1
+    STREAM_SLOT_FULL = 1,
+    STREAM_SLOT_SAMPLES = 4608,
+    STREAM_SAMPLE_WORDS = STREAM_SLOTS * FLAC_MAX_CHANNELS * STREAM_SLOT_SAMPLES
 };
 
 enum {
@@ -49,6 +51,8 @@ typedef struct StreamControl {
     uint32_t load_percent;
     uint32_t ring_bytes;
     uint32_t sleep_allowed;
+    uint32_t slot_offset;
+    uint32_t slot_samples;
     StreamSlot slots[STREAM_SLOTS];
 } StreamControl;
 
@@ -60,7 +64,7 @@ typedef struct Core1EqualizerShare {
 
 typedef struct StreamRegion {
     volatile StreamControl *control;
-    int32_t (*samples)[FLAC_MAX_CHANNELS][FLAC_MAX_BLOCK];
+    int32_t *samples;
     volatile uint8_t *ring;
     uint32_t ring_bytes;
 } StreamRegion;
@@ -88,12 +92,18 @@ typedef struct Core1Decoder {
     void *context;
 } Core1Decoder;
 
+typedef struct Core1FlacBanks {
+    int32_t *first;
+    int32_t *second;
+} Core1FlacBanks;
+
 typedef struct Core1Flac {
     FlacDecoder *decoder;
+    Core1FlacBanks banks;
     const bool *starved;
 } Core1Flac;
 
-Core1Decoder core1_flac_decoder(Core1Flac *flac, FlacDecoder *decoder);
+Core1Decoder core1_flac_decoder(Core1Flac *flac, FlacDecoder *decoder, Core1FlacBanks banks);
 
 typedef struct Core1Stream {
     StreamRegion region;
@@ -105,6 +115,10 @@ typedef struct Core1Stream {
     uint32_t start_offset;
     uint32_t end_offset;
     uint32_t slot;
+    uint32_t slot_offset;
+    uint32_t slot_samples;
+    Core1Block pending;
+    uint32_t emitted;
     uint32_t (*ticks)(void);
     uint32_t tick_mask;
     uint32_t load_window;
@@ -121,6 +135,7 @@ typedef struct Core1Stream {
 
 void core1_stream_init(Core1Stream *stream, StreamRegion region, Core1Decoder decoder);
 void core1_stream_set_decoder(Core1Stream *stream, uint32_t codec, Core1Decoder decoder);
+void core1_stream_set_slots(Core1Stream *stream, uint32_t offset, uint32_t samples);
 void core1_stream_set_clock(Core1Stream *stream, uint32_t (*ticks)(void), uint32_t mask,
                             uint32_t window);
 void core1_stream_set_equalizer(Core1Stream *stream, Equalizer *equalizer,

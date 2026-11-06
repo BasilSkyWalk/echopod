@@ -27,6 +27,7 @@ static void no_arguments_give_a_windowed_run_at_default_scale(void)
     CHECK(options.key_script == NULL);
     CHECK(options.card_directory == NULL);
     CHECK(options.system_directory == NULL);
+    CHECK(options.internal_directory == NULL);
     CHECK_EQUAL(SIM_DEFAULT_BATTERY_PERCENT, options.battery_percent);
     CHECK(!options.battery_charging);
 }
@@ -61,11 +62,12 @@ static void a_battery_level_above_full_is_rejected(void)
 
 static void storage_directories_are_read(void)
 {
-    char *given[] = {"--card", "/music", "--system-dir", "/tmp/echo"};
+    char *given[] = {"--card", "/music", "--system-dir", "/tmp/echo", "--internal", "/flash"};
     SimOptions options;
-    CHECK(parse(given, 4, &options));
+    CHECK(parse(given, 6, &options));
     CHECK(options.card_directory == given[1]);
     CHECK(options.system_directory == given[3]);
+    CHECK(options.internal_directory == given[5]);
 }
 
 static void a_key_script_is_read(void)

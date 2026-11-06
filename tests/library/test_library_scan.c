@@ -189,6 +189,33 @@ static void scanning_folders_and_playlists_matches_the_pc_indexer(void)
     free(expected);
 }
 
+static void internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer(void)
+{
+    static uint8_t memory[MEMORY_SIZE];
+    static HostFiles files;
+    static Output output;
+    sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
+    sim_storage_configure_internal(ECHO_FIXTURE_DIR "/tags");
+    hal_storage_show_internal(true);
+    output.length = 0;
+    ScanJob job = {
+        .files = {open_dir, next_entry, close_dir, open_file, close_file, &files},
+        .memory = memory,
+        .size = sizeof memory,
+        .scratch = SCRATCH,
+        .sink = {write_output, &output},
+    };
+    ScanStats stats;
+    ScanResult result = library_scan(&job, &stats);
+    hal_storage_show_internal(false);
+    CHECK_EQUAL(SCAN_OK, result);
+    CHECK_EQUAL(21u, stats.tracks);
+    uint32_t expected_size = 0;
+    uint8_t *expected = read_fixture("two_drives.db", &expected_size);
+    CHECK(library_compare(expected, expected_size, output.bytes, stats.length));
+    free(expected);
+}
+
 static void a_separate_listing_leaves_the_memory_to_the_builder(void)
 {
     static uint8_t memory[128 * 1024];
@@ -472,6 +499,7 @@ int main(void)
         TEST_CASE(scanning_the_tag_fixtures_matches_the_pc_indexer),
         TEST_CASE(scanning_folders_and_playlists_matches_the_pc_indexer),
         TEST_CASE(a_missing_music_root_says_so),
+        TEST_CASE(internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer),
         TEST_CASE(a_separate_listing_leaves_the_memory_to_the_builder),
         TEST_CASE(a_folder_bigger_than_the_listing_is_read_in_batches),
         TEST_CASE(many_sibling_folders_fit_a_small_listing),

@@ -29,12 +29,23 @@ static uint32_t smaller(uint32_t a, uint32_t b)
     return a < b ? a : b;
 }
 
+static void use_banks(Core1Flac *flac, uint32_t max_block)
+{
+    uint32_t half = FLAC_MAX_BLOCK / 2;
+    if (max_block > 0 && max_block <= half) {
+        flac_set_buffers(flac->decoder, flac->banks.second, flac->banks.second + half, half);
+    } else {
+        flac_set_buffers(flac->decoder, flac->banks.first, flac->banks.second, FLAC_MAX_BLOCK);
+    }
+}
+
 static void start_flac(void *context, FlacInput input, FlacInfo info, uint32_t first_sample,
                        const bool *starved)
 {
     Core1Flac *flac = context;
     (void)first_sample;
     flac->starved = starved;
+    use_banks(flac, info.max_block);
     flac_start(flac->decoder, input, info);
 }
 
@@ -64,17 +75,37 @@ static Core1DecodeResult decode_flac(void *context, Core1Block *block)
     return CORE1_DECODED;
 }
 
-Core1Decoder core1_flac_decoder(Core1Flac *flac, FlacDecoder *decoder)
+Core1Decoder core1_flac_decoder(Core1Flac *flac, FlacDecoder *decoder, Core1FlacBanks banks)
 {
-    *flac = (Core1Flac){.decoder = decoder, .starved = NULL};
+    *flac = (Core1Flac){.decoder = decoder, .banks = banks, .starved = NULL};
     return (Core1Decoder){start_flac, decode_flac, flac};
 }
 
 void core1_stream_init(Core1Stream *stream, StreamRegion region, Core1Decoder decoder)
 {
-    *stream =
-        (Core1Stream){.region = region, .ring_capacity = region.ring_bytes, .decoder = decoder};
+    *stream = (Core1Stream){.region = region,
+                            .ring_capacity = region.ring_bytes,
+                            .decoder = decoder,
+                            .slot_samples = STREAM_SLOT_SAMPLES};
     stream->decoders[STREAM_CODEC_NATIVE] = decoder;
+}
+
+void core1_stream_set_slots(Core1Stream *stream, uint32_t offset, uint32_t samples)
+{
+    stream->slot_offset = offset;
+    stream->slot_samples = samples;
+}
+
+static int32_t *slot_row(int32_t *samples, uint32_t offset, uint32_t stride, uint32_t slot,
+                         uint32_t channel)
+{
+    return samples + offset + (slot * FLAC_MAX_CHANNELS + channel) * stride;
+}
+
+static int32_t *stream_row(const Core1Stream *stream, uint32_t slot, uint32_t channel)
+{
+    return slot_row(stream->region.samples, stream->slot_offset, stream->slot_samples, slot,
+                    channel);
 }
 
 void core1_stream_set_clock(Core1Stream *stream, uint32_t (*ticks)(void), uint32_t mask,
@@ -147,8 +178,8 @@ static uint32_t equalize_slot(Core1Stream *stream, uint32_t slot, uint32_t sampl
     if (!equalizer_active(stream->equalizer) || bits == 0 || bits > EQUALIZED_BITS) {
         return 0;
     }
-    int32_t *left = stream->region.samples[slot][0];
-    int32_t *right = stream->channels > 1 ? stream->region.samples[slot][1] : NULL;
+    int32_t *left = stream_row(stream, slot, 0);
+    int32_t *right = stream->channels > 1 ? stream_row(stream, slot, 1) : NULL;
     widen(left, samples, EQUALIZED_BITS - bits);
     if (right != NULL) {
         widen(right, samples, EQUALIZED_BITS - bits);
@@ -215,8 +246,12 @@ static void adopt(Core1Stream *stream, uint32_t generation)
     stream->channels =
         control->channels < FLAC_MAX_CHANNELS ? control->channels : FLAC_MAX_CHANNELS;
     stream->slot = 0;
+    stream->pending = (Core1Block){0};
+    stream->emitted = 0;
     stream->finished = false;
     stream->starved = false;
+    control->slot_offset = stream->slot_offset;
+    control->slot_samples = stream->slot_samples;
     if (stream->equalizer != NULL) {
         equalizer_set_rate(stream->equalizer, info.sample_rate);
     }
@@ -233,43 +268,59 @@ static void adopt(Core1Stream *stream, uint32_t generation)
     control->acked_generation = generation;
 }
 
-static void copy_channels(Core1Stream *stream, uint32_t slot, const Core1Block *block)
+static void copy_channels(Core1Stream *stream, uint32_t slot, uint32_t samples)
 {
+    const Core1Block *block = &stream->pending;
     uint32_t stride = block->stride > 0 ? block->stride : 1;
+    uint32_t first = stream->emitted * stride;
     for (uint32_t channel = 0; channel < stream->channels; channel++) {
         const int32_t *from = block->channels[channel];
         const int16_t *narrow = block->narrow[channel];
-        int32_t *to = stream->region.samples[slot][channel];
-        for (uint32_t index = 0; index < block->samples; index++) {
-            to[index] = narrow != NULL ? narrow[index * stride] : from[index * stride];
+        int32_t *to = stream_row(stream, slot, channel);
+        for (uint32_t index = 0; index < samples; index++) {
+            uint32_t at = first + index * stride;
+            to[index] = narrow != NULL ? narrow[at] : from[at];
         }
     }
 }
 
-static void fill_slot(Core1Stream *stream, Core1DecodeResult result, const Core1Block *block)
+static void hand_over(Core1Stream *stream, uint32_t outcome)
 {
-    volatile StreamControl *control = stream->region.control;
-    volatile StreamSlot *slot = &control->slots[stream->slot];
-    uint32_t outcome = AUDIO_FRAME_ERROR;
-    if (result == CORE1_DECODED) {
-        copy_channels(stream, stream->slot, block);
-        slot->equalized = equalize_slot(stream, stream->slot, block->samples);
-        slot->first_sample = block->first_sample;
-        slot->samples = block->samples;
-        control->released = stream->start_offset + block->position;
-        outcome = AUDIO_FRAME_READY;
-    } else {
-        slot->first_sample = 0;
-        slot->samples = 0;
-        slot->equalized = 0;
-        outcome = result == CORE1_FINISHED ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
-        stream->finished = true;
-    }
+    volatile StreamSlot *slot = &stream->region.control->slots[stream->slot];
     slot->generation = stream->generation;
     slot->result = outcome;
     publish();
     slot->state = STREAM_SLOT_FULL;
     stream->slot = (stream->slot + 1) % STREAM_SLOTS;
+}
+
+static void emit_piece(Core1Stream *stream)
+{
+    volatile StreamSlot *slot = &stream->region.control->slots[stream->slot];
+    uint32_t samples = smaller(stream->pending.samples - stream->emitted, stream->slot_samples);
+    copy_channels(stream, stream->slot, samples);
+    slot->equalized = equalize_slot(stream, stream->slot, samples);
+    slot->first_sample = stream->pending.first_sample + stream->emitted;
+    slot->samples = samples;
+    stream->emitted += samples;
+    hand_over(stream, AUDIO_FRAME_READY);
+}
+
+static void fill_slot(Core1Stream *stream, Core1DecodeResult result, const Core1Block *block)
+{
+    if (result == CORE1_DECODED) {
+        stream->pending = *block;
+        stream->emitted = 0;
+        stream->region.control->released = stream->start_offset + block->position;
+        emit_piece(stream);
+        return;
+    }
+    volatile StreamSlot *slot = &stream->region.control->slots[stream->slot];
+    slot->first_sample = 0;
+    slot->samples = 0;
+    slot->equalized = 0;
+    stream->finished = true;
+    hand_over(stream, result == CORE1_FINISHED ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR);
 }
 
 bool core1_stream_step(Core1Stream *stream)
@@ -290,6 +341,12 @@ bool core1_stream_step(Core1Stream *stream)
     }
     if (control->slots[stream->slot].state != STREAM_SLOT_EMPTY) {
         return false;
+    }
+    if (stream->emitted < stream->pending.samples) {
+        uint32_t began = tick_now(stream);
+        emit_piece(stream);
+        stream->busy_ticks += (tick_now(stream) - began) & stream->tick_mask;
+        return true;
     }
     stream->starved = false;
     Core1Block block = {0};
@@ -462,6 +519,18 @@ static void advance_slot(Core1Source *source)
     wake_core1(source);
 }
 
+static int32_t *source_row(const Core1Source *source, uint32_t samples, uint32_t channel)
+{
+    volatile StreamControl *control = source->region.control;
+    uint32_t offset = control->slot_offset;
+    uint32_t stride = control->slot_samples;
+    if (stride == 0 || samples > stride || offset > STREAM_SAMPLE_WORDS ||
+        stride > (STREAM_SAMPLE_WORDS - offset) / (STREAM_SLOTS * FLAC_MAX_CHANNELS)) {
+        return NULL;
+    }
+    return slot_row(source->region.samples, offset, stride, source->slot, channel);
+}
+
 static AudioFrameResult next_frame(void *context, AudioFrame *frame)
 {
     Core1Source *source = context;
@@ -491,10 +560,14 @@ static AudioFrameResult next_frame(void *context, AudioFrame *frame)
             continue;
         }
         uint32_t skip = from - first;
-        int32_t (*channels)[FLAC_MAX_BLOCK] = source->region.samples[source->slot];
+        int32_t *left = source_row(source, slot->samples, 0);
+        int32_t *right = source->channels > 1 ? source_row(source, slot->samples, 1) : left;
+        if (left == NULL || right == NULL) {
+            return AUDIO_FRAME_ERROR;
+        }
         *frame = (AudioFrame){
-            .left = channels[0] + skip,
-            .right = channels[source->channels > 1 ? 1 : 0] + skip,
+            .left = left + skip,
+            .right = right + skip,
             .first_sample = from - source->lead_trim,
             .samples = end - from,
             .bits = slot->equalized != 0 ? EQUALIZED_BITS : source->bits_per_sample,

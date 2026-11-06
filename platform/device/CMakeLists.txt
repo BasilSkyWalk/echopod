@@ -203,6 +203,7 @@ set(ECHO_OVERLAY_IMPORTS
     usb_silence_audio
     usb_vbus_present
     utf8_next
+    volume_is_internal_name
 )
 set(ECHO_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/echo_device.ld)
 set_target_properties(echo_device PROPERTIES

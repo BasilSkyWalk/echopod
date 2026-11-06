@@ -4,6 +4,7 @@
 
 #include "check.h"
 #include "codec/flac.h"
+#include "flac_writer.h"
 
 typedef struct Buffer {
     uint8_t *bytes;
@@ -11,6 +12,8 @@ typedef struct Buffer {
 } Buffer;
 
 static FlacDecoder decoder;
+static int32_t first_bank[FLAC_MAX_BLOCK];
+static int32_t second_bank[FLAC_MAX_BLOCK];
 
 static Buffer load(const char *name, const char *extension)
 {
@@ -57,10 +60,8 @@ static int32_t expected_at(const Buffer *pcm, uint32_t index)
     return value;
 }
 
-static bool decodes_exactly(const char *name, uint32_t rate, int channels, int bits)
+static bool decodes_buffers_exactly(Buffer flac, Buffer pcm, uint32_t rate, int channels, int bits)
 {
-    Buffer flac = load(name, "flac");
-    Buffer pcm = load(name, "pcm");
     bool ok = flac.size > 0 && pcm.size > 0 && flac_open(&decoder, input_of(&flac)) == FLAC_OK;
     ok = ok && decoder.info.sample_rate == rate && decoder.info.channels == channels &&
          decoder.info.bits_per_sample == bits &&
@@ -77,9 +78,27 @@ static bool decodes_exactly(const char *name, uint32_t rate, int channels, int b
         }
         frame += decoder.block_samples;
     }
-    ok = ok && result == FLAC_END && frame == decoder.info.total_samples;
+    return ok && result == FLAC_END && frame == decoder.info.total_samples;
+}
+
+static bool decodes_exactly(const char *name, uint32_t rate, int channels, int bits)
+{
+    Buffer flac = load(name, "flac");
+    Buffer pcm = load(name, "pcm");
+    bool ok = decodes_buffers_exactly(flac, pcm, rate, channels, bits);
     free(flac.bytes);
     free(pcm.bytes);
+    return ok;
+}
+
+static bool made_file_decodes_exactly(FlacWriterSpec spec)
+{
+    FlacWriterOutput made = flac_writer_make(spec);
+    Buffer flac = {made.bytes, made.size};
+    Buffer pcm = {(uint8_t *)made.samples, made.sample_bytes};
+    bool ok =
+        decodes_buffers_exactly(flac, pcm, spec.sample_rate, (int)spec.channels, (int)spec.bits);
+    flac_writer_free(&made);
     return ok;
 }
 
@@ -176,12 +195,53 @@ static void independent_channels_decode_exactly(void)
     CHECK(decodes_exactly("independent_16", 22050, 2, 16));
 }
 
-static void blocks_larger_than_the_buffer_are_refused(void)
+static void blocks_of_8192_samples_decode_exactly(void)
+{
+    CHECK(decodes_exactly("big_blocks_16", 44100, 2, 16));
+}
+
+static void blocks_of_16384_samples_decode_exactly(void)
+{
+    CHECK(made_file_decodes_exactly((FlacWriterSpec){192000, 2, 24, 16384, 40000, 7}));
+    CHECK(made_file_decodes_exactly((FlacWriterSpec){176400, 1, 16, 16384, 20000, 9}));
+    CHECK(made_file_decodes_exactly((FlacWriterSpec){96000, 2, 16, 10000, 25000, 11}));
+}
+
+static void a_frame_larger_than_the_buffer_is_an_error(void)
 {
     Buffer flac = load("big_blocks_16", "flac");
-    CHECK(flac.size > 0);
-    CHECK_EQUAL(FLAC_UNSUPPORTED, flac_open(&decoder, input_of(&flac)));
+    FlacBlockBuffer small;
+    flac_use_block_buffer(&decoder, &small);
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(FLAC_ERROR, flac_decode_frame(&decoder));
+    flac_set_buffers(&decoder, first_bank, second_bank, FLAC_MAX_BLOCK);
     free(flac.bytes);
+}
+
+static void blocks_over_16384_samples_are_refused(void)
+{
+    FlacWriterOutput made = flac_writer_make((FlacWriterSpec){48000, 2, 16, 4096, 5000, 3});
+    made.bytes[10] = 0x80;
+    made.bytes[11] = 0x00;
+    Buffer flac = {made.bytes, made.size};
+    CHECK_EQUAL(FLAC_UNSUPPORTED, flac_open(&decoder, input_of(&flac)));
+    flac_writer_free(&made);
+}
+
+static void a_16384_sample_file_seeks_to_the_frame_that_holds_the_target(void)
+{
+    FlacWriterOutput made = flac_writer_make((FlacWriterSpec){192000, 2, 24, 16384, 70000, 5});
+    Buffer flac = {made.bytes, made.size};
+    uint32_t targets[] = {0, 16383, 16384, 40000, 69999};
+    for (size_t index = 0; index < sizeof targets / sizeof targets[0]; index++) {
+        CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+        CHECK_EQUAL(FLAC_OK, flac_seek(&decoder, targets[index]));
+        CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+        uint32_t first = decoder.frame_first_sample;
+        CHECK(first <= targets[index] && targets[index] < first + decoder.block_samples);
+        CHECK_EQUAL(made.samples[2 * first + 1], flac_channel(&decoder, 1)[0]);
+    }
+    flac_writer_free(&made);
 }
 
 static void a_file_that_is_not_flac_is_refused(void)
@@ -361,6 +421,7 @@ static void the_position_moves_from_the_audio_start_to_the_next_frame(void)
 
 int main(void)
 {
+    flac_set_buffers(&decoder, first_bank, second_bank, FLAC_MAX_BLOCK);
     static const TestCase cases[] = {
         TEST_CASE(sixteen_bit_lpc_stereo_decodes_exactly),
         TEST_CASE(an_lpc_hook_that_restores_gives_the_same_samples),
@@ -372,7 +433,11 @@ int main(void)
         TEST_CASE(wasted_bits_decode_exactly),
         TEST_CASE(odd_block_sizes_decode_exactly),
         TEST_CASE(independent_channels_decode_exactly),
-        TEST_CASE(blocks_larger_than_the_buffer_are_refused),
+        TEST_CASE(blocks_of_8192_samples_decode_exactly),
+        TEST_CASE(blocks_of_16384_samples_decode_exactly),
+        TEST_CASE(a_frame_larger_than_the_buffer_is_an_error),
+        TEST_CASE(blocks_over_16384_samples_are_refused),
+        TEST_CASE(a_16384_sample_file_seeks_to_the_frame_that_holds_the_target),
         TEST_CASE(a_file_that_is_not_flac_is_refused),
         TEST_CASE(a_truncated_file_ends_with_an_error),
         TEST_CASE(a_corrupted_frame_is_caught),

@@ -470,7 +470,7 @@ FlacResult flac_decode_frame(FlacDecoder *decoder)
         return FLAC_END;
     }
     FrameHeader header;
-    if (!read_frame_header(decoder, &header)) {
+    if (!read_frame_header(decoder, &header) || header.block_size > decoder->capacity) {
         return FLAC_ERROR;
     }
     for (uint32_t channel = 0; channel < header.channels; channel++) {
@@ -592,4 +592,16 @@ void flac_rewind(FlacDecoder *decoder, uint32_t position)
 void flac_set_lpc_hook(FlacDecoder *decoder, FlacLpcHook hook)
 {
     decoder->lpc_hook = hook;
+}
+
+void flac_set_buffers(FlacDecoder *decoder, int32_t *first, int32_t *second, uint32_t capacity)
+{
+    decoder->samples[0] = first;
+    decoder->samples[1] = second;
+    decoder->capacity = capacity;
+}
+
+void flac_use_block_buffer(FlacDecoder *decoder, FlacBlockBuffer *buffer)
+{
+    flac_set_buffers(decoder, buffer->samples[0], buffer->samples[1], FLAC_SUBSET_BLOCK);
 }

@@ -247,7 +247,8 @@ static UsbSessionEnd run(void)
 
 static bool card_changed(void)
 {
-    return msc_stats(&msc).lun_sectors_written[CARD_LUN] > 0 ||
+    MscStats stats = msc_stats(&msc);
+    return stats.lun_sectors_written[CARD_LUN] > 0 || stats.lun_sectors_written[INTERNAL_LUN] > 0 ||
            sd_health().starts != card_at_start.starts;
 }
 

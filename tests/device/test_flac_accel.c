@@ -301,6 +301,27 @@ static void the_hook_takes_only_classes_that_passed(void)
     CHECK_EQUAL(1u, hook.restored);
 }
 
+static void code_ram_needs_the_classes_that_passed_there(void)
+{
+    reset_fake();
+    static const int32_t COEFFICIENTS[8] = {300, -200, 100, -50, 25, -12, 6, -3};
+    AccelHook data_only = {.bus = &BUS,
+                           .window = fake.memory,
+                           .window_address = FLAC_ACCEL_CODE_RAM_END - 0x10000u,
+                           .narrow = true,
+                           .wide = true};
+    FlacLpcHook lpc = flac_accel_hook(&data_only);
+    CHECK(!lpc.restore(lpc.context, fake.memory, job_of(COEFFICIENTS, 8, 16, 12)));
+    AccelHook code_only = {.bus = &BUS,
+                           .window = fake.memory,
+                           .window_address = MEMORY_BASE,
+                           .code_narrow = true,
+                           .code_wide = true};
+    lpc = flac_accel_hook(&code_only);
+    CHECK(!lpc.restore(lpc.context, fake.memory, job_of(COEFFICIENTS, 8, 16, 12)));
+    CHECK_EQUAL(0, fake.jobs);
+}
+
 static void a_timeout_turns_the_hook_off(void)
 {
     reset_fake();
@@ -310,11 +331,15 @@ static void a_timeout_turns_the_hook_off(void)
                       .window = fake.memory,
                       .window_address = MEMORY_BASE,
                       .narrow = true,
-                      .wide = true};
+                      .wide = true,
+                      .code_narrow = true,
+                      .code_wide = true};
     FlacLpcHook lpc = flac_accel_hook(&hook);
     CHECK(!lpc.restore(lpc.context, fake.memory, job_of(COEFFICIENTS, 4, 16, 12)));
     CHECK(!hook.narrow);
     CHECK(!hook.wide);
+    CHECK(!hook.code_narrow);
+    CHECK(!hook.code_wide);
     CHECK_EQUAL(1u, hook.timeouts);
 }
 
@@ -344,6 +369,7 @@ int main(void)
         TEST_CASE(a_32_bit_accelerator_fails_only_the_wide_class),
         TEST_CASE(a_dead_accelerator_fails_both_and_says_it_timed_out),
         TEST_CASE(the_hook_takes_only_classes_that_passed),
+        TEST_CASE(code_ram_needs_the_classes_that_passed_there),
         TEST_CASE(a_timeout_turns_the_hook_off),
         TEST_CASE(the_timing_block_is_a_full_24_bit_order_12_block),
     };

@@ -5,7 +5,8 @@
 
 enum {
     FLAC_MAX_CHANNELS = 2,
-    FLAC_MAX_BLOCK = 4608,
+    FLAC_MAX_BLOCK = 16384,
+    FLAC_SUBSET_BLOCK = 4608,
     FLAC_MAX_BITS = 24,
     FLAC_BUFFER_BYTES = 4096
 };
@@ -68,8 +69,13 @@ typedef struct FlacDecoder {
     uint32_t block_samples;
     uint32_t frame_first_sample;
     FlacLpcHook lpc_hook;
-    int32_t samples[FLAC_MAX_CHANNELS][FLAC_MAX_BLOCK];
+    int32_t *samples[FLAC_MAX_CHANNELS];
+    uint32_t capacity;
 } FlacDecoder;
+
+typedef struct FlacBlockBuffer {
+    int32_t samples[FLAC_MAX_CHANNELS][FLAC_SUBSET_BLOCK];
+} FlacBlockBuffer;
 
 FlacResult flac_open(FlacDecoder *decoder, FlacInput input);
 FlacResult flac_read_header(FlacBits *bits, FlacInput input, FlacInfo *info,
@@ -81,3 +87,5 @@ FlacResult flac_decode_frame(FlacDecoder *decoder);
 FlacResult flac_seek(FlacDecoder *decoder, uint32_t sample);
 const int32_t *flac_channel(const FlacDecoder *decoder, int channel);
 void flac_set_lpc_hook(FlacDecoder *decoder, FlacLpcHook hook);
+void flac_set_buffers(FlacDecoder *decoder, int32_t *first, int32_t *second, uint32_t capacity);
+void flac_use_block_buffer(FlacDecoder *decoder, FlacBlockBuffer *buffer);

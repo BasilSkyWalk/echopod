@@ -1,7 +1,9 @@
 #include <stddef.h>
 
 #include "board.h"
+#include "core/volume_path.h"
 #include "device/fat.h"
+#include "emmc.h"
 #include "hal/storage.h"
 #include "hal/time.h"
 #include "sd.h"
@@ -16,6 +18,12 @@ enum {
     OPEN_DIR_CAPACITY = 16
 };
 
+enum {
+    CARD_VOLUME,
+    INTERNAL_VOLUME,
+    VOLUME_COUNT
+};
+
 typedef enum MountState {
     MOUNT_NOT_TRIED,
     MOUNT_READY,
@@ -24,22 +32,44 @@ typedef enum MountState {
 
 _Static_assert((int)HAL_NAME_CAPACITY == (int)FAT_NAME_CAPACITY, "listed names fit the HAL entry");
 
-static MountState mount_state;
-static FatVolume volume;
+static MountState mount_state[VOLUME_COUNT];
+static FatVolume volumes[VOLUME_COUNT];
 static FatFile files[OPEN_FILE_CAPACITY];
 static bool in_use[OPEN_FILE_CAPACITY];
+static uint8_t file_volume[OPEN_FILE_CAPACITY];
 static FatDirCursor dirs[OPEN_DIR_CAPACITY];
 static bool dir_in_use[OPEN_DIR_CAPACITY];
+static uint8_t dir_volume[OPEN_DIR_CAPACITY];
+static bool owes_internal[OPEN_DIR_CAPACITY];
+static bool internal_shown;
 static FatDirEntry listed;
 
-static bool mounted(void)
+static bool start_device(int which, BlockDevice *device)
 {
-    if (mount_state == MOUNT_NOT_TRIED) {
-        BlockDevice device;
-        bool ready = sd_start(&device) && fat_mount(&volume, device);
-        mount_state = ready ? MOUNT_READY : MOUNT_FAILED;
+    if (which == CARD_VOLUME) {
+        return sd_start(device);
     }
-    return mount_state == MOUNT_READY;
+    EmmcInfo info;
+    *device = (BlockDevice){emmc_volume_read, NULL, NULL};
+    return emmc_start(&info);
+}
+
+static FatVolume *mounted(int which)
+{
+    if (mount_state[which] == MOUNT_NOT_TRIED) {
+        BlockDevice device;
+        bool ready = start_device(which, &device) && fat_mount(&volumes[which], device);
+        mount_state[which] = ready ? MOUNT_READY : MOUNT_FAILED;
+    }
+    return mount_state[which] == MOUNT_READY ? &volumes[which] : NULL;
+}
+
+static FatVolume *volume_for(const char **path, int *which)
+{
+    const char *inside = volume_internal_path(*path);
+    *which = inside != NULL ? INTERNAL_VOLUME : CARD_VOLUME;
+    *path = inside != NULL ? inside : *path;
+    return mounted(*which);
 }
 
 static int free_slot(void)
@@ -64,10 +94,13 @@ bool hal_file_open(HalFile *file, const char *path)
 {
     *file = (HalFile){.handle = -1, .size = 0};
     int slot = free_slot();
-    if (slot < 0 || !mounted() || !fat_open(&volume, path, &files[slot])) {
+    int which = CARD_VOLUME;
+    FatVolume *volume = slot < 0 ? NULL : volume_for(&path, &which);
+    if (volume == NULL || !fat_open(volume, path, &files[slot])) {
         return false;
     }
     in_use[slot] = true;
+    file_volume[slot] = (uint8_t)which;
     *file = (HalFile){.handle = slot, .size = files[slot].size};
     return true;
 }
@@ -75,7 +108,8 @@ bool hal_file_open(HalFile *file, const char *path)
 bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
 {
     FatFile *open = file_of(file);
-    return open != NULL && fat_read(&volume, open, offset, buffer, length);
+    return open != NULL &&
+           fat_read(&volumes[file_volume[file.handle]], open, offset, buffer, length);
 }
 
 void hal_file_close(HalFile *file)
@@ -89,11 +123,12 @@ void hal_file_close(HalFile *file)
 bool hal_file_write(const char *path, const void *bytes, uint32_t length)
 {
     FatFile file;
-    if (!mounted() || !fat_open(&volume, path, &file)) {
+    FatVolume *volume = mounted(CARD_VOLUME);
+    if (volume == NULL || !fat_open(volume, path, &file)) {
         return false;
     }
     board_start_record_step(HAL_START_STEP_CARD_WRITE);
-    bool written = fat_write(&volume, &file, 0, bytes, length);
+    bool written = fat_write(volume, &file, 0, bytes, length);
     board_start_record_step_done();
     return written;
 }
@@ -101,11 +136,12 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length)
 bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)
 {
     FatFile file;
-    if (!mounted() || !fat_open(&volume, path, &file)) {
+    FatVolume *volume = mounted(CARD_VOLUME);
+    if (volume == NULL || !fat_open(volume, path, &file)) {
         return false;
     }
     board_start_record_step(HAL_START_STEP_CARD_WRITE);
-    bool written = fat_write(&volume, &file, offset, bytes, length);
+    bool written = fat_write(volume, &file, offset, bytes, length);
     board_start_record_step_done();
     return written;
 }
@@ -152,16 +188,17 @@ static void stamp_from_clock(void)
 static HalReserveResult change_card(FatReserveResult (*change)(FatVolume *, const char *, uint32_t),
                                     const char *path, uint32_t size)
 {
-    if (!mounted()) {
+    FatVolume *volume = mounted(CARD_VOLUME);
+    if (volume == NULL) {
         return HAL_RESERVE_FAILED;
     }
     stamp_from_clock();
-    card_device = volume.device;
-    volume.device.read = read_and_beat;
+    card_device = volume->device;
+    volume->device.read = read_and_beat;
     board_start_record_step(HAL_START_STEP_CARD_WRITE);
-    FatReserveResult result = change(&volume, path, size);
+    FatReserveResult result = change(volume, path, size);
     board_start_record_step_done();
-    volume.device = card_device;
+    volume->device = card_device;
     return reserve_result(result);
 }
 
@@ -177,7 +214,8 @@ HalReserveResult hal_file_grow(const char *path, uint32_t size)
 
 void storage_reset(void)
 {
-    mount_state = MOUNT_NOT_TRIED;
+    mount_state[CARD_VOLUME] = MOUNT_NOT_TRIED;
+    mount_state[INTERNAL_VOLUME] = MOUNT_NOT_TRIED;
     for (int slot = 0; slot < OPEN_FILE_CAPACITY; slot++) {
         in_use[slot] = false;
     }
@@ -196,22 +234,52 @@ static int free_dir_slot(void)
     return -1;
 }
 
+void hal_storage_show_internal(bool shown)
+{
+    internal_shown = shown;
+}
+
 bool hal_dir_open(HalDir *dir, const char *path)
 {
     dir->handle = -1;
     int slot = free_dir_slot();
-    if (slot < 0 || !mounted() || !fat_open_directory(&volume, path, &dirs[slot])) {
+    int which = CARD_VOLUME;
+    FatVolume *volume = slot < 0 ? NULL : volume_for(&path, &which);
+    if (volume == NULL || !fat_open_directory(volume, path, &dirs[slot])) {
         return false;
     }
     dir_in_use[slot] = true;
+    dir_volume[slot] = (uint8_t)which;
+    owes_internal[slot] =
+        internal_shown && which == CARD_VOLUME && path[0] == '/' && path[1] == '\0';
     dir->handle = slot;
+    return true;
+}
+
+static bool list_internal_folder(int slot)
+{
+    if (!owes_internal[slot]) {
+        return false;
+    }
+    owes_internal[slot] = false;
+    if (mounted(INTERNAL_VOLUME) == NULL) {
+        return false;
+    }
+    listed.file.directory = true;
+    listed.hidden = false;
+    listed.modified = 0;
+    for (size_t index = 0; index <= VOLUME_INTERNAL_NAME_LENGTH; index++) {
+        listed.name[index] = VOLUME_INTERNAL_NAME[index];
+    }
     return true;
 }
 
 bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
 {
-    if (dir->handle < 0 || dir->handle >= OPEN_DIR_CAPACITY || !dir_in_use[dir->handle] ||
-        !fat_next_entry(&volume, &dirs[dir->handle], &listed)) {
+    int slot = dir->handle;
+    if (slot < 0 || slot >= OPEN_DIR_CAPACITY || !dir_in_use[slot] ||
+        (!fat_next_entry(&volumes[dir_volume[slot]], &dirs[slot], &listed) &&
+         !list_internal_folder(slot))) {
         return false;
     }
     entry->directory = listed.file.directory;
