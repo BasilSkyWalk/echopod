@@ -520,6 +520,34 @@ class OverlayTest(unittest.TestCase):
             make_image.overlay_from_elf(elf, zeroed=True)
 
 
+def symbol_elf(symbols):
+    names = bytearray(1)
+    table = bytes(16)
+    for name, binding, kind, index in symbols:
+        table += struct.pack("<IIIBBH", len(names), 0x0307A000, 4, binding << 4 | kind, 0, index)
+        names += name.encode() + bytes(1)
+    return elf_file([(".symtab", 2, 0, 0, table, len(table)),
+                     (".strtab", SHT_STRTAB, 0, 0, bytes(names), len(names))])
+
+
+class OverlayCopiesTest(unittest.TestCase):
+    MAIN = [("hash_update", 0, 2, 1), ("i18n_text.isra.0", 0, 2, 1), ("app_step", 1, 2, 1)]
+
+    def test_an_overlay_copy_of_a_main_function_is_found_even_when_lto_renamed_it(self):
+        overlay = [("hash_update", 1, 2, 1), ("i18n_text", 1, 2, 1), ("msc_init", 1, 2, 1)]
+        copies = make_image.overlay_copies(symbol_elf(self.MAIN), symbol_elf(overlay))
+        self.assertEqual(["hash_update", "i18n_text"], copies)
+
+    def test_symbols_taken_from_the_main_program_and_local_names_are_not_copies(self):
+        overlay = [("app_step", 1, 2, 0xFFF1), ("hash_update", 0, 2, 1), ("app_step", 1, 2, 0)]
+        self.assertEqual([], make_image.overlay_copies(symbol_elf(self.MAIN), symbol_elf(overlay)))
+
+    def test_a_copy_stops_the_image(self):
+        overlay = symbol_elf([("hash_update", 1, 2, 1)])
+        with self.assertRaises(make_image.ImageError):
+            make_image.check_overlay_copies(symbol_elf(self.MAIN), overlay, "rescan overlay")
+
+
 class ResidentTablesTest(unittest.TestCase):
     def resident(self, body=b"\x3C" * 100):
         return bytes(16) + body

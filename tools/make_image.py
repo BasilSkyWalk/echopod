@@ -79,6 +79,14 @@ DEFAULT_VERSION = (0, 9, 0)
 ELF_IDENT = b"\x7fELF\x01\x01"
 ELF_HEADER = struct.Struct("<16sHHIIIIIHHHHHH")
 ELF_SECTION = struct.Struct("<10I")
+ELF_SYMBOL = struct.Struct("<IIIBBH")
+SHT_SYMTAB = 2
+STB_GLOBAL = 1
+STB_WEAK = 2
+STT_OBJECT = 1
+STT_FUNC = 2
+SHN_UNDEF = 0
+SHN_ABS = 0xFFF1
 SHF_ALLOC = 2
 SHT_NOBITS = 8
 FIRMWARE_SECTIONS = (".code", ".data", ".bss", ".resident")
@@ -486,6 +494,41 @@ def overlay_from_elf(elf, zeroed=False):
     return overlay.content
 
 
+def elf_symbols(elf):
+    """(name, binding, type, section index) for every entry of the ELF's .symtab."""
+    sections = elf_sections(elf)
+    symtab, strtab = sections.get(".symtab"), sections.get(".strtab")
+    if symtab is None or strtab is None:
+        return []
+    names = strtab.content
+    symbols = []
+    for offset in range(0, len(symtab.content) - ELF_SYMBOL.size + 1, ELF_SYMBOL.size):
+        name, _, _, info, _, index = ELF_SYMBOL.unpack_from(symtab.content, offset)
+        label = names[name:names.index(b"\x00", name)].decode("ascii", "replace")
+        symbols.append((label, info >> 4, info & 0xF, index))
+    return symbols
+
+
+def overlay_copies(main_elf, overlay_elf):
+    """Functions and tables the overlay holds its own copy of although the main program has them.
+
+    The overlay should call the main program's copy; its own would duplicate code, and for a
+    module with state, the state.
+    """
+    main_names = {name.split(".")[0] for name, _, kind, index in elf_symbols(main_elf)
+                  if kind in (STT_OBJECT, STT_FUNC) and index != SHN_UNDEF}
+    return sorted(name for name, binding, kind, index in elf_symbols(overlay_elf)
+                  if binding in (STB_GLOBAL, STB_WEAK) and kind in (STT_OBJECT, STT_FUNC)
+                  and index not in (SHN_UNDEF, SHN_ABS) and name in main_names)
+
+
+def check_overlay_copies(main_elf, overlay_elf, label):
+    copies = overlay_copies(main_elf, overlay_elf)
+    if copies:
+        raise ImageError(f"the {label} has its own copy of what the main program has: "
+                         + ", ".join(copies) + " (add them to ECHO_OVERLAY_IMPORTS)")
+
+
 def git_output(directory, *arguments):
     result = subprocess.run(["git", "-C", str(directory), *arguments],
                             capture_output=True, text=True, check=False)
@@ -548,10 +591,17 @@ def main(argv=None):
     build_tag = arguments.build_tag or default_build_tag(Path(__file__).resolve().parents[1])
     date = arguments.date or default_date()
     try:
-        firmware = firmware_from_elf(arguments.elf.read_bytes())
-        overlay = overlay_from_elf(arguments.overlay.read_bytes()) if arguments.overlay else b""
-        usb_overlay = (overlay_from_elf(arguments.usb_overlay.read_bytes(), zeroed=True)
-                       if arguments.usb_overlay else b"")
+        main_elf = arguments.elf.read_bytes()
+        firmware = firmware_from_elf(main_elf)
+        overlay = usb_overlay = b""
+        if arguments.overlay:
+            overlay_elf = arguments.overlay.read_bytes()
+            check_overlay_copies(main_elf, overlay_elf, "rescan overlay")
+            overlay = overlay_from_elf(overlay_elf)
+        if arguments.usb_overlay:
+            usb_overlay_elf = arguments.usb_overlay.read_bytes()
+            check_overlay_copies(main_elf, usb_overlay_elf, "USB overlay")
+            usb_overlay = overlay_from_elf(usb_overlay_elf, zeroed=True)
         core1_mp3 = arguments.core1_mp3.read_bytes() if arguments.core1_mp3 else b""
         core1_flac = arguments.core1_flac.read_bytes() if arguments.core1_flac else b""
         core1_aac = arguments.core1_aac.read_bytes() if arguments.core1_aac else b""

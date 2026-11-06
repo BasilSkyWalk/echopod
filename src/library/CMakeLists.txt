@@ -45,3 +45,4 @@ target_link_libraries(echo_library_scan
     PUBLIC echo_core echo_image echo_library
     PRIVATE echo_options
 )
+target_link_libraries(echo_library PRIVATE echo_lto)

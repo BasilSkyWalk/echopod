@@ -48,7 +48,7 @@ set_target_properties(echo_core1 PROPERTIES
     LINK_DEPENDS ${ECHO_CORE1_LINKER_SCRIPT}
 )
 target_include_directories(echo_core1 PRIVATE board)
-target_link_libraries(echo_core1 PRIVATE echo_codec echo_device_logic echo_options)
+target_link_libraries(echo_core1 PRIVATE echo_codec_plain echo_device_logic_plain echo_options)
 target_link_options(echo_core1 PRIVATE
     -fno-lto
     -T${ECHO_CORE1_LINKER_SCRIPT}
@@ -66,7 +66,7 @@ set_target_properties(echo_core1_mp3 PROPERTIES
     LINK_DEPENDS ${ECHO_CORE1_MP3_LINKER_SCRIPT}
 )
 target_include_directories(echo_core1_mp3 PRIVATE board)
-target_link_libraries(echo_core1_mp3 PRIVATE echo_device_logic echo_libmad echo_options gcc)
+target_link_libraries(echo_core1_mp3 PRIVATE echo_device_logic_plain echo_libmad echo_options gcc)
 target_link_options(echo_core1_mp3 PRIVATE
     -fno-lto
     -T${ECHO_CORE1_MP3_LINKER_SCRIPT}
@@ -91,7 +91,7 @@ set_target_properties(echo_core1_aac PROPERTIES
     LINK_DEPENDS ${ECHO_CORE1_AAC_LINKER_SCRIPT}
 )
 target_include_directories(echo_core1_aac PRIVATE board)
-target_link_libraries(echo_core1_aac PRIVATE echo_device_logic echo_faad2 echo_options gcc)
+target_link_libraries(echo_core1_aac PRIVATE echo_device_logic_plain echo_faad2 echo_options gcc)
 target_link_options(echo_core1_aac PRIVATE
     -fno-lto
     -T${ECHO_CORE1_AAC_LINKER_SCRIPT}
@@ -117,7 +117,7 @@ set_target_properties(echo_core1_opus PROPERTIES
     LINK_DEPENDS ${ECHO_CORE1_OPUS_LINKER_SCRIPT}
 )
 target_include_directories(echo_core1_opus PRIVATE board)
-target_link_libraries(echo_core1_opus PRIVATE echo_device_logic echo_opus echo_options gcc)
+target_link_libraries(echo_core1_opus PRIVATE echo_device_logic_plain echo_opus echo_options gcc)
 target_link_options(echo_core1_opus PRIVATE
     -fno-lto
     -T${ECHO_CORE1_OPUS_LINKER_SCRIPT}
@@ -157,24 +157,43 @@ set(ECHO_OVERLAY_IMPORTS
     board_display_service
     board_start_record_update
     board_wait_for_key
+    covers_open
     emmc_read
     emmc_start
     emmc_status
     emmc_volume_read
     emmc_volume_write
     emmc_write
+    fat_mount
+    fat_open
+    fat_read
     hal_audio_service
     hal_audio_set_volume
     hal_clock_milliseconds
     hal_display_set_power
     hal_input_next_transition
     hal_power_battery
+    hash_update
+    i18n_format
+    i18n_text
+    image_crc_update
+    library_album_key
+    library_count
+    library_open
+    library_read_album
+    library_read_string
+    library_read_track
     sd_health
     sd_prepare
     sd_read
     sd_sector_count
     sd_write
+    spoken_kind_of
     storage_reset
+    string_builder_append
+    string_builder_append_char
+    string_builder_append_unsigned
+    string_builder_make
     update_record_save
     usb_connect
     usb_flush_fifos
@@ -183,6 +202,7 @@ set(ECHO_OVERLAY_IMPORTS
     usb_session_stop_listening
     usb_silence_audio
     usb_vbus_present
+    utf8_next
 )
 set(ECHO_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/echo_device.ld)
 set_target_properties(echo_device PROPERTIES
@@ -272,7 +292,7 @@ target_include_directories(echo_usb_overlay PRIVATE
     $<TARGET_PROPERTY:echo_playback,INTERFACE_INCLUDE_DIRECTORIES>
     $<TARGET_PROPERTY:echo_library,INTERFACE_INCLUDE_DIRECTORIES>
 )
-target_link_libraries(echo_usb_overlay PRIVATE echo_device_logic echo_options gcc)
+target_link_libraries(echo_usb_overlay PRIVATE echo_device_logic_plain echo_options gcc)
 target_link_options(echo_usb_overlay PRIVATE
     -fno-lto
     -T${ECHO_USB_OVERLAY_LINKER_SCRIPT}
