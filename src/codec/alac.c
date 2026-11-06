@@ -78,7 +78,7 @@ bool alac_parse_config(const uint8_t *bytes, uint32_t length, AlacConfig *config
     };
     bool depth_ok = config->bit_depth == 16 || config->bit_depth == 20 || config->bit_depth == 24;
     return depth_ok && config->channels >= 1 && config->channels <= FLAC_MAX_CHANNELS &&
-           config->frame_length > 0 && config->frame_length <= FLAC_MAX_BLOCK &&
+           config->frame_length > 0 && config->frame_length <= ALAC_MAX_FRAME &&
            config->sample_rate > 0 && config->kb <= MAX_KB;
 }
 

@@ -44,3 +44,5 @@ SECTIONS
 ASSERT(ADDR(.text) == 0, "core 1 code must start at its address 0")
 ASSERT(SIZEOF(.data) == 0, "core 1 has no initialised data: make globals const")
 ASSERT(core1_bss_end <= 0x01022000, "the AAC program needs 48 KB of stack below 0x0102E000 for FAAD2")
+
+core1_stack_top = 0x0102E000;

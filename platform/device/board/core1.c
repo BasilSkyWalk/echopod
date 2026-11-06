@@ -295,7 +295,8 @@ static HalCore1Accel accel_results(HalCore1Accel result)
     result.hardware_us = register_read(CORE1_SHARED_ACCEL_HARDWARE_TICKS) / ticks_per_us;
     result.software_us = register_read(CORE1_SHARED_ACCEL_SOFTWARE_TICKS) / ticks_per_us;
     accel_known = true;
-    accel_classes = status & (CORE1_ACCEL_NARROW | CORE1_ACCEL_WIDE);
+    accel_classes = status & (CORE1_ACCEL_NARROW | CORE1_ACCEL_WIDE | CORE1_ACCEL_CODE_NARROW |
+                              CORE1_ACCEL_CODE_WIDE);
     return result;
 }
 

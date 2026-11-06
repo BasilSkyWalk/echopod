@@ -18,6 +18,7 @@ typedef struct Fixture {
 } Fixture;
 
 static FlacDecoder decoder;
+static FlacBlockBuffer block;
 static FlacSource source;
 static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
@@ -69,6 +70,7 @@ static void close_file(void *context)
 
 static void start_engine(void)
 {
+    flac_use_block_buffer(&decoder, &block);
     flac_source_init(&source,
                      (FlacFileOpener){.open = open_file, .close = close_file, .context = NULL},
                      &decoder);

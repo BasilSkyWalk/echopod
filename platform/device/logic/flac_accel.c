@@ -332,17 +332,22 @@ static bool restore_with_accelerator(void *context, int32_t *samples, FlacLpcJob
     if (job.order < SMALLEST_HARDWARE_ORDER) {
         return false;
     }
-    bool wide = flac_lpc_is_wide((int)job.width, (int)job.precision, (int)job.order);
-    if (wide ? !hook->wide : !hook->narrow) {
-        return false;
-    }
     uint32_t address = hook->window == NULL
                            ? (uint32_t)(uintptr_t)samples
                            : hook->window_address + 4u * (uint32_t)(samples - hook->window);
+    bool code = address < FLAC_ACCEL_CODE_RAM_END;
+    bool wide = flac_lpc_is_wide((int)job.width, (int)job.precision, (int)job.order);
+    bool allowed =
+        wide ? (code ? hook->code_wide : hook->wide) : (code ? hook->code_narrow : hook->narrow);
+    if (!allowed) {
+        return false;
+    }
     if (!flac_accel_restore(hook->bus, address, job.block_size, job.coefficients, (int)job.order,
                             (int)job.shift)) {
         hook->narrow = false;
         hook->wide = false;
+        hook->code_narrow = false;
+        hook->code_wide = false;
         hook->timeouts++;
         return false;
     }
