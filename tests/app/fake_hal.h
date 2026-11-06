@@ -40,6 +40,7 @@ void fake_hal_set_empty_card(bool empty);
 int fake_hal_dir_open_count(void);
 int fake_hal_dir_next_count(void);
 int fake_hal_presents_at_last_dir_open(void);
+bool fake_hal_lit_at_last_dir_open(void);
 int fake_hal_library_writes(void);
 int fake_hal_covers_writes(void);
 int fake_hal_scratch_outstanding(void);

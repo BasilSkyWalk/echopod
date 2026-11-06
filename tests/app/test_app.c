@@ -1249,6 +1249,24 @@ static void a_new_firmware_checks_the_music_once_without_rescanning(void)
     CHECK_EQUAL(walks_after_restart, fake_hal_dir_open_count());
 }
 
+static void a_new_firmware_shows_the_splash_then_checks_the_music_on_a_lit_screen(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    step();
+    fake_hal_set_version("newer");
+    int walks_before = fake_hal_dir_open_count();
+    restart_app();
+    app_show_splash();
+    step();
+    CHECK_EQUAL(walks_before, fake_hal_dir_open_count());
+    CHECK(fake_hal_display_on());
+    int presents = fake_hal_present_count();
+    wait_ms(SPLASH_MS);
+    CHECK(fake_hal_dir_open_count() > walks_before);
+    CHECK(fake_hal_presents_at_last_dir_open() > presents);
+    CHECK(fake_hal_lit_at_last_dir_open());
+}
+
 static void the_music_check_after_usb_says_so_before_walking_the_card(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_CREATED);
@@ -2555,6 +2573,7 @@ int main(void)
         TEST_CASE(unchanged_music_is_not_rescanned_after_usb),
         TEST_CASE(a_different_stored_fingerprint_is_rescanned_after_usb),
         TEST_CASE(a_new_firmware_checks_the_music_once_without_rescanning),
+        TEST_CASE(a_new_firmware_shows_the_splash_then_checks_the_music_on_a_lit_screen),
         TEST_CASE(the_music_check_after_usb_says_so_before_walking_the_card),
         TEST_CASE(a_new_firmware_rescans_music_that_changed),
         TEST_CASE(a_new_firmware_rebuilds_a_library_it_cannot_read),

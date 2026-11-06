@@ -1210,7 +1210,7 @@ void app_step(void)
     }
     app.idle = false;
     take_computer_clock();
-    if (app.music_check_requested) {
+    if (app.music_check_requested && fade_finished(&app.splash, hal_clock_milliseconds())) {
         app.music_check_requested = false;
         bool changed = hal_system_restart_pending();
         if (!changed) {
