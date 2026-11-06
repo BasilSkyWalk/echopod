@@ -148,7 +148,7 @@ The computer picks each album's cover the way the player does: the picture insid
 | Back | Back; hold to go home | Back; hold to go home |
 | Power | Screen off or on; hold 2 s to turn off | Same |
 
-With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks (or jumps 30 s / 15 s in audiobooks and podcasts). After 30 s paused the player powers its audio output down to save battery, so resuming after a longer pause takes a moment longer and fades in. With the screen off, FLAC, ALAC, WAV and MP3 at 48 kHz or less play with the processor at a lower speed; switching between the two speeds happens at a track change, which then has a short gap instead of following seamlessly (Diagnostics → Savings → No 96 MHz turns this off).
+With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks (or jumps 30 s / 15 s in audiobooks and podcasts). After 30 s paused the player powers its audio output down to save battery, so resuming after a longer pause takes a moment longer. With the screen off, FLAC, ALAC, WAV and MP3 at 48 kHz or less play with the processor at a lower speed; switching between the two speeds happens at a track change, which then has a short gap instead of following seamlessly (Diagnostics → Savings → No 96 MHz turns this off).
 
 Settings → **Volume buttons** changes what the rocker does on Now Playing and with the screen off: *Tap: volume, hold: skip* (the default), *Tap: skip, hold: volume*, or *Tap: volume, hold: seek* (5 s steps while held). Right after you tap the volume, holding the rocker keeps changing the volume in every mode. **Swap volume buttons** turns + and − around everywhere.
 

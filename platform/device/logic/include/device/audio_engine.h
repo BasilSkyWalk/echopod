@@ -120,6 +120,9 @@ typedef struct AudioEngine {
     uint32_t end_at;
     bool rate_pending;
     uint32_t rate_end;
+    uint32_t lead_frames;
+    uint32_t ramp_frames;
+    uint32_t ramp_done;
     uint32_t output_rate;
     bool has_next;
     uint32_t next_token;
@@ -137,6 +140,7 @@ bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms,
 const char *audio_engine_current_path(const AudioEngine *engine);
 void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token);
 bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms);
+void audio_engine_lead_in(AudioEngine *engine, uint32_t silence_frames, uint32_t ramp_frames);
 void audio_engine_close_source(AudioEngine *engine);
 bool audio_engine_next_pending(const AudioEngine *engine);
 void audio_engine_pause(AudioEngine *engine);

@@ -323,7 +323,7 @@ static bool play_tone_segments(void)
 {
     static int16_t samples[TONE_PERIOD_SAMPLES];
     tone_fill(samples, TONE_PERIOD_SAMPLES, TONE_AMPLITUDE);
-    dac_output_on(&BUS, current_volume());
+    dac_output_on(&BUS, current_volume(), true);
     applied_volume = current_volume();
     if (!play_for(samples, TONE_PERIOD_SAMPLES, TONE_SEGMENT_MS) ||
         !play_for(NULL, 1, TONE_GAP_MS)) {
@@ -460,7 +460,7 @@ static void fade_to(uint8_t target)
 
 void dac_path_output_on(void)
 {
-    dac_output_on(&BUS, DAC_VOLUME_MUTED);
+    dac_output_on(&BUS, DAC_VOLUME_MUTED, false);
     applied_volume = DAC_VOLUME_MUTED;
     muted = true;
 }
@@ -475,6 +475,19 @@ void dac_path_set_muted(bool mute)
     }
     dac_set_muted(&BUS, false, applied_volume);
     fade_to(current_volume());
+}
+
+void dac_path_set_muted_now(bool mute)
+{
+    muted = mute;
+    if (mute) {
+        applied_volume = DAC_VOLUME_MUTED;
+        dac_set_muted(&BUS, true, DAC_VOLUME_MUTED);
+        return;
+    }
+    dac_set_pin(NULL, DAC_PIN_MUTE, false);
+    applied_volume = current_volume();
+    dac_set_balanced_volume(&BUS, applied_volume, current_balance());
 }
 
 void dac_path_set_volume(uint8_t value)
