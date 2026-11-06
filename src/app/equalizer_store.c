@@ -113,7 +113,7 @@ bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, Equaliz
         error->problem = EQUALIZER_TEXT_EMPTY;
         return false;
     }
-    char text[EQUALIZER_TEXT_MAX_BYTES];
+    static char text[EQUALIZER_TEXT_MAX_BYTES];
     bool read = hal_file_read(file, 0, text, file.size);
     hal_file_close(&file);
     if (!read) {
