@@ -3,10 +3,12 @@
 
 #include "codec/alac.h"
 #include "codec/flac.h"
+#include "codec/qoa.h"
 #include "core1_region.h"
 #include "core1_ticks.h"
 #include "device/core1_alac.h"
 #include "device/core1_control.h"
+#include "device/core1_qoa.h"
 #include "device/flac_accel.h"
 #include "device/tick_clock.h"
 #include "hal/system.h"
@@ -20,9 +22,11 @@ void core1_main(void);
 static union {
     FlacDecoder flac;
     AlacDecoder alac;
+    QoaDecoder qoa;
 } decoders;
 static Core1Flac flac;
 static Core1Alac alac;
+static Core1Qoa qoa;
 static Core1Decoder flac_stream;
 static FlacLpcHook lpc_hook;
 static AccelHook accel_hook;
@@ -199,6 +203,7 @@ void core1_main(void)
     flac_stream = core1_flac_decoder(&flac, &decoders.flac);
     core1_stream_init(&stream, core1_region(), (Core1Decoder){start_flac, decode_flac, NULL});
     core1_stream_set_decoder(&stream, STREAM_CODEC_ALAC, core1_alac_decoder(&alac, &decoders.alac));
+    core1_stream_set_decoder(&stream, STREAM_CODEC_QOA, core1_qoa_decoder(&qoa, &decoders.qoa));
     core1_stream_set_equalizer(&stream, &equalizer,
                                (volatile Core1EqualizerShare *)(uintptr_t)CORE1_SHARED_EQUALIZER);
     core1_ticks_measure(&stream);

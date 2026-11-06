@@ -239,6 +239,11 @@ def dff_chunk(name, body):
     return name + struct.pack(">Q", len(body)) + body + (b"\x00" if len(body) % 2 else b"")
 
 
+def make_qoa(path):
+    from qoa_fixture import encode, signal
+    path.write_bytes(encode(signal(777, 1), 1, 22050))
+
+
 def make_dff(path):
     from mutagen.dsdiff import DSDIFF
     rate, channels = DSD_RATE, 2
@@ -269,6 +274,7 @@ FIXTURES = {
     "tagged.ape": make_ape,
     "tagged.dsf": make_dsf,
     "tagged.dff": make_dff,
+    "qoa.qoa": make_qoa,
 }
 
 

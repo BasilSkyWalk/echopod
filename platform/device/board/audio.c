@@ -46,6 +46,7 @@ typedef enum SourceKind {
     SOURCE_ALAC,
     SOURCE_AAC,
     SOURCE_OPUS,
+    SOURCE_QOA,
     SOURCE_UNKNOWN
 } SourceKind;
 
@@ -175,6 +176,9 @@ static SourceKind kind_of(const char *path)
     if (!read || tag_is(magic, "fLaC")) {
         return SOURCE_FLAC;
     }
+    if (tag_is(magic, "qoaf")) {
+        return SOURCE_QOA;
+    }
     if (tag_is(magic, "RIFF") && tag_is(magic + 8, "WAVE")) {
         return SOURCE_WAV;
     }
@@ -205,6 +209,9 @@ static AudioSource chosen_source(void)
     }
     if (source_kind == SOURCE_OPUS) {
         return core1_source_ogg_interface(&core1_source);
+    }
+    if (source_kind == SOURCE_QOA) {
+        return core1_source_qoa_interface(&core1_source);
     }
     return using_core1 ? core1_source_interface(&core1_source)
                        : flac_source_interface(&software_source);
@@ -562,6 +569,8 @@ static HalAudioCodec codec_of(AudioCodec codec)
         return HAL_AUDIO_CODEC_AAC;
     case AUDIO_CODEC_OPUS:
         return HAL_AUDIO_CODEC_OPUS;
+    case AUDIO_CODEC_QOA:
+        return HAL_AUDIO_CODEC_QOA;
     case AUDIO_CODEC_FLAC:
         break;
     }

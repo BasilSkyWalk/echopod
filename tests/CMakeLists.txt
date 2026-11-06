@@ -244,6 +244,11 @@ echo_add_unit_test(NAME test_ogg
     LIBRARIES echo_codec
 )
 target_compile_definitions(test_ogg PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+echo_add_unit_test(NAME test_qoa
+    SOURCES codec/test_qoa.c
+    LIBRARIES echo_codec
+)
+target_compile_definitions(test_qoa PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_flac_bits
     SOURCES codec/test_flac_bits.c
     LIBRARIES echo_codec
