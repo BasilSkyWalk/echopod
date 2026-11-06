@@ -197,10 +197,26 @@ static void an_e8_second_id_byte_selects_variant_a(void)
     CHECK_EQUAL(PANEL_VARIANT_B, panel_variant_of_id(0x00E90000u));
 }
 
+static void sleeping_turns_the_display_off_then_sleeps_and_waking_reverses_it(void)
+{
+    Recorder recorder;
+    PanelBus bus = recording_bus(&recorder);
+    panel_sleep(&bus);
+    panel_wake(&bus);
+    panel_show(&bus);
+    CHECK_EQUAL(4, recorder.count);
+    static const uint32_t EXPECTED[] = {0x28, 0x10, 0x11, 0x29};
+    for (int index = 0; index < 4; index++) {
+        CHECK_EQUAL(ENTRY_COMMAND, recorder.entries[index].kind);
+        CHECK_EQUAL(EXPECTED[index], recorder.entries[index].value);
+    }
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(variant_b_sends_its_init_stream),
+        TEST_CASE(sleeping_turns_the_display_off_then_sleeps_and_waking_reverses_it),
         TEST_CASE(variant_a_sends_its_init_stream),
         TEST_CASE(a_window_maps_visible_rows_to_panel_rows_from_35),
         TEST_CASE(a_partial_window_sets_its_columns_and_rows),

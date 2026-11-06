@@ -285,7 +285,9 @@ static void set_display(bool on)
     app.display_on = on;
     app.light_after_frame = on;
     app.frame_stable = false;
-    if (!on) {
+    if (on) {
+        frame_diff_forget(&app.frame_diff);
+    } else {
         hal_display_set_power(false);
     }
     use_wanted_clock();

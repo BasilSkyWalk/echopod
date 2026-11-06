@@ -8,7 +8,11 @@ enum {
     COMMAND_COLUMNS = 0x2A,
     COMMAND_ROWS = 0x2B,
     COMMAND_WRITE = 0x2C,
-    COMMAND_MEMORY_ACCESS = 0x36
+    COMMAND_MEMORY_ACCESS = 0x36,
+    COMMAND_SLEEP_IN = 0x10,
+    COMMAND_SLEEP_OUT = 0x11,
+    COMMAND_DISPLAY_OFF = 0x28,
+    COMMAND_DISPLAY_ON = 0x29
 };
 
 static const uint8_t MEMORY_ACCESS_FOR[PANEL_ROTATION_COUNT] = {0x60, 0xC0, 0x00};
@@ -92,4 +96,20 @@ uint32_t panel_bus_word(uint32_t shadow, uint8_t value, bool data)
     uint32_t bus_bits = (0xFFu << PANEL_BUS_DATA_SHIFT) | PANEL_BUS_WR | PANEL_BUS_DC;
     uint32_t word = (shadow & ~bus_bits) | ((uint32_t)value << PANEL_BUS_DATA_SHIFT);
     return data ? word | PANEL_BUS_DC : word;
+}
+
+void panel_sleep(const PanelBus *bus)
+{
+    bus->command(bus->context, COMMAND_DISPLAY_OFF);
+    bus->command(bus->context, COMMAND_SLEEP_IN);
+}
+
+void panel_wake(const PanelBus *bus)
+{
+    bus->command(bus->context, COMMAND_SLEEP_OUT);
+}
+
+void panel_show(const PanelBus *bus)
+{
+    bus->command(bus->context, COMMAND_DISPLAY_ON);
 }
