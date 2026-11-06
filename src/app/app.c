@@ -1330,6 +1330,11 @@ PlayerStatus app_player_status(void)
     return player_status(&app.player);
 }
 
+const char *app_now_playing_lyric(void)
+{
+    return now_playing_lyric(&app.screens.now_playing);
+}
+
 const char *app_toast_text(void)
 {
     return app.toast.visible ? app.toast.text : NULL;

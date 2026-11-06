@@ -47,7 +47,8 @@ enum {
     SETTINGS_RESCAN_INDEX = 14,
     SETTINGS_LANGUAGE_INDEX = 16,
     SETTINGS_THEME_INDEX = 30,
-    SETTINGS_CLOCK_INDEX = 31,
+    SETTINGS_LYRICS_INDEX = 31,
+    SETTINGS_CLOCK_INDEX = 32,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -2140,6 +2141,57 @@ static void the_light_theme_lightens_the_screens_and_keeps_the_accent(void)
     CHECK_EQUAL(red_dark.colors.selection_shine, red_light.colors.selection_shine);
 }
 
+static const uint8_t HELLS_BELLS_LYRICS[] = "[ti:Hells Bells]\n[00:00.50]I'm a rolling thunder\n"
+                                            "[00:05.00][00:09.00]Pouring rain\n";
+
+static void synced_lyrics_beside_a_track_follow_its_position(void)
+{
+    start_app_with_library();
+    fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.lrc", HELLS_BELLS_LYRICS,
+                      sizeof HELLS_BELLS_LYRICS - 1);
+    play_first_album_track();
+    CHECK(title_is("Now Playing"));
+    CHECK(app_now_playing_lyric() != NULL);
+    CHECK_EQUAL(0, strcmp("", app_now_playing_lyric()));
+    fake_hal_audio_set_position(1000);
+    wait_ms(20);
+    CHECK_EQUAL(0, strcmp("I'm a rolling thunder", app_now_playing_lyric()));
+    fake_hal_audio_set_position(9500);
+    wait_ms(20);
+    CHECK_EQUAL(0, strcmp("Pouring rain", app_now_playing_lyric()));
+    hold(KEY_PLAY);
+    CHECK(app_now_playing_lyric() == NULL);
+}
+
+static void lyrics_in_capitals_are_found_and_the_setting_hides_them(void)
+{
+    start_app_with_library();
+    fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.LRC", HELLS_BELLS_LYRICS,
+                      sizeof HELLS_BELLS_LYRICS - 1);
+    play_first_album_track();
+    CHECK(app_now_playing_lyric() != NULL);
+    hold_back();
+    open_setting(SETTINGS_LYRICS_INDEX);
+    CHECK(title_is("Lyrics"));
+    move_down(1);
+    tap(KEY_PLAY);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(LYRICS_OFF, settings.options[OPTION_LYRICS]);
+    hold_back();
+    tap(KEY_MENU);
+    CHECK(title_is("Now Playing"));
+    CHECK(app_now_playing_lyric() == NULL);
+}
+
+static void a_track_without_lyrics_shows_none(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    CHECK(title_is("Now Playing"));
+    CHECK(app_now_playing_lyric() == NULL);
+}
+
 static void start_app_with_clock(bool clock_on)
 {
     static uint8_t clock_settings[SETTINGS_FILE_SIZE];
@@ -2355,6 +2407,9 @@ int main(void)
         TEST_CASE(a_listen_history_turned_off_records_nothing),
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
         TEST_CASE(the_light_theme_lightens_the_screens_and_keeps_the_accent),
+        TEST_CASE(synced_lyrics_beside_a_track_follow_its_position),
+        TEST_CASE(lyrics_in_capitals_are_found_and_the_setting_hides_them),
+        TEST_CASE(a_track_without_lyrics_shows_none),
         TEST_CASE(the_header_shows_the_time_only_while_the_clock_setting_is_on),
         TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
         TEST_CASE(dac_keys_follow_the_swap_setting),

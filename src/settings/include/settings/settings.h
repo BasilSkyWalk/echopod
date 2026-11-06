@@ -79,6 +79,7 @@ typedef enum SettingOption {
     OPTION_LISTEN_HISTORY,
     OPTION_TIME_ZONE,
     OPTION_THEME,
+    OPTION_LYRICS,
     SETTINGS_OPTION_COUNT
 } SettingOption;
 
@@ -122,6 +123,11 @@ enum {
 enum {
     THEME_DARK,
     THEME_LIGHT
+};
+
+enum {
+    LYRICS_ON,
+    LYRICS_OFF
 };
 
 typedef enum RockerMode {

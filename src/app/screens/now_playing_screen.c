@@ -6,6 +6,8 @@
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "gfx/image.h"
+#include "hal/audio.h"
+#include "hal/storage.h"
 #include "settings/settings.h"
 #include "ui/header.h"
 #include "ui/icons.h"
@@ -40,6 +42,10 @@ enum {
     PORTRAIT_FORMAT_GAP = 4,
     PORTRAIT_BOTTOM_MARGIN = 2,
     PORTRAIT_PROGRESS_GAP = 3,
+    LYRICS_TOP = 49,
+    LYRICS_ROWS = 5,
+    LYRICS_ROW_HEIGHT = 19,
+    EXTENSION_ROOM = 5,
     TIMES_GAP = TIMES_TOP - PROGRESS_TOP - PROGRESS_HEIGHT
 };
 
@@ -362,6 +368,67 @@ static ScreenAction run_command(NowPlayingScreen *now_playing, NowPlayingCommand
     return screen_action_none();
 }
 
+static bool lyrics_wanted(const NowPlayingScreen *now_playing)
+{
+    const uint8_t *options = now_playing->config.options;
+    return options != NULL && options[OPTION_LYRICS] == LYRICS_ON;
+}
+
+static bool open_lyrics(char *path, size_t dot, HalFile *file)
+{
+    static const char *const EXTENSIONS[] = {".lrc", ".LRC"};
+    for (size_t index = 0; index < sizeof EXTENSIONS / sizeof EXTENSIONS[0]; index++) {
+        for (size_t at = 0; at < EXTENSION_ROOM; at++) {
+            path[dot + at] = EXTENSIONS[index][at];
+        }
+        if (hal_file_open(file, path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void read_lyrics(Lyrics *lyrics, HalFile file)
+{
+    char bytes[NOW_PLAYING_LYRICS_CHUNK];
+    uint32_t end =
+        file.size < NOW_PLAYING_LYRICS_READ_LIMIT ? file.size : NOW_PLAYING_LYRICS_READ_LIMIT;
+    for (uint32_t offset = 0; offset < end && !lyrics_full(lyrics); offset += sizeof bytes) {
+        uint32_t length = end - offset < sizeof bytes ? end - offset : sizeof bytes;
+        if (!hal_file_read(file, offset, bytes, length)) {
+            break;
+        }
+        lyrics_feed(lyrics, bytes, length);
+        hal_audio_service();
+    }
+    lyrics_finish(lyrics);
+}
+
+static void load_lyrics(NowPlayingScreen *now_playing, const LibraryTrack *track)
+{
+    NowPlayingLyrics *lyrics = &now_playing->lyrics;
+    lyrics->ready = false;
+    lyrics->current = LYRICS_NONE;
+    lyrics_start(&lyrics->lyrics);
+    char path[PLAYER_PATH_CAPACITY] = "/";
+    if (!lyrics_wanted(now_playing) ||
+        !library_read_string(now_playing->config.library, track->path, path + 1,
+                             sizeof path - 1 - EXTENSION_ROOM)) {
+        return;
+    }
+    size_t dot = 0;
+    size_t length = 0;
+    for (; path[length] != '\0'; length++) {
+        dot = path[length] == '.' ? length : path[length] == '/' ? 0 : dot;
+    }
+    HalFile file;
+    if (open_lyrics(path, dot > 0 ? dot : length, &file)) {
+        read_lyrics(&lyrics->lyrics, file);
+        hal_file_close(&file);
+        lyrics->ready = true;
+    }
+}
+
 static void load_texts(NowPlayingScreen *now_playing, uint16_t track_index)
 {
     const Library *library = now_playing->config.library;
@@ -371,9 +438,11 @@ static void load_texts(NowPlayingScreen *now_playing, uint16_t track_index)
     now_playing->title[0] = '\0';
     now_playing->artist[0] = '\0';
     now_playing->album[0] = '\0';
+    now_playing->lyrics.ready = false;
     if (!library_read_track(library, track_index, &track)) {
         return;
     }
+    load_lyrics(now_playing, &track);
     library_read_string(library, track.title, now_playing->title, NOW_PLAYING_TEXT_CAPACITY);
     if (library_read_group(library, LIBRARY_ARTISTS, track.artist, &artist)) {
         library_read_string(library, artist.name, now_playing->artist, NOW_PLAYING_TEXT_CAPACITY);
@@ -431,10 +500,35 @@ static bool showing(const NowPlayingScreen *now_playing, NowPlayingFeedback feed
                                         now_playing->now_ms);
 }
 
+static void follow_lyrics(NowPlayingScreen *now_playing, uint32_t now_ms)
+{
+    NowPlayingLyrics *lyrics = &now_playing->lyrics;
+    int current = lyrics_current(&lyrics->lyrics, now_playing->status.position_ms,
+                                 now_playing->status.duration_ms);
+    if (current != lyrics->current) {
+        lyrics->current = current;
+        lyrics->current_ms = now_ms;
+    }
+}
+
+static bool lyrics_shown(const NowPlayingScreen *now_playing)
+{
+    return now_playing->lyrics.ready && now_playing->lyrics.lyrics.count > 0 &&
+           !now_playing->scrubbing && lyrics_wanted(now_playing);
+}
+
+const char *now_playing_lyric(const NowPlayingScreen *now_playing)
+{
+    return lyrics_shown(now_playing)
+               ? lyrics_line(&now_playing->lyrics.lyrics, now_playing->lyrics.current)
+               : NULL;
+}
+
 static void update(void *context, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
     refresh(now_playing, now_ms);
+    follow_lyrics(now_playing, now_ms);
     if (now_playing->config.covers != NULL && now_playing->status.has_track) {
         cover_cache_load_full(now_playing->config.covers, now_playing->album_index);
     }
@@ -458,7 +552,7 @@ static Layout layout_of(const NowPlayingScreen *now_playing)
     Image ignored;
     int cover_top = theme->metrics.header_height + PORTRAIT_COVER_GAP;
     int title_top = cover_top + COVER_FULL_SIZE + PORTRAIT_TEXT_GAP;
-    if (!current_cover(now_playing, &ignored)) {
+    if (!current_cover(now_playing, &ignored) && !lyrics_shown(now_playing)) {
         title_top = cover_top + (COVER_FULL_SIZE + PORTRAIT_TEXT_GAP) / 2;
     }
     int times_top = theme->metrics.screen_height - SMALL_LINE_HEIGHT - PORTRAIT_BOTTOM_MARGIN;
@@ -507,10 +601,10 @@ static Rect column_area(const NowPlayingScreen *now_playing, int top, int height
 static void draw_cover(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     Image cover;
-    if (!current_cover(now_playing, &cover)) {
+    Layout layout = layout_of(now_playing);
+    if (!current_cover(now_playing, &cover) || (layout.centered && lyrics_shown(now_playing))) {
         return;
     }
-    Layout layout = layout_of(now_playing);
     image_draw_quad(canvas, cover,
                     (Quad){layout.cover_left, COVER_FULL_SIZE, layout.cover_top, COVER_FULL_SIZE,
                            layout.cover_top, COVER_FULL_SIZE});
@@ -522,8 +616,8 @@ static Rect line_area(const Theme *theme, int top, int height)
     return (Rect){padding, top, theme->metrics.screen_width - 2 * padding, height};
 }
 
-static void draw_text_line(const NowPlayingScreen *now_playing, Canvas *canvas, Label label,
-                           TextStyle style)
+static void draw_moving_line(const NowPlayingScreen *now_playing, Canvas *canvas, Label label,
+                             TextStyle style, uint32_t since_ms)
 {
     int width = text_width(style.font, label.text);
     if (width <= label.area.width) {
@@ -531,9 +625,52 @@ static void draw_text_line(const NowPlayingScreen *now_playing, Canvas *canvas, 
         return;
     }
     MarqueeTiming timing = now_playing->config.theme->marquee;
-    uint32_t elapsed = now_playing->now_ms - now_playing->text_changed_ms;
+    uint32_t elapsed = now_playing->now_ms - since_ms;
     int offset = marquee_offset(timing, width, label.area.width, elapsed);
     label_draw_scrolling(canvas, style, label, (Marquee){.offset = offset, .gap = timing.gap_px});
+}
+
+static void draw_text_line(const NowPlayingScreen *now_playing, Canvas *canvas, Label label,
+                           TextStyle style)
+{
+    draw_moving_line(now_playing, canvas, label, style, now_playing->text_changed_ms);
+}
+
+static Rect lyrics_area(const NowPlayingScreen *now_playing)
+{
+    const Theme *theme = now_playing->config.theme;
+    Layout layout = layout_of(now_playing);
+    int height = LYRICS_ROWS * LYRICS_ROW_HEIGHT;
+    if (!layout.centered) {
+        return column_area(now_playing, LYRICS_TOP, height);
+    }
+    return (Rect){theme->metrics.padding, layout.cover_top + (COVER_FULL_SIZE - height) / 2,
+                  theme->metrics.screen_width - 2 * theme->metrics.padding, height};
+}
+
+static void draw_lyrics(const NowPlayingScreen *now_playing, Canvas *canvas)
+{
+    const Theme *theme = now_playing->config.theme;
+    const NowPlayingLyrics *lyrics = &now_playing->lyrics;
+    Rect area = lyrics_area(now_playing);
+    bool synced = lyrics->lyrics.synced;
+    for (int row = 0; row < LYRICS_ROWS; row++) {
+        int index = lyrics->current - LYRICS_ROWS / 2 + row;
+        if (index < 0 || index >= lyrics->lyrics.count) {
+            continue;
+        }
+        Label label = {{area.x, area.y + row * LYRICS_ROW_HEIGHT, area.width, LYRICS_ROW_HEIGHT},
+                       lyrics_line(&lyrics->lyrics, index)};
+        if (synced && index == lyrics->current) {
+            TextStyle style = {.font = theme->fonts.title, .color = theme->colors.text};
+            draw_moving_line(now_playing, canvas, label, style, lyrics->current_ms);
+            continue;
+        }
+        TextStyle style = {.font = theme->fonts.body,
+                           .color =
+                               synced ? theme->colors.text_tertiary : theme->colors.text_secondary};
+        label_draw(canvas, style, centered_if(layout_of(now_playing).centered, style.font, label));
+    }
 }
 
 static void draw_track_text(const NowPlayingScreen *now_playing, Canvas *canvas)
@@ -546,6 +683,9 @@ static void draw_track_text(const NowPlayingScreen *now_playing, Canvas *canvas)
     draw_text_line(now_playing, canvas,
                    (Label){column_area(now_playing, top, TEXT_LINE_HEIGHT), now_playing->title},
                    title);
+    if (!layout_of(now_playing).centered && lyrics_shown(now_playing)) {
+        return;
+    }
     draw_text_line(now_playing, canvas,
                    (Label){column_area(now_playing, top + ARTIST_TOP - TITLE_TOP, TEXT_LINE_HEIGHT),
                            now_playing->artist},
@@ -704,7 +844,8 @@ static void draw_badge(const NowPlayingScreen *now_playing, Canvas *canvas)
     Image cover;
     NowPlayingFeedback feedback = now_playing->feedback;
     if (feedback == NOW_PLAYING_FEEDBACK_VOLUME || !showing(now_playing, feedback) ||
-        !current_cover(now_playing, &cover)) {
+        !current_cover(now_playing, &cover) ||
+        (layout_of(now_playing).centered && lyrics_shown(now_playing))) {
         return;
     }
     const Theme *theme = now_playing->config.theme;
@@ -741,9 +882,15 @@ static void draw(void *context, Canvas *canvas)
     draw_badge(now_playing, canvas);
     draw_track_text(now_playing, canvas);
     draw_progress(now_playing, canvas);
+    draw_times(now_playing, canvas);
+    if (lyrics_shown(now_playing)) {
+        draw_lyrics(now_playing, canvas);
+        if (!layout_of(now_playing).centered) {
+            return;
+        }
+    }
     draw_format(now_playing, canvas);
     draw_details(now_playing, canvas);
-    draw_times(now_playing, canvas);
 }
 
 Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig config)
@@ -754,6 +901,8 @@ Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig 
     now_playing->scrub_position_ms = 0;
     now_playing->feedback = NOW_PLAYING_FEEDBACK_NONE;
     now_playing->feedback_started_ms = 0;
+    now_playing->lyrics.ready = false;
+    now_playing->lyrics.current = LYRICS_NONE;
     now_playing->status = (PlayerStatus){.state = PLAYER_IDLE};
     now_playing->screen = (Screen){
         .title = i18n_text(STR_MENU_NOW_PLAYING),

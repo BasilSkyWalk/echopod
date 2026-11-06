@@ -7,6 +7,7 @@
 #include "core/key_tracker.h"
 #include "cover_cache.h"
 #include "library/library.h"
+#include "playback/lyrics.h"
 #include "player.h"
 #include "ui/screen.h"
 #include "ui/theme.h"
@@ -70,6 +71,18 @@ typedef struct NowPlayingConfig {
     const uint8_t *options;
 } NowPlayingConfig;
 
+typedef struct NowPlayingLyrics {
+    Lyrics lyrics;
+    bool ready;
+    int current;
+    uint32_t current_ms;
+} NowPlayingLyrics;
+
+enum {
+    NOW_PLAYING_LYRICS_CHUNK = 512,
+    NOW_PLAYING_LYRICS_READ_LIMIT = 64 * 1024
+};
+
 typedef struct NowPlayingScreen {
     Screen screen;
     NowPlayingConfig config;
@@ -86,6 +99,7 @@ typedef struct NowPlayingScreen {
     char title[NOW_PLAYING_TEXT_CAPACITY];
     char artist[NOW_PLAYING_TEXT_CAPACITY];
     char album[NOW_PLAYING_TEXT_CAPACITY];
+    NowPlayingLyrics lyrics;
 } NowPlayingScreen;
 
 NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing);
@@ -101,4 +115,5 @@ NowPlayingFeedback now_playing_feedback_for(NowPlayingCommand command, PlayerSta
 bool now_playing_feedback_visible(NowPlayingFeedback feedback, uint32_t started_ms,
                                   uint32_t now_ms);
 int now_playing_volume_width(uint8_t volume, int width);
+const char *now_playing_lyric(const NowPlayingScreen *now_playing);
 Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig config);

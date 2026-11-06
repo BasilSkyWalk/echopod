@@ -338,3 +338,4 @@ STR_LANGUAGE_ID = Bahasa Indonesia
 STR_SETTINGS_THEME = Тема
 STR_SETTINGS_DARK = Темна
 STR_SETTINGS_LIGHT = Світла
+STR_SETTINGS_LYRICS = Тексти пісень
