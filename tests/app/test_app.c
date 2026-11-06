@@ -50,6 +50,7 @@ enum {
     SETTINGS_LYRICS_INDEX = 31,
     SETTINGS_FOLDER_VIEW_INDEX = 32,
     SETTINGS_CLOCK_INDEX = 33,
+    SETTINGS_STATUS_BAR_INDEX = 34,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -2239,7 +2240,7 @@ static void the_clock_and_date_time_rows_end_the_settings_list(void)
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(CLOCK_ON, settings.options[OPTION_CLOCK]);
-    move_down(1);
+    move_down(SETTINGS_STATUS_BAR_INDEX - SETTINGS_CLOCK_INDEX + 1);
     tap(KEY_PLAY);
     CHECK(title_is("Date & time"));
     tap(KEY_BACK);
@@ -2264,6 +2265,32 @@ static void the_light_theme_lightens_the_screens_and_keeps_the_accent(void)
     Theme red_dark = default_theme_styled(false, 1, false, false);
     CHECK_EQUAL(red_dark.colors.selection_background, red_light.colors.selection_background);
     CHECK_EQUAL(red_dark.colors.selection_shine, red_light.colors.selection_shine);
+}
+
+static void a_large_status_bar_grows_the_portrait_status_band(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_STATUS_BAR_INDEX);
+    CHECK(title_is("Portrait status bar"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(STATUS_BAR_LARGE, settings.options[OPTION_STATUS_BAR]);
+    Theme portrait = default_theme_for(true);
+    Theme large = portrait;
+    default_theme_enlarge_status(&large);
+    CHECK(large.metrics.status_height > portrait.metrics.status_height);
+    CHECK(large.metrics.status_icon_size > portrait.metrics.status_icon_size);
+    CHECK_EQUAL(large.metrics.header_height - large.metrics.status_height,
+                portrait.metrics.header_height - portrait.metrics.status_height);
+    Theme landscape = default_theme_for(false);
+    Theme unchanged = landscape;
+    default_theme_enlarge_status(&unchanged);
+    CHECK_EQUAL(landscape.metrics.header_height, unchanged.metrics.header_height);
+    CHECK_EQUAL(landscape.metrics.status_icon_size, unchanged.metrics.status_icon_size);
+    CHECK(unchanged.fonts.status == NULL);
 }
 
 static const uint8_t HELLS_BELLS_LYRICS[] = "[ti:Hells Bells]\n[00:00.50]I'm a rolling thunder\n"
@@ -2538,6 +2565,7 @@ int main(void)
         TEST_CASE(a_listen_history_turned_off_records_nothing),
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
         TEST_CASE(the_light_theme_lightens_the_screens_and_keeps_the_accent),
+        TEST_CASE(a_large_status_bar_grows_the_portrait_status_band),
         TEST_CASE(synced_lyrics_beside_a_track_follow_its_position),
         TEST_CASE(lyrics_in_capitals_are_found_and_the_setting_hides_them),
         TEST_CASE(a_track_without_lyrics_shows_none),

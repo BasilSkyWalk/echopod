@@ -15,6 +15,11 @@ enum {
     FULL_PERCENT = 100
 };
 
+static const Font *status_font(const Theme *theme)
+{
+    return theme->fonts.status != NULL ? theme->fonts.status : theme->fonts.small;
+}
+
 static int icon_top(const Theme *theme)
 {
     int band = theme->metrics.status_height > 0 ? theme->metrics.status_height
@@ -80,7 +85,7 @@ Rect status_bar_bolt_area(const Theme *theme)
 Rect status_bar_percent_area(const Theme *theme, const char *text, bool charging)
 {
     Rect beside = charging ? status_bar_bolt_area(theme) : status_bar_battery_area(theme);
-    int width = text_width(theme->fonts.small, text);
+    int width = text_width(status_font(theme), text);
     return (Rect){beside.x - percent_gap(theme) - width, beside.y, width, beside.height};
 }
 
@@ -101,10 +106,13 @@ Rect status_bar_clock_area(const Theme *theme, StatusBarState state)
     int gap = percent_gap(theme);
     int left = bluetooth.x + bluetooth.width + gap;
     int right = right_items_left(theme, state) - gap;
-    int width = state.clock != NULL ? text_width(theme->fonts.small, state.clock) : 0;
+    int width = state.clock != NULL ? text_width(status_font(theme), state.clock) : 0;
     bool centered = theme->metrics.status_height > 0;
     int x = centered ? (theme->metrics.screen_width - width) / 2 : left;
     int limit = centered ? right : theme->metrics.header_inset;
+    if (centered && x + width > limit) {
+        x = left;
+    }
     if (width == 0 || x < left || x + width > limit) {
         return (Rect){0, 0, 0, 0};
     }
@@ -116,7 +124,7 @@ static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent, bo
     char text[STATUS_BAR_PERCENT_CAPACITY];
     status_bar_percent_text(percent, text, sizeof text);
     Rect area = status_bar_percent_area(theme, text, charging);
-    TextStyle style = {.font = theme->fonts.small, .color = theme->colors.header_text};
+    TextStyle style = {.font = status_font(theme), .color = theme->colors.header_text};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, area, text), .text = text});
 }
@@ -158,6 +166,9 @@ static void draw_battery(Canvas *canvas, const Theme *theme, StatusBarState stat
 
 void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
 {
+    if (state.clock != NULL && rect_is_empty(status_bar_clock_area(theme, state))) {
+        state.hide_percent = true;
+    }
     Rect icon = status_bar_playback_area(theme);
     Color color = theme->colors.header_text;
     if (state.playback == STATUS_PLAYBACK_PLAYING) {
@@ -172,7 +183,7 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
     }
     Rect clock = status_bar_clock_area(theme, state);
     if (!rect_is_empty(clock)) {
-        TextStyle style = {.font = theme->fonts.small, .color = color};
+        TextStyle style = {.font = status_font(theme), .color = color};
         label_draw(canvas, style,
                    (Label){.area = label_centered_area(style.font, clock, state.clock),
                            .text = state.clock});

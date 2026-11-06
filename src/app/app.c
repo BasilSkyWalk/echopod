@@ -210,7 +210,8 @@ static HalDisplayRotation rotation_for(Orientation orientation)
 static int theme_key(const Settings *settings)
 {
     return (int)settings->orientation | settings->options[OPTION_ACCENT] << 2 |
-           settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_THEME] << 6;
+           settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_THEME] << 6 |
+           settings->options[OPTION_STATUS_BAR] << 7;
 }
 
 static void apply_orientation(void)
@@ -224,6 +225,10 @@ static void apply_orientation(void)
     app.theme = default_theme_styled(portrait, accent, flat,
                                      settings->options[OPTION_THEME] == THEME_LIGHT);
     app.stage_theme = default_theme_styled(portrait, accent, flat, false);
+    if (settings->options[OPTION_STATUS_BAR] == STATUS_BAR_LARGE) {
+        default_theme_enlarge_status(&app.theme);
+        default_theme_enlarge_status(&app.stage_theme);
+    }
     hal_display_set_rotation(rotation_for(orientation));
     frame_diff_init(&app.frame_diff, row_hashes, app.theme.metrics.screen_height);
 }
