@@ -40,6 +40,7 @@
 #include "ui/fade.h"
 #include "ui/header.h"
 #include "ui/label.h"
+#include "ui/marquee.h"
 #include "ui/message_screen.h"
 #include "ui/screen_stack.h"
 #include "ui/slide.h"
@@ -757,6 +758,7 @@ static void render_frame(void)
     app.frame_changed = false;
     app.status_bar = current_status_bar();
     bool screen_paints = top_screen()->paints_every_pixel && !fade_running() && !slide_running();
+    marquee_frame_start();
     render((FrameDrawer){.draw = draw_frame, .context = &app}, screen_paints);
     uint32_t render_us = hal_clock_microseconds() - started_us;
     frame_stats_record(&app.send_stats, app.send_us);
@@ -764,6 +766,11 @@ static void render_frame(void)
     draw_profile_finish_frame();
     app.frame_stable = !app.frame_changed;
     app.idle_render_ms = hal_clock_milliseconds() + IDLE_RENDER_MS;
+    uint32_t marquee_wait_ms = marquee_frame_wait_ms();
+    if (marquee_wait_ms > 0 &&
+        !deadline_reached(app.now_ms + marquee_wait_ms, app.idle_render_ms)) {
+        app.idle_render_ms = app.now_ms + marquee_wait_ms;
+    }
 }
 
 static bool frame_needed(uint32_t now_ms)

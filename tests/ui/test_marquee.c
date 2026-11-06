@@ -49,6 +49,41 @@ static void a_zero_speed_never_scrolls(void)
     CHECK_EQUAL(0, marquee_offset(still, LONG_TEXT, VIEW, 5000));
 }
 
+static void the_offset_moves_one_pixel_at_each_wait(void)
+{
+    uint32_t elapsed = 0;
+    int offset = marquee_offset(TIMING, LONG_TEXT, VIEW, elapsed);
+    for (int step = 0; step < LONG_TEXT + GAP; step++) {
+        uint32_t wait = marquee_wait_ms(TIMING, LONG_TEXT, VIEW, elapsed);
+        CHECK(wait > 0);
+        CHECK_EQUAL(offset, marquee_offset(TIMING, LONG_TEXT, VIEW, elapsed + wait - 1));
+        elapsed += wait;
+        int next = marquee_offset(TIMING, LONG_TEXT, VIEW, elapsed);
+        CHECK(next == offset + 1 || (next == 0 && elapsed % CYCLE_MS == 0));
+        offset = next;
+    }
+}
+
+static void the_first_wait_covers_the_pause(void)
+{
+    CHECK_EQUAL((uint32_t)PAUSE_MS + 34, marquee_wait_ms(TIMING, LONG_TEXT, VIEW, 0));
+    CHECK_EQUAL(34u, marquee_wait_ms(TIMING, LONG_TEXT, VIEW, PAUSE_MS));
+    CHECK_EQUAL(0u, marquee_wait_ms(TIMING, 50, VIEW, 0));
+}
+
+static void a_frame_remembers_the_soonest_wait(void)
+{
+    marquee_frame_start();
+    CHECK_EQUAL(0u, marquee_frame_wait_ms());
+    marquee_offset(TIMING, 50, VIEW, 0);
+    CHECK_EQUAL(0u, marquee_frame_wait_ms());
+    marquee_offset(TIMING, LONG_TEXT, VIEW, 0);
+    marquee_offset(TIMING, LONG_TEXT, VIEW, PAUSE_MS + 10);
+    CHECK_EQUAL(24u, marquee_frame_wait_ms());
+    marquee_frame_start();
+    CHECK_EQUAL(0u, marquee_frame_wait_ms());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -58,6 +93,9 @@ int main(void)
         TEST_CASE(a_full_cycle_returns_to_the_start_and_pauses_again),
         TEST_CASE(the_offset_stays_within_one_text_and_gap),
         TEST_CASE(a_zero_speed_never_scrolls),
+        TEST_CASE(the_offset_moves_one_pixel_at_each_wait),
+        TEST_CASE(the_first_wait_covers_the_pause),
+        TEST_CASE(a_frame_remembers_the_soonest_wait),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
