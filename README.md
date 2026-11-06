@@ -14,7 +14,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 - **Cover Flow**, with every album and a Random album tile, and **Now Playing** with the cover, progress and seeking.
 - **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **echo-sync**.
 - **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.
-- **Equalizer:** FiiO's presets, a 7-band Custom EQ, and user Equalizer APO-style preset files from `/EQ`.
+- **Equalizer:** FiiO's presets, a 7-band Custom EQ, and Equalizer APO preset files in `/EQ`, such as AutoEQ's files for your headphones (peak and shelf filters, up to ten).
 - **Portrait mode:** Settings → Orientation turns the screen upright either way, with layouts made for it. The volume rocker turns with it.
 - **Languages:** Settings → Language: English, Simplified Chinese, Japanese, Korean, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Danish, Norwegian, Finnish, Russian, Ukrainian, Polish and Indonesian. The choice applies after a restart. Titles and artists in Cyrillic, Greek, Polish, Czech, Turkish, Romanian and Vietnamese letters draw too.
 - **Audiobooks and podcasts** on their own shelves, with a bookmark for each.
