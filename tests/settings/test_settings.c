@@ -485,6 +485,21 @@ static void a_version_9_file_is_48_bytes_with_the_checksum_at_the_end(void)
     }
 }
 
+static void internal_storage_is_off_by_default_and_saved_at_byte_thirty_eight(void)
+{
+    Settings settings = settings_defaults();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    CHECK_EQUAL(INTERNAL_STORAGE_OFF, settings.options[OPTION_INTERNAL_STORAGE]);
+    CHECK_EQUAL(2, settings_option_count(OPTION_INTERNAL_STORAGE));
+    settings.options[OPTION_INTERNAL_STORAGE] = INTERNAL_STORAGE_ON;
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(38, OPTIONS_FIELD + OPTION_INTERNAL_STORAGE);
+    CHECK_EQUAL(INTERNAL_STORAGE_ON, bytes[38]);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(INTERNAL_STORAGE_ON, decoded.options[OPTION_INTERNAL_STORAGE]);
+}
+
 static void a_version_8_file_keeps_every_value_and_gets_the_new_defaults(void)
 {
     Settings settings = settings_with_every_option_at_its_top();
@@ -566,6 +581,7 @@ int main(void)
         TEST_CASE(the_new_options_default_to_their_first_choice),
         TEST_CASE(the_animation_speed_scales_animation_times),
         TEST_CASE(a_version_9_file_is_48_bytes_with_the_checksum_at_the_end),
+        TEST_CASE(internal_storage_is_off_by_default_and_saved_at_byte_thirty_eight),
         TEST_CASE(a_version_8_file_keeps_every_value_and_gets_the_new_defaults),
         TEST_CASE(a_version_8_file_is_saved_again_as_version_9),
         TEST_CASE(a_short_or_corrupted_version_8_file_is_rejected),

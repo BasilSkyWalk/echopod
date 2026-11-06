@@ -4,6 +4,7 @@
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "core/utf8.h"
+#include "core/volume_path.h"
 
 enum {
     PATH_CAPACITY = 256,
@@ -391,11 +392,28 @@ static bool track_text(const Library *library, BrowseQuery query, BrowseItem ite
     return track_label(library, query, track, text);
 }
 
+bool browse_folder_name(const Library *library, const LibraryFolder *folder, char *buffer,
+                        size_t capacity)
+{
+    if (!library_read_string(library, folder->name, buffer, capacity)) {
+        return false;
+    }
+    size_t length = 0;
+    while (buffer[length] != '\0') {
+        length++;
+    }
+    if (folder->parent == ROOT_FOLDER && volume_is_internal_name(buffer, length)) {
+        StringBuilder builder = string_builder_make(buffer, capacity);
+        string_builder_append(&builder, i18n_text(STR_LIBRARY_INTERNAL_STORAGE));
+    }
+    return true;
+}
+
 static bool folder_text(const Library *library, BrowseItem item, BrowseText text)
 {
     LibraryFolder folder;
     return library_read_folder(library, item.index, &folder) &&
-           library_read_string(library, folder.name, text.label, text.label_capacity);
+           browse_folder_name(library, &folder, text.label, text.label_capacity);
 }
 
 bool browse_item_text(const Library *library, BrowseQuery query, BrowseItem item, BrowseText text)
@@ -438,7 +456,7 @@ static bool subject_title(const Library *library, BrowseQuery query, char *buffe
                library_read_string(library, album.title, buffer, capacity);
     case BROWSE_FOLDER:
         return library_read_folder(library, query.subject, &folder) &&
-               library_read_string(library, folder.name, buffer, capacity);
+               browse_folder_name(library, &folder, buffer, capacity);
     case BROWSE_ARTISTS:
     case BROWSE_ALBUM_ARTISTS:
     case BROWSE_GENRES:

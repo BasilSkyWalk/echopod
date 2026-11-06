@@ -54,3 +54,5 @@ bool browse_child(BrowseQuery parent, BrowseItem item, BrowseQuery *child);
 BrowseQuery browse_group_tracks(BrowseQuery albums);
 bool browse_item_text(const Library *library, BrowseQuery query, BrowseItem item, BrowseText text);
 bool browse_title(const Library *library, BrowseQuery query, char *buffer, size_t capacity);
+bool browse_folder_name(const Library *library, const LibraryFolder *folder, char *buffer,
+                        size_t capacity);

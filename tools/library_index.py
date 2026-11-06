@@ -24,6 +24,7 @@ AUDIO_SUFFIXES = {".flac", ".ogg", ".opus", ".mp3", ".m4a", ".wav", ".wma", ".ap
 PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
 URL_MARKER = "://"
 SPOKEN_FOLDERS = {b"audiobooks", b"audiobook", b"podcasts", b"podcast"}
+INTERNAL_FOLDER = ":internal"
 
 HEADER_PREFIX = struct.Struct("<4sHH")
 SECTION_ENTRY = struct.Struct("<IIHH")
@@ -154,6 +155,10 @@ def first_tag(tags, key):
     return ""
 
 
+def folder_album(path):
+    return "" if str(path.parent) == INTERNAL_FOLDER else path.parent.name
+
+
 def track_from_tags(relative_path, tags, duration_seconds):
     path = PurePosixPath(relative_path)
     file_disc, file_number = numbers_from_filename(path.stem)
@@ -167,7 +172,7 @@ def track_from_tags(relative_path, tags, duration_seconds):
         artist=artist or album_artist or UNKNOWN_ARTIST,
         album_artist=album_artist or artist or UNKNOWN_ARTIST,
         album=f"{album} ({version})" if album and version
-        else album or path.parent.name or UNKNOWN_ALBUM,
+        else album or folder_album(path) or UNKNOWN_ALBUM,
         genre=first_tag(tags, "genre") or UNKNOWN_GENRE,
         year=parse_year(first_tag(tags, "date")),
         disc=min(parse_number(first_tag(tags, "discnumber")) or file_disc or 1, MAX_U8),
@@ -279,13 +284,21 @@ def normalized_tags(audio):
     return {key: [tag_text(value) for value in values] for key, values in raw_tag_values(audio.tags).items()}
 
 
-def read_track(root, path):
+def music_path(prefix, relative):
+    text = relative.as_posix()
+    if not prefix:
+        return text
+    return prefix if text == "." else f"{prefix}/{text}"
+
+
+def read_track(root, path, prefix=""):
     from mutagen import File
     from tag_skim import open_skimming
     with open_skimming(path) as handle:
         audio = File(handle)
     duration = audio.info.length if audio is not None else 0.0
-    return track_from_tags(nfc(path.relative_to(root).as_posix()), normalized_tags(audio), duration)
+    relative = music_path(prefix, path.relative_to(root))
+    return track_from_tags(nfc(relative), normalized_tags(audio), duration)
 
 
 def parse_m3u(text):
@@ -631,33 +644,60 @@ def visible_files(root, suffixes):
             yield path
 
 
-def read_playlist(root, path):
-    folder = nfc(path.parent.relative_to(root).as_posix())
+def read_playlist(root, path, prefix=""):
+    folder = nfc(music_path(prefix, path.parent.relative_to(root)))
     entries = [nfc(entry) for entry in parse_m3u(decode_playlist(path.read_bytes()))]
     return RawPlaylist(nfc(path.stem), "" if folder == "." else folder, entries)
 
 
-def scan(root):
+class MusicRoots:
+    def __init__(self, card, internal=None):
+        self.card = Path(card)
+        self.internal = None if internal is None else Path(internal)
+
+    def __truediv__(self, relative):
+        text = str(relative)
+        if self.internal is not None and text.split("/", 1)[0] == INTERNAL_FOLDER:
+            return self.internal / text[len(INTERNAL_FOLDER) + 1:]
+        return self.card / text
+
+    def files(self, suffixes):
+        found = [(path, self.card, path, "") for path in visible_files(self.card, suffixes)]
+        if self.internal is not None:
+            found += [(self.card.joinpath(INTERNAL_FOLDER, path.relative_to(self.internal)),
+                       self.internal, path, INTERNAL_FOLDER)
+                      for path in visible_files(self.internal, suffixes)]
+        found.sort(key=lambda item: item[0])
+        return [(root, path, prefix) for _, root, path, prefix in found]
+
+
+def scan(root, internal=None):
+    roots = MusicRoots(root, internal)
     tracks, failures = [], []
-    for path in visible_files(root, AUDIO_SUFFIXES):
+    for base, path, prefix in roots.files(AUDIO_SUFFIXES):
         try:
-            tracks.append(read_track(root, path))
+            tracks.append(read_track(base, path, prefix))
         except Exception as error:
-            failures.append(f"{path.relative_to(root)}: {error}")
-    playlists = [read_playlist(root, path) for path in visible_files(root, PLAYLIST_SUFFIXES)]
+            failures.append(f"{music_path(prefix, path.relative_to(base))}: {error}")
+    playlists = [read_playlist(base, path, prefix)
+                 for base, path, prefix in roots.files(PLAYLIST_SUFFIXES)]
     return tracks, playlists, failures
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Index a music folder into an Echo Mini library")
     parser.add_argument("--music", type=Path, required=True, help="music root (read only)")
+    parser.add_argument("--internal", type=Path,
+                        help="the player's internal storage, indexed as the folder "
+                             f"{INTERNAL_FOLDER} (read only)")
     parser.add_argument("--output", type=Path, required=True, help="library.db to write")
     return parser.parse_args()
 
 
 def main():
     arguments = parse_arguments()
-    tracks, playlists, failures = scan(arguments.music.resolve())
+    internal = None if arguments.internal is None else arguments.internal.resolve()
+    tracks, playlists, failures = scan(arguments.music.resolve(), internal)
     for failure in failures:
         print(f"skipped {failure}", file=sys.stderr)
     model = build_library(tracks, playlists)

@@ -70,7 +70,8 @@ static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_TIME_ZONE] = TIME_ZONE_OPTION_COUNT,
     [OPTION_THEME] = 2,
     [OPTION_LYRICS] = 2,
-    [OPTION_FOLDER_VIEW] = 2};
+    [OPTION_FOLDER_VIEW] = 2,
+    [OPTION_INTERNAL_STORAGE] = 2};
 
 _Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
                "the options must fit the file");
