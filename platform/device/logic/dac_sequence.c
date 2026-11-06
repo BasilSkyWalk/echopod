@@ -35,6 +35,7 @@ enum {
     FILTER_MAP = 0x090000,
     BALANCE_UNITS_PER_STEP = 2,
     RAMP_STEP = 6,
+    RAMP_FLOOR = 0xC0,
     VOLUME_STEP_NUMERATOR = 12,
     VOLUME_STEP_DENOMINATOR = 5,
     GAIN_HIGH_VALUE = 0x31,
@@ -305,10 +306,12 @@ uint8_t dac_volume_value(uint8_t level, DacCurve curve)
     return (uint8_t)(top - VOLUME_STEP_NUMERATOR * capped / VOLUME_STEP_DENOMINATOR);
 }
 
-void dac_output_on(const DacBus *bus, uint8_t volume)
+void dac_output_on(const DacBus *bus, uint8_t volume, bool release_mute)
 {
     set_pin(bus, DAC_PIN_ENABLE_A, true);
-    set_pin(bus, DAC_PIN_MUTE, false);
+    if (release_mute) {
+        set_pin(bus, DAC_PIN_MUTE, false);
+    }
     set_pin(bus, DAC_PIN_AMP, true);
     write_channel_values(bus);
     dac_set_volume(bus, volume);
@@ -343,7 +346,11 @@ void dac_set_muted(const DacBus *bus, bool muted, uint8_t volume)
 uint8_t dac_ramp_next(uint8_t current, uint8_t target)
 {
     if (current < target) {
-        return target - current > RAMP_STEP ? (uint8_t)(current + RAMP_STEP) : target;
+        uint32_t next = target - current > RAMP_STEP ? current + RAMP_STEP : target;
+        return next >= RAMP_FLOOR ? target : (uint8_t)next;
+    }
+    if (current > RAMP_FLOOR) {
+        return target > RAMP_FLOOR ? target : RAMP_FLOOR;
     }
     return current - target > RAMP_STEP ? (uint8_t)(current - RAMP_STEP) : target;
 }

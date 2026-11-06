@@ -37,7 +37,8 @@ enum {
     STATUS_CAPACITY = 64,
     BITRATE_CAPACITY = 24,
     RATE_CAPACITY = 16,
-    PORTRAIT_COVER_GAP = 12,
+    PORTRAIT_COVER_TOP = 52,
+    PORTRAIT_COVER_MIN_GAP = 6,
     PORTRAIT_TEXT_GAP = 10,
     PORTRAIT_FORMAT_GAP = 4,
     PORTRAIT_BOTTOM_MARGIN = 2,
@@ -550,7 +551,8 @@ static Layout layout_of(const NowPlayingScreen *now_playing)
             PROGRESS_TOP,           TIMES_TOP, false};
     }
     Image ignored;
-    int cover_top = theme->metrics.header_height + PORTRAIT_COVER_GAP;
+    int cover_top = theme->metrics.header_height + PORTRAIT_COVER_MIN_GAP;
+    cover_top = cover_top > PORTRAIT_COVER_TOP ? cover_top : PORTRAIT_COVER_TOP;
     int title_top = cover_top + COVER_FULL_SIZE + PORTRAIT_TEXT_GAP;
     if (!current_cover(now_playing, &ignored) && !lyrics_shown(now_playing)) {
         title_top = cover_top + (COVER_FULL_SIZE + PORTRAIT_TEXT_GAP) / 2;

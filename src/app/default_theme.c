@@ -48,6 +48,8 @@ const Theme DEFAULT_THEME = {
 enum {
     PORTRAIT_STATUS_HEIGHT = 16,
     PORTRAIT_TITLE_HEIGHT = 24,
+    LARGE_STATUS_HEIGHT = 22,
+    LARGE_STATUS_ICON_SIZE = 14,
     ACCENT_SHADES = 3,
     ACCENTS = 8
 };
@@ -74,6 +76,17 @@ Theme default_theme_for(bool portrait)
         theme.metrics.header_inset = theme.metrics.padding;
     }
     return theme;
+}
+
+void default_theme_enlarge_status(Theme *theme)
+{
+    if (!theme_is_portrait(theme)) {
+        return;
+    }
+    theme->metrics.status_height = LARGE_STATUS_HEIGHT;
+    theme->metrics.header_height = LARGE_STATUS_HEIGHT + PORTRAIT_TITLE_HEIGHT;
+    theme->metrics.status_icon_size = LARGE_STATUS_ICON_SIZE;
+    theme->fonts.status = &FONT_INTER_REGULAR_16;
 }
 
 static const ThemeColors LIGHT_COLORS = {

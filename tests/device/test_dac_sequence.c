@@ -264,7 +264,7 @@ static void output_on_unmutes_and_restores_the_channel_values(void)
 {
     DacBus bus = fresh_bus();
     cursor = 0;
-    dac_output_on(&bus, 0x5E);
+    dac_output_on(&bus, 0x5E, true);
     CHECK(next_pin(DAC_PIN_ENABLE_A, true));
     CHECK(next_pin(DAC_PIN_MUTE, false));
     CHECK(next_pin(DAC_PIN_AMP, true));
@@ -274,6 +274,18 @@ static void output_on_unmutes_and_restores_the_channel_values(void)
     CHECK(next_both(0x090002, 0x5E));
     CHECK(next_delay_ms(10));
     CHECK_EQUAL(cursor, fake.count);
+}
+
+static void output_on_can_leave_the_mute_pin_up(void)
+{
+    DacBus bus = fresh_bus();
+    cursor = 0;
+    dac_output_on(&bus, 0xFF, false);
+    CHECK(next_pin(DAC_PIN_ENABLE_A, true));
+    CHECK(next_pin(DAC_PIN_AMP, true));
+    for (int op = 0; op < fake.count; op++) {
+        CHECK(!(fake.ops[op].kind == OP_PIN && fake.ops[op].map == DAC_PIN_MUTE));
+    }
 }
 
 static void output_off_mutes_and_powers_down(void)
@@ -392,11 +404,20 @@ static void the_louder_bluetooth_curve_tops_out_where_the_wired_one_does(void)
 
 static void a_volume_ramp_moves_six_units_a_step_and_lands_on_the_target(void)
 {
-    CHECK_EQUAL(0xF9, dac_ramp_next(0xFF, 0x02));
+    CHECK_EQUAL(0xBA, dac_ramp_next(0xC0, 0x02));
     CHECK_EQUAL(0x02, dac_ramp_next(0x05, 0x02));
     CHECK_EQUAL(0x08, dac_ramp_next(0x02, 0xFF));
     CHECK_EQUAL(0xFF, dac_ramp_next(0xFC, 0xFF));
     CHECK_EQUAL(0x30, dac_ramp_next(0x30, 0x30));
+}
+
+static void a_volume_ramp_skips_the_inaudible_end(void)
+{
+    CHECK_EQUAL(0xC0, dac_ramp_next(0xFF, 0x02));
+    CHECK_EQUAL(0xC8, dac_ramp_next(0xFF, 0xC8));
+    CHECK_EQUAL(0xFF, dac_ramp_next(0xBA, 0xFF));
+    CHECK_EQUAL(0xBF, dac_ramp_next(0xB9, 0xFF));
+    CHECK_EQUAL(0xB3, dac_ramp_next(0xAD, 0xB3));
 }
 
 int main(void)
@@ -410,6 +431,7 @@ int main(void)
         TEST_CASE(one_chip_reporting_not_ready_carries_on),
         TEST_CASE(a_silent_bus_reports_no_reply),
         TEST_CASE(output_on_unmutes_and_restores_the_channel_values),
+        TEST_CASE(output_on_can_leave_the_mute_pin_up),
         TEST_CASE(output_off_mutes_and_powers_down),
         TEST_CASE(muting_holds_the_pin_and_mutes_both_chips),
         TEST_CASE(setting_the_volume_writes_both_pcm_volume_registers),
@@ -421,6 +443,7 @@ int main(void)
         TEST_CASE(balance_attenuates_one_chip_only),
         TEST_CASE(the_louder_bluetooth_curve_tops_out_where_the_wired_one_does),
         TEST_CASE(a_volume_ramp_moves_six_units_a_step_and_lands_on_the_target),
+        TEST_CASE(a_volume_ramp_skips_the_inaudible_end),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

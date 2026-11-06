@@ -86,6 +86,7 @@ int fake_hal_time_write_count(void);
 HalTime fake_hal_time(void);
 int fake_hal_power_off_count(void);
 void fake_hal_set_usb_start(bool started);
+bool fake_hal_start_hold_required(void);
 int fake_hal_audio_gain(void);
 int fake_hal_audio_filter(void);
 int fake_hal_audio_balance(void);

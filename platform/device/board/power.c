@@ -14,6 +14,11 @@ static const GpioPin POWER_KEY = {2, 5};
 static const GpioPin POWER_HOLD = {2, 6};
 static const GpioPin CHARGE_STATUS = {2, 3};
 
+enum {
+    START_HOLD_MS = 1000,
+    CUT_WAIT_MS = 1000
+};
+
 static bool charge_status_ready;
 static HalPowerHold boot_hold;
 static bool usb_start;
@@ -74,6 +79,23 @@ bool hal_power_take_usb_start(void)
     bool started = usb_start;
     usb_start = false;
     return started;
+}
+
+void hal_power_confirm_start(bool hold_required)
+{
+    if (!hold_required || boot_hold.usb_power || usb_vbus_present() ||
+        hal_system_start_info().warm) {
+        return;
+    }
+    while (gpio_read(POWER_KEY) && hal_clock_milliseconds() < START_HOLD_MS) {
+    }
+    if (gpio_read(POWER_KEY)) {
+        return;
+    }
+    board_backlight_off();
+    gpio_output(POWER_HOLD, false);
+    board_delay_ms(CUT_WAIT_MS);
+    gpio_output(POWER_HOLD, true);
 }
 static BatteryDisplay display;
 static bool usb_seen;
