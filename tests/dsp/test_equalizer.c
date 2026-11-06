@@ -182,6 +182,43 @@ static void a_fade_can_finish_inside_a_block(void)
     CHECK_EQUAL(2000, equalizer.current.curve.bands[0].frequency_hz);
 }
 
+static int32_t largest_step(Equalizer *equalizer, int frames, int32_t *previous)
+{
+    int32_t largest = 0;
+    for (int frame = 0; frame < frames; frame++) {
+        int32_t left = (int32_t)HALF_SCALE;
+        int32_t right = (int32_t)HALF_SCALE;
+        process_pair(equalizer, &left, &right);
+        int32_t step = abs(left - *previous);
+        largest = step > largest ? step : largest;
+        *previous = left;
+    }
+    return largest;
+}
+
+static void a_change_during_a_fade_carries_on_from_the_current_level(void)
+{
+    EqualizerCurve first = one_band(1000, 0, 14);
+    first.bands[0].gain_tenths = -1;
+    Equalizer equalizer = equalizer_for(first, 48000);
+    int32_t previous = (int32_t)HALF_SCALE;
+    int32_t smooth = (int32_t)(HALF_SCALE / 64);
+    CHECK(largest_step(&equalizer, 64, &previous) < smooth);
+    EqualizerCurve second = first;
+    second.bands[0].frequency_hz = 2000;
+    equalizer_set_curve(&equalizer, &second);
+    CHECK(largest_step(&equalizer, EQUALIZER_FADE_FRAMES + 96, &previous) < smooth);
+    CHECK(equalizer.has_pending && !equalizer.fading_out);
+    EqualizerCurve third = first;
+    third.bands[0].frequency_hz = 3000;
+    equalizer_set_curve(&equalizer, &third);
+    CHECK(largest_step(&equalizer, 40, &previous) < smooth);
+    equalizer_set_curve(&equalizer, &second);
+    CHECK(largest_step(&equalizer, 3 * EQUALIZER_FADE_FRAMES, &previous) < smooth);
+    CHECK(!equalizer.has_pending);
+    CHECK_EQUAL(2000, equalizer.current.curve.bands[0].frequency_hz);
+}
+
 static void silence_after_loud_bass_comes_out_as_silence(void)
 {
     EqualizerCurve curve = {.band_count = 7};
@@ -385,6 +422,7 @@ int main(void)
         TEST_CASE(both_channels_are_filtered_on_their_own),
         TEST_CASE(changing_a_gain_keeps_the_filter_history),
         TEST_CASE(a_fade_can_finish_inside_a_block),
+        TEST_CASE(a_change_during_a_fade_carries_on_from_the_current_level),
         TEST_CASE(silence_after_loud_bass_comes_out_as_silence),
         TEST_CASE(a_batch_sounds_the_same_as_one_frame_at_a_time),
         TEST_CASE(a_tenth_decibel_cut_is_honoured),

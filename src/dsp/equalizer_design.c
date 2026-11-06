@@ -365,10 +365,14 @@ void equalizer_set_curve(Equalizer *equalizer, const EqualizerCurve *curve)
         design_chain(&equalizer->current, curve, equalizer->rate, false);
         return;
     }
+    if (!equalizer->has_pending) {
+        equalizer->fade_remaining = EQUALIZER_FADE_FRAMES;
+    } else if (!equalizer->fading_out) {
+        equalizer->fade_remaining = (uint16_t)(EQUALIZER_FADE_FRAMES - equalizer->fade_remaining);
+    }
     equalizer->pending_curve = *curve;
     equalizer->has_pending = 1;
     equalizer->fading_out = 1;
-    equalizer->fade_remaining = EQUALIZER_FADE_FRAMES;
 }
 
 void equalizer_apply_pending(Equalizer *equalizer)
