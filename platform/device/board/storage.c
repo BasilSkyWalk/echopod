@@ -149,7 +149,8 @@ static void stamp_from_clock(void)
     }
 }
 
-HalReserveResult hal_file_reserve(const char *path, uint32_t size)
+static HalReserveResult change_card(FatReserveResult (*change)(FatVolume *, const char *, uint32_t),
+                                    const char *path, uint32_t size)
 {
     if (!mounted()) {
         return HAL_RESERVE_FAILED;
@@ -158,10 +159,20 @@ HalReserveResult hal_file_reserve(const char *path, uint32_t size)
     card_device = volume.device;
     volume.device.read = read_and_beat;
     board_start_record_step(HAL_START_STEP_CARD_WRITE);
-    FatReserveResult result = fat_reserve(&volume, path, size);
+    FatReserveResult result = change(&volume, path, size);
     board_start_record_step_done();
     volume.device = card_device;
     return reserve_result(result);
+}
+
+HalReserveResult hal_file_reserve(const char *path, uint32_t size)
+{
+    return change_card(fat_reserve, path, size);
+}
+
+HalReserveResult hal_file_grow(const char *path, uint32_t size)
+{
+    return change_card(fat_grow, path, size);
 }
 
 void storage_reset(void)

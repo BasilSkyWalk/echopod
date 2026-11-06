@@ -375,7 +375,7 @@ find_program(FSCK_EXFAT fsck_exfat)
 if(FSCK_MSDOS AND FSCK_EXFAT)
     add_test(NAME created_cards_pass_fsck
         COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_card_images.py
-            ${ECHO_CREATED_CARDS} --expect 4
+            ${ECHO_CREATED_CARDS} --expect 7
     )
     set_tests_properties(created_cards_pass_fsck PROPERTIES
         FIXTURES_REQUIRED created_cards

@@ -26,6 +26,7 @@ typedef enum HalReserveResult {
 } HalReserveResult;
 
 HalReserveResult hal_file_reserve(const char *path, uint32_t size);
+HalReserveResult hal_file_grow(const char *path, uint32_t size);
 
 enum {
     HAL_NAME_CAPACITY = 768

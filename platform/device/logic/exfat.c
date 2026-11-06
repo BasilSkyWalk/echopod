@@ -150,6 +150,7 @@ bool exfat_find_entry(FatVolume *volume, FatFile *directory, const char *name, s
         }
         read_names(volume, directory, index + 1, &set);
         if (fat_name_matches(volume->long_name, set.name_length, name, length)) {
+            volume->found_entry = index;
             return file_from_set(&set, found);
         }
         index += 1u + set.secondaries;

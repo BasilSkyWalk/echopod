@@ -157,6 +157,7 @@ static bool find_fat_entry(FatVolume *volume, FatFile *directory, const char *na
         } else if ((entry[ATTRIBUTES] & ATTRIBUTE_VOLUME_ID) == 0 &&
                    entry_matches(volume, &long_name, entry, name, length)) {
             *found = entry_file(volume, entry);
+            volume->found_entry = index;
             return true;
         } else {
             long_name.valid = false;

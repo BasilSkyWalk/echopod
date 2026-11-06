@@ -29,6 +29,8 @@ void fake_hal_set_language_pack(const uint8_t *pack, uint32_t size);
 uint32_t fake_hal_language_requested(void);
 void fake_hal_set_reserve_result(HalReserveResult result);
 int fake_hal_reserve_count(void);
+void fake_hal_set_grow_limit(uint32_t limit);
+int fake_hal_grow_count(void);
 uint32_t fake_hal_reserved_size(const char *path);
 int fake_hal_scratch_borrow_count(void);
 void fake_hal_refuse_scratch(bool refused);

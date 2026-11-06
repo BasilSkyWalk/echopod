@@ -14,6 +14,8 @@ enum {
     ATTRIBUTE_DIRECTORY = 0x10,
     ATTRIBUTE_ARCHIVE = 0x20,
     STREAM_FLAGS = 0x03,
+    FLAG_NO_FAT_CHAIN = 0x02,
+    MAXIMUM_GROW_SET = 19,
     NAME_UNITS_PER_ENTRY = 15,
     MAXIMUM_SET_ENTRIES = 2 +
         (FAT_RESERVE_NAME_LIMIT + NAME_UNITS_PER_ENTRY - 1) / NAME_UNITS_PER_ENTRY,
@@ -260,5 +262,111 @@ FatReserveResult exfat_create_entry(FatVolume *volume, FatFile *parent, const Fa
     bool written = mark_allocated(volume, &bitmap, first, clusters) &&
                    fat_clear_sectors(volume, lba, fat_new_cleared_sectors(volume, entry)) &&
                    write_set(volume, parent, slot, entries, count);
+    return written ? FAT_RESERVE_CREATED : FAT_RESERVE_FAILED;
+}
+
+static bool bitmap_free(FatVolume *volume, void *context, uint32_t cluster, bool *free)
+{
+    uint32_t bit = cluster - FIRST_CLUSTER;
+    if (!bitmap_sector(volume, context, bit / BITS_PER_SECTOR)) {
+        return false;
+    }
+    uint32_t within = bit % BITS_PER_SECTOR;
+    *free =
+        (fat_cached_sector(volume)[within / BITS_PER_BYTE] >> (within % BITS_PER_BYTE) & 1u) == 0;
+    return true;
+}
+
+static bool claim_bits(FatVolume *volume, void *context, uint32_t first, uint32_t count)
+{
+    return mark_allocated(volume, context, first, count);
+}
+
+static bool run_free(FatVolume *volume, FatFile *bitmap, uint32_t first, uint32_t count)
+{
+    if (first + count > volume->cluster_count + FIRST_CLUSTER || first + count < first) {
+        return false;
+    }
+    for (uint32_t cluster = first; cluster < first + count; cluster++) {
+        bool free = false;
+        if (!bitmap_free(volume, bitmap, cluster, &free) || !free) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool read_set_entries(FatVolume *volume, FatFile *parent, uint32_t index, uint8_t *entries,
+                             uint32_t *count)
+{
+    const uint8_t *file = fat_read_entry(volume, parent, index);
+    if (file == NULL || file[0] != ENTRY_FILE || file[1] < 1 || file[1] >= MAXIMUM_GROW_SET) {
+        return false;
+    }
+    *count = 1u + file[1];
+    for (uint32_t entry = 0; entry < *count; entry++) {
+        const uint8_t *bytes = fat_read_entry(volume, parent, index + entry);
+        if (bytes == NULL) {
+            return false;
+        }
+        for (uint32_t offset = 0; offset < ENTRY_SIZE; offset++) {
+            entries[entry * ENTRY_SIZE + offset] = bytes[offset];
+        }
+    }
+    return entries[ENTRY_SIZE] == ENTRY_STREAM;
+}
+
+static FatReserveResult extend(FatVolume *volume, FatFile *bitmap, FatFile file, uint8_t *stream,
+                               uint32_t size)
+{
+    bool contiguous = (stream[1] & FLAG_NO_FAT_CHAIN) != 0;
+    uint32_t have = fat_clusters_for(volume, fat_le32(stream + 24));
+    uint32_t needed = fat_clusters_for(volume, size) - have;
+    file.contiguous = contiguous;
+    uint32_t last =
+        contiguous ? file.first_cluster + have - 1 : fat_last_cluster(volume, file, have);
+    if (have == 0 || last < FIRST_CLUSTER) {
+        return FAT_RESERVE_FAILED;
+    }
+    if (needed == 0) {
+        return FAT_RESERVE_CREATED;
+    }
+    if (contiguous && run_free(volume, bitmap, last + 1, needed)) {
+        return mark_allocated(volume, bitmap, last + 1, needed) ? FAT_RESERVE_CREATED
+                                                                : FAT_RESERVE_FAILED;
+    }
+    if (contiguous && !fat_write_chain(volume, file.first_cluster, have)) {
+        return FAT_RESERVE_FAILED;
+    }
+    FatGrowth growth = {bitmap_free, claim_bits, bitmap, last + 1, needed, last};
+    uint32_t final = 0;
+    stream[1] &= (uint8_t)~FLAG_NO_FAT_CHAIN;
+    return fat_grow_chain(volume, &growth, &final);
+}
+
+FatReserveResult exfat_grow_entry(FatVolume *volume, FatFile *parent, uint32_t index, FatFile file,
+                                  uint32_t size)
+{
+    FatFile bitmap;
+    uint8_t entries[MAXIMUM_GROW_SET * ENTRY_SIZE];
+    uint32_t count = 0;
+    if (!find_bitmap(volume, &bitmap) ||
+        !read_set_entries(volume, parent, index, entries, &count)) {
+        return FAT_RESERVE_FAILED;
+    }
+    uint8_t *stream = entries + ENTRY_SIZE;
+    if (fat_le32(stream + 28) != 0) {
+        return FAT_RESERVE_FAILED;
+    }
+    FatReserveResult result = extend(volume, &bitmap, file, stream, size);
+    if (result != FAT_RESERVE_CREATED) {
+        return result;
+    }
+    put32(stream + 8, size);
+    put32(stream + 12, 0);
+    put32(stream + 24, size);
+    put16(entries + 2, set_checksum(entries, count));
+    bool written = write_entry(volume, parent, index + 1, stream) &&
+                   write_entry(volume, parent, index, entries);
     return written ? FAT_RESERVE_CREATED : FAT_RESERVE_FAILED;
 }

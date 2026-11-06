@@ -350,6 +350,221 @@ static void new_entries_carry_the_stamp_the_clock_gave(void)
     CHECK_EQUAL(fixed, fat_new_stamp());
 }
 
+static uint32_t cluster_bytes(const Card *card)
+{
+    return (uint32_t)SECTOR_SIZE << card->volume.cluster_shift;
+}
+
+static void write_pattern(Card *card, const char *path, uint32_t seed, uint32_t size)
+{
+    FatFile file;
+    CHECK(fat_open(&card->volume, path, &file));
+    uint8_t *bytes = malloc(size + 1);
+    for (uint32_t index = 0; index < size; index++) {
+        bytes[index] = pattern_byte(seed, index);
+    }
+    CHECK(fat_write(&card->volume, &file, 0, bytes, size));
+    free(bytes);
+}
+
+static void check_pattern_start(Card *card, const char *path, uint32_t seed, uint32_t length)
+{
+    FatFile file;
+    CHECK(fat_open(&card->volume, path, &file));
+    uint8_t *bytes = malloc(length + 1);
+    CHECK(fat_read(&card->volume, &file, 0, bytes, length));
+    uint32_t mismatches = 0;
+    for (uint32_t index = 0; index < length; index++) {
+        mismatches += bytes[index] != pattern_byte(seed, index);
+    }
+    CHECK_EQUAL(0, mismatches);
+    free(bytes);
+}
+
+static bool is_contiguous(Card *card, const char *path)
+{
+    FatFile file;
+    CHECK(fat_open(&card->volume, path, &file));
+    return file.contiguous;
+}
+
+static void check_grow(const char *name, const char *saved)
+{
+    Card *card = mounted(name);
+    uint32_t cluster = cluster_bytes(card);
+    uint32_t grown = 10 * cluster + 100;
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.echo/grow.bin", 3 * cluster));
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.echo/after.bin", cluster));
+    write_pattern(card, "/.echo/grow.bin", 7, 3 * cluster);
+    write_pattern(card, "/.echo/after.bin", 9, cluster);
+    CHECK_EQUAL(FAT_RESERVE_EXISTS, fat_grow(&card->volume, "/.echo/grow.bin", 3 * cluster));
+    CHECK_EQUAL(FAT_RESERVE_FAILED, fat_grow(&card->volume, "/.echo/missing.bin", grown));
+    CHECK_EQUAL(FAT_RESERVE_FAILED, fat_grow(&card->volume, "/.echo", grown));
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_grow(&card->volume, "/.echo/grow.bin", grown));
+    remount(card);
+    check_pattern_start(card, "/.echo/grow.bin", 7, 3 * cluster);
+    CHECK(!is_contiguous(card, "/.echo/grow.bin"));
+    write_pattern(card, "/.echo/grow.bin", 5, grown);
+    remount(card);
+    check_pattern_file(card, "/.echo/grow.bin", 5, grown);
+    check_pattern_file(card, "/.echo/after.bin", 9, cluster);
+    check_fixture_files(card);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_grow(&card->volume, "/.echo/grow.bin", grown + cluster));
+    remount(card);
+    check_pattern_start(card, "/.echo/grow.bin", 5, grown);
+    save_card(card, saved);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_file_grows_past_the_files_after_it_and_keeps_its_data(void)
+{
+    check_grow("fat32_mbr", "fat32_grown");
+    check_grow("fat16_superfloppy", "fat16_grown");
+    check_grow("exfat_mbr", "exfat_grown");
+}
+
+static void an_exfat_file_with_free_clusters_after_it_stays_contiguous(void)
+{
+    Card *card = mounted("exfat_mbr");
+    uint32_t cluster = cluster_bytes(card);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.echo/tail.bin", 2 * cluster));
+    write_pattern(card, "/.echo/tail.bin", 3, 2 * cluster);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_grow(&card->volume, "/.echo/tail.bin", 6 * cluster));
+    remount(card);
+    CHECK(is_contiguous(card, "/.echo/tail.bin"));
+    check_contiguous(card, "/.echo/tail.bin");
+    check_pattern_start(card, "/.echo/tail.bin", 3, 2 * cluster);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.echo/next.bin", cluster));
+    check_cleared_file(card, "/.echo/next.bin", cluster);
+    check_pattern_start(card, "/.echo/tail.bin", 3, 2 * cluster);
+    sparse_card_free(&card->sparse);
+}
+
+static void raw_update(Card *card, uint32_t lba, uint32_t within, const uint8_t *bytes,
+                       uint32_t length)
+{
+    BlockDevice device = sparse_card_device(&card->sparse);
+    uint8_t sector[SECTOR_SIZE];
+    CHECK(device.read(device.context, lba, 1, sector));
+    memcpy(sector + within, bytes, length);
+    CHECK(device.write(device.context, lba, 1, sector));
+}
+
+static uint32_t first_cluster_of(Card *card, const char *path)
+{
+    FatFile file;
+    CHECK(fat_open(&card->volume, path, &file));
+    return file.first_cluster;
+}
+
+static uint32_t exfat_bitmap_lba(Card *card)
+{
+    BlockDevice device = sparse_card_device(&card->sparse);
+    uint8_t sector[SECTOR_SIZE];
+    uint32_t root =
+        card->volume.data_start + ((card->volume.root_cluster - 2) << card->volume.cluster_shift);
+    CHECK(device.read(device.context, root, 1, sector));
+    for (uint32_t offset = 0; offset < SECTOR_SIZE; offset += 32) {
+        if (sector[offset] == 0x81) {
+            uint32_t first = (uint32_t)sector[offset + 20] | (uint32_t)sector[offset + 21] << 8 |
+                             (uint32_t)sector[offset + 22] << 16 |
+                             (uint32_t)sector[offset + 23] << 24;
+            return card->volume.data_start + ((first - 2) << card->volume.cluster_shift);
+        }
+    }
+    CHECK(false);
+    return 0;
+}
+
+static void free_cluster(Card *card, uint32_t cluster)
+{
+    FatVolume *volume = &card->volume;
+    static const uint8_t ZERO[4] = {0};
+    if (volume->type == FAT_TYPE_EXFAT) {
+        uint32_t bit = cluster - 2;
+        uint32_t lba = exfat_bitmap_lba(card) + bit / (SECTOR_SIZE * 8);
+        BlockDevice device = sparse_card_device(&card->sparse);
+        uint8_t sector[SECTOR_SIZE];
+        CHECK(device.read(device.context, lba, 1, sector));
+        sector[bit % (SECTOR_SIZE * 8) / 8] &= (uint8_t)~(1u << (bit % 8));
+        CHECK(device.write(device.context, lba, 1, sector));
+        return;
+    }
+    uint32_t width = volume->type == FAT_TYPE_16 ? 2 : 4;
+    for (uint32_t copy = 0; copy < volume->fat_count; copy++) {
+        uint32_t offset = cluster * width;
+        raw_update(card, volume->fat_start + copy * volume->fat_sectors + offset / SECTOR_SIZE,
+                   offset % SECTOR_SIZE, ZERO, width);
+    }
+}
+
+static void fill_the_card(Card *card)
+{
+    uint32_t cluster = cluster_bytes(card);
+    uint32_t clusters = card->volume.cluster_count;
+    int index = 0;
+    FatReserveResult result = FAT_RESERVE_NO_SPACE;
+    while (clusters > 0) {
+        char path[32];
+        snprintf(path, sizeof path, "/fill/f%d.bin", index);
+        result = fat_reserve(&card->volume, path, clusters * cluster);
+        if (result == FAT_RESERVE_CREATED) {
+            index++;
+        } else {
+            CHECK_EQUAL(FAT_RESERVE_NO_SPACE, result);
+            clusters /= 2;
+        }
+    }
+}
+
+static void check_fragmented(const char *name)
+{
+    enum {
+        PIECES = 8
+    };
+    Card *card = mounted(name);
+    uint32_t cluster = cluster_bytes(card);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/target.bin", cluster));
+    write_pattern(card, "/target.bin", 11, cluster);
+    for (int index = 0; index < PIECES; index++) {
+        char path[32];
+        snprintf(path, sizeof path, "/p/piece%d.bin", index);
+        CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, path, cluster));
+        write_pattern(card, path, (uint32_t)index, cluster);
+    }
+    fill_the_card(card);
+    for (int index = 1; index < PIECES; index += 2) {
+        char path[32];
+        snprintf(path, sizeof path, "/p/piece%d.bin", index);
+        free_cluster(card, first_cluster_of(card, path));
+    }
+    remount(card);
+    uint32_t grown = (1 + PIECES / 2) * cluster;
+    CHECK_EQUAL(FAT_RESERVE_NO_SPACE, fat_grow(&card->volume, "/target.bin", grown + 1));
+    check_pattern_file(card, "/target.bin", 11, cluster);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_grow(&card->volume, "/target.bin", grown));
+    remount(card);
+    check_pattern_start(card, "/target.bin", 11, cluster);
+    write_pattern(card, "/target.bin", 13, grown);
+    remount(card);
+    check_pattern_file(card, "/target.bin", 13, grown);
+    for (int index = 0; index < PIECES; index += 2) {
+        char path[32];
+        snprintf(path, sizeof path, "/p/piece%d.bin", index);
+        check_pattern_file(card, path, (uint32_t)index, cluster);
+    }
+    check_fixture_files(card);
+    CHECK_EQUAL(FAT_RESERVE_NO_SPACE, fat_grow(&card->volume, "/target.bin", grown + cluster));
+    sparse_card_free(&card->sparse);
+}
+
+static void a_file_grows_into_scattered_free_clusters_and_a_full_card_refuses(void)
+{
+    check_fragmented("fat32_mbr");
+    check_fragmented("fat16_superfloppy");
+    check_fragmented("exfat_mbr");
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -364,6 +579,9 @@ int main(void)
         TEST_CASE(lower_case_short_names_keep_their_case),
         TEST_CASE(reserving_32_megabytes_takes_few_writes),
         TEST_CASE(a_full_fat32_card_is_scanned_at_most_once_for_new_files),
+        TEST_CASE(a_file_grows_past_the_files_after_it_and_keeps_its_data),
+        TEST_CASE(an_exfat_file_with_free_clusters_after_it_stays_contiguous),
+        TEST_CASE(a_file_grows_into_scattered_free_clusters_and_a_full_card_refuses),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
