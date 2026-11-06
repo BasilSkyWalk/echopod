@@ -221,6 +221,16 @@ bool emmc_volume_write(void *context, uint32_t lba, uint32_t count, const void *
            emmc_write(context, emmc.layout.volume_start + lba, count, buffer);
 }
 
+bool emmc_status(uint32_t *status)
+{
+    uint32_t words[4] = {0, 0, 0, 0};
+    if (!started || !command(CMD_SEND_STATUS, RCA_ARGUMENT, SD_RESPONSE_SHORT, words)) {
+        return false;
+    }
+    *status = words[0];
+    return true;
+}
+
 bool emmc_start(EmmcInfo *info)
 {
     if (!started) {

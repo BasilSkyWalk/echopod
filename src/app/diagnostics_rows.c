@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "app/update_record.h"
 #include "diagnostics_values.h"
 #include "hal/audio.h"
 #include "hal/display.h"
@@ -80,6 +81,15 @@ const char *diagnostics_row_usb_last(const void *context)
     return usb_last_text;
 }
 
+static char usb_errors_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+const char *diagnostics_row_usb_errors(const void *context)
+{
+    (void)context;
+    diagnostics_usb_errors_text(hal_system_usb_last(), usb_errors_text, sizeof usb_errors_text);
+    return usb_errors_text;
+}
+
 static char panel_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 const char *diagnostics_row_panel(const void *context)
@@ -109,4 +119,36 @@ const char *diagnostics_row_clock(const void *context)
     }
     diagnostics_time_text(clock_time, clock_text, sizeof clock_text);
     return clock_text;
+}
+
+static char last_update_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+const char *diagnostics_row_last_update(const void *context)
+{
+    (void)context;
+    HalUpdateRecord update;
+    if (!update_record_read(&update)) {
+        update = hal_system_start_info().last_update;
+    }
+    diagnostics_update_text(update, last_update_text, sizeof last_update_text);
+    return last_update_text;
+}
+
+static char last_stack_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+const char *diagnostics_row_last_stack(const void *context)
+{
+    (void)context;
+    diagnostics_last_stack_text(hal_system_start_info(), last_stack_text, sizeof last_stack_text);
+    return last_stack_text;
+}
+
+static char stack_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+const char *diagnostics_row_stack(const void *context)
+{
+    (void)context;
+    diagnostics_stack_text(hal_system_stack_usage(), hal_system_start_info(), stack_text,
+                           sizeof stack_text);
+    return stack_text;
 }

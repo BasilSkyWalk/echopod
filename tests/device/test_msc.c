@@ -526,6 +526,44 @@ static void history_records_only_the_first_lun(void)
     CHECK_EQUAL(0x12, history.entries[0].opcode);
 }
 
+static void failures_are_counted_per_lun(void)
+{
+    uint8_t block[10];
+    Msc *msc = started();
+    failing_read_lba = 2;
+    read_10_block(block, 0x28, 2, 1);
+    send_command(msc, 512, true, 1, block, 10);
+    check_csw(collect(msc), 1, 512);
+    send_command(msc, 512, true, 1, block, 10);
+    collect(msc);
+    send_command(msc, 512, true, 0, block, 10);
+    collect(msc);
+    MscStats stats = msc_stats(msc);
+    CHECK_EQUAL(1, stats.lun_failures[0]);
+    CHECK_EQUAL(2, stats.lun_failures[1]);
+    CHECK_EQUAL(3, stats.read_failures);
+}
+
+static void history_records_failed_transfers_on_any_lun(void)
+{
+    static const uint8_t ready[6] = {0x00};
+    uint8_t block[10];
+    Msc *msc = started();
+    msc->luns[1].present = false;
+    send_command(msc, 0, false, 1, ready, 6);
+    collect(msc);
+    msc->luns[1].present = true;
+    failing_read_lba = 5;
+    read_10_block(block, 0x28, 5, 1);
+    send_command(msc, 512, true, 1, block, 10);
+    collect(msc);
+    MscHistory history = msc_history(msc);
+    CHECK_EQUAL(1, history.count);
+    CHECK_EQUAL(0x28, history.entries[0].opcode);
+    CHECK_EQUAL(1, history.entries[0].lun);
+    CHECK_EQUAL(1, history.entries[0].status);
+}
+
 static int collect_chunks(Msc *msc, uint32_t capacity, uint8_t *data, uint32_t *lengths)
 {
     static uint32_t chunk[128];
@@ -923,6 +961,8 @@ int main(void)
         TEST_CASE(history_holds_the_most_recent_entries),
         TEST_CASE(each_lun_keeps_its_own_sense),
         TEST_CASE(history_records_only_the_first_lun),
+        TEST_CASE(failures_are_counted_per_lun),
+        TEST_CASE(history_records_failed_transfers_on_any_lun),
         TEST_CASE(sectors_come_out_in_whole_sector_chunks),
         TEST_CASE(a_reply_fits_in_one_chunk),
         TEST_CASE(prefetching_reads_the_next_sector_once),

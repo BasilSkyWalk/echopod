@@ -40,6 +40,25 @@ typedef struct SdCard {
     uint8_t bus_width;
 } SdCard;
 
+typedef struct SdRetry {
+    bool (*transfer)(void *context);
+    bool (*resume)(void *context);
+    bool (*restart)(void *context);
+    void *context;
+} SdRetry;
+
+typedef struct SdRetryStats {
+    uint32_t retries;
+    uint32_t restarts;
+    uint32_t recovered;
+    uint32_t failed;
+} SdRetryStats;
+
+enum {
+    SD_RETRY_ATTEMPTS = 2
+};
+
 bool sd_card_init(SdCard *card, const SdHost *host);
+bool sd_card_retry(const SdRetry *retry, SdRetryStats *stats);
 uint32_t sd_card_address(const SdCard *card, uint32_t lba);
 uint32_t sd_card_rca_argument(const SdCard *card);

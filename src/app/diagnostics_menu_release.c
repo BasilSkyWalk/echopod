@@ -6,7 +6,7 @@
 #include "diagnostics_rows.h"
 
 enum {
-    RELEASE_DIAGNOSTICS_COUNT = 11
+    RELEASE_DIAGNOSTICS_COUNT = 15
 };
 
 static MenuItem value_item(StringId label, const char *(*value)(const void *context))
@@ -32,10 +32,14 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
     items[4] = value_item(STR_DIAG_LAST_STEP, diagnostics_row_last_step);
     items[5] = value_item(STR_DIAG_LAST_BATTERY, diagnostics_row_last_battery);
     items[6] = value_item(STR_DIAG_LAST_USB, diagnostics_row_usb_last);
-    items[7] = value_item(STR_DIAG_JACK_SINGLE_ENDED, diagnostics_row_jack_single_ended);
-    items[8] = value_item(STR_DIAG_JACK_BALANCED, diagnostics_row_jack_balanced);
-    items[9] = value_item(STR_DIAG_PANEL, diagnostics_row_panel);
-    items[10] = action_item(STR_DIAG_CLOCK, diagnostics_row_clock_read, diagnostics_row_clock);
+    items[7] = value_item(STR_DIAG_USB_ERRORS, diagnostics_row_usb_errors);
+    items[8] = value_item(STR_DIAG_JACK_SINGLE_ENDED, diagnostics_row_jack_single_ended);
+    items[9] = value_item(STR_DIAG_JACK_BALANCED, diagnostics_row_jack_balanced);
+    items[10] = value_item(STR_DIAG_PANEL, diagnostics_row_panel);
+    items[11] = action_item(STR_DIAG_CLOCK, diagnostics_row_clock_read, diagnostics_row_clock);
+    items[12] = value_item(STR_DIAG_LAST_UPDATE, diagnostics_row_last_update);
+    items[13] = value_item(STR_DIAG_LAST_STACK, diagnostics_row_last_stack);
+    items[14] = value_item(STR_DIAG_STACK, diagnostics_row_stack);
     app_screens_build_menu(&screens->diagnostics, i18n_text(STR_DIAG_TITLE), items,
                            RELEASE_DIAGNOSTICS_COUNT, theme);
 }

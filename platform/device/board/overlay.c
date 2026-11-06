@@ -10,12 +10,15 @@
 #define OVERLAY_CAPACITY 0x15000u
 #define OVERLAY_IMAGE_OFFSET 0x200000u
 #define OVERLAY_MAGIC 0x4C564F45u
+#define CODE_BASE 0x03050000u
 
 enum {
     SECTOR_BYTES = 512,
     HEADER_BYTES = 16,
     SECTORS_PER_READ = 8
 };
+
+extern const uint8_t device_code_end[];
 
 static uint32_t le32(const uint8_t *bytes)
 {
@@ -36,6 +39,13 @@ static bool read_overlay(uint32_t first_sector, uint32_t size)
     return true;
 }
 
+static bool linked_against_running_code(uint32_t expected_crc)
+{
+    const uint8_t *code = (const uint8_t *)(uintptr_t)CODE_BASE;
+    uint32_t size = (uint32_t)((uintptr_t)device_code_end - CODE_BASE);
+    return image_crc_update(0, code, size) == expected_crc;
+}
+
 const void *hal_system_load_rescan_code(void)
 {
     static uint32_t header[SECTOR_BYTES / 4];
@@ -51,7 +61,8 @@ const void *hal_system_load_rescan_code(void)
     const uint8_t *bytes = (const uint8_t *)header;
     uint32_t size = le32(bytes + 4);
     uint32_t whole_sectors = (size + SECTOR_BYTES - 1) / SECTOR_BYTES * SECTOR_BYTES;
-    if (le32(bytes) != OVERLAY_MAGIC || size < HEADER_BYTES || whole_sectors > OVERLAY_CAPACITY) {
+    if (le32(bytes) != OVERLAY_MAGIC || size < HEADER_BYTES || whole_sectors > OVERLAY_CAPACITY ||
+        !linked_against_running_code(le32(bytes + 12))) {
         return NULL;
     }
     if (!read_overlay(first_sector, size)) {

@@ -3,12 +3,14 @@
 #include <stddef.h>
 
 #include "app/app.h"
+#include "app/update_record.h"
 #include "board.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "device/fat.h"
 #include "device/updater.h"
 #include "emmc.h"
+#include "storage_reset.h"
 
 enum {
     MESSAGE_CAPACITY = 128,
@@ -99,13 +101,29 @@ static bool open_update(UpdateStorage *storage)
     return true;
 }
 
+static HalUpdateRecord outcome(HalUpdateResult result, uint8_t detail)
+{
+    HalUpdateRecord record = {.result = result, .detail = detail, .emmc_status = 0};
+    record.emmc_replied = emmc_status(&record.emmc_status);
+    return record;
+}
+
+static void remember(HalUpdateRecord record)
+{
+    board_start_record_update(record);
+    storage_reset();
+    (void)update_record_save(record);
+}
+
 static void install(const UpdateFile *update, const UpdateStorage *storage, bool stock)
 {
     install_title = i18n_text(stock ? STR_UPDATE_INSTALLING_FIIO : STR_UPDATE_INSTALLING);
     last_percent = 0;
     show_percent(0);
     flash_rewritten = true;
-    if (updater_install(update, storage, (UpdateProgress){report, NULL})) {
+    bool installed = updater_install(update, storage, (UpdateProgress){report, NULL});
+    remember(outcome(installed ? HAL_UPDATE_INSTALLED : HAL_UPDATE_FAILED, (uint8_t)last_percent));
+    if (installed) {
         app_show_notice(i18n_text(stock ? STR_UPDATE_FIIO_INSTALLED : STR_UPDATE_INSTALLED),
                         i18n_text(STR_UPDATE_UNPLUG_AND_RESTART));
     } else {
@@ -132,7 +150,10 @@ void update_after_usb(void)
     UpdateCheck check = updater_check(&update, &storage);
     if (check == UPDATE_VALID || check == UPDATE_STOCK) {
         install(&update, &storage, check == UPDATE_STOCK);
+    } else if (check == UPDATE_ALREADY_INSTALLED) {
+        remember(outcome(HAL_UPDATE_ALREADY_INSTALLED, 0));
     } else if (check == UPDATE_INVALID) {
+        remember(outcome(HAL_UPDATE_REFUSED, (uint8_t)updater_refusal()));
         builder = string_builder_make(text, sizeof text);
         i18n_format(&builder, STR_UPDATE_INVALID_IMAGE, arguments, 1);
         string_builder_append(&builder, " (E");

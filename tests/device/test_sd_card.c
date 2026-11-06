@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "check.h"
 #include "device/sd_card.h"
 
@@ -277,6 +279,141 @@ static void a_wrong_cmd8_echo_fails(void)
     CHECK(find_command(&card, 41, 0) == NULL);
 }
 
+typedef struct FlakyCard {
+    int failures_left;
+    bool resumes;
+    bool restarts;
+    int transfers;
+    int resumed;
+    int restarted;
+    char steps[16];
+    int step_count;
+} FlakyCard;
+
+static void note_step(FlakyCard *card, char step)
+{
+    if (card->step_count < (int)sizeof card->steps - 1) {
+        card->steps[card->step_count++] = step;
+    }
+}
+
+static bool flaky_transfer(void *context)
+{
+    FlakyCard *card = context;
+    card->transfers++;
+    note_step(card, 't');
+    if (card->failures_left > 0) {
+        card->failures_left--;
+        return false;
+    }
+    return true;
+}
+
+static bool flaky_resume(void *context)
+{
+    FlakyCard *card = context;
+    card->resumed++;
+    note_step(card, 's');
+    return card->resumes;
+}
+
+static bool flaky_restart(void *context)
+{
+    FlakyCard *card = context;
+    card->restarted++;
+    note_step(card, 'r');
+    return card->restarts;
+}
+
+static SdRetry retry_for(FlakyCard *card)
+{
+    return (SdRetry){flaky_transfer, flaky_resume, flaky_restart, card};
+}
+
+static bool steps_are(const FlakyCard *card, const char *expected)
+{
+    return strcmp(card->steps, expected) == 0;
+}
+
+static void a_good_transfer_runs_once(void)
+{
+    FlakyCard card = {.resumes = true, .restarts = true};
+    SdRetry retry = retry_for(&card);
+    SdRetryStats stats = {0};
+    CHECK(sd_card_retry(&retry, &stats));
+    CHECK(steps_are(&card, "t"));
+    CHECK_EQUAL(0, stats.retries);
+    CHECK_EQUAL(0, stats.failed);
+}
+
+static void one_failure_resumes_the_card_and_tries_again(void)
+{
+    FlakyCard card = {.failures_left = 1, .resumes = true, .restarts = true};
+    SdRetry retry = retry_for(&card);
+    SdRetryStats stats = {0};
+    CHECK(sd_card_retry(&retry, &stats));
+    CHECK(steps_are(&card, "tst"));
+    CHECK_EQUAL(1, stats.retries);
+    CHECK_EQUAL(0, stats.restarts);
+    CHECK_EQUAL(1, stats.recovered);
+}
+
+static void a_second_failure_restarts_the_card(void)
+{
+    FlakyCard card = {.failures_left = 2, .resumes = true, .restarts = true};
+    SdRetry retry = retry_for(&card);
+    SdRetryStats stats = {0};
+    CHECK(sd_card_retry(&retry, &stats));
+    CHECK(steps_are(&card, "tstrt"));
+    CHECK_EQUAL(2, stats.retries);
+    CHECK_EQUAL(1, stats.restarts);
+    CHECK_EQUAL(1, stats.recovered);
+}
+
+static void a_card_that_does_not_resume_is_restarted_at_once(void)
+{
+    FlakyCard card = {.failures_left = 1, .resumes = false, .restarts = true};
+    SdRetry retry = retry_for(&card);
+    SdRetryStats stats = {0};
+    CHECK(sd_card_retry(&retry, &stats));
+    CHECK(steps_are(&card, "tsrt"));
+    CHECK_EQUAL(1, stats.restarts);
+}
+
+static void three_failures_give_up(void)
+{
+    FlakyCard card = {.failures_left = 5, .resumes = true, .restarts = true};
+    SdRetry retry = retry_for(&card);
+    SdRetryStats stats = {0};
+    CHECK(!sd_card_retry(&retry, &stats));
+    CHECK_EQUAL(1 + SD_RETRY_ATTEMPTS, card.transfers);
+    CHECK_EQUAL(1, stats.failed);
+    CHECK_EQUAL(0, stats.recovered);
+}
+
+static void a_card_that_does_not_restart_is_not_tried_again(void)
+{
+    FlakyCard card = {.failures_left = 5, .resumes = false, .restarts = false};
+    SdRetry retry = retry_for(&card);
+    SdRetryStats stats = {0};
+    CHECK(!sd_card_retry(&retry, &stats));
+    CHECK(steps_are(&card, "tsr"));
+    CHECK_EQUAL(1, stats.failed);
+}
+
+static void counts_add_up_over_several_transfers(void)
+{
+    FlakyCard card = {.failures_left = 1, .resumes = true, .restarts = true};
+    SdRetry retry = retry_for(&card);
+    SdRetryStats stats = {0};
+    CHECK(sd_card_retry(&retry, &stats));
+    card.failures_left = 1;
+    CHECK(sd_card_retry(&retry, &stats));
+    CHECK(sd_card_retry(&retry, &stats));
+    CHECK_EQUAL(2, stats.retries);
+    CHECK_EQUAL(2, stats.recovered);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -292,6 +429,13 @@ int main(void)
         TEST_CASE(a_card_that_stays_busy_fails_after_100_tries),
         TEST_CASE(no_card_fails_without_sending_commands),
         TEST_CASE(a_wrong_cmd8_echo_fails),
+        TEST_CASE(a_good_transfer_runs_once),
+        TEST_CASE(one_failure_resumes_the_card_and_tries_again),
+        TEST_CASE(a_second_failure_restarts_the_card),
+        TEST_CASE(a_card_that_does_not_resume_is_restarted_at_once),
+        TEST_CASE(three_failures_give_up),
+        TEST_CASE(a_card_that_does_not_restart_is_not_tried_again),
+        TEST_CASE(counts_add_up_over_several_transfers),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

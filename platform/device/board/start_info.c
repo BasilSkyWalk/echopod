@@ -10,7 +10,8 @@
 
 enum {
     STACKED_LR_WORD = 5,
-    STACKED_PC_WORD = 6
+    STACKED_PC_WORD = 6,
+    FRAME_WORDS = 8
 };
 
 __attribute__((section(".noinit"))) static StartRecord record;
@@ -66,8 +67,20 @@ __attribute__((used)) void device_fault_handler(const uint32_t *frame)
 
 void board_stall_report(const uint32_t *frame)
 {
-    start_record_stall(&record, frame[STACKED_PC_WORD], frame[STACKED_LR_WORD]);
+    StallSnapshot snapshot = {.pc = frame[STACKED_PC_WORD],
+                              .lr = frame[STACKED_LR_WORD],
+                              .sp = (uint32_t)(uintptr_t)frame,
+                              .stack_used = board_stack_used()};
+    for (int index = 0; index < START_RECORD_STACK_WORDS; index++) {
+        snapshot.words[index] = frame[FRAME_WORDS + index];
+    }
+    start_record_stall(&record, &snapshot);
     board_panic_show("STALL", frame, register_read(SCB_CFSR));
+}
+
+void board_start_record_update(HalUpdateRecord update)
+{
+    start_record_update(&record, update);
 }
 
 __attribute__((naked)) void device_fault_entry(void)
@@ -77,17 +90,22 @@ __attribute__((naked)) void device_fault_entry(void)
 
 HalStartInfo hal_system_start_info(void)
 {
-    return (HalStartInfo){.warm = info.warm,
-                          .starts = info.starts,
-                          .previous_uptime_ms = info.previous_uptime_ms,
-                          .previous_power_off = info.previous_power_off,
-                          .fault_status = info.fault_status,
-                          .hard_fault_status = info.hard_fault_status,
-                          .fault_pc = info.fault_address,
-                          .last_step = info.last_step,
-                          .last_step_finished = info.last_step_finished,
-                          .last_step_ms = info.last_step_ms,
-                          .last_millivolts = info.last_millivolts,
-                          .stalled = info.stalled,
-                          .stall_lr = info.stall_lr};
+    return (HalStartInfo){
+        .warm = info.warm,
+        .starts = info.starts,
+        .previous_uptime_ms = info.previous_uptime_ms,
+        .previous_power_off = info.previous_power_off,
+        .fault_status = info.fault_status,
+        .hard_fault_status = info.hard_fault_status,
+        .fault_pc = info.fault_address,
+        .last_step = info.last_step,
+        .last_step_finished = info.last_step_finished,
+        .last_step_ms = info.last_step_ms,
+        .last_millivolts = info.last_millivolts,
+        .stalled = info.stalled,
+        .stall_lr = info.stall_lr,
+        .stall_sp = info.stall_sp,
+        .stall_stack = {info.stall_words[0], info.stall_words[1], info.stall_words[2]},
+        .stall_stack_used = info.stall_stack_used,
+        .last_update = info.last_update};
 }

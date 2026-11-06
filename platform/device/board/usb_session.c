@@ -8,8 +8,11 @@
 #include "core/string_builder.h"
 #include "device/block_device.h"
 #include "device/usb_fallback.h"
+#include "device/vbus_debounce.h"
 #include "emmc.h"
 #include "hal/clock.h"
+#include "hal/display.h"
+#include "hal/input.h"
 #include "hal/system.h"
 #include "sd.h"
 #include "usb.h"
@@ -25,7 +28,8 @@ enum {
     CARD_LUN = 1,
     LUN_COUNT = 2,
     WRITE_BUFFER_SECTORS = 64,
-    WORKING_COMMANDS = 2
+    WORKING_COMMANDS = 2,
+    SCREEN_DARK_MS = 30000
 };
 
 static EmmcInfo internal;
@@ -36,6 +40,10 @@ static Msc msc;
 static UsbFallback fallback;
 static bool high_speed_failed;
 static HalUsbLast last_session;
+static VbusDebounce vbus;
+static SdHealth card_at_start;
+static bool screen_dark;
+static uint32_t screen_used_ms;
 static uint32_t write_buffer[WRITE_BUFFER_SECTORS * MSC_SECTOR_SIZE / 4]
     __attribute__((section(".high_ram")));
 
@@ -66,7 +74,8 @@ static void prepare_port(void)
 static void prepare_luns(void)
 {
     BlockDevice card;
-    bool card_ready = sd_start(&card);
+    card_at_start = sd_health();
+    bool card_ready = sd_prepare(&card);
     MscLun luns[LUN_COUNT] = {
         {emmc_volume_read, emmc_volume_write, NULL, internal.layout.volume_sectors, true,
          report.internal_ready, "Internal storage"},
@@ -103,8 +112,33 @@ static void append_history(StringBuilder *line)
     }
 }
 
+static void light_screen(void)
+{
+    screen_used_ms = hal_clock_milliseconds();
+    if (screen_dark) {
+        screen_dark = false;
+        hal_display_set_power(true);
+    }
+}
+
+static void dim_when_idle(void)
+{
+    HalKeyTransition transition;
+    bool pressed = false;
+    while (hal_input_next_transition(&transition)) {
+        pressed = pressed || transition.pressed;
+    }
+    if (pressed) {
+        light_screen();
+    } else if (!screen_dark && hal_clock_milliseconds() - screen_used_ms >= SCREEN_DARK_MS) {
+        screen_dark = true;
+        hal_display_set_power(false);
+    }
+}
+
 static void show_counters(MscStats stats)
 {
+    light_screen();
     char title[COUNTER_TEXT_CAPACITY];
     char message[COUNTER_TEXT_CAPACITY];
     StringBuilder top = string_builder_make(title, sizeof title);
@@ -142,7 +176,8 @@ static UsbSessionEnd serve(void)
 {
     MscStats shown = msc_stats(&msc);
     uint32_t refreshed = hal_clock_milliseconds();
-    while (usb_vbus_present()) {
+    light_screen();
+    while (vbus_debounce_present(&vbus, usb_vbus_present(), hal_clock_milliseconds())) {
         uint32_t now = hal_clock_milliseconds();
         if (now - refreshed >= COUNTER_REFRESH_MS && stats_changed(msc_stats(&msc), shown)) {
             shown = msc_stats(&msc);
@@ -151,6 +186,7 @@ static UsbSessionEnd serve(void)
         }
         usb_poll(&port);
         board_display_service();
+        dim_when_idle();
         if (usb_fallback_due(&fallback, session_works(), hal_clock_milliseconds())) {
             fall_back_to_full_speed();
         }
@@ -173,11 +209,23 @@ static HalUsbEnd hal_end(UsbSessionEnd end)
 static void remember_session(UsbSessionEnd end)
 {
     MscStats stats = msc_stats(&msc);
+    SdHealth card = sd_health();
+    bool card_failed = card.failures != card_at_start.failures;
     last_session = (HalUsbLast){.end = hal_end(end),
                                 .left_mounted = msc_left_mounted(&msc),
                                 .internal_written = stats.lun_sectors_written[INTERNAL_LUN],
                                 .card_written = stats.lun_sectors_written[CARD_LUN],
-                                .writes_after_eject = stats.writes_after_eject};
+                                .writes_after_eject = stats.writes_after_eject,
+                                .internal_errors = stats.lun_failures[INTERNAL_LUN],
+                                .card_errors = stats.lun_failures[CARD_LUN],
+                                .card_retries = card.retry.retries - card_at_start.retry.retries,
+                                .card_starts = card.starts - card_at_start.starts,
+                                .card_step = card_failed ? (uint8_t)card.failure.step : 0,
+                                .card_interrupts = card_failed ? card.failure.interrupts : 0,
+                                .host_resets = port.configured_resets,
+                                .vbus_dips = vbus.dips,
+                                .fell_back = fallback.fired,
+                                .full_speed = !port.high_speed_allowed};
 }
 
 bool usb_session_listen(void)
@@ -208,6 +256,8 @@ void usb_session_stop_listening(void)
 UsbSessionEnd usb_session_run(void)
 {
     app_show_notice("USB", i18n_text(STR_USB_COMPUTER_FOUND));
+    vbus_debounce_start(&vbus);
+    fallback = (UsbFallback){.watching = false};
     prepare_luns();
     app_release_audio();
     board_audio_shut_down();
@@ -218,6 +268,7 @@ UsbSessionEnd usb_session_run(void)
         app_show_notice("USB", i18n_text(card_present ? STR_USB_CONNECTED_EJECT_BOTH
                                                       : STR_USB_CONNECTED_EJECT_ONE));
         end = serve();
+        light_screen();
     }
     usb_session_stop_listening();
     remember_session(end);
@@ -236,5 +287,6 @@ const UsbReport *usb_session_report(void)
 
 bool usb_session_card_changed(void)
 {
-    return msc_stats(&msc).lun_sectors_written[CARD_LUN] > 0;
+    return msc_stats(&msc).lun_sectors_written[CARD_LUN] > 0 ||
+           sd_health().starts != card_at_start.starts;
 }

@@ -1174,6 +1174,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/bluetooth.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/equalizer.bin"));
     CHECK_EQUAL(1024 * 1024, fake_hal_reserved_size("/.echo/history.bin"));
+    CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/update.bin"));
     step();
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
     CHECK(toast_is("Library: 0 tracks"));
@@ -1182,7 +1183,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(13, fake_hal_reserve_count());
+    CHECK_EQUAL(14, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
