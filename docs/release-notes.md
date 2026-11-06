@@ -4,7 +4,7 @@
 
 ### New
 
-- **QOA plays.** `.qoa` files now show up in the library (with their length) and play, mono or stereo, with seeking that lands on the exact sample. They use the same queue and gapless hand-over as the other formats. The decoder is the reference implementation by Dominic Szablewski (`third_party/qoa`, MIT), which also runs in the simulator; so far it has only been tested in the simulator. Rescan the library (Settings → Library → Rescan library) or run echo-sync again to see QOA files you already have.
+- **QOA plays.** `.qoa` files now show up in the library (with their length) and play, mono or stereo, with seeking that lands on the exact sample. They use the same queue and gapless hand-over as the other formats. The decoder is the reference implementation by Dominic Szablewski (`third_party/qoa`, MIT), which also runs in the simulator. Playback has been tested on the player. Rescan the library (Settings → Library → Rescan library) or run echo-sync again to see QOA files you already have.
 
 ## 0.11.1
 
