@@ -179,6 +179,18 @@ void board_core1_set_equalizer(const EqualizerCurve *curve)
     }
 }
 
+static void share_sleep(void)
+{
+    core1_region().control->sleep_allowed = board_saving(HAL_SAVING_CORE1_SLEEP) ? 1u : 0u;
+}
+
+void board_core1_follow_savings(void)
+{
+    if (streaming) {
+        share_sleep();
+    }
+}
+
 bool board_core1_start_stream(Core1Program program)
 {
     if (streaming && streaming_program == program &&
@@ -203,6 +215,7 @@ bool board_core1_start_stream(Core1Program program)
         register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_STREAM);
         register_write(CORE1_SHARED_ACCEL_CLASSES, accel_classes);
         share_equalizer(equalizing(program) && divider == 1);
+        share_sleep();
         result = core1_run(&BUS, REPLY_TIMEOUT_MS);
     }
     board_start_record_step_done();

@@ -56,6 +56,7 @@ void board_core1_set_equalizer(const EqualizerCurve *curve);
 void board_core1_stop(void);
 bool board_core1_streaming(void);
 uint8_t board_core1_load_percent(void);
+void board_core1_follow_savings(void);
 void board_audio_before_clock_change(void);
 void board_audio_after_clock_change(void);
 void board_audio_shut_down(void);

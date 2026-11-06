@@ -48,6 +48,7 @@ typedef struct StreamControl {
     uint32_t codec;
     uint32_t load_percent;
     uint32_t ring_bytes;
+    uint32_t sleep_allowed;
     StreamSlot slots[STREAM_SLOTS];
 } StreamControl;
 
@@ -113,6 +114,7 @@ typedef struct Core1Stream {
     Equalizer *equalizer;
     volatile Core1EqualizerShare *share;
     uint32_t share_version;
+    void (*wait)(void);
     bool finished;
     bool starved;
 } Core1Stream;
@@ -124,6 +126,8 @@ void core1_stream_set_clock(Core1Stream *stream, uint32_t (*ticks)(void), uint32
 void core1_stream_set_equalizer(Core1Stream *stream, Equalizer *equalizer,
                                 volatile Core1EqualizerShare *share);
 bool core1_stream_step(Core1Stream *stream);
+void core1_stream_set_wait(Core1Stream *stream, void (*wait)(void));
+void core1_stream_serve(Core1Stream *stream);
 
 typedef struct Core1Source {
     StreamRegion region;
@@ -140,6 +144,7 @@ typedef struct Core1Source {
     uint32_t play_from;
     uint32_t play_end;
     uint32_t fill_budget;
+    void (*wake)(void);
     uint8_t bits_per_sample;
     uint8_t channels;
     bool streaming;
@@ -150,6 +155,7 @@ typedef struct Core1Source {
 void core1_source_init(Core1Source *source, StreamRegion region, FlacFileOpener files,
                        FlacDecoder *decoder, uint32_t fill_budget);
 void core1_source_fill(Core1Source *source);
+void core1_source_set_wake(Core1Source *source, void (*wake)(void));
 AudioSource core1_source_interface(Core1Source *source);
 AudioSource core1_source_mp3_interface(Core1Source *source);
 AudioSource core1_source_mp4_interface(Core1Source *source);

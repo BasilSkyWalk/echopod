@@ -32,6 +32,6 @@ void core1_main(void)
     core1_ticks_measure(&stream);
     core1_stream_set_decoder(&stream, STREAM_CODEC_OPUS, decoder);
     for (;;) {
-        core1_stream_step(&stream);
+        core1_stream_serve(&stream);
     }
 }

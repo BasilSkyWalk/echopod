@@ -25,6 +25,6 @@ void core1_main(void)
     core1_ticks_start();
     core1_ticks_measure(&stream);
     for (;;) {
-        core1_stream_step(&stream);
+        core1_stream_serve(&stream);
     }
 }

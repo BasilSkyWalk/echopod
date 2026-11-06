@@ -31,6 +31,7 @@ bool board_saving(uint32_t saving)
 void hal_system_set_power_savings(uint32_t wanted)
 {
     savings_changed = wanted ^ HAL_SAVINGS_DEFAULT;
+    board_core1_follow_savings();
 }
 
 HalPowerInfo hal_system_power_info(void)

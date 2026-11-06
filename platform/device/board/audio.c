@@ -275,6 +275,12 @@ static uint32_t *ring(void)
     return music_ring;
 }
 
+static void signal_core1(void)
+{
+    __asm__ volatile("dsb" ::: "memory");
+    __asm__ volatile("sev" ::: "memory");
+}
+
 static void ensure_engine(void)
 {
     if (engine_ready) {
@@ -283,6 +289,7 @@ static void ensure_engine(void)
     FlacFileOpener files = {.open = open_file, .close = close_file, .context = NULL};
     flac_source_init(&software_source, files, &decoding.flac);
     core1_source_init(&core1_source, core1_region(), files, &decoding.flac, FILL_BUDGET_BYTES);
+    core1_source_set_wake(&core1_source, signal_core1);
     wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
     audio_engine_init(

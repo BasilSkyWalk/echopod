@@ -201,8 +201,9 @@ void core1_main(void)
     core1_stream_set_decoder(&stream, STREAM_CODEC_ALAC, core1_alac_decoder(&alac, &decoders.alac));
     core1_stream_set_equalizer(&stream, &equalizer,
                                (volatile Core1EqualizerShare *)(uintptr_t)CORE1_SHARED_EQUALIZER);
+    core1_ticks_start();
     core1_ticks_measure(&stream);
     for (;;) {
-        core1_stream_step(&stream);
+        core1_stream_serve(&stream);
     }
 }
