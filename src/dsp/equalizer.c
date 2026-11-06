@@ -86,12 +86,22 @@ static inline __attribute__((always_inline)) void filter_run(EqualizerStage stag
     history[3] = (int32_t)carry_low;
 }
 
+static __attribute__((noinline)) void filter_peak(EqualizerStage stage, int32_t *history, Run run)
+{
+    filter_run(stage, history, run, false);
+}
+
+static __attribute__((noinline)) void filter_shelf(EqualizerStage stage, int32_t *history, Run run)
+{
+    filter_run(stage, history, run, true);
+}
+
 static void filter_channel(EqualizerStage stage, int32_t *history, Run run)
 {
     if (stage.m2 != 0) {
-        filter_run(stage, history, run, true);
+        filter_shelf(stage, history, run);
     } else {
-        filter_run(stage, history, run, false);
+        filter_peak(stage, history, run);
     }
 }
 
