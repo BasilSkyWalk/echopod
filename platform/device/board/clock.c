@@ -97,6 +97,7 @@ void board_stall_beat(void)
 void hal_system_keep_alive(void)
 {
     board_stall_beat();
+    board_display_service();
 }
 
 void board_stall_pause(bool paused)

@@ -77,6 +77,7 @@ static uint32_t large_size;
 
 typedef struct FakeHal {
     const char *version;
+    uint32_t build_day;
     uint16_t panel[HAL_DISPLAY_LONG_SIDE][HAL_DISPLAY_LONG_SIDE];
     HalDisplayRotation rotation;
     long pixels_written;
@@ -114,6 +115,7 @@ typedef struct FakeHal {
     int dir_opens;
     int dir_nexts;
     int presents_at_dir_open;
+    bool lit_at_dir_open;
     FakeDirEntry dir_entries[DIR_CAPACITY];
     int dir_count;
     char dir_path[PATH_CAPACITY];
@@ -163,6 +165,11 @@ void fake_hal_set_version(const char *version)
     fake.version = version;
 }
 
+void fake_hal_set_build_day(uint32_t day)
+{
+    fake.build_day = day;
+}
+
 void fake_hal_set_time(HalTime time)
 {
     fake.time = time;
@@ -207,6 +214,11 @@ HalTime fake_hal_time(void)
 const char *hal_system_version(void)
 {
     return fake.version != NULL ? fake.version : "test";
+}
+
+uint32_t hal_system_build_day(void)
+{
+    return fake.build_day;
 }
 
 void fake_hal_refuse_clock_switch(void)
@@ -1039,6 +1051,7 @@ bool hal_dir_open(HalDir *dir, const char *path)
 {
     fake.dir_opens++;
     fake.presents_at_dir_open = fake.present_count;
+    fake.lit_at_dir_open = fake.display_on;
     copy_path(fake.dir_path, path);
     fake.dir_index = 0;
     if (fake.empty_card) {
@@ -1085,6 +1098,11 @@ int fake_hal_dir_next_count(void)
 int fake_hal_presents_at_last_dir_open(void)
 {
     return fake.presents_at_dir_open;
+}
+
+bool fake_hal_lit_at_last_dir_open(void)
+{
+    return fake.lit_at_dir_open;
 }
 
 int fake_hal_covers_writes(void)

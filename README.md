@@ -97,6 +97,7 @@ Nothing else on the card needs a computer. Covers come from art embedded in one 
 | `--system-dir DIR` | Read and write `/.echo/` (library database, resume, settings, favorites) in DIR |
 | `--battery N` | Report N % battery in the header (default 80) |
 | `--charging` | Report the battery as charging |
+| `--clock-date YYYY-MM-DD` | Start the clock chip on that date (at the host's time of day) |
 | `--keys LIST` | Play a key script, e.g. `down,down,play,back:long` (`up`, `down`, `play`, `menu`, `back`, `power`, each optionally `:long`) |
 
 Headless runs use a virtual clock, so scripted screenshots are deterministic.

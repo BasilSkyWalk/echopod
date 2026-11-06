@@ -1249,6 +1249,24 @@ static void a_new_firmware_checks_the_music_once_without_rescanning(void)
     CHECK_EQUAL(walks_after_restart, fake_hal_dir_open_count());
 }
 
+static void a_new_firmware_shows_the_splash_then_checks_the_music_on_a_lit_screen(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    step();
+    fake_hal_set_version("newer");
+    int walks_before = fake_hal_dir_open_count();
+    restart_app();
+    app_show_splash();
+    step();
+    CHECK_EQUAL(walks_before, fake_hal_dir_open_count());
+    CHECK(fake_hal_display_on());
+    int presents = fake_hal_present_count();
+    wait_ms(SPLASH_MS);
+    CHECK(fake_hal_dir_open_count() > walks_before);
+    CHECK(fake_hal_presents_at_last_dir_open() > presents);
+    CHECK(fake_hal_lit_at_last_dir_open());
+}
+
 static void the_music_check_after_usb_says_so_before_walking_the_card(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_CREATED);
@@ -2203,22 +2221,31 @@ static void menu_does_nothing_while_nothing_plays(void)
 
 static uint8_t history_settings[SETTINGS_FILE_SIZE];
 
-static void start_app_with_history(bool history_on)
+static void start_app_with_history_and_chip(bool history_on, HalTime chip, uint32_t build_day)
 {
     uint32_t size = 0;
     const uint8_t *bytes = fixture_bytes(&size);
     Settings settings = settings_defaults();
     settings.options[OPTION_LISTEN_HISTORY] = history_on ? LISTEN_HISTORY_ON : LISTEN_HISTORY_OFF;
+    settings.options[OPTION_TIME_ZONE] = WALL_CLOCK_ZONE_UTC;
     settings_encode(&settings, history_settings);
     fake_hal_reset();
     fake_hal_add_file("/.echo/library.db", bytes, size);
     fake_hal_add_file("/.echo/settings.bin", history_settings, sizeof history_settings);
     fake_hal_add_file(LISTEN_HISTORY_PATH, NULL, 16 * HISTORY_SLOT_BYTES);
+    fake_hal_set_time(chip);
+    fake_hal_set_build_day(build_day);
+    app_forget_clock();
     now_ms = START_MS;
     fake_hal_set_milliseconds(now_ms);
     app_start();
     step();
     app_release_audio();
+}
+
+static void start_app_with_history(bool history_on)
+{
+    start_app_with_history_and_chip(history_on, (HalTime){.present = false}, 0);
 }
 
 static int history_records(HistoryRecord *records, int capacity)
@@ -2402,6 +2429,106 @@ static void start_app_with_clock(bool clock_on)
     step();
 }
 
+static HalTime chip_on(uint16_t year, uint8_t month, uint8_t day)
+{
+    return (HalTime){
+        .present = true, .valid = true, .year = year, .month = month, .day = day, .hour = 12};
+}
+
+static uint32_t day_of(uint32_t year, uint32_t month, uint32_t day)
+{
+    return wall_clock_days_from_civil(year, month, day);
+}
+
+static void a_clock_dated_before_the_firmware_shows_no_time(void)
+{
+    StatusBarState state = {.clock = "12:34"};
+    Rect clock = status_bar_clock_area(&DEFAULT_THEME, state);
+    start_app_with_clock(true);
+    CHECK(area_has_color(clock, DEFAULT_THEME.colors.header_text));
+    fake_hal_set_time(chip_on(2026, 1, 14));
+    fake_hal_set_build_day(day_of(2026, 11, 1));
+    app_forget_clock();
+    restart_app();
+    step();
+    CHECK(!area_has_color(clock, DEFAULT_THEME.colors.header_text));
+}
+
+static uint32_t last_play_time(void)
+{
+    HistoryRecord records[16];
+    play_first_album_track();
+    wait_ms(40000);
+    app_release_audio();
+    int count = history_records(records, 16);
+    CHECK(count >= 2);
+    CHECK_EQUAL(HISTORY_PLAY, records[count - 2].kind);
+    return records[count - 2].unix_time;
+}
+
+static void the_listen_history_has_no_time_while_the_clock_predates_the_firmware(void)
+{
+    start_app_with_history_and_chip(true, chip_on(2026, 1, 14), day_of(2026, 11, 1));
+    CHECK_EQUAL(0, last_play_time());
+    start_app_with_history_and_chip(true, chip_on(2026, 11, 5), day_of(2026, 11, 1));
+    CHECK(last_play_time() >= day_of(2026, 11, 5) * 86400u);
+}
+
+static void start_with_new_firmware(HalTime chip)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    step();
+    fake_hal_set_version("newer");
+    fake_hal_set_time(chip);
+    fake_hal_set_build_day(day_of(2026, 11, 1));
+    app_forget_clock();
+    restart_app();
+    app_show_splash();
+    step();
+}
+
+static void a_new_firmware_asks_once_for_the_clock_after_the_start_up_screen(void)
+{
+    start_with_new_firmware(chip_on(2026, 1, 14));
+    CHECK(title_is("EchoPod"));
+    wait_ms(SPLASH_MS);
+    CHECK(title_is("Set the date and time?"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("EchoPod"));
+    restart_app();
+    app_show_splash();
+    wait_ms(SPLASH_MS);
+    wait_ms(SPLASH_MS);
+    CHECK(title_is("EchoPod"));
+}
+
+static void set_now_opens_the_date_and_time_at_the_build_date(void)
+{
+    start_with_new_firmware(chip_on(2026, 1, 14));
+    wait_ms(SPLASH_MS);
+    tap(KEY_PLAY);
+    CHECK(title_is("Date & time"));
+    tap(KEY_PLAY);
+    move_down(1);
+    move_up(1);
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    CHECK(title_is("EchoPod"));
+    CHECK_EQUAL(1, fake_hal_time_write_count());
+    CHECK_EQUAL(2026, fake_hal_time().year);
+    CHECK_EQUAL(11, fake_hal_time().month);
+    CHECK_EQUAL(1, fake_hal_time().day);
+}
+
+static void a_new_firmware_does_not_ask_when_the_clock_is_set(void)
+{
+    start_with_new_firmware(chip_on(2026, 11, 5));
+    wait_ms(SPLASH_MS);
+    wait_ms(SPLASH_MS);
+    CHECK(title_is("EchoPod"));
+}
+
 static void the_header_shows_the_time_only_while_the_clock_setting_is_on(void)
 {
     StatusBarState state = {.clock = "12:34"};
@@ -2555,6 +2682,7 @@ int main(void)
         TEST_CASE(unchanged_music_is_not_rescanned_after_usb),
         TEST_CASE(a_different_stored_fingerprint_is_rescanned_after_usb),
         TEST_CASE(a_new_firmware_checks_the_music_once_without_rescanning),
+        TEST_CASE(a_new_firmware_shows_the_splash_then_checks_the_music_on_a_lit_screen),
         TEST_CASE(the_music_check_after_usb_says_so_before_walking_the_card),
         TEST_CASE(a_new_firmware_rescans_music_that_changed),
         TEST_CASE(a_new_firmware_rebuilds_a_library_it_cannot_read),
@@ -2601,6 +2729,11 @@ int main(void)
         TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
         TEST_CASE(a_listen_history_turned_off_records_nothing),
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
+        TEST_CASE(a_clock_dated_before_the_firmware_shows_no_time),
+        TEST_CASE(the_listen_history_has_no_time_while_the_clock_predates_the_firmware),
+        TEST_CASE(a_new_firmware_asks_once_for_the_clock_after_the_start_up_screen),
+        TEST_CASE(set_now_opens_the_date_and_time_at_the_build_date),
+        TEST_CASE(a_new_firmware_does_not_ask_when_the_clock_is_set),
         TEST_CASE(the_light_theme_lightens_the_screens_and_keeps_the_accent),
         TEST_CASE(a_large_status_bar_grows_the_portrait_status_band),
         TEST_CASE(power_on_hold_is_asked_for_at_the_next_start),

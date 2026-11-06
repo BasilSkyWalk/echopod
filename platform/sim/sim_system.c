@@ -1,8 +1,11 @@
+#include "core/wall_clock.h"
 #include "hal/system.h"
 #include "library/library_scan.h"
 
 enum {
-    BOOT_CLOCK_MHZ = 24
+    BOOT_CLOCK_MHZ = 24,
+    BUILD_YEAR_DIVISOR = 10000,
+    BUILD_MONTH_DIVISOR = 100
 };
 
 static uint32_t clock_mhz = BOOT_CLOCK_MHZ;
@@ -26,6 +29,14 @@ HalPowerInfo hal_system_power_info(void)
 const char *hal_system_version(void)
 {
     return "simulator";
+}
+
+uint32_t hal_system_build_day(void)
+{
+    uint32_t date = ECHO_SIM_BUILD_DATE;
+    return wall_clock_days_from_civil(date / BUILD_YEAR_DIVISOR,
+                                      date / BUILD_MONTH_DIVISOR % BUILD_MONTH_DIVISOR,
+                                      date % BUILD_MONTH_DIVISOR);
 }
 
 HalBootClocks hal_system_boot_clocks(void)

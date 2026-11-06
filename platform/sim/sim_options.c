@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -127,6 +128,24 @@ static bool read_clock_unset(ArgumentCursor *cursor, SimOptions *options)
     return true;
 }
 
+static bool read_clock_date(ArgumentCursor *cursor, SimOptions *options)
+{
+    const char *text = next_value(cursor);
+    unsigned int year = 0;
+    unsigned int month = 0;
+    unsigned int day = 0;
+    char extra = 0;
+    if (text == NULL || sscanf(text, "%4u-%2u-%2u%c", &year, &month, &day, &extra) != 3 ||
+        year < SIM_FIRST_CLOCK_YEAR || year > SIM_LAST_CLOCK_YEAR || month < 1 ||
+        month > SIM_LAST_MONTH || day < 1 || day > SIM_LAST_DAY) {
+        return false;
+    }
+    options->clock_year = (uint16_t)year;
+    options->clock_month = (uint8_t)month;
+    options->clock_day = (uint8_t)day;
+    return true;
+}
+
 static const OptionSpec OPTION_SPECS[] = {
     {"--scale", read_scale},
     {"--frames", read_frames},
@@ -140,6 +159,7 @@ static const OptionSpec OPTION_SPECS[] = {
     {"--charging", read_charging},
     {"--no-clock", read_no_clock},
     {"--clock-unset", read_clock_unset},
+    {"--clock-date", read_clock_date},
 };
 
 static bool read_option(ArgumentCursor *cursor, SimOptions *options)

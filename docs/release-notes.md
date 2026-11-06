@@ -40,6 +40,7 @@ A test build. Built and unit-tested, not yet tried on a player.
 - Your library and settings stay as they are. Going back to 0.10 or earlier resets settings to defaults.
 - After an update installs, restart the player before connecting it to a computer again.
 - Delete the update file from the player once it has installed, or it installs again.
+- Set the clock after installing (Settings → Date & time) or sync with echo-sync. A clock dated before the firmware was built counts as not set, and the player asks once after the update.
 
 ## 0.10.1
 

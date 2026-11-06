@@ -3,6 +3,7 @@
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "hal/clock.h"
+#include "hal/system.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/navigation.h"
@@ -20,7 +21,8 @@ enum {
     MONTHS_PER_YEAR = 12,
     LAST_HOUR = 23,
     LAST_MINUTE = 59,
-    LONGEST_MONTH = 31
+    LONGEST_MONTH = 31,
+    SECONDS_PER_DAY = 86400
 };
 
 static const StringId FIELD_LABELS[DATE_TIME_FIELD_COUNT] = {
@@ -158,7 +160,11 @@ static void enter(void *context, uint32_t now_ms)
     DateTimeScreen *screen = context;
     const DateTimeConfig *config = &screen->config;
     if (!clock_store_now(config->clock, now_ms, &screen->civil)) {
+        uint32_t build_day = hal_system_build_day();
         screen->civil = (WallCivil){.year = DEFAULT_YEAR, .month = 1, .day = 1};
+        if (build_day > 0) {
+            wall_clock_civil_of(build_day * SECONDS_PER_DAY, &screen->civil);
+        }
     }
     screen->civil.second = 0;
     screen->zone = config->store->settings.options[OPTION_TIME_ZONE];

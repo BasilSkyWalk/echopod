@@ -2,6 +2,7 @@
 
 #include "core/hash.h"
 #include "hal/storage.h"
+#include "hal/system.h"
 #include "hal/time.h"
 
 const char CLOCK_RECORD_PATH[] = "/.echo/clock.bin";
@@ -19,7 +20,8 @@ enum {
     RECORD_EARLIEST_YEAR = 2024,
     BITS_PER_BYTE = 8,
     SECONDS_PER_MINUTE = 60,
-    SECONDS_PER_DAY = 86400
+    SECONDS_PER_DAY = 86400,
+    BUILD_SLACK_DAYS = 1
 };
 
 static const uint8_t RECORD_MAGIC[RECORD_MAGIC_BYTES] = {'E', 'C', 'L', 'K'};
@@ -74,8 +76,11 @@ static void read_chip(ClockStore *store, uint32_t now_ms)
 {
     HalTime time;
     store->chip_answered = hal_time_read(&time);
-    store->chip_valid = store->chip_answered && time.valid && time.year >= WALL_CLOCK_FIRST_YEAR &&
-                        time.year <= WALL_CLOCK_LAST_YEAR;
+    store->chip_valid =
+        store->chip_answered && time.valid && time.year >= WALL_CLOCK_FIRST_YEAR &&
+        time.year <= WALL_CLOCK_LAST_YEAR &&
+        wall_clock_days_from_civil(time.year, time.month, time.day) + BUILD_SLACK_DAYS >=
+            hal_system_build_day();
     if (store->chip_valid) {
         WallCivil civil = {time.year, time.month, time.day, time.hour, time.minute, time.second};
         wall_clock_set(&store->clock, wall_clock_seconds_of(&civil), now_ms);

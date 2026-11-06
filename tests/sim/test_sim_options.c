@@ -53,6 +53,22 @@ static void the_clock_can_be_absent_or_unset(void)
     CHECK(options.clock_unset);
 }
 
+static void the_clock_can_start_on_a_given_date(void)
+{
+    char *given[] = {"--clock-date", "2026-01-14"};
+    char *bad_month[] = {"--clock-date", "2026-13-01"};
+    char *trailing[] = {"--clock-date", "2026-01-14x"};
+    SimOptions options;
+    CHECK(parse(NULL, 0, &options));
+    CHECK_EQUAL(0, options.clock_year);
+    CHECK(parse(given, 2, &options));
+    CHECK_EQUAL(2026, options.clock_year);
+    CHECK_EQUAL(1, options.clock_month);
+    CHECK_EQUAL(14, options.clock_day);
+    CHECK(!parse(bad_month, 2, &options));
+    CHECK(!parse(trailing, 2, &options));
+}
+
 static void a_battery_level_above_full_is_rejected(void)
 {
     char *given[] = {"--battery", "101"};
@@ -136,6 +152,7 @@ int main(void)
         TEST_CASE(the_battery_level_and_charging_are_read),
         TEST_CASE(a_battery_level_above_full_is_rejected),
         TEST_CASE(the_clock_can_be_absent_or_unset),
+        TEST_CASE(the_clock_can_start_on_a_given_date),
         TEST_CASE(an_unknown_option_is_rejected),
         TEST_CASE(an_option_missing_its_value_is_rejected),
         TEST_CASE(non_numeric_values_are_rejected),
