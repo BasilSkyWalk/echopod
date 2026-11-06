@@ -209,6 +209,11 @@ void audio_engine_close_source(AudioEngine *engine)
     close_file(engine);
 }
 
+bool audio_engine_next_pending(const AudioEngine *engine)
+{
+    return engine->has_next;
+}
+
 void audio_engine_pause(AudioEngine *engine)
 {
     if (engine->state == AUDIO_ENGINE_PLAYING) {

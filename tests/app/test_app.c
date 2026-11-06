@@ -937,8 +937,19 @@ static void with_the_screen_off_the_cpu_drops_to_96_mhz_once_audio_is_down(void)
     step();
     CHECK_EQUAL(96, hal_system_clock_mhz());
     fake_hal_audio_set_idle(false);
-    step();
-    CHECK_EQUAL(200, hal_system_clock_mhz());
+    tap(KEY_POWER);
+    CHECK_EQUAL(96, hal_system_clock_mhz());
+}
+
+static void the_audio_may_slow_the_clock_only_while_the_screen_is_off(void)
+{
+    start_app_with_library();
+    CHECK(!fake_hal_slow_clock_allowed());
+    play_first_album_track();
+    tap(KEY_POWER);
+    CHECK(fake_hal_slow_clock_allowed());
+    tap(KEY_POWER);
+    CHECK(!fake_hal_slow_clock_allowed());
 }
 
 static void the_player_turns_itself_off_after_five_idle_minutes_on_battery(void)
@@ -2263,6 +2274,7 @@ int main(void)
         TEST_CASE(waking_draws_a_frame_before_the_backlight_comes_on),
         TEST_CASE(the_clock_never_changes_with_the_screen_while_audio_is_up),
         TEST_CASE(with_the_screen_off_the_cpu_drops_to_96_mhz_once_audio_is_down),
+        TEST_CASE(the_audio_may_slow_the_clock_only_while_the_screen_is_off),
         TEST_CASE(the_player_turns_itself_off_after_five_idle_minutes_on_battery),
         TEST_CASE(playing_or_usb_power_keeps_the_player_on),
         TEST_CASE(the_screen_turns_off_after_the_timeout),

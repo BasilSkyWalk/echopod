@@ -618,6 +618,18 @@ int fake_hal_audio_bluetooth_level(void)
     return (int)bluetooth_level;
 }
 
+static bool slow_clock_allowed;
+
+void hal_audio_allow_slow_clock(bool allowed)
+{
+    slow_clock_allowed = allowed;
+}
+
+bool fake_hal_slow_clock_allowed(void)
+{
+    return slow_clock_allowed;
+}
+
 int fake_hal_test_tone_count(void)
 {
     return fake.test_tone_count;

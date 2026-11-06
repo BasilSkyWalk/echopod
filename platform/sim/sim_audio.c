@@ -349,6 +349,11 @@ void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level)
     (void)level;
 }
 
+void hal_audio_allow_slow_clock(bool allowed)
+{
+    (void)allowed;
+}
+
 static bool dma_tone_running;
 
 void hal_audio_service(void)
