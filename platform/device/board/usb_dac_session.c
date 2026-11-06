@@ -1,4 +1,4 @@
-#include "usb_dac_session.h"
+#include "usb_session.h"
 
 #include <stddef.h>
 
@@ -30,6 +30,7 @@ enum {
 
 static const char TITLE[] = "USB DAC";
 
+static UsbShared *shared;
 static UsbPort port;
 static UsbAudio audio;
 static UsbAudioSink sink;
@@ -37,8 +38,6 @@ static uint32_t open_rate;
 static uint32_t last_packet_ms;
 static bool receiving;
 static bool playing;
-static uint8_t dac_volume;
-static bool dac_volume_known;
 static bool frame_known;
 static uint16_t last_frame;
 static uint32_t missed_packets;
@@ -47,12 +46,6 @@ static char shown_text[NOTICE_CAPACITY];
 static uint8_t reports[REPORT_QUEUE_CAPACITY];
 static uint8_t report_start;
 static uint8_t report_count;
-
-void hal_system_set_dac_volume(uint8_t level)
-{
-    dac_volume = level;
-    dac_volume_known = true;
-}
 
 static void count_missed_frames(void)
 {
@@ -80,18 +73,6 @@ static void serve_usb(void)
     }
 }
 
-bool usb_dac_session_listen(void)
-{
-    port = (UsbPort){.audio = &audio, .receive_stream = receive_stream};
-    usb_audio_init(&audio, &port.device);
-    usb_power_up();
-    if (usb_connect(&port)) {
-        return true;
-    }
-    usb_power_down();
-    return false;
-}
-
 static void number_text(char *text, size_t capacity, uint32_t value)
 {
     StringBuilder number = string_builder_make(text, capacity);
@@ -110,7 +91,7 @@ static void append_format(StringBuilder *line)
         string_builder_append_unsigned(&rate_builder, audio.rate % HZ_PER_KHZ / 100);
     }
     number_text(bits, sizeof bits, BITS_PER_BYTE * usb_audio_sample_bytes(&audio));
-    number_text(volume, sizeof volume, dac_volume);
+    number_text(volume, sizeof volume, shared->dac_volume);
     const char *arguments[] = {rate, bits, volume};
     i18n_format(line, STR_USB_FORMAT_VOLUME, arguments, 3);
 }
@@ -149,7 +130,7 @@ static void state_text(char *text, size_t capacity)
     StringBuilder line = string_builder_make(text, capacity);
     if (usb_audio_sample_bytes(&audio) == 0) {
         char volume[NUMBER_CAPACITY];
-        number_text(volume, sizeof volume, dac_volume);
+        number_text(volume, sizeof volume, shared->dac_volume);
         const char *arguments[] = {volume};
         i18n_format(&line, STR_USB_CHOOSE_OUTPUT, arguments, 1);
     } else if (open_rate == 0) {
@@ -249,12 +230,12 @@ static void keep_output(void)
 
 static void step_volume(int step)
 {
-    int level = dac_volume + step;
+    int level = shared->dac_volume + step;
     if (level < 0 || level > HAL_AUDIO_VOLUME_MAX) {
         return;
     }
-    dac_volume = (uint8_t)level;
-    hal_audio_set_volume(dac_volume);
+    shared->dac_volume = (uint8_t)level;
+    hal_audio_set_volume(shared->dac_volume);
     apply_attenuation();
     show_state();
 }
@@ -329,18 +310,24 @@ static void start_session(void)
     frame_known = false;
     missed_packets = 0;
     report_count = 0;
-    dac_volume = dac_volume_known ? dac_volume : (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME;
-    hal_audio_set_volume(dac_volume);
+    port = (UsbPort){.link = shared->link,
+                     .bulk_packet = USB_PACKET_SIZE,
+                     .audio = &audio,
+                     .receive_stream = receive_stream};
+    usb_audio_init(&audio, &port.device);
+    if (!shared->dac_volume_known) {
+        shared->dac_volume = (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME;
+    }
+    hal_audio_set_volume(shared->dac_volume);
 }
 
-void usb_dac_session_run(void)
+void usb_dac_session(UsbShared *state)
 {
+    shared = state;
     app_show_notice(TITLE, i18n_text(STR_USB_COMPUTER_FOUND));
-    app_release_audio();
-    board_audio_shut_down();
     uint8_t level = board_audio_volume_level();
     start_session();
-    uint8_t starting_volume = dac_volume;
+    uint8_t starting_volume = shared->dac_volume;
     if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
         show_state();
         serve();
@@ -350,7 +337,7 @@ void usb_dac_session_run(void)
     board_audio_stream_close();
     hal_audio_set_volume(level);
     usb_power_down();
-    if (dac_volume != starting_volume) {
-        app_remember_dac_volume(dac_volume);
+    if (shared->dac_volume != starting_volume) {
+        app_remember_dac_volume(shared->dac_volume);
     }
 }

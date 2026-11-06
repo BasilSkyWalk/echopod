@@ -1,4 +1,4 @@
-#include "update.h"
+#include "usb_session.h"
 
 #include <stddef.h>
 
@@ -31,12 +31,7 @@ static const char *install_title;
 static FatVolume volume;
 static FatFile file;
 static uint32_t last_percent;
-static bool flash_rewritten;
-
-bool hal_system_restart_pending(void)
-{
-    return flash_rewritten;
-}
+static UsbShared *shared;
 
 static bool read_update(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
@@ -120,7 +115,7 @@ static void install(const UpdateFile *update, const UpdateStorage *storage, bool
     install_title = i18n_text(stock ? STR_UPDATE_INSTALLING_FIIO : STR_UPDATE_INSTALLING);
     last_percent = 0;
     show_percent(0);
-    flash_rewritten = true;
+    shared->flash_rewritten = true;
     bool installed = updater_install(update, storage, (UpdateProgress){report, NULL});
     remember(outcome(installed ? HAL_UPDATE_INSTALLED : HAL_UPDATE_FAILED, (uint8_t)last_percent));
     if (installed) {
@@ -132,14 +127,15 @@ static void install(const UpdateFile *update, const UpdateStorage *storage, bool
     board_wait_for_key();
 }
 
-void update_after_usb(void)
+void update_after_usb(UsbShared *state)
 {
     UpdateStorage storage;
+    shared = state;
     if (!open_update(&storage)) {
         return;
     }
     _Static_assert(UPDATER_SCRATCH_WORDS * 4 <= 64 * 512, "the USB write buffer holds the scratch");
-    updater_use_scratch(board_usb_scratch());
+    updater_use_scratch(usb_session_buffer());
     UpdateFile update = {read_update, file.size, NULL};
     const char *name = update_path + 1;
     char text[MESSAGE_CAPACITY];

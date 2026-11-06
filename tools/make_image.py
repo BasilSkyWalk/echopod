@@ -21,6 +21,9 @@ OVERLAY_BASE = 0x0307A000
 OVERLAY_CAPACITY = 0x15000
 OVERLAY_HEADER_SIZE = 16
 OVERLAY_MAGIC = b"EOVL"
+USB_OVERLAY_OFFSET = 0x43C000
+USB_OVERLAY_CAPACITY = 0x10000
+USB_OVERLAY_MAGIC = b"EUSB"
 CORE1_MP3_OFFSET = 0x240000
 CORE1_FLAC_OFFSET = 0x280000
 CORE1_AAC_OFFSET = 0x2A0200
@@ -41,7 +44,7 @@ GLYPH_FACE_LIMIT = (GLYPH_TABLE_SIZE - 8) // 8
 GLYPH_PAYLOAD_LIMIT = 0x30000
 GLYPH_REGIONS = (
     (GLYPH_PAYLOAD_LIMIT, OVERLAY_OFFSET),
-    (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, FW_SIZE),
+    (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, USB_OVERLAY_OFFSET),
     (RESIDENT_OFFSET + RESIDENT_CAPACITY, CORE1_MP3_OFFSET),
     (CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_FLAC_OFFSET),
 )
@@ -106,6 +109,7 @@ class ImageParts:
     core1_aac: bytes = b""
     core1_opus: bytes = b""
     resident: bytes = b""
+    usb_overlay: bytes = b""
 
 
 def crc_table():
@@ -194,8 +198,10 @@ def assemble(parts):
     image[PAYLOAD_OFFSET:PAYLOAD_OFFSET + len(parts.payload)] = parts.payload
     image[FW_SIZE:FW_SIZE + HEADER_SIZE] = image[:HEADER_SIZE]
     image[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE] = parts.marker
-    place_overlay(image, parts)
-    place_resident(image, parts.resident)
+    place_overlay(image, parts, parts.overlay, OVERLAY_OFFSET, OVERLAY_CAPACITY, OVERLAY_MAGIC)
+    place_overlay(image, parts, parts.usb_overlay, USB_OVERLAY_OFFSET, USB_OVERLAY_CAPACITY,
+                  USB_OVERLAY_MAGIC)
+    place_resident(image, parts)
     place_core1_module(image, parts.core1_mp3, CORE1_MP3_OFFSET)
     place_core1_module(image, parts.core1_flac, CORE1_FLAC_OFFSET)
     place_core1_module(image, parts.core1_aac, CORE1_AAC_OFFSET, CORE1_AAC_CAPACITY)
@@ -206,17 +212,16 @@ def assemble(parts):
     return bytes(image)
 
 
-def place_overlay(image, parts):
-    overlay = parts.overlay
+def place_overlay(image, parts, overlay, offset, capacity, magic):
     if not overlay:
         return
-    if len(overlay) > OVERLAY_CAPACITY or len(overlay) < OVERLAY_HEADER_SIZE:
-        raise ImageError(f"the overlay must be {OVERLAY_HEADER_SIZE} to {OVERLAY_CAPACITY:#x} bytes")
-    if PAYLOAD_OFFSET + len(parts.payload) > OVERLAY_OFFSET:
+    if len(overlay) > capacity or len(overlay) < OVERLAY_HEADER_SIZE:
+        raise ImageError(f"the overlay must be {OVERLAY_HEADER_SIZE} to {capacity:#x} bytes")
+    if PAYLOAD_OFFSET + len(parts.payload) > offset:
         raise ImageError("the payload reaches the overlay")
-    header = OVERLAY_MAGIC + struct.pack("<III", len(overlay), crc32(overlay[OVERLAY_HEADER_SIZE:]),
-                                         code_crc(parts))
-    image[OVERLAY_OFFSET:OVERLAY_OFFSET + len(overlay)] = header + overlay[OVERLAY_HEADER_SIZE:]
+    header = magic + struct.pack("<III", len(overlay), crc32(overlay[OVERLAY_HEADER_SIZE:]),
+                                 code_crc(parts))
+    image[offset:offset + len(overlay)] = header + overlay[OVERLAY_HEADER_SIZE:]
 
 
 def code_crc(parts):
@@ -224,14 +229,15 @@ def code_crc(parts):
     return crc32(parts.payload[start:start + parts.rows[0][2]])
 
 
-def place_resident(image, resident):
+def place_resident(image, parts):
+    resident = parts.resident
     if not resident:
         return
     if len(resident) > RESIDENT_CAPACITY or len(resident) < RESIDENT_HEADER_SIZE:
         raise ImageError(f"the resident tables must be {RESIDENT_HEADER_SIZE} to "
                          f"{RESIDENT_CAPACITY:#x} bytes")
     header = RESIDENT_MAGIC + struct.pack("<III", len(resident),
-                                          crc32(resident[RESIDENT_HEADER_SIZE:]), 0)
+                                          crc32(resident[RESIDENT_HEADER_SIZE:]), code_crc(parts))
     image[RESIDENT_OFFSET:RESIDENT_OFFSET + len(resident)] = header + resident[RESIDENT_HEADER_SIZE:]
 
 
@@ -367,7 +373,8 @@ def generated_header(version):
 
 
 def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", core1_flac=b"",
-                version=DEFAULT_VERSION, glyph_faces=(), core1_aac=b"", core1_opus=b""):
+                version=DEFAULT_VERSION, glyph_faces=(), core1_aac=b"", core1_opus=b"",
+                usb_overlay=b""):
     check_firmware(firmware)
     code_size, data_size = len(firmware.code), len(firmware.data)
     header = generated_header(version)
@@ -384,7 +391,7 @@ def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", co
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     return assemble(ImageParts(bytes(header), tuple(rows), payload, bytes(MARKER_SIZE), overlay,
                                core1_mp3, core1_flac, tuple(glyph_faces), core1_aac, core1_opus,
-                               firmware.resident))
+                               firmware.resident, usb_overlay))
 
 
 def validate_image(image):
@@ -460,15 +467,22 @@ def firmware_from_elf(elf):
                     resident=resident.content if resident is not None else b"")
 
 
-def overlay_from_elf(elf):
+def overlay_from_elf(elf, zeroed=False):
     sections = elf_sections(elf)
     overlay = sections.get(".overlay")
     if overlay is None or overlay.address != OVERLAY_BASE:
         raise ImageError(f"the overlay ELF needs an .overlay section at {OVERLAY_BASE:#010x}")
+    allowed = {".overlay", ".bss"} if zeroed else {".overlay"}
     stray = [name for name, section in sections.items()
-             if section.flags & SHF_ALLOC and section.size and name != ".overlay"]
+             if section.flags & SHF_ALLOC and section.size and name not in allowed]
     if stray:
         raise ImageError("the overlay may only hold code and constants: " + ", ".join(sorted(stray)))
+    bss = sections.get(".bss")
+    if zeroed and bss is not None and bss.size:
+        if bss.kind != SHT_NOBITS or bss.address < OVERLAY_BASE + overlay.size:
+            raise ImageError("the overlay's .bss must be zeroed memory after its code")
+        if bss.address + bss.size > OVERLAY_BASE + OVERLAY_CAPACITY:
+            raise ImageError(f"the overlay and its .bss must fit {OVERLAY_CAPACITY:#x} bytes")
     return overlay.content
 
 
@@ -517,6 +531,8 @@ def parse_arguments(argv):
     parser.add_argument("--build-tag", help="defaults to the short git commit, + when dirty")
     parser.add_argument("--date", type=parse_date, help="YYYY-MM-DD; defaults to today")
     parser.add_argument("--overlay", type=Path, help="rescan overlay ELF linked at 0x0307A000")
+    parser.add_argument("--usb-overlay", type=Path,
+                        help="USB and update overlay ELF linked at 0x0307A000")
     parser.add_argument("--core1-mp3", type=Path, help="core 1 MP3 program, a raw binary")
     parser.add_argument("--core1-flac", type=Path, help="core 1 FLAC program, a raw binary")
     parser.add_argument("--core1-aac", type=Path, help="core 1 AAC program, a raw binary")
@@ -534,6 +550,8 @@ def main(argv=None):
     try:
         firmware = firmware_from_elf(arguments.elf.read_bytes())
         overlay = overlay_from_elf(arguments.overlay.read_bytes()) if arguments.overlay else b""
+        usb_overlay = (overlay_from_elf(arguments.usb_overlay.read_bytes(), zeroed=True)
+                       if arguments.usb_overlay else b"")
         core1_mp3 = arguments.core1_mp3.read_bytes() if arguments.core1_mp3 else b""
         core1_flac = arguments.core1_flac.read_bytes() if arguments.core1_flac else b""
         core1_aac = arguments.core1_aac.read_bytes() if arguments.core1_aac else b""
@@ -541,7 +559,8 @@ def main(argv=None):
         glyph_faces = [path.read_bytes() if path.exists() else b""
                        for path in arguments.glyph_face]
         image = build_image(firmware, arguments.brand, build_tag, date, overlay, core1_mp3,
-                            core1_flac, arguments.version, glyph_faces, core1_aac, core1_opus)
+                            core1_flac, arguments.version, glyph_faces, core1_aac, core1_opus,
+                            usb_overlay)
     except ImageError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -554,6 +573,7 @@ def main(argv=None):
     print(f"wrote {arguments.output} ({build_tag}): "
           f"code {len(firmware.code):,} bytes, "
           f"overlay {len(overlay):,} bytes, resident {len(firmware.resident):,} bytes, "
+          f"USB overlay {len(usb_overlay):,} bytes, "
           f"core 1 MP3 {len(core1_mp3):,} bytes, "
           f"core 1 FLAC {len(core1_flac):,} bytes, core 1 AAC {len(core1_aac):,} bytes, core 1 Opus {len(core1_opus):,} bytes, "
           f"glyph faces {sum(len(face) for face in glyph_faces):,} bytes, "

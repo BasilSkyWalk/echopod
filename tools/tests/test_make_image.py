@@ -470,6 +470,55 @@ class OverlayTest(unittest.TestCase):
         with self.assertRaises(make_image.ImageError):
             make_image.overlay_from_elf(elf)
 
+    def test_the_usb_overlay_lands_at_its_own_offset_with_its_own_magic(self):
+        parts = firmware(code_tail=b"Uf" * 32)
+        overlay = self.overlay(b"w" * 300)
+        image = build(parts, overlay=self.overlay(), usb_overlay=overlay)
+        offset = make_image.USB_OVERLAY_OFFSET
+        self.assertEqual(b"EUSB", image[offset:offset + 4])
+        self.assertEqual(len(overlay), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(overlay[16:]), word(image, offset + 8))
+        self.assertEqual(make_image.crc32(parts.code), word(image, offset + 12))
+        self.assertEqual(overlay[16:], image[offset + 16:offset + len(overlay)])
+        self.assertEqual(b"EOVL", image[make_image.OVERLAY_OFFSET:make_image.OVERLAY_OFFSET + 4])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_the_usb_overlay_sits_after_the_glyph_space_inside_the_header_copy(self):
+        end = make_image.USB_OVERLAY_OFFSET + make_image.USB_OVERLAY_CAPACITY
+        self.assertEqual(make_image.FW_SIZE, end)
+        self.assertEqual(0, make_image.USB_OVERLAY_OFFSET % 512)
+        self.assertIn((make_image.GLYPH_TABLE_OFFSET + make_image.GLYPH_TABLE_SIZE,
+                       make_image.USB_OVERLAY_OFFSET), make_image.GLYPH_REGIONS)
+
+    def test_a_usb_overlay_bigger_than_its_space_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(usb_overlay=self.overlay(bytes(make_image.USB_OVERLAY_CAPACITY)))
+
+    def test_a_usb_overlay_elf_may_have_zeroed_memory_after_its_code(self):
+        content = self.overlay(b"")
+        bss = (".bss", SHT_NOBITS, SHF_ALLOC | 1, 0x0307A000 + len(content), b"", 0x8000)
+        elf = elf_file([(".overlay", SHT_PROGBITS, SHF_ALLOC, 0x0307A000, content, len(content)),
+                        bss])
+        self.assertEqual(content, make_image.overlay_from_elf(elf, zeroed=True))
+        with self.assertRaises(make_image.ImageError):
+            make_image.overlay_from_elf(elf)
+
+    def test_zeroed_memory_past_the_window_is_refused(self):
+        content = self.overlay()
+        size = make_image.OVERLAY_CAPACITY - len(content) + 4
+        elf = elf_file([(".overlay", SHT_PROGBITS, SHF_ALLOC, 0x0307A000, content, len(content)),
+                        (".bss", SHT_NOBITS, SHF_ALLOC | 1, 0x0307A000 + len(content), b"",
+                         size)])
+        with self.assertRaises(make_image.ImageError):
+            make_image.overlay_from_elf(elf, zeroed=True)
+
+    def test_zeroed_memory_over_the_code_is_refused(self):
+        content = self.overlay()
+        elf = elf_file([(".overlay", SHT_PROGBITS, SHF_ALLOC, 0x0307A000, content, len(content)),
+                        (".bss", SHT_NOBITS, SHF_ALLOC | 1, 0x0307A000, b"", 64)])
+        with self.assertRaises(make_image.ImageError):
+            make_image.overlay_from_elf(elf, zeroed=True)
+
 
 class ResidentTablesTest(unittest.TestCase):
     def resident(self, body=b"\x3C" * 100):
@@ -484,6 +533,11 @@ class ResidentTablesTest(unittest.TestCase):
         self.assertEqual(make_image.crc32(resident[16:]), word(image, offset + 8))
         self.assertEqual(resident[16:], image[offset + 16:offset + len(resident)])
         self.assertEqual([], make_image.validate_image(image))
+
+    def test_the_tables_header_names_the_code_they_belong_to(self):
+        parts = firmware(code_tail=b"!C" * 40, resident=self.resident())
+        image = build(parts)
+        self.assertEqual(make_image.crc32(parts.code), word(image, make_image.RESIDENT_OFFSET + 12))
 
     def test_the_tables_sit_after_the_opus_program_and_before_the_mp3_slot(self):
         opus_end = (make_image.CORE1_OPUS_OFFSET + make_image.CORE1_MODULE_HEADER_SIZE
@@ -633,6 +687,7 @@ class GlyphFaceTest(unittest.TestCase):
                  (make_image.CORE1_OPUS_OFFSET, make_image.CORE1_OPUS_OFFSET + 512 +
                   make_image.CORE1_MODULE_CAPACITY),
                  (make_image.GLYPH_TABLE_OFFSET, make_image.GLYPH_TABLE_OFFSET + 512),
+                 (make_image.USB_OVERLAY_OFFSET, make_image.FW_SIZE),
                  (make_image.FW_SIZE, make_image.IMAGE_SIZE),
                  (0, make_image.GLYPH_PAYLOAD_LIMIT)]
         placed = sorted(zip(offsets, sizes))

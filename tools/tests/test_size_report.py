@@ -61,6 +61,16 @@ OVERLAY_MAP = """Linker script and memory map
  .text.scan     0x0307a010     0x1000 src/library/libecho_library_scan.a(library_scan.c.obj)
 """
 
+USB_OVERLAY_MAP = """Linker script and memory map
+
+.overlay        0x0307a000     0x3000
+ .text.usb_poll 0x0307a010      0x400 platform/device/CMakeFiles/echo_usb_overlay.dir/board/usb_port.c.obj
+
+.bss            0x0307d000     0x9000
+ .bss.write_buffer
+                0x0307d000     0x8000 platform/device/CMakeFiles/echo_usb_overlay.dir/board/usb_session.c.obj
+"""
+
 NM = """03050110 00000200 T app_step\tD:/Projects/echopod/src/app/app.c:200
 0301f588 00004a78 b app\tD:/Projects/echopod/src/app/app.c:133
 030500cc 00000040 T hal_audio_play\tD:/Projects/echopod/platform/device/board/audio.c:50
@@ -133,6 +143,11 @@ class ReportTest(unittest.TestCase):
                                    "302,424 free")
         self.assertEqual(lines[2], "resident tables: 15,152 of 18,432 bytes, 3,280 free")
         self.assertEqual(lines[3], "rescan overlay: 81,920 of 86,016 bytes, 4,096 free")
+
+    def test_summary_measures_the_usb_overlay_in_the_image_and_with_its_zeroed_memory(self):
+        lines = size_report.summary(MAP, OVERLAY_MAP, USB_OVERLAY_MAP)
+        self.assertEqual(lines[4], "USB overlay code: 12,288 of 65,536 bytes, 53,248 free")
+        self.assertEqual(lines[5], "USB overlay code + .bss: 49,152 of 86,016 bytes, 36,864 free")
 
     def test_summary_flags_a_limit_that_is_over(self):
         over = MAP.replace(".code           0x03050000     0x1000",
