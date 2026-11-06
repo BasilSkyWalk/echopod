@@ -314,11 +314,17 @@ static int current_slot(const void *context)
 static void choose_slot(void *context, int index)
 {
     SettingsEntry *entry = context;
+    SettingsContext *settings = &entry->owner->context;
+    int option = entry->choice->slot - 1;
+    bool changed = *option_of(entry) != (uint8_t)index;
     *option_of(entry) = (uint8_t)index;
-    if (entry->choice->slot - 1 == OPTION_USB_PROMPT) {
-        apply_and_save(&entry->owner->context);
+    if (option == OPTION_INTERNAL_STORAGE && changed && settings->rescan_requested != NULL) {
+        *settings->rescan_requested = true;
+    }
+    if (option == OPTION_USB_PROMPT || option == OPTION_INTERNAL_STORAGE) {
+        apply_and_save(settings);
     } else {
-        save(&entry->owner->context);
+        save(settings);
     }
 }
 
@@ -370,6 +376,7 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_THEME, THEME_OPTIONS, OPTION_THEME),
     OPTION_CHOICE(STR_SETTINGS_LYRICS, SHOWN_OPTIONS, OPTION_LYRICS),
     OPTION_CHOICE(STR_SETTINGS_FOLDER_VIEW, ARTIST_VIEW_OPTIONS, OPTION_FOLDER_VIEW),
+    OPTION_CHOICE(STR_LIBRARY_INTERNAL_STORAGE, SWITCH_OPTIONS, OPTION_INTERNAL_STORAGE),
     OPTION_CHOICE(STR_SETTINGS_CLOCK, SWITCH_OPTIONS, OPTION_CLOCK),
 };
 

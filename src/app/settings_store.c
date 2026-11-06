@@ -98,4 +98,5 @@ void settings_store_apply_hardware(const Settings *settings)
     hal_system_set_usb_mode(HAL_USB_MODES[settings->usb_mode]);
     hal_system_set_dac_volume(settings->dac_volume);
     hal_system_set_usb_prompt(settings->options[OPTION_USB_PROMPT] == USB_PROMPT_ON);
+    hal_storage_show_internal(settings->options[OPTION_INTERNAL_STORAGE] == INTERNAL_STORAGE_ON);
 }

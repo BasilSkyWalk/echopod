@@ -356,7 +356,7 @@ static void load_text(CoverFlowScreen *flow, const CoverFlowTile *tile)
     flow->title[0] = '\0';
     flow->artist[0] = '\0';
     if (folders && library_read_folder(library, tile->item, &folder)) {
-        library_read_string(library, folder.name, flow->title, sizeof flow->title);
+        browse_folder_name(library, &folder, flow->title, sizeof flow->title);
     }
     if (!library_read_album(library, tile->album, &album) ||
         !library_read_string(library, album.title, title, sizeof title)) {

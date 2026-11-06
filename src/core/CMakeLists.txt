@@ -11,6 +11,7 @@ set(ECHO_CORE_SOURCES
     random.c
     string_builder.c
     utf8.c
+    volume_path.c
     wall_clock.c
 )
 add_library(echo_core STATIC ${ECHO_CORE_SOURCES})

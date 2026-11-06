@@ -25,7 +25,7 @@ target_link_libraries(echo_sim_language PUBLIC echo_hal PRIVATE echo_options)
 
 add_library(echo_sim_storage STATIC sim_storage.c)
 target_include_directories(echo_sim_storage PUBLIC .)
-target_link_libraries(echo_sim_storage PUBLIC echo_hal PRIVATE echo_options)
+target_link_libraries(echo_sim_storage PUBLIC echo_hal PRIVATE echo_core echo_options)
 
 add_executable(echo_sim
     main.c

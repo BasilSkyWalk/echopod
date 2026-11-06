@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "core/volume_path.h"
+
 enum {
     MAX_SMALL = 255,
     NUMBER_CEILING = 1000000,
@@ -195,6 +197,9 @@ void track_fields_from_tags(const char *path, const TrackTags *tags, TrackFields
     const char *parent = NULL;
     size_t parent_length = 0;
     const char *name = last_component(path, &name_length, &parent, &parent_length);
+    if (parent == path && volume_is_internal_name(parent, parent_length)) {
+        parent_length = 0;
+    }
     size_t stem = stem_length(name, name_length);
     copy_text(fields->title, name, stem);
     FilePrefix prefix = prefix_of(fields->title);

@@ -49,7 +49,8 @@ enum {
     SETTINGS_THEME_INDEX = 30,
     SETTINGS_LYRICS_INDEX = 31,
     SETTINGS_FOLDER_VIEW_INDEX = 32,
-    SETTINGS_CLOCK_INDEX = 33,
+    SETTINGS_INTERNAL_STORAGE_INDEX = 33,
+    SETTINGS_CLOCK_INDEX = 34,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -1136,6 +1137,25 @@ static void a_refused_track_says_why_it_was_skipped(void)
     play_first_album_track();
     CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
     CHECK(toast_is("192 kHz isn't supported yet"));
+}
+
+static void turning_internal_storage_on_lists_it_and_rescans(void)
+{
+    start_app_with_library();
+    CHECK(!fake_hal_internal_shown());
+    open_setting(SETTINGS_INTERNAL_STORAGE_INDEX);
+    CHECK(title_is("Internal storage"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    CHECK(fake_hal_internal_shown());
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(INTERNAL_STORAGE_ON, settings.options[OPTION_INTERNAL_STORAGE]);
+    step();
+    CHECK(toast_is("No music found on the card"));
+    restart_app();
+    CHECK(fake_hal_internal_shown());
 }
 
 static void rescanning_without_a_card_says_so(void)
@@ -2552,6 +2572,7 @@ int main(void)
         TEST_CASE(a_dismissed_usb_choice_keeps_the_saved_one),
         TEST_CASE(the_usb_choice_lights_the_screen_and_keeps_the_audio_served),
         TEST_CASE(the_last_setting_asks_whether_to_prompt_on_usb),
+        TEST_CASE(turning_internal_storage_on_lists_it_and_rescans),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

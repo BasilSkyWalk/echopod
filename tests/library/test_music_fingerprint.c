@@ -129,6 +129,21 @@ static void the_test_card_keeps_its_stored_fingerprint(void)
     CHECK_EQUAL(6u, print.entries);
 }
 
+static void internal_storage_folds_in_as_the_last_root_folder(void)
+{
+    music_card();
+    add("/", ":internal", true, 0, 0);
+    add("/:internal", "Artist", true, 0, 11);
+    add("/:internal/Artist", "01 - Song.flac", false, 5000000, 12);
+    add("/:internal", "System Volume Information", true, 0, 13);
+    add("/:internal", "HIFIEC90.IMG", false, 9000000, 14);
+    MusicFingerprint print = fingerprint();
+    CHECK(print.complete);
+    CHECK_EQUAL(1993034583u, print.first);
+    CHECK_EQUAL(148508692u, print.second);
+    CHECK_EQUAL(9u, print.entries);
+}
+
 static void a_folder_that_cannot_be_opened_counts_as_empty(void)
 {
     music_card();
@@ -281,6 +296,7 @@ int main(void)
         TEST_CASE(the_same_card_gives_the_same_fingerprint),
         TEST_CASE(the_test_card_keeps_its_stored_fingerprint),
         TEST_CASE(a_folder_that_cannot_be_opened_counts_as_empty),
+        TEST_CASE(internal_storage_folds_in_as_the_last_root_folder),
         TEST_CASE(hidden_entries_do_not_count),
         TEST_CASE(files_the_library_ignores_do_not_count),
         TEST_CASE(every_format_the_library_reads_counts),
