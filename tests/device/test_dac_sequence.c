@@ -392,11 +392,20 @@ static void the_louder_bluetooth_curve_tops_out_where_the_wired_one_does(void)
 
 static void a_volume_ramp_moves_six_units_a_step_and_lands_on_the_target(void)
 {
-    CHECK_EQUAL(0xF9, dac_ramp_next(0xFF, 0x02));
+    CHECK_EQUAL(0xBA, dac_ramp_next(0xC0, 0x02));
     CHECK_EQUAL(0x02, dac_ramp_next(0x05, 0x02));
     CHECK_EQUAL(0x08, dac_ramp_next(0x02, 0xFF));
     CHECK_EQUAL(0xFF, dac_ramp_next(0xFC, 0xFF));
     CHECK_EQUAL(0x30, dac_ramp_next(0x30, 0x30));
+}
+
+static void a_volume_ramp_skips_the_inaudible_end(void)
+{
+    CHECK_EQUAL(0xC0, dac_ramp_next(0xFF, 0x02));
+    CHECK_EQUAL(0xC8, dac_ramp_next(0xFF, 0xC8));
+    CHECK_EQUAL(0xFF, dac_ramp_next(0xBA, 0xFF));
+    CHECK_EQUAL(0xBF, dac_ramp_next(0xB9, 0xFF));
+    CHECK_EQUAL(0xB3, dac_ramp_next(0xAD, 0xB3));
 }
 
 int main(void)
@@ -421,6 +430,7 @@ int main(void)
         TEST_CASE(balance_attenuates_one_chip_only),
         TEST_CASE(the_louder_bluetooth_curve_tops_out_where_the_wired_one_does),
         TEST_CASE(a_volume_ramp_moves_six_units_a_step_and_lands_on_the_target),
+        TEST_CASE(a_volume_ramp_skips_the_inaudible_end),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

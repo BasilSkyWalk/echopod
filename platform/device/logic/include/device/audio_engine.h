@@ -119,6 +119,7 @@ typedef struct AudioEngine {
     bool ended;
     uint32_t end_at;
     bool rate_pending;
+    uint32_t rate_end;
     uint32_t output_rate;
     bool has_next;
     uint32_t next_token;

@@ -386,6 +386,7 @@ static void finish_decoding(AudioEngine *engine)
     }
     if (engine->decode_rate != engine->output_rate) {
         engine->rate_pending = true;
+        engine->rate_end = engine->produced;
         return;
     }
     if (engine->source_rate != previous_rate) {
@@ -451,10 +452,18 @@ void audio_engine_observe(AudioEngine *engine, uint32_t consumed)
     }
 }
 
+static void write_silence(AudioEngine *engine)
+{
+    while (free_space(engine) > 0) {
+        write_frame(engine, 0, 0);
+    }
+}
+
 void audio_engine_pump(AudioEngine *engine, uint32_t consumed)
 {
     audio_engine_observe(engine, consumed);
     if (engine->rate_pending) {
+        write_silence(engine);
         return;
     }
     copy_pending(engine);
@@ -465,15 +474,13 @@ void audio_engine_pump(AudioEngine *engine, uint32_t consumed)
         }
     }
     if (!engine->decoding) {
-        while (free_space(engine) > 0) {
-            write_frame(engine, 0, 0);
-        }
+        write_silence(engine);
     }
 }
 
 bool audio_engine_wants_rate(const AudioEngine *engine, uint32_t *rate)
 {
-    if (!engine->rate_pending || (int32_t)(engine->consumed - engine->produced) < 0) {
+    if (!engine->rate_pending || (int32_t)(engine->consumed - engine->rate_end) < 0) {
         return false;
     }
     *rate = engine->decode_rate;
