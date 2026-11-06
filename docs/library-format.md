@@ -72,10 +72,13 @@ The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` (AAC
 | date | `date` | `TDRC` (`TYER` in ID3v2.3) | `©day` | `Year` | `WM/Year` |
 | disc | `discnumber` | `TPOS` | `disk` (first number) | `Disc` | `WM/PartOfSet` |
 | track | `tracknumber` | `TRCK` | `trkn` (first number) | `Track` | `WM/TrackNumber` |
+| album version | `albumversion` | `TXXX` described `ALBUMVERSION` (any case) | `----` named `ALBUMVERSION` (any case, any mean) | `AlbumVersion` | not read |
+
+**Album versions.** When a track has both an album tag and an album version (the `ALBUMVERSION` tag Navidrome uses to tell editions apart; Picard users usually set it from `%_releasecomment%` with a script), the album title becomes `Album (Version)`, for example `Abbey Road (2019 Remix)`. The version is part of the title everywhere (lists, Now Playing, Cover Flow, sorting) and of the album key, so two editions of one album are two albums, each with its own cover and favorite. Albums without a version keep their key, so favorites and stored covers of those survive. A version without an album tag is ignored (the folder name stays the album). Navidrome also reads `MUSICBRAINZ_ALBUMCOMMENT` as the version; EchoPod doesn't.
 
 An MP3 without ID3v2 uses its ID3v1 tag. The duration is the container's length rounded to the nearest millisecond (FLAC and DSF sample counts, Ogg's last granule (for Opus minus the header's pre-skip, at 48 kHz), an MP3's Xing/Info frame count or its bitrate, MP4's track duration, WAV data length, APE frame counts, ASF play duration minus preroll, DFF DSD data length). `tools/tag_fixture.py` writes one small file per format to `tests/fixtures/tags`, and both the Python indexer and the device reader (`src/library/track_tags`) are tested against them.
 
-On the device, `track_tags_read` reads through a `ByteSource` with small bounded reads, keeps the first 255 bytes of each value (UTF-8, trimmed as Python's `strip()` does) and computes durations in double precision in the same order as mutagen, so the rounded milliseconds match. It also reports where the cover is: a front cover (picture type 3, or MP4's `covr`) wins over any other picture. For Ogg, the cover is the base64 `METADATA_BLOCK_PICTURE` text, and its offset counts bytes of the Ogg stream from the start of the comment packet's first page body, page headers excluded; the cover pass decodes that text as it reads it (see `docs/architecture.md`, Covers on the device). Known differences from the PC indexer: values aren't recomposed to NFC, and an ID3v2.3 tag with tag-wide unsynchronisation is read without undoing it.
+On the device, `track_tags_read` reads through a `ByteSource` with small bounded reads, keeps the first 255 bytes of each value (UTF-8, trimmed as Python's `strip()` does; on both sides, invisible marks and control codes are dropped, bytes 0x80–0x9F read as Windows-1252, and the typographic spaces U+2000–U+200A, U+2028, U+2029, U+202F and U+205F become plain spaces, which the fonts can draw) and computes durations in double precision in the same order as mutagen, so the rounded milliseconds match. It also reports where the cover is: a front cover (picture type 3, or MP4's `covr`) wins over any other picture. For Ogg, the cover is the base64 `METADATA_BLOCK_PICTURE` text, and its offset counts bytes of the Ogg stream from the start of the comment packet's first page body, page headers excluded; the cover pass decodes that text as it reads it (see `docs/architecture.md`, Covers on the device). Known differences from the PC indexer: values aren't recomposed to NFC, and an ID3v2.3 tag with tag-wide unsynchronisation is read without undoing it.
 
 ## Building on the device
 
@@ -135,6 +138,22 @@ Favorites outlive a re-index, so they don't store album indices. An album's key 
 | 12 + 16 × count | `u32` | FNV-1a checksum of everything before it |
 
 Each bookmark is `u32 key`, `u32 track key`, `u32 position_ms`, `u16 chapter`, `u8 flags` (bit 0: finished), `u8 reserved`. The key is the FNV-1a hash of the book's folder path relative to the music root (`Audiobooks/The Long Road`), or of the track's own path for a single-file book or a podcast episode; the track key hashes the track's path. `chapter` is the track's place among its folder's tracks, checked against the track key before it's used. A zero-filled or damaged file reads as no bookmarks.
+
+## Update record
+
+`/.echo/update.bin` (4 KB, reserved by the player) keeps what the firmware installer last did, so Diagnostics → Last update can show it after the player has been switched off (`app/update_record`, written by `board/update.c` at the end of a USB session that found a `HIFIECnn.IMG`). Every value is little-endian.
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | `char[4]` | magic `EUPD` |
+| 4 | `u8` | result: 0 none, 1 installed, 2 failed, 3 refused, 4 already installed |
+| 5 | `u8` | detail: the last progress mark shown (5 % steps) for installed and failed, the refusal code (`E` number) for refused |
+| 6 | `u8` | 1 when the internal storage answered CMD13 after the install |
+| 7 | `u8` | reserved (0) |
+| 8 | `u32` | the eMMC status word that CMD13 returned (card state in bits 12:9, ready-for-data in bit 8) |
+| 12 | `u32` | checksum: the bitwise complement of a 31-multiplier sum over the first 12 bytes |
+
+A zero-filled or damaged file reads as no record.
 
 ## Listen history file
 

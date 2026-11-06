@@ -9,7 +9,7 @@ enum {
 static Slide started(SlideDirection direction)
 {
     Slide slide;
-    slide_start(&slide, START_MS, direction);
+    slide_start(&slide, START_MS, direction, SLIDE_DURATION_MS);
     return slide;
 }
 
@@ -57,6 +57,18 @@ static void the_title_switches_halfway(void)
     CHECK(slide_shows_arriving_title(&slide, START_MS + SLIDE_DURATION_MS / 2));
 }
 
+static void a_longer_slide_takes_its_own_time(void)
+{
+    Slide slide;
+    uint32_t duration = SLIDE_DURATION_MS * 3 / 2;
+    slide_start(&slide, START_MS, SLIDE_FORWARD, duration);
+    CHECK_EQUAL(280, slide_progress(&slide, START_MS + duration / 2, WIDTH));
+    CHECK(!slide_finished(&slide, START_MS + SLIDE_DURATION_MS));
+    CHECK(!slide_shows_arriving_title(&slide, START_MS + duration / 2 - 1));
+    CHECK(slide_finished(&slide, START_MS + duration));
+    CHECK_EQUAL(WIDTH, slide_progress(&slide, START_MS + duration, WIDTH));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -65,6 +77,7 @@ int main(void)
         TEST_CASE(the_slide_ends_at_the_full_width),
         TEST_CASE(forward_moves_the_old_screen_left_and_back_moves_it_right),
         TEST_CASE(the_title_switches_halfway),
+        TEST_CASE(a_longer_slide_takes_its_own_time),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

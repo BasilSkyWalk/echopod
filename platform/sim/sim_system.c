@@ -130,6 +130,11 @@ HalStartInfo hal_system_start_info(void)
     return (HalStartInfo){.warm = false, .starts = 1};
 }
 
+HalStackUsage hal_system_stack_usage(void)
+{
+    return (HalStackUsage){.used = 0, .capacity = 0};
+}
+
 void hal_system_watchdog_test(void)
 {
 }

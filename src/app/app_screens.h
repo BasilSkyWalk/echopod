@@ -29,7 +29,7 @@ enum {
     HOME_ITEM_COUNT = 6,
     SHELF_COUNT = 2,
     MUSIC_ITEM_COUNT = 9,
-    DIAGNOSTICS_ITEM_COUNT = 19,
+    DIAGNOSTICS_ITEM_COUNT = 23,
     START_PATH_CAPACITY = 2
 };
 
@@ -91,6 +91,7 @@ typedef struct AppScreens {
 typedef struct AppScreensContext {
     AppOptions *options;
     const Theme *theme;
+    const Theme *stage_theme;
     const LibraryStore *store;
     Player *player;
     SettingsStore *settings;

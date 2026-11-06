@@ -41,6 +41,13 @@ FIXTURE_PLAYLISTS = [
         "../Missing/Gone.flac",
         "../Björk/Homogenic/02 - Jóga.flac",
     ]),
+    RawPlaylist("Weekend", "Playlists", [
+        "../AC DC/Back In Black/1-01 - Hells Bells.flac",
+        "../AC DC/Back In Black/1-02 - Shoot to Thrill.flac",
+        "../Björk/Homogenic/01 - Hunter.flac",
+        "../Björk/Homogenic/02 - Jóga.flac",
+        "../AC DC/Back In Black/1-02 - Shoot to Thrill.flac",
+    ]),
 ]
 
 

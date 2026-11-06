@@ -42,6 +42,13 @@ class SortKeyTest(unittest.TestCase):
 
 
 class TagParsingTest(unittest.TestCase):
+    def test_an_album_version_follows_the_album_title(self):
+        track = library_index.track_from_tags("A/B/01 - x.flac", {"album": ["Abbey Road"],
+                                              "albumversion": ["", "2019 Remix"]}, 1.0)
+        self.assertEqual("Abbey Road (2019 Remix)", track.album)
+        track = library_index.track_from_tags("A/B/01 - x.flac", {"albumversion": ["Live"]}, 1.0)
+        self.assertEqual("B", track.album)
+
     def test_numbers_take_the_leading_integer(self):
         self.assertEqual(1, library_index.parse_number("1/10"))
         self.assertEqual(7, library_index.parse_number("07"))
@@ -395,6 +402,12 @@ class UnicodeFormTest(unittest.TestCase):
         self.assertEqual("AB", library_index.tag_text("A\u200bB\x01"))
         self.assertEqual("It\u2019s \u2026", library_index.tag_text("It\x92s \x85"))
         self.assertEqual("Tab\tkept", library_index.tag_text("Tab\tkept"))
+
+    def test_odd_spaces_become_plain_spaces(self):
+        self.assertEqual(" A B C D E F ", library_index.tag_text(
+            "\u2003A\u2002B\u202fC\u205fD\u200aE\u2028F\u2009"))
+        self.assertEqual("x y", library_index.tag_text("x\u2000y"))
+        self.assertEqual("\u5468\u2027\u502b", library_index.tag_text("\u5468\u2027\u502b"))
 
     def test_decomposed_playlist_entries_and_folders_are_composed(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -106,6 +106,7 @@ add_library(echo_device_logic STATIC
     start_record.c
     sd_card.c
     sleep_meter.c
+    stack_mark.c
     stall_watch.c
     stream_drift.c
     tick_clock.c
@@ -114,6 +115,7 @@ add_library(echo_device_logic STATIC
     usb_audio_sink.c
     usb_device.c
     usb_fallback.c
+    vbus_debounce.c
     wav_source.c
 )
 if(CMAKE_CROSSCOMPILING)
@@ -139,6 +141,7 @@ if(CMAKE_CROSSCOMPILING)
         pcf8563.c
         pll.c
         sd_card.c
+        stack_mark.c
         start_record.c
         updater.c
         usb_audio.c

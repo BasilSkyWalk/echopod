@@ -46,7 +46,10 @@ enum {
     SETTINGS_START_INDEX = 13,
     SETTINGS_RESCAN_INDEX = 14,
     SETTINGS_LANGUAGE_INDEX = 16,
-    SETTINGS_CLOCK_INDEX = 28,
+    SETTINGS_THEME_INDEX = 30,
+    SETTINGS_LYRICS_INDEX = 31,
+    SETTINGS_FOLDER_VIEW_INDEX = 32,
+    SETTINGS_CLOCK_INDEX = 33,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -1183,6 +1186,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/bluetooth.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/equalizer.bin"));
     CHECK_EQUAL(1024 * 1024, fake_hal_reserved_size("/.echo/history.bin"));
+    CHECK_EQUAL(4096, fake_hal_reserved_size("/.echo/update.bin"));
     step();
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
     CHECK(toast_is("Library: 0 tracks"));
@@ -1191,7 +1195,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(13, fake_hal_reserve_count());
+    CHECK_EQUAL(14, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -1717,6 +1721,118 @@ static void holding_play_in_cover_flow_toggles_a_favorite(void)
     CHECK(title_is("Cover Flow"));
 }
 
+static void start_with_folder_flows(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_FOLDER_VIEW_INDEX);
+    CHECK(title_is("Folders & playlists"));
+    move_down(1);
+    tap(KEY_PLAY);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(1, settings.options[OPTION_FOLDER_VIEW]);
+    restart_app();
+}
+
+static void folders_open_as_cover_flow_of_their_subfolders(void)
+{
+    start_with_folder_flows();
+    open_music_entry(MUSIC_FOLDERS_INDEX);
+    CHECK(title_is("Cover Flow"));
+    settle();
+    CHECK_EQUAL(RED_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+    tap(KEY_PLAY);
+    CHECK(title_is("Cover Flow"));
+    move_down(1);
+    settle();
+    CHECK_EQUAL(BLUE_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+    tap(KEY_PLAY);
+    CHECK(title_is("High Voltage"));
+    tap(KEY_BACK);
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_BACK);
+    CHECK(title_is("Cover Flow"));
+    move_down(2);
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    CHECK(title_is("Music"));
+}
+
+static void folders_stay_lists_by_default(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_FOLDERS_INDEX);
+    CHECK(title_is("Folders"));
+}
+
+static void playlists_open_as_cover_flow_of_their_albums(void)
+{
+    start_with_folder_flows();
+    open_music_entry(MUSIC_PLAYLISTS_INDEX);
+    CHECK(title_is("Playlists"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_PLAY);
+    CHECK(title_is("This Won't Be The Last Time"));
+    tap(KEY_BACK);
+    move_down(1);
+    settle();
+    CHECK_EQUAL(RED_COVER, fake_hal_pixel(COVER_CENTER_X, COVER_CENTER_Y));
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    tap(KEY_BACK);
+    move_down(5);
+    settle();
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    CHECK(title_is("Playlists"));
+}
+
+static void a_playlist_flow_joins_neighbouring_tracks_of_one_album(void)
+{
+    start_with_folder_flows();
+    open_music_entry(MUSIC_PLAYLISTS_INDEX);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Cover Flow"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    tap(KEY_BACK);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+    tap(KEY_BACK);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    tap(KEY_BACK);
+    move_down(3);
+    settle();
+    move_up(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Homogenic"));
+}
+
+static void a_playlist_flow_starts_at_the_playing_album(void)
+{
+    start_with_folder_flows();
+    play_first_album_track();
+    hold_back();
+    tap(KEY_PLAY);
+    move_down(MUSIC_PLAYLISTS_INDEX - MUSIC_ALBUMS_INDEX);
+    tap(KEY_PLAY);
+    CHECK(title_is("Playlists"));
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+}
+
 static bool area_has_color(Rect area, Color color)
 {
     for (int y = area.y; y < area.y + area.height; y++) {
@@ -2130,6 +2246,77 @@ static void the_clock_and_date_time_rows_end_the_settings_list(void)
     CHECK(title_is("Settings"));
 }
 
+static void the_light_theme_lightens_the_screens_and_keeps_the_accent(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_THEME_INDEX);
+    CHECK(title_is("Theme"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(THEME_LIGHT, settings.options[OPTION_THEME]);
+    Theme light = default_theme_styled(false, 0, false, true);
+    CHECK(light.colors.background != DEFAULT_THEME.colors.background);
+    CHECK_EQUAL(light.colors.background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+    Theme red_light = default_theme_styled(false, 1, false, true);
+    Theme red_dark = default_theme_styled(false, 1, false, false);
+    CHECK_EQUAL(red_dark.colors.selection_background, red_light.colors.selection_background);
+    CHECK_EQUAL(red_dark.colors.selection_shine, red_light.colors.selection_shine);
+}
+
+static const uint8_t HELLS_BELLS_LYRICS[] = "[ti:Hells Bells]\n[00:00.50]I'm a rolling thunder\n"
+                                            "[00:05.00][00:09.00]Pouring rain\n";
+
+static void synced_lyrics_beside_a_track_follow_its_position(void)
+{
+    start_app_with_library();
+    fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.lrc", HELLS_BELLS_LYRICS,
+                      sizeof HELLS_BELLS_LYRICS - 1);
+    play_first_album_track();
+    CHECK(title_is("Now Playing"));
+    CHECK(app_now_playing_lyric() != NULL);
+    CHECK_EQUAL(0, strcmp("", app_now_playing_lyric()));
+    fake_hal_audio_set_position(1000);
+    wait_ms(20);
+    CHECK_EQUAL(0, strcmp("I'm a rolling thunder", app_now_playing_lyric()));
+    fake_hal_audio_set_position(9500);
+    wait_ms(20);
+    CHECK_EQUAL(0, strcmp("Pouring rain", app_now_playing_lyric()));
+    hold(KEY_PLAY);
+    CHECK(app_now_playing_lyric() == NULL);
+}
+
+static void lyrics_in_capitals_are_found_and_the_setting_hides_them(void)
+{
+    start_app_with_library();
+    fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.LRC", HELLS_BELLS_LYRICS,
+                      sizeof HELLS_BELLS_LYRICS - 1);
+    play_first_album_track();
+    CHECK(app_now_playing_lyric() != NULL);
+    hold_back();
+    open_setting(SETTINGS_LYRICS_INDEX);
+    CHECK(title_is("Lyrics"));
+    move_down(1);
+    tap(KEY_PLAY);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(LYRICS_OFF, settings.options[OPTION_LYRICS]);
+    hold_back();
+    tap(KEY_MENU);
+    CHECK(title_is("Now Playing"));
+    CHECK(app_now_playing_lyric() == NULL);
+}
+
+static void a_track_without_lyrics_shows_none(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    CHECK(title_is("Now Playing"));
+    CHECK(app_now_playing_lyric() == NULL);
+}
+
 static void start_app_with_clock(bool clock_on)
 {
     static uint8_t clock_settings[SETTINGS_FILE_SIZE];
@@ -2337,6 +2524,11 @@ int main(void)
         TEST_CASE(cover_flow_starts_at_the_playing_album),
         TEST_CASE(holding_play_in_cover_flow_toggles_a_favorite),
         TEST_CASE(cover_flow_starts_with_a_random_album),
+        TEST_CASE(folders_open_as_cover_flow_of_their_subfolders),
+        TEST_CASE(folders_stay_lists_by_default),
+        TEST_CASE(playlists_open_as_cover_flow_of_their_albums),
+        TEST_CASE(a_playlist_flow_starts_at_the_playing_album),
+        TEST_CASE(a_playlist_flow_joins_neighbouring_tracks_of_one_album),
         TEST_CASE(stopping_the_app_saves_the_session),
         TEST_CASE(each_step_records_its_duration),
         TEST_CASE(a_calm_frame_is_not_drawn_again_for_a_while),
@@ -2345,6 +2537,10 @@ int main(void)
         TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
         TEST_CASE(a_listen_history_turned_off_records_nothing),
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
+        TEST_CASE(the_light_theme_lightens_the_screens_and_keeps_the_accent),
+        TEST_CASE(synced_lyrics_beside_a_track_follow_its_position),
+        TEST_CASE(lyrics_in_capitals_are_found_and_the_setting_hides_them),
+        TEST_CASE(a_track_without_lyrics_shows_none),
         TEST_CASE(the_header_shows_the_time_only_while_the_clock_setting_is_on),
         TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
         TEST_CASE(dac_keys_follow_the_swap_setting),

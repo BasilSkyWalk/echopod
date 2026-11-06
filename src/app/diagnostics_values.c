@@ -156,6 +156,52 @@ void diagnostics_usb_last_text(HalUsbLast last, char *text, size_t capacity)
     }
 }
 
+static void append_part(StringBuilder *builder, const char *label)
+{
+    if (builder->length > 0) {
+        string_builder_append_char(builder, ' ');
+    }
+    string_builder_append(builder, label);
+}
+
+static void append_count(StringBuilder *builder, const char *label, uint32_t value)
+{
+    if (value > 0) {
+        append_part(builder, label);
+        string_builder_append_unsigned(builder, value);
+    }
+}
+
+void diagnostics_usb_errors_text(HalUsbLast last, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (last.end == HAL_USB_END_NONE || last.end == HAL_USB_END_NO_HOST) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_NONE));
+        return;
+    }
+    if (last.internal_errors > 0 || last.card_errors > 0) {
+        append_part(&builder, "E");
+        string_builder_append_unsigned(&builder, last.internal_errors);
+        string_builder_append_char(&builder, '/');
+        string_builder_append_unsigned(&builder, last.card_errors);
+    }
+    append_count(&builder, "r", last.card_retries);
+    append_count(&builder, "i", last.card_starts);
+    append_count(&builder, "s", last.card_step);
+    if (last.card_step != 0) {
+        string_builder_append_char(&builder, ':');
+        append_hex(&builder, last.card_interrupts, 4);
+    }
+    append_count(&builder, "b", last.host_resets);
+    append_count(&builder, "v", last.vbus_dips);
+    if (last.fell_back || last.full_speed) {
+        append_part(&builder, last.fell_back ? "FS" : "fs");
+    }
+    if (builder.length == 0) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_NONE));
+    }
+}
+
 void diagnostics_dma_tone_text(DmaToneView view, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
@@ -537,4 +583,90 @@ void diagnostics_jack_pin_text(HalJackPin pin, char *text, size_t capacity)
     if (pin.pull) {
         string_builder_append(&builder, " pull");
     }
+}
+
+void diagnostics_last_stack_text(HalStartInfo info, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (!info.warm || !info.stalled) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_NONE));
+        return;
+    }
+    append_hex(&builder, info.stall_sp, 8);
+    for (int index = 0; index + 1 < HAL_STALL_STACK_WORDS; index++) {
+        string_builder_append_char(&builder, ' ');
+        append_hex(&builder, info.stall_stack[index], 8);
+    }
+}
+
+void diagnostics_stack_text(HalStackUsage usage, HalStartInfo info, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    if (usage.capacity == 0) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_RAM_UNAVAILABLE));
+        return;
+    }
+    char used[ARGUMENT_CAPACITY];
+    char total[ARGUMENT_CAPACITY];
+    char stalled[ARGUMENT_CAPACITY];
+    number_text(used, sizeof used, usage.used);
+    number_text(total, sizeof total, usage.capacity);
+    number_text(stalled, sizeof stalled, info.stall_stack_used);
+    const char *arguments[] = {used, total, stalled};
+    bool stall = info.warm && info.stalled;
+    i18n_format(&builder, stall ? STR_DIAG_STACK_USED_STALL : STR_DIAG_STACK_USED, arguments,
+                stall ? 3 : 2);
+}
+
+static void emmc_state_text(HalUpdateRecord update, char *text, size_t capacity)
+{
+    enum {
+        READY_BIT = 8,
+        STATE_SHIFT = 9,
+        STATE_MASK = 0xF,
+        STATE_TRANSFER = 4
+    };
+    StringBuilder builder = string_builder_make(text, capacity);
+    uint32_t state = (update.emmc_status >> STATE_SHIFT) & STATE_MASK;
+    bool ready = ((update.emmc_status >> READY_BIT) & 1u) != 0;
+    if (!update.emmc_replied) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_EMMC_NO_REPLY));
+    } else if (state == STATE_TRANSFER && ready) {
+        string_builder_append(&builder, i18n_text(STR_DIAG_EMMC_READY));
+    } else {
+        char number[ARGUMENT_CAPACITY];
+        number_text(number, sizeof number, state);
+        const char *arguments[] = {number};
+        i18n_format(&builder, STR_DIAG_EMMC_STATE, arguments, 1);
+    }
+}
+
+void diagnostics_update_text(HalUpdateRecord update, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    char emmc[ARGUMENT_CAPACITY];
+    char detail[ARGUMENT_CAPACITY];
+    emmc_state_text(update, emmc, sizeof emmc);
+    number_text(detail, sizeof detail, update.detail);
+    const char *failed[] = {detail, emmc};
+    const char *installed[] = {emmc};
+    const char *refused[] = {detail};
+    switch (update.result) {
+    case HAL_UPDATE_INSTALLED:
+        i18n_format(&builder, STR_DIAG_UPDATE_INSTALLED, installed, 1);
+        return;
+    case HAL_UPDATE_FAILED:
+        i18n_format(&builder, STR_DIAG_UPDATE_FAILED, failed, 2);
+        return;
+    case HAL_UPDATE_REFUSED:
+        i18n_format(&builder, STR_DIAG_UPDATE_REFUSED, refused, 1);
+        return;
+    case HAL_UPDATE_ALREADY_INSTALLED:
+        string_builder_append(&builder, i18n_text(STR_DIAG_UPDATE_ALREADY));
+        return;
+    case HAL_UPDATE_NONE:
+    case HAL_UPDATE_RESULT_COUNT:
+        break;
+    }
+    string_builder_append(&builder, i18n_text(STR_DIAG_NONE));
 }

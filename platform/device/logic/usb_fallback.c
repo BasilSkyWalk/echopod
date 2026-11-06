@@ -18,5 +18,6 @@ bool usb_fallback_due(UsbFallback *fallback, bool working, uint32_t now_ms)
         return false;
     }
     fallback->watching = false;
+    fallback->fired = true;
     return true;
 }

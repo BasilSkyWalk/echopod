@@ -50,6 +50,15 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 3. **Eject both drives before you unplug.** If you unplug first, recent changes may be lost, and the player warns you.
 4. When music changed, the player rebuilds its library by itself. Copying other files doesn't trigger a rebuild. Settings → Rescan library rebuilds it on demand.
 
+During a long copy the screen goes dark after 30 seconds; any button lights it again. If the drives disappear from the computer on their own while the cable stays in, the player connects again by itself (without asking Storage or DAC) and the computer may warn that a drive was removed without ejecting. Afterwards, Home → Diagnostics → **USB errors** shows what happened in the last session, or *None*:
+
+- `E1/2`: commands that failed on internal storage / on the SD card.
+- `r3`: SD card transfers that failed and were tried again; `i1`: times the card had to be started again (also when it didn't answer at the start of the session, for example after it was taken out and put back while the player was on).
+- `s4:A208`: the card controller's step and status at the last card failure (for bug reports).
+- `b1`: times the computer reset the connection after it was working.
+- `v2`: moments the player briefly lost the cable's power reading and carried on.
+- `FS`: the connection dropped from high speed to full speed in this session (the computer sees one disconnect); `fs`: it was already at full speed from an earlier session since the player was switched on.
+
 ## Using the player as a USB DAC
 
 **Untested on a player so far** (see `docs/known-issues.md`). In this mode the player is a sound card for your computer or phone: their audio plays through the player's headphone outputs.
@@ -145,7 +154,13 @@ Settings → **Volume buttons** changes what the rocker does on Now Playing and 
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
-More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones), and **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC). The start screen can also be Album Artists, Genres, Folders or All Songs. **Clock** shows the time in the status bar and **Date & time** sets it (see Clock below).
+More settings, at the end of the Settings list: **Accent color** and **Highlight** (gradient or flat) change the selection bar, **Battery percent** hides the number next to the battery, **Cover Flow order** sorts Cover Flow by album artist or by album title, **Artist albums** → Cover Flow opens an artist, album artist or genre as a Cover Flow of just their albums, **Listen history** turns the log of played songs on or off (below), **Cover Flow** shows 5 covers (the centre one and two each side) or 3 (one each side), **Animations** makes screen slides and Cover Flow scrolling Slower (1.5× as long) or Faster (0.6×), **Bluetooth level** makes Bluetooth headphones louder (see Bluetooth headphones), **Ask when connected** chooses whether plugging into a computer asks Storage, DAC or Charge only (see Using the player as a USB DAC), **Theme** switches between Dark and Light (light menus, lists and Now Playing with dark text; Cover Flow and the cover panel on Home stay dark, and the accent color works in both), **Lyrics** shows or hides lyrics on Now Playing (see Lyrics below), and **Folders & playlists** → Cover Flow opens a playlist as a Cover Flow of its albums and a folder of folders as a Cover Flow of those folders (below). The start screen can also be Album Artists, Genres, Folders or All Songs. **Clock** shows the time in the status bar and **Date & time** sets it (see Clock below).
+
+## Lyrics
+
+Put a `.lrc` file next to a song with the same name (`01 Come Together.flac` and `01 Come Together.lrc`; `.LRC` works too), and Now Playing shows the lyrics: in landscape under the title, in place of the artist, album and format lines; in portrait in place of the cover. Synced lyrics (lines starting with `[mm:ss.xx]`) scroll with the song, the current line in bold in the middle, and a current line too long for the screen scrolls sideways. A line can carry several times (`[00:12.00][01:30.00]Chorus`), `[offset:+500]` shows every line half a second earlier (`-` later), and word times such as `<00:12.50>` are skipped. A file without times shows as plain text that moves down the song as it plays. The lyrics are hidden while you seek (hold ▶).
+
+The file must be UTF-8 (with or without a BOM); other encodings, such as the GBK some Chinese sites use, show garbled. Lyrics show in every script the player draws (see Characters in `docs/known-issues.md`). The player reads at most 3 KB of lyric text and 160 lines per song (about two to three times a typical song); anything past that is left out. Lyrics stored inside the music file (ID3 `USLT`/`SYLT`, a Vorbis `LYRICS` tag) aren't read. **Settings → Lyrics → Off** hides them.
 
 ## Clock
 
@@ -160,6 +175,8 @@ Whether the chip keeps time on every player hasn't been confirmed yet; if yours 
 
 In Cover Flow (Music → Cover Flow), the tile before the first album, with a shuffle mark for a cover, is **Random album**: press ▶ on it to play a random album from its first track.
 
+With **Folders & playlists** set to Cover Flow, a playlist opens as a Cover Flow of its albums in playlist order: songs next to each other from the same album make one tile, and an album that comes back later in the playlist gets a tile again. ▶ on a tile opens the whole album. Music → Folders, and any folder that holds only folders, opens as a Cover Flow of its folders, each showing the cover of the album of its first song (the folder's own songs first, otherwise its first folder's, and so on down). ▶ on a folder that again holds only folders moves into it, and Back moves out again; a folder with songs opens as a list. A folder's own picture (`folder.jpg`) isn't used yet. Audiobooks and Podcasts stay lists.
+
 ## Portrait mode
 
 Settings → Orientation has Landscape, Portrait and Portrait, flipped. The screen turns as soon as you pick, and the player starts the same way next time. Pick whichever portrait way round puts the buttons where you like them.
@@ -168,7 +185,7 @@ In portrait, Home shows the album art under the menu, Now Playing puts the cover
 
 ## Language
 
-Settings → Language lists English, 简体中文, 日本語, 한국어, Deutsch, Français, Español, Italiano, Português, Nederlands, Svenska, Dansk, Norsk, Suomi, Русский, Українська and Polski. Pick one and the player says "Restart to apply"; hold Power to turn it off and on again, and every menu, setting and message uses that language. Song, artist and album names are never translated.
+Settings → Language lists English, 简体中文, 日本語, 한국어, Deutsch, Français, Español, Italiano, Português, Nederlands, Svenska, Dansk, Norsk, Suomi, Русский, Українська, Polski and Bahasa Indonesia. Pick one and the player says "Restart to apply"; hold Power to turn it off and on again, and every menu, setting and message uses that language. Song, artist and album names are never translated.
 
 The translations were not checked by native speakers, and a few long texts may be cut short on the small screen. Folder names stay as they are: audiobooks and podcasts still go in folders named `Audiobooks` and `Podcasts`.
 
@@ -263,4 +280,6 @@ While the clock is set and has a time zone (a sync sets both; Date & time asks f
 - **"isn't a valid image for this player" when going back to FiiO:** check that you copied the `HIFIECnn.IMG` file, not `MINIVnnn.IMG`, and that it's unchanged (its hash matches the one in FiiO's zip). EchoPod 0.2.0 and earlier also refuse FiiO's 4.0.0 firmware: update EchoPod first, or install FiiO 3.9.0 (`HIFIEC39.IMG`) and then FiiO's own update to 4.0.0. To switch to another custom firmware, go back to FiiO's first: EchoPod only installs its own images and FiiO's.
 - **The install doesn't take** (FiiO's firmware comes back after a short "Updating"): copy the file again, check its hash on the player's drive, and make sure it's the only `HIFIECnn.IMG` there. If it keeps failing, the only other way in is maskrom (below).
 - **The player doesn't start at all:** every case so far was recovered through the chip's maskrom mode, which writes FiiO's firmware back from a computer over USB. It needs a patched `rkdeveloptool` and some care; the steps are in `docs/device-recovery.md`.
-- **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step and Last USB lines from Home → Diagnostics.
+- **A "STALL" or "FAULT" screen** (white text on black with PC and LR lines): photograph it, then press the small RST hole rather than holding Power. RST keeps the player's memory, so Home → Diagnostics → Last start and Last stack still show what stopped; holding Power on battery wipes it.
+- **The player doesn't turn on after an update:** press RST once and start it; then photograph Home → Diagnostics → Last update (what the installer did and the state it left the internal storage in), Last start ("#n after power-off" means the player never lost power when you switched it off) and Boot hold if present.
+- **Reporting a problem:** include what you did, your FiiO version before installing, and the Firmware, Last start, Last step, Last stack, Last USB, USB errors and Last update lines from Home → Diagnostics.

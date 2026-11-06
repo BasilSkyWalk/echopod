@@ -69,6 +69,26 @@ static void a_read_after_an_overwrite_sees_the_new_bytes(void)
     CHECK(memcmp(seen, FRESH, sizeof FRESH) == 0);
 }
 
+static void a_file_grows_and_keeps_its_bytes(void)
+{
+    static const char PATH[] = "/.echo/grown.bin";
+    static const uint8_t FRESH[4] = {9, 8, 7, 6};
+    static uint8_t zeros[4096];
+    uint8_t seen[sizeof FRESH];
+    HalFile file;
+    sim_storage_configure(ECHO_FIXTURE_DIR, ECHO_TEST_OUTPUT_DIR);
+    CHECK(hal_file_write(PATH, zeros, sizeof zeros));
+    CHECK(hal_file_write_at(PATH, 100, FRESH, sizeof FRESH));
+    CHECK_EQUAL(HAL_RESERVE_EXISTS, hal_file_grow(PATH, sizeof zeros));
+    CHECK_EQUAL(HAL_RESERVE_CREATED, hal_file_grow(PATH, 3 * sizeof zeros));
+    CHECK_EQUAL(HAL_RESERVE_FAILED, hal_file_grow("/.echo/never made.bin", 10));
+    CHECK(hal_file_open(&file, PATH));
+    CHECK_EQUAL(3 * sizeof zeros, file.size);
+    CHECK(hal_file_read(file, 100, seen, sizeof seen));
+    hal_file_close(&file);
+    CHECK(memcmp(seen, FRESH, sizeof FRESH) == 0);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -76,6 +96,7 @@ int main(void)
         TEST_CASE(a_folder_lists_its_files_with_sizes),
         TEST_CASE(a_missing_folder_does_not_open),
         TEST_CASE(a_read_after_an_overwrite_sees_the_new_bytes),
+        TEST_CASE(a_file_grows_and_keeps_its_bytes),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

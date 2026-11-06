@@ -40,9 +40,16 @@ static const GpioPin CARD_DETECT = {0, 11};
 static uint32_t sd_fifo_depth;
 static const MmcHost SD_HOST = {SD_BASE, CRU_SD_IDENTIFY, CRU_SD_TRANSFER, &sd_fifo_depth};
 
+typedef struct CardTransfer {
+    uint32_t lba;
+    uint32_t count;
+    uint32_t *words;
+    const uint32_t *source;
+} CardTransfer;
+
 static SdCard card;
 static bool ready;
-static bool tried;
+static SdHealth health;
 
 static bool host_command(void *context, SdCommand command, uint32_t response[4])
 {
@@ -109,16 +116,6 @@ static void power_controller(void)
     board_delay_ms(POWER_SETTLE_MS);
 }
 
-bool sd_read(void *context, uint32_t lba, uint32_t count, void *buffer)
-{
-    (void)context;
-    if (!ready || count == 0 || lba >= card.sector_count || count > card.sector_count - lba) {
-        return false;
-    }
-    return mmc_read_blocks(&SD_HOST, sd_card_address(&card, lba), count,
-                           sd_card_rca_argument(&card), buffer);
-}
-
 static bool start_card(void)
 {
     start_card_detect();
@@ -126,30 +123,101 @@ static bool start_card(void)
         return false;
     }
     power_controller();
-    return sd_card_init(&card, &HOST);
+    bool started = sd_card_init(&card, &HOST);
+    if (started) {
+        health.starts++;
+    }
+    return started;
+}
+
+static bool in_transfer_state(void)
+{
+    uint32_t words[4] = {0, 0, 0, 0};
+    SdCommand status = {CMD_SEND_STATUS, sd_card_rca_argument(&card), SD_RESPONSE_SHORT, false};
+    return mmc_command(&SD_HOST, status, words) && (words[0] & STATUS_READY_FOR_DATA) != 0 &&
+           ((words[0] >> STATUS_STATE_SHIFT) & STATUS_STATE_MASK) == STATE_TRANSFER;
+}
+
+static bool wait_for_transfer_state(void)
+{
+    for (int attempt = 0; attempt < STATUS_TRIES; attempt++) {
+        if (in_transfer_state()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void note_card_failure(void)
+{
+    health.failure = mmc_last_failure();
+    health.failures++;
+}
+
+static bool resume_card(void *context)
+{
+    (void)context;
+    if (in_transfer_state()) {
+        return true;
+    }
+    mmc_stop(&SD_HOST, sd_card_rca_argument(&card));
+    return wait_for_transfer_state();
+}
+
+static bool restart_card(void *context)
+{
+    (void)context;
+    ready = start_card();
+    return ready;
+}
+
+static bool read_now(void *context)
+{
+    const CardTransfer *transfer = context;
+    bool read = mmc_read_blocks(&SD_HOST, sd_card_address(&card, transfer->lba), transfer->count,
+                                sd_card_rca_argument(&card), transfer->words);
+    if (!read) {
+        note_card_failure();
+    }
+    return read;
+}
+
+static bool fits(uint32_t lba, uint32_t count)
+{
+    return ready && count > 0 && lba < card.sector_count && count <= card.sector_count - lba;
+}
+
+bool sd_read(void *context, uint32_t lba, uint32_t count, void *buffer)
+{
+    (void)context;
+    if (!fits(lba, count)) {
+        return false;
+    }
+    CardTransfer transfer = {lba, count, buffer, NULL};
+    SdRetry retry = {read_now, resume_card, restart_card, &transfer};
+    return sd_card_retry(&retry, &health.retry);
 }
 
 bool sd_start(BlockDevice *device)
 {
-    if (!tried) {
-        tried = true;
+    if (!ready) {
         ready = start_card();
     }
     *device = (BlockDevice){sd_read, NULL, sd_write};
     return ready;
 }
 
-static bool wait_for_transfer_state(void)
+bool sd_prepare(BlockDevice *device)
 {
-    uint32_t words[4] = {0, 0, 0, 0};
-    SdCommand status = {CMD_SEND_STATUS, sd_card_rca_argument(&card), SD_RESPONSE_SHORT, false};
-    for (int attempt = 0; attempt < STATUS_TRIES; attempt++) {
-        if (mmc_command(&SD_HOST, status, words) && (words[0] & STATUS_READY_FOR_DATA) != 0 &&
-            ((words[0] >> STATUS_STATE_SHIFT) & STATUS_STATE_MASK) == STATE_TRANSFER) {
-            return true;
-        }
+    if (ready && (!host_card_present(NULL) || !resume_card(NULL))) {
+        ready = false;
     }
-    return false;
+    return sd_start(device);
+}
+
+SdHealth sd_health(void)
+{
+    return health;
 }
 
 static bool write_data(void *context, uint8_t command, uint32_t address, uint32_t count,
@@ -177,13 +245,26 @@ static bool wait_until_ready(void *context)
 
 static const CardWriter WRITER = {write_data, stop_writing, wait_until_ready, NULL};
 
+static bool write_now(void *context)
+{
+    const CardTransfer *transfer = context;
+    bool written = card_write(&WRITER, sd_card_address(&card, transfer->lba), transfer->count,
+                              transfer->source);
+    if (!written) {
+        note_card_failure();
+    }
+    return written;
+}
+
 bool sd_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
 {
     (void)context;
-    if (!ready || lba >= card.sector_count || count > card.sector_count - lba) {
+    if (!fits(lba, count)) {
         return false;
     }
-    return card_write(&WRITER, sd_card_address(&card, lba), count, buffer);
+    CardTransfer transfer = {lba, count, NULL, buffer};
+    SdRetry retry = {write_now, resume_card, restart_card, &transfer};
+    return sd_card_retry(&retry, &health.retry);
 }
 
 uint32_t sd_sector_count(void)

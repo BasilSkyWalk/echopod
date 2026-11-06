@@ -442,6 +442,14 @@ class OverlayTest(unittest.TestCase):
         self.assertEqual(overlay[16:], image[offset + 16:offset + len(overlay)])
         self.assertEqual([], make_image.validate_image(image))
 
+    def test_the_overlay_header_names_the_code_it_was_linked_against(self):
+        parts = firmware(code_tail=b"\x11\x22\x33\x44" * 16)
+        image = build(parts, overlay=self.overlay())
+        offset = make_image.OVERLAY_OFFSET
+        self.assertEqual(make_image.crc32(parts.code), word(image, offset + 12))
+        self.assertEqual(parts.code, image[CODE_OFFSET:CODE_OFFSET + len(parts.code)])
+        self.assertNotEqual(word(image, offset + 12), word(build(overlay=self.overlay()), offset + 12))
+
     def test_the_fw1_end_ignores_the_overlay(self):
         self.assertEqual(word(build(), make_image.FW1_END_OFFSET),
                          word(build(overlay=self.overlay()), make_image.FW1_END_OFFSET))
@@ -614,7 +622,7 @@ class GlyphFaceTest(unittest.TestCase):
         self.assertEqual((0, 0), (word(image, table + 8), word(image, table + 12)))
 
     def test_faces_stay_clear_of_everything_else(self):
-        sizes = [1_700_000, 1_100_000, 8_000, 8_000, 8_000]
+        sizes = [1_720_000, 1_060_000, 35_000, 51_000, 53_000]
         offsets = make_image.glyph_face_offsets(sizes)
         taken = [(make_image.OVERLAY_OFFSET, make_image.OVERLAY_OFFSET + make_image.OVERLAY_CAPACITY),
                  (make_image.CORE1_MP3_OFFSET, make_image.CORE1_MP3_OFFSET + 512 +

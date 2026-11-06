@@ -29,7 +29,7 @@ typedef struct VorbisKey {
 static const VorbisKey KEYS[] = {
     {"title", TAG_TITLE},     {"artist", TAG_ARTIST},     {"albumartist", TAG_ALBUM_ARTIST},
     {"album", TAG_ALBUM},     {"genre", TAG_GENRE},       {"date", TAG_DATE},
-    {"discnumber", TAG_DISC}, {"tracknumber", TAG_TRACK},
+    {"discnumber", TAG_DISC}, {"tracknumber", TAG_TRACK}, {"albumversion", TAG_ALBUM_VERSION},
 };
 
 static const char PICTURE_KEY[] = "metadata_block_picture";

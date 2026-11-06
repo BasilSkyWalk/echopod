@@ -51,7 +51,7 @@ static void the_fixture_opens_with_its_counts(void)
     CHECK_EQUAL(FIXTURE_GROUPS, library_count(library, LIBRARY_GENRES));
     CHECK_EQUAL(FIXTURE_FOLDERS, library_count(library, LIBRARY_FOLDERS));
     CHECK_EQUAL(FIXTURE_TRACKS, library_count(library, LIBRARY_TITLE_ORDER));
-    CHECK_EQUAL(1, library_count(library, LIBRARY_PLAYLISTS));
+    CHECK_EQUAL(2, library_count(library, LIBRARY_PLAYLISTS));
 }
 
 static void a_wrong_magic_is_rejected(void)

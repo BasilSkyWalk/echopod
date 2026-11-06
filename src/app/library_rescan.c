@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "card_files.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
@@ -191,6 +192,12 @@ static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *sca
     }
     if (!hal_file_open(&files->library, LIBRARY_STORE_PATH)) {
         return SCAN_WRITE_FAILED;
+    }
+    Library library;
+    if (library_open(&library, (ByteSource){read_handle, &files->library}, files->library.size) ==
+        LIBRARY_OK) {
+        card_files_fit_covers(library_count(&library, LIBRARY_ALBUMS));
+        capacity = reserved_size_of(COVER_CACHE_PATH);
     }
     bool previous = hal_file_open(&files->covers, COVER_CACHE_PATH);
     CoverJob job = {

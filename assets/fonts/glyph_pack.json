@@ -4,31 +4,31 @@
       "name": "cjk_16",
       "file": "noto-cjk/NotoSansCJKsc-Regular.otf",
       "size": 16,
-      "character_sets": ["hangul", "hanzi", "kanji", "kana", "cjk_punctuation", "fullwidth"]
+      "character_sets": ["hangul", "hanzi", "hanzi_traditional", "kanji", "kana", "cjk_punctuation", "fullwidth"]
     },
     {
       "name": "cjk_12",
       "file": "noto-cjk/NotoSansCJKsc-Regular.otf",
       "size": 12,
-      "character_sets": ["hangul", "hanzi", "kanji", "kana", "cjk_punctuation", "fullwidth"]
+      "character_sets": ["hangul", "hanzi", "hanzi_traditional", "kanji", "kana", "cjk_punctuation", "fullwidth"]
     },
     {
       "name": "inter_regular_12_latin1",
       "file": "inter/Inter-Regular.ttf",
       "size": 12,
-      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929]]
+      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929], [8208, 8210], [8213, 8215], [8218, 8219], [8222, 8225], [8231, 8231], [8240, 8249], [9679, 9679]]
     },
     {
       "name": "inter_regular_16_latin1",
       "file": "inter/Inter-Regular.ttf",
       "size": 16,
-      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929]]
+      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929], [8208, 8210], [8213, 8215], [8218, 8219], [8222, 8225], [8231, 8231], [8240, 8249], [9679, 9679]]
     },
     {
       "name": "inter_semibold_16_latin1",
       "file": "inter/Inter-SemiBold.ttf",
       "size": 16,
-      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929]]
+      "ranges": [[160, 383], [416, 417], [431, 432], [536, 539], [880, 1023], [1024, 1279], [7840, 7929], [8208, 8210], [8213, 8215], [8218, 8219], [8222, 8225], [8231, 8231], [8240, 8249], [9679, 9679]]
     }
   ],
   "character_sets": {
@@ -42,6 +42,13 @@
       "description": "Simplified Chinese hanzi in GB 2312",
       "codec": "gb2312",
       "leads": [176, 247],
+      "ranges": [[19968, 40959]]
+    },
+    "hanzi_traditional": {
+      "description": "Traditional Chinese hanzi in Big5 level 1 (common characters)",
+      "codec": "big5",
+      "leads": [164, 198],
+      "trails": [[64, 126], [161, 254]],
       "ranges": [[19968, 40959]]
     },
     "kanji": {

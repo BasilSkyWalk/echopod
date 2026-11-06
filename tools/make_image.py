@@ -214,8 +214,14 @@ def place_overlay(image, parts):
         raise ImageError(f"the overlay must be {OVERLAY_HEADER_SIZE} to {OVERLAY_CAPACITY:#x} bytes")
     if PAYLOAD_OFFSET + len(parts.payload) > OVERLAY_OFFSET:
         raise ImageError("the payload reaches the overlay")
-    header = OVERLAY_MAGIC + struct.pack("<III", len(overlay), crc32(overlay[OVERLAY_HEADER_SIZE:]), 0)
+    header = OVERLAY_MAGIC + struct.pack("<III", len(overlay), crc32(overlay[OVERLAY_HEADER_SIZE:]),
+                                         code_crc(parts))
     image[OVERLAY_OFFSET:OVERLAY_OFFSET + len(overlay)] = header + overlay[OVERLAY_HEADER_SIZE:]
+
+
+def code_crc(parts):
+    start = CODE_OFFSET - PAYLOAD_OFFSET
+    return crc32(parts.payload[start:start + parts.rows[0][2]])
 
 
 def place_resident(image, resident):

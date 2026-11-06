@@ -213,7 +213,7 @@ static void playlists_list_their_tracks_in_order(void)
 {
     Library *library = open_fixture();
     BrowseQuery playlists = browse_root_query(BROWSE_PLAYLISTS);
-    CHECK_EQUAL(1, browse_count(library, playlists));
+    CHECK_EQUAL(2, browse_count(library, playlists));
     CHECK(title_is(library, playlists, "Playlists"));
     BrowseItem road_trip = item_at(library, playlists, 0);
     CHECK(label_is(library, playlists, road_trip, "Road Trip"));

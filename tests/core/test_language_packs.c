@@ -44,18 +44,28 @@ static void every_language_has_a_pack_that_attaches(void)
     CHECK_EQUAL(LANGUAGE_COUNT, count);
 }
 
-static void polish_is_the_last_language_and_translates_the_menus(void)
+static uint32_t read_language_pack(Language language, uint8_t *pack)
+{
+    const char *cursor = PACK_PATHS;
+    for (int index = 0; index < (int)language && cursor != NULL; index++) {
+        cursor = strchr(cursor, '|');
+        cursor = cursor != NULL ? cursor + 1 : NULL;
+    }
+    if (cursor == NULL) {
+        return 0;
+    }
+    char path[PATH_CAPACITY];
+    size_t length = strcspn(cursor, "|");
+    CHECK(length < sizeof path);
+    memcpy(path, cursor, length);
+    path[length] = '\0';
+    return read_pack(path, pack);
+}
+
+static void polish_translates_the_menus(void)
 {
     static uint8_t pack[PACK_LIMIT + 1];
-    CHECK_EQUAL(LANGUAGE_POLISH + 1, LANGUAGE_COUNT);
-    const char *cursor = PACK_PATHS;
-    const char *last = cursor;
-    while (strchr(cursor, '|') != NULL) {
-        cursor = strchr(cursor, '|') + 1;
-        last = cursor;
-    }
-    CHECK(strstr(last, "pl.bin") != NULL);
-    uint32_t size = read_pack(last, pack);
+    uint32_t size = read_language_pack(LANGUAGE_POLISH, pack);
     CHECK(size > 0 && size <= PACK_LIMIT);
     CHECK(i18n_attach(pack, size));
     CHECK(strcmp("Uruchom ponownie, aby zastosować", i18n_text(STR_LANGUAGE_RESTART)) == 0);
@@ -63,11 +73,26 @@ static void polish_is_the_last_language_and_translates_the_menus(void)
     i18n_detach();
 }
 
+static void indonesian_is_the_last_language_and_translates_the_menus(void)
+{
+    static uint8_t pack[PACK_LIMIT + 1];
+    CHECK_EQUAL(LANGUAGE_INDONESIAN + 1, LANGUAGE_COUNT);
+    CHECK(strstr(strrchr(PACK_PATHS, '|'), "id.bin") != NULL);
+    uint32_t size = read_language_pack(LANGUAGE_INDONESIAN, pack);
+    CHECK(size > 0 && size <= PACK_LIMIT);
+    CHECK(i18n_attach(pack, size));
+    CHECK(strcmp("Pengaturan", i18n_text(STR_MENU_SETTINGS)) == 0);
+    CHECK(strcmp("Mulai ulang untuk menerapkan", i18n_text(STR_LANGUAGE_RESTART)) == 0);
+    CHECK(strcmp("Bahasa Indonesia", i18n_text(STR_LANGUAGE_ID)) == 0);
+    i18n_detach();
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(every_language_has_a_pack_that_attaches),
-        TEST_CASE(polish_is_the_last_language_and_translates_the_menus),
+        TEST_CASE(polish_translates_the_menus),
+        TEST_CASE(indonesian_is_the_last_language_and_translates_the_menus),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

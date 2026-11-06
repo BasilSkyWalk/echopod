@@ -4,6 +4,7 @@
 
 #define FAT32_ENTRY_MASK 0x0FFFFFFFu
 #define FAT32_END_OF_CHAIN 0x0FFFFFFFu
+#define EXFAT_END_OF_CHAIN 0xFFFFFFFFu
 #define INFO_LEAD_SIGNATURE 0x41615252u
 #define INFO_STRUCT_SIGNATURE 0x61417272u
 #define INFO_UNKNOWN 0xFFFFFFFFu
@@ -139,6 +140,9 @@ static uint32_t chain_value(const FatVolume *volume, uint32_t cluster, uint32_t 
     if (cluster != last) {
         return cluster + 1;
     }
+    if (volume->type == FAT_TYPE_EXFAT) {
+        return EXFAT_END_OF_CHAIN;
+    }
     return volume->type == FAT_TYPE_16 ? FAT16_END_OF_CHAIN : FAT32_END_OF_CHAIN;
 }
 
@@ -148,7 +152,8 @@ static void set_entry(const FatVolume *volume, uint8_t *sector, uint32_t within,
         put16(sector + within * 2, value);
         return;
     }
-    uint32_t kept = fat_le32(sector + within * 4) & ~FAT32_ENTRY_MASK;
+    uint32_t kept =
+        volume->type == FAT_TYPE_32 ? fat_le32(sector + within * 4) & ~FAT32_ENTRY_MASK : 0;
     put32(sector + within * 4, kept | value);
 }
 
@@ -174,7 +179,7 @@ static bool write_chain_copy(FatVolume *volume, uint32_t copy_start, uint32_t fi
     return true;
 }
 
-static bool write_chain(FatVolume *volume, uint32_t first, uint32_t count)
+bool fat_write_chain(FatVolume *volume, uint32_t first, uint32_t count)
 {
     for (uint32_t copy = 0; copy < volume->fat_count; copy++) {
         if (!write_chain_copy(volume, volume->fat_start + copy * volume->fat_sectors, first,
@@ -554,8 +559,168 @@ FatReserveResult fat_create_entry(FatVolume *volume, FatFile *parent, const FatN
     *created = (FatFile){.first_cluster = first,
                          .size = entry->directory ? UINT32_MAX : entry->size,
                          .directory = entry->directory};
-    bool written = write_chain(volume, first, clusters) && update_info(volume, first, clusters) &&
+    bool written = fat_write_chain(volume, first, clusters) &&
+                   update_info(volume, first, clusters) &&
                    write_contents(volume, entry, created, parent) &&
                    write_entries(volume, parent, slot, entry, &name, created);
+    return written ? FAT_RESERVE_CREATED : FAT_RESERVE_FAILED;
+}
+
+uint32_t fat_clusters_for(const FatVolume *volume, uint32_t size)
+{
+    uint32_t cluster_bytes = (uint32_t)FAT_SECTOR_SIZE << volume->cluster_shift;
+    return size == 0 ? 0 : (size - 1u) / cluster_bytes + 1u;
+}
+
+bool fat_link_cluster(FatVolume *volume, uint32_t cluster, uint32_t next)
+{
+    uint32_t per_sector = entries_per_fat_sector(volume);
+    for (uint32_t copy = 0; copy < volume->fat_count; copy++) {
+        uint32_t lba = volume->fat_start + copy * volume->fat_sectors + cluster / per_sector;
+        uint8_t *sector = fat_sector_for_update(volume, lba);
+        if (sector == NULL) {
+            return false;
+        }
+        set_entry(volume, sector, cluster % per_sector, next);
+        if (!fat_commit_sector(volume, lba)) {
+            return false;
+        }
+    }
+    volume->fat_sector_valid = false;
+    return true;
+}
+
+uint32_t fat_last_cluster(FatVolume *volume, FatFile file, uint32_t clusters)
+{
+    uint32_t lba = 0;
+    file.cursor_cluster = 0;
+    if (clusters == 0 ||
+        !fat_file_sector(volume, &file, (clusters - 1u) << volume->cluster_shift, &lba)) {
+        return 0;
+    }
+    return ((lba - volume->data_start) >> volume->cluster_shift) + FIRST_CLUSTER;
+}
+
+static FatReserveResult next_free(FatVolume *volume, const FatGrowth *growth, uint32_t *cursor,
+                                  uint32_t *visited, uint32_t *found)
+{
+    uint32_t end = volume->cluster_count + FIRST_CLUSTER;
+    while (*visited < volume->cluster_count) {
+        uint32_t cluster = *cursor;
+        bool free = false;
+        *cursor = cluster + 1 < end ? cluster + 1 : FIRST_CLUSTER;
+        (*visited)++;
+        if (!growth->is_free(volume, growth->context, cluster, &free)) {
+            return FAT_RESERVE_FAILED;
+        }
+        if (free) {
+            *found = cluster;
+            return FAT_RESERVE_CREATED;
+        }
+    }
+    return FAT_RESERVE_NO_SPACE;
+}
+
+static bool add_run(FatVolume *volume, const FatGrowth *growth, uint32_t *last, uint32_t first,
+                    uint32_t count)
+{
+    bool added = growth->claim(volume, growth->context, first, count) &&
+                 fat_write_chain(volume, first, count) &&
+                 (*last == 0 || fat_link_cluster(volume, *last, first));
+    *last = first + count - 1;
+    return added;
+}
+
+FatReserveResult fat_grow_chain(FatVolume *volume, const FatGrowth *growth, uint32_t *final)
+{
+    uint32_t end = volume->cluster_count + FIRST_CLUSTER;
+    uint32_t start =
+        growth->start >= FIRST_CLUSTER && growth->start < end ? growth->start : FIRST_CLUSTER;
+    uint32_t cursor = start;
+    uint32_t visited = 0;
+    uint32_t found = 0;
+    for (uint32_t count = 0; count < growth->needed; count++) {
+        FatReserveResult result = next_free(volume, growth, &cursor, &visited, &found);
+        if (result != FAT_RESERVE_CREATED) {
+            return result;
+        }
+    }
+    cursor = start;
+    visited = 0;
+    uint32_t head = 0;
+    uint32_t last = 0;
+    uint32_t run_first = 0;
+    uint32_t run_count = 0;
+    for (uint32_t count = 0; count < growth->needed; count++) {
+        if (next_free(volume, growth, &cursor, &visited, &found) != FAT_RESERVE_CREATED) {
+            return FAT_RESERVE_FAILED;
+        }
+        if (run_count > 0 && found == run_first + run_count) {
+            run_count++;
+            continue;
+        }
+        if (run_count > 0 && !add_run(volume, growth, &last, run_first, run_count)) {
+            return FAT_RESERVE_FAILED;
+        }
+        head = head == 0 ? found : head;
+        run_first = found;
+        run_count = 1;
+    }
+    if (!add_run(volume, growth, &last, run_first, run_count) ||
+        !fat_link_cluster(volume, growth->last, head)) {
+        return FAT_RESERVE_FAILED;
+    }
+    *final = last;
+    return FAT_RESERVE_CREATED;
+}
+
+static bool fat_entry_free(FatVolume *volume, void *context, uint32_t cluster, bool *free)
+{
+    (void)context;
+    uint32_t per_sector = entries_per_fat_sector(volume);
+    if (!read_fat_sectors(volume, cluster / per_sector)) {
+        return false;
+    }
+    *free = entry_at(volume, fat_cached_sector(volume), cluster % per_sector) == 0;
+    return true;
+}
+
+static bool claim_by_chain(FatVolume *volume, void *context, uint32_t first, uint32_t count)
+{
+    (void)volume;
+    (void)context;
+    (void)first;
+    (void)count;
+    return true;
+}
+
+FatReserveResult fat_grow_entry(FatVolume *volume, FatFile *parent, uint32_t index, FatFile file,
+                                uint32_t size)
+{
+    uint32_t have = fat_clusters_for(volume, file.size);
+    uint32_t needed = fat_clusters_for(volume, size) - have;
+    uint32_t last = fat_last_cluster(volume, file, have);
+    if (last == 0) {
+        return FAT_RESERVE_FAILED;
+    }
+    if (needed > 0) {
+        FatGrowth growth = {fat_entry_free,       claim_by_chain, NULL,
+                            search_start(volume), needed,         last};
+        uint32_t final = 0;
+        FatReserveResult result = fat_grow_chain(volume, &growth, &final);
+        if (result != FAT_RESERVE_CREATED) {
+            return result;
+        }
+        volume->free_hint = final + 1;
+        if (!update_info(volume, final + 1 - needed, needed)) {
+            return FAT_RESERVE_FAILED;
+        }
+    }
+    uint8_t bytes[4];
+    uint32_t lba = 0;
+    uint32_t offset = index * ENTRY_SIZE + 28;
+    put32(bytes, size);
+    bool written = fat_file_sector(volume, parent, offset / FAT_SECTOR_SIZE, &lba) &&
+                   fat_update_bytes(volume, lba, offset % FAT_SECTOR_SIZE, bytes, sizeof bytes);
     return written ? FAT_RESERVE_CREATED : FAT_RESERVE_FAILED;
 }

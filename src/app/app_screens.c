@@ -76,8 +76,15 @@ static Screen *browse_screen_for(BrowseEntry *entry)
     if (!entry->store->available) {
         return entry->unavailable;
     }
-    if (entry->flow != NULL) {
+    if (entry->flow != NULL && entry->query.kind != BROWSE_FOLDER) {
         return cover_flow_screen_open_all(entry->flow);
+    }
+    const uint8_t *options = entry->pool->config.options;
+    if (entry->flow != NULL && options != NULL && options[OPTION_FOLDER_VIEW] != 0) {
+        Screen *folders = cover_flow_screen_open_group(entry->flow, LIBRARY_FOLDERS, 0, 0);
+        if (folders != NULL) {
+            return folders;
+        }
     }
     if (entry->favorites) {
         return browse_pool_open_favorites(entry->pool, 0);
@@ -102,7 +109,9 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
         .unavailable = &screens->no_library.screen,
         .query = browse_root_query(entry->kind),
         .favorites = entry->source == MUSIC_FAVORITES,
-        .flow = entry->source == MUSIC_COVER_FLOW ? &screens->cover_flow : NULL,
+        .flow = entry->source == MUSIC_COVER_FLOW || entry->kind == BROWSE_FOLDER
+                    ? &screens->cover_flow
+                    : NULL,
         .shelf = SPOKEN_NONE,
         .present = true,
     };
@@ -135,7 +144,7 @@ static void build_music(AppScreens *screens, AppScreensContext context)
     browse_pool_init(&screens->browse, browse);
     CoverFlowConfig cover_flow = {
         .library = &context.store->library,
-        .theme = context.theme,
+        .theme = context.stage_theme != NULL ? context.stage_theme : context.theme,
         .covers = context.covers,
         .favorites = context.favorites,
         .toast = context.toast,

@@ -127,7 +127,9 @@ static bool is_routine(uint8_t opcode)
 
 static void remember(Msc *msc)
 {
-    if (msc->lun != 0 || is_routine(msc->opcode)) {
+    bool transfer = msc->opcode == SCSI_READ_10 || msc->opcode == SCSI_WRITE_10;
+    bool failed_transfer = transfer && msc->status != STATUS_GOOD;
+    if (!failed_transfer && (msc->lun != 0 || is_routine(msc->opcode))) {
         return;
     }
     msc->history[msc->history_next] = (MscHistoryEntry){msc->opcode, msc->lun, msc->status};
@@ -398,6 +400,7 @@ static void fail_read(Msc *msc)
     set_sense(msc, SENSE_MEDIUM_ERROR, CODE_UNRECOVERED_READ);
     msc->source = MSC_SOURCE_NONE;
     msc->stats.read_failures++;
+    msc->stats.lun_failures[msc->lun]++;
     msc->stats.last_failed_lba = msc->lba;
 }
 
@@ -489,6 +492,7 @@ static void flush_batch(Msc *msc)
     set_sense(msc, SENSE_MEDIUM_ERROR, CODE_WRITE_ERROR);
     msc->source = MSC_SOURCE_NONE;
     msc->stats.write_failures++;
+    msc->stats.lun_failures[msc->lun]++;
     msc->stats.last_failed_lba = msc->lba;
 }
 

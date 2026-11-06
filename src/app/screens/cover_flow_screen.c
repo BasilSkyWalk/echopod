@@ -30,7 +30,10 @@ enum {
     SHUFFLE_STROKE = 4,
     STACK_TITLE_TOP = 272,
     STACK_ARTIST_TOP = 294,
-    STACK_FLOOR_TOP = 266
+    STACK_FLOOR_TOP = 266,
+    THREE_FADE_START = COVER_FLOW_ONE,
+    THREE_FADE_END = COVER_FLOW_ONE + COVER_FLOW_ONE / 2,
+    FOLDER_DEPTH_LIMIT = 64
 };
 
 static const CoverStackLayout STACK = {
@@ -41,6 +44,7 @@ static const CoverStackLayout STACK = {
     .side_spacing = 30,
     .side_width = 100,
     .side_height = 30,
+    .side_shrink = COVER_FLOW_ONE / 4,
 };
 
 static const CoverFlowLayout LAYOUT = {
@@ -52,6 +56,7 @@ static const CoverFlowLayout LAYOUT = {
     .side_width = 46,
     .side_near_height = 104,
     .side_far_height = 78,
+    .side_shrink = COVER_FLOW_ONE / 4,
     .side_near_light = 230,
     .side_far_light = 140,
     .fade_start = 2 * COVER_FLOW_ONE,
@@ -139,14 +144,160 @@ bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint16_
     return false;
 }
 
+static bool is_random(const CoverFlowScreen *flow, int position)
+{
+    return flow->first > 0 && position == RANDOM_POSITION;
+}
+
 static uint16_t album_of(const CoverFlowScreen *flow, int position)
 {
-    uint16_t album = LIBRARY_NONE;
-    if (position <= RANDOM_POSITION || !cover_flow_order_album(flow->config.library, flow->order,
-                                                               (uint32_t)position - 1, &album)) {
+    if (position < flow->first) {
         return LIBRARY_NONE;
     }
-    return album;
+    const CoverFlowTile *tile = &flow->tiles[position % COVER_FLOW_TILES];
+    return tile->position == position ? tile->album : LIBRARY_NONE;
+}
+
+static uint16_t link_album(const Library *library, uint32_t link)
+{
+    uint16_t track_index = 0;
+    LibraryTrack track;
+    if (!library_read_index(library, LIBRARY_LINKS, link, &track_index) ||
+        !library_read_track(library, track_index, &track)) {
+        return LIBRARY_NONE;
+    }
+    return track.album;
+}
+
+static uint16_t folder_album(const Library *library, uint16_t folder)
+{
+    uint32_t count = library_count(library, LIBRARY_FOLDERS);
+    LibraryFolder record;
+    for (uint32_t index = folder; index < count; index++) {
+        if (!library_read_folder(library, index, &record) ||
+            (index > folder && record.parent < folder)) {
+            break;
+        }
+        if (record.track_count > 0) {
+            return link_album(library, record.first_link + record.subfolder_count);
+        }
+    }
+    return LIBRARY_NONE;
+}
+
+static bool step_run(const CoverFlowScreen *flow, CoverFlowTile *tile, int direction)
+{
+    const Library *library = flow->config.library;
+    uint32_t first = flow->order.first_link;
+    uint32_t link = tile->link;
+    uint16_t album = tile->album;
+    if (direction > 0) {
+        while (album == tile->album) {
+            if (++link >= first + flow->order.links) {
+                return false;
+            }
+            album = link_album(library, link);
+        }
+    } else {
+        if (link <= first) {
+            return false;
+        }
+        album = link_album(library, --link);
+        while (link > first && link_album(library, link - 1) == album) {
+            link--;
+        }
+    }
+    *tile = (CoverFlowTile){tile->position + direction, album, album, link};
+    return true;
+}
+
+static CoverFlowTile first_run(const CoverFlowScreen *flow)
+{
+    uint16_t album = link_album(flow->config.library, flow->order.first_link);
+    return (CoverFlowTile){flow->first, album, album, flow->order.first_link};
+}
+
+static int distance(int from, int to)
+{
+    return from < to ? to - from : from - to;
+}
+
+static bool playlist_tile(const CoverFlowScreen *flow, int position, CoverFlowTile *tile)
+{
+    *tile = first_run(flow);
+    for (int slot = 0; slot < COVER_FLOW_TILES; slot++) {
+        const CoverFlowTile *known = &flow->tiles[slot];
+        if (known->position >= flow->first &&
+            distance(known->position, position) < distance(tile->position, position)) {
+            *tile = *known;
+        }
+    }
+    while (tile->position != position) {
+        if (!step_run(flow, tile, tile->position < position ? 1 : -1)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool folder_tile(const CoverFlowScreen *flow, int position, CoverFlowTile *tile)
+{
+    uint32_t link = flow->order.first_link + (uint32_t)(position - flow->first);
+    if (!library_read_index(flow->config.library, LIBRARY_LINKS, link, &tile->item)) {
+        return false;
+    }
+    tile->album = folder_album(flow->config.library, tile->item);
+    return true;
+}
+
+static bool find_tile(const CoverFlowScreen *flow, int position, CoverFlowTile *tile)
+{
+    switch (flow->order.kind) {
+    case COVER_FLOW_PLAYLIST:
+        return playlist_tile(flow, position, tile);
+    case COVER_FLOW_FOLDERS:
+        return folder_tile(flow, position, tile);
+    case COVER_FLOW_ALBUMS:
+        break;
+    }
+    bool found = cover_flow_order_album(flow->config.library, flow->order,
+                                        (uint32_t)(position - flow->first), &tile->album);
+    tile->item = tile->album;
+    return found;
+}
+
+static bool resolve(CoverFlowScreen *flow, int position, CoverFlowTile *tile)
+{
+    *tile = (CoverFlowTile){position, LIBRARY_NONE, LIBRARY_NONE, 0};
+    if (position < flow->first || position >= flow->count) {
+        return false;
+    }
+    CoverFlowTile *slot = &flow->tiles[position % COVER_FLOW_TILES];
+    if (slot->position == position) {
+        *tile = *slot;
+        return true;
+    }
+    if (!find_tile(flow, position, tile)) {
+        *tile = (CoverFlowTile){position, LIBRARY_NONE, LIBRARY_NONE, 0};
+        return false;
+    }
+    *slot = *tile;
+    return true;
+}
+
+static int center_of(const CoverFlowScreen *flow)
+{
+    return (int)((flow->position + COVER_FLOW_ONE / 2) / COVER_FLOW_ONE);
+}
+
+static void fill_tiles(CoverFlowScreen *flow)
+{
+    int center = center_of(flow);
+    CoverFlowTile tile;
+    for (int position = center - COVER_FLOW_TILES / 2; position <= center + COVER_FLOW_TILES / 2;
+         position++) {
+        resolve(flow, position, &tile);
+    }
 }
 
 static void plot(int x, int y)
@@ -194,28 +345,30 @@ static Image shuffle_image(void)
     return (Image){.pixels = shuffle_pixels, .width = SHUFFLE_SIZE, .height = SHUFFLE_SIZE};
 }
 
-static int center_of(const CoverFlowScreen *flow)
-{
-    return (int)((flow->position + COVER_FLOW_ONE / 2) / COVER_FLOW_ONE);
-}
-
-static void load_text(CoverFlowScreen *flow, uint16_t album_index)
+static void load_text(CoverFlowScreen *flow, const CoverFlowTile *tile)
 {
     const Library *library = flow->config.library;
     LibraryAlbum album;
     LibraryGroup artist;
+    LibraryFolder folder;
     char title[COVER_FLOW_TEXT_CAPACITY];
+    bool folders = flow->order.kind == COVER_FLOW_FOLDERS;
     flow->title[0] = '\0';
     flow->artist[0] = '\0';
-    if (!library_read_album(library, album_index, &album) ||
+    if (folders && library_read_folder(library, tile->item, &folder)) {
+        library_read_string(library, folder.name, flow->title, sizeof flow->title);
+    }
+    if (!library_read_album(library, tile->album, &album) ||
         !library_read_string(library, album.title, title, sizeof title)) {
         return;
     }
-    StringBuilder builder = string_builder_make(flow->title, sizeof flow->title);
-    if (favorites_store_contains_album(flow->config.favorites, album_index)) {
-        string_builder_append(&builder, STAR_PREFIX);
+    if (!folders) {
+        StringBuilder builder = string_builder_make(flow->title, sizeof flow->title);
+        if (favorites_store_contains_album(flow->config.favorites, tile->album)) {
+            string_builder_append(&builder, STAR_PREFIX);
+        }
+        string_builder_append(&builder, title);
     }
-    string_builder_append(&builder, title);
     if (library_read_group(library, LIBRARY_ALBUM_ARTISTS, album.album_artist, &artist)) {
         library_read_string(library, artist.name, flow->artist, sizeof flow->artist);
     }
@@ -227,13 +380,15 @@ static void refresh_text(CoverFlowScreen *flow, bool force)
     if (flow->count == 0 || (!force && center == flow->text_position)) {
         return;
     }
-    if (center == RANDOM_POSITION) {
+    if (is_random(flow, center)) {
         StringBuilder title = string_builder_make(flow->title, sizeof flow->title);
         string_builder_append(&title, i18n_text(STR_MENU_RANDOM_ALBUM));
         StringBuilder hint = string_builder_make(flow->artist, sizeof flow->artist);
         string_builder_append(&hint, i18n_text(STR_MENU_PLAY_ANY_ALBUM));
     } else {
-        load_text(flow, album_of(flow, center));
+        CoverFlowTile tile;
+        resolve(flow, center, &tile);
+        load_text(flow, &tile);
     }
     flow->text_position = center;
     flow->text_changed_ms = flow->now_ms;
@@ -245,7 +400,7 @@ static bool load_nearest_half(CoverFlowScreen *flow)
     for (int distance = 0; distance <= COVER_CACHE_SLOTS / 2; distance++) {
         for (int side = -1; side <= 1; side += 2) {
             int position = center + side * distance;
-            if (position > RANDOM_POSITION && position < flow->count &&
+            if (position >= flow->first && position < flow->count &&
                 cover_cache_load_half(flow->config.covers, position, album_of(flow, position))) {
                 return true;
             }
@@ -259,24 +414,75 @@ static void load_covers(CoverFlowScreen *flow)
     if (flow->count == 0 || load_nearest_half(flow)) {
         return;
     }
-    if (flow->target != RANDOM_POSITION &&
+    if (!is_random(flow, flow->target) &&
         flow->position == (int32_t)flow->target * COVER_FLOW_ONE) {
         cover_cache_load_full(flow->config.covers, album_of(flow, flow->target));
     }
 }
 
-static int playing_position(const CoverFlowScreen *flow)
+static int playlist_find(CoverFlowScreen *flow, uint16_t album)
+{
+    CoverFlowTile tile = first_run(flow);
+    while (tile.album != album) {
+        if (!step_run(flow, &tile, 1)) {
+            return NO_POSITION;
+        }
+    }
+    flow->tiles[tile.position % COVER_FLOW_TILES] = tile;
+    return tile.position;
+}
+
+static bool child_index(const Library *library, CoverFlowOrder order, uint16_t folder,
+                        uint32_t *index)
+{
+    for (uint32_t link = 0; link < order.count; link++) {
+        uint16_t value = LIBRARY_NONE;
+        if (library_read_index(library, LIBRARY_LINKS, order.first_link + link, &value) &&
+            value == folder) {
+            *index = link;
+            return true;
+        }
+    }
+    return false;
+}
+
+static int folder_find(const CoverFlowScreen *flow, uint16_t folder)
+{
+    LibraryFolder record;
+    uint32_t index = 0;
+    for (int depth = 0; depth < FOLDER_DEPTH_LIMIT; depth++) {
+        if (child_index(flow->config.library, flow->order, folder, &index)) {
+            return (int)index + flow->first;
+        }
+        if (folder == flow->order.folder ||
+            !library_read_folder(flow->config.library, folder, &record)) {
+            break;
+        }
+        folder = record.parent;
+    }
+    return NO_POSITION;
+}
+
+static int playing_position(CoverFlowScreen *flow)
 {
     PlayerStatus status = player_status(flow->config.player);
     LibraryTrack track;
+    uint32_t position = 0;
     if (!status.has_track || !library_read_track(flow->config.library, status.track, &track)) {
         return NO_POSITION;
     }
-    uint32_t position = 0;
+    switch (flow->order.kind) {
+    case COVER_FLOW_PLAYLIST:
+        return playlist_find(flow, track.album);
+    case COVER_FLOW_FOLDERS:
+        return folder_find(flow, track.folder);
+    case COVER_FLOW_ALBUMS:
+        break;
+    }
     if (!cover_flow_order_find(flow->config.library, flow->order, track.album, &position)) {
         return NO_POSITION;
     }
-    return (int)position + 1;
+    return (int)position + flow->first;
 }
 
 static void move_target(CoverFlowScreen *flow, int delta, bool repeated)
@@ -289,14 +495,13 @@ static void move_target(CoverFlowScreen *flow, int delta, bool repeated)
 static ScreenAction play_random(CoverFlowScreen *flow)
 {
     Random random = random_seeded(hal_clock_microseconds());
-    uint32_t pick = random_below(&random, flow->order.count);
-    uint16_t album = LIBRARY_NONE;
+    int pick = (int)random_below(&random, flow->order.count) + flow->first;
+    CoverFlowTile tile;
     BrowseQuery child;
-    BrowseItem item = {.kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = 0};
-    if (!cover_flow_order_album(flow->config.library, flow->order, pick, &album)) {
+    if (!resolve(flow, pick, &tile)) {
         return screen_action_none();
     }
-    item.index = album;
+    BrowseItem item = {.kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = tile.album};
     PlayerListStart start = {.position = 0, .seed = random_next(&random), .in_order = true};
     if (!browse_child(flow->parent, item, &child)) {
         return screen_action_none();
@@ -305,32 +510,111 @@ static ScreenAction play_random(CoverFlowScreen *flow)
     if (!player_play_from(flow->config.player, start)) {
         return screen_action_none();
     }
-    flow->target = (int)pick + 1;
+    flow->target = pick;
     return screen_action_push(flow->config.browse->config.now_playing);
+}
+
+static void use_order(CoverFlowScreen *flow, CoverFlowOrder order, int32_t key, BrowseQuery parent,
+                      int album_level)
+{
+    if (key != flow->order_key) {
+        flow->positioned = false;
+        flow->order_key = key;
+    }
+    flow->order = order;
+    flow->parent = parent;
+    flow->album_level = album_level;
+    flow->first = order.kind == COVER_FLOW_FOLDERS ? 0 : 1;
+    flow->count = order.count > 0 ? (int)order.count + flow->first : 0;
+    flow->text_position = NO_POSITION;
+    for (int slot = 0; slot < COVER_FLOW_TILES; slot++) {
+        flow->tiles[slot].position = NO_POSITION;
+    }
+}
+
+static int32_t folder_key(uint16_t folder)
+{
+    return (int32_t)LIBRARY_FOLDERS << 16 | folder;
+}
+
+static bool folder_order(const Library *library, uint16_t folder, CoverFlowOrder *order)
+{
+    LibraryFolder record;
+    if (!library_read_folder(library, folder, &record) || record.subfolder_count == 0 ||
+        record.track_count > 0) {
+        return false;
+    }
+    *order = (CoverFlowOrder){.first_link = record.first_link,
+                              .count = record.subfolder_count,
+                              .linked = true,
+                              .kind = COVER_FLOW_FOLDERS,
+                              .links = record.subfolder_count,
+                              .folder = folder};
+    return true;
+}
+
+static bool enter_folder(CoverFlowScreen *flow, uint16_t folder, uint16_t child)
+{
+    CoverFlowOrder order;
+    uint32_t index = 0;
+    if (!folder_order(flow->config.library, folder, &order)) {
+        return false;
+    }
+    use_order(flow, order, folder_key(folder), flow->parent, flow->album_level);
+    flow->target = child_index(flow->config.library, order, child, &index) ? (int)index : 0;
+    flow->positioned = true;
+    flow->position = (int32_t)flow->target * COVER_FLOW_ONE;
+    fill_tiles(flow);
+    refresh_text(flow, true);
+    return true;
+}
+
+static bool leave_folder(CoverFlowScreen *flow)
+{
+    LibraryFolder record;
+    return flow->order.kind == COVER_FLOW_FOLDERS && flow->order.folder != flow->origin &&
+           library_read_folder(flow->config.library, flow->order.folder, &record) &&
+           enter_folder(flow, record.parent, flow->order.folder);
 }
 
 static ScreenAction open_album(CoverFlowScreen *flow)
 {
-    if (flow->count > 0 && flow->target == RANDOM_POSITION) {
+    if (flow->count > 0 && is_random(flow, flow->target)) {
         return play_random(flow);
     }
     BrowseQuery child;
-    BrowseItem item = {
-        .kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = album_of(flow, flow->target)};
-    if (flow->count == 0 || !browse_child(flow->parent, item, &child)) {
+    CoverFlowTile tile;
+    if (flow->count == 0 || !resolve(flow, flow->target, &tile)) {
         return screen_action_none();
     }
-    Screen *album = browse_pool_open(flow->config.browse, flow->album_level, child);
-    return album != NULL ? screen_action_push(album) : screen_action_none();
+    BrowseItem item = {.kind = BROWSE_ITEM_ALBUM, .group = LIBRARY_ALBUMS, .index = tile.album};
+    if (flow->order.kind == COVER_FLOW_FOLDERS) {
+        if (enter_folder(flow, tile.item, LIBRARY_NONE)) {
+            return screen_action_none();
+        }
+        item =
+            (BrowseItem){.kind = BROWSE_ITEM_FOLDER, .group = LIBRARY_ARTISTS, .index = tile.item};
+    }
+    if (!browse_child(flow->parent, item, &child)) {
+        return screen_action_none();
+    }
+    BrowsePool *pool = flow->config.browse;
+    Screen *album = browse_pool_open(pool, flow->album_level, child);
+    if (album == NULL) {
+        return screen_action_none();
+    }
+    pool->screens[flow->album_level].in_flow = true;
+    return screen_action_push(album);
 }
 
 static ScreenAction toggle_favorite(CoverFlowScreen *flow)
 {
-    uint16_t album = album_of(flow, flow->target);
-    if (flow->count == 0 || album == LIBRARY_NONE) {
+    CoverFlowTile tile;
+    if (flow->count == 0 || flow->order.kind == COVER_FLOW_FOLDERS ||
+        !resolve(flow, flow->target, &tile) || tile.album == LIBRARY_NONE) {
         return screen_action_none();
     }
-    FavoriteResult result = favorites_store_toggle_album(flow->config.favorites, album);
+    FavoriteResult result = favorites_store_toggle_album(flow->config.favorites, tile.album);
     toast_show(flow->config.toast, favorites_store_message(result), flow->now_ms);
     refresh_text(flow, true);
     return screen_action_none();
@@ -353,7 +637,7 @@ static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
     case NAVIGATION_OPTIONS:
         return toggle_favorite(flow);
     case NAVIGATION_BACK:
-        return screen_action_pop();
+        return leave_folder(flow) ? screen_action_none() : screen_action_pop();
     case NAVIGATION_HOME:
         return screen_action_pop_to_root();
     case NAVIGATION_NONE:
@@ -367,12 +651,13 @@ static void enter(void *context, uint32_t now_ms)
     CoverFlowScreen *flow = context;
     if (!flow->positioned) {
         int playing = playing_position(flow);
-        flow->target = playing != NO_POSITION ? playing : min_of(1, flow->count - 1);
+        flow->target = playing != NO_POSITION ? playing : min_of(flow->first, flow->count - 1);
         flow->positioned = true;
     }
     flow->position = (int32_t)flow->target * COVER_FLOW_ONE;
     flow->last_ms = now_ms;
     flow->now_ms = now_ms;
+    fill_tiles(flow);
     refresh_text(flow, true);
 }
 
@@ -380,16 +665,20 @@ static void update(void *context, uint32_t now_ms)
 {
     CoverFlowScreen *flow = context;
     int32_t target = (int32_t)flow->target * COVER_FLOW_ONE;
-    flow->position = cover_flow_approach(flow->position, target, now_ms - flow->last_ms);
+    uint32_t time_constant_ms =
+        settings_animation_ms(flow->config.options, COVER_FLOW_TIME_CONSTANT_MS);
+    flow->position =
+        cover_flow_approach(flow->position, target, now_ms - flow->last_ms, time_constant_ms);
     flow->last_ms = now_ms;
     flow->now_ms = now_ms;
+    fill_tiles(flow);
     load_covers(flow);
     refresh_text(flow, false);
 }
 
 static bool cover_image(const CoverFlowScreen *flow, int position, Image *image)
 {
-    if (position == RANDOM_POSITION) {
+    if (is_random(flow, position)) {
         *image = shuffle_image();
         return true;
     }
@@ -398,13 +687,24 @@ static bool cover_image(const CoverFlowScreen *flow, int position, Image *image)
            cover_cache_half(flow->config.covers, position, album, image) == COVER_LOADED;
 }
 
+static bool three_covers(const CoverFlowScreen *flow)
+{
+    const uint8_t *options = flow->config.options;
+    return options != NULL && options[OPTION_COVER_FLOW_COVERS] == COVER_FLOW_THREE_COVERS;
+}
+
 static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position)
 {
     int32_t relative = (int32_t)position * COVER_FLOW_ONE - flow->position;
     bool stacked = theme_is_portrait(flow->config.theme);
     Quad quad =
         stacked ? cover_flow_stacked_quad(&STACK, relative) : cover_flow_quad(&LAYOUT, relative);
-    QuadLight light = cover_flow_light(&LAYOUT, relative);
+    CoverFlowLayout layout = LAYOUT;
+    if (three_covers(flow)) {
+        layout.fade_start = THREE_FADE_START;
+        layout.fade_end = THREE_FADE_END;
+    }
+    QuadLight light = cover_flow_light(&layout, relative);
     if (light.left == 0 && light.right == 0) {
         return;
     }
@@ -499,20 +799,6 @@ static void draw(void *context, Canvas *canvas)
     draw_profile_add(DRAW_PART_TEXT, hal_clock_microseconds() - text_started_us);
 }
 
-static void use_order(CoverFlowScreen *flow, CoverFlowOrder order, int32_t key, BrowseQuery parent,
-                      int album_level)
-{
-    if (key != flow->order_key) {
-        flow->positioned = false;
-        flow->order_key = key;
-    }
-    flow->order = order;
-    flow->parent = parent;
-    flow->album_level = album_level;
-    flow->count = order.count > 0 ? (int)order.count + 1 : 0;
-    flow->text_position = NO_POSITION;
-}
-
 Screen *cover_flow_screen_open_all(CoverFlowScreen *flow)
 {
     const uint8_t *options = flow->config.options;
@@ -525,18 +811,53 @@ Screen *cover_flow_screen_open_all(CoverFlowScreen *flow)
     return &flow->screen;
 }
 
+static uint32_t playlist_runs(const Library *library, CoverFlowOrder order)
+{
+    uint32_t runs = 0;
+    uint16_t previous = LIBRARY_NONE;
+    for (uint32_t link = order.first_link; link < order.first_link + order.links; link++) {
+        uint16_t album = link_album(library, link);
+        runs += link == order.first_link || album != previous ? 1u : 0u;
+        previous = album;
+    }
+    return runs;
+}
+
+static Screen *open_folder(CoverFlowScreen *flow, uint16_t folder, int album_level)
+{
+    CoverFlowOrder order;
+    if (!folder_order(flow->config.library, folder, &order)) {
+        return NULL;
+    }
+    flow->origin = folder;
+    use_order(flow, order, folder_key(folder), browse_root_query(BROWSE_FOLDER), album_level);
+    return &flow->screen;
+}
+
 Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group, uint16_t subject,
                                      int album_level)
 {
     LibraryGroup record;
+    if (group == LIBRARY_FOLDERS) {
+        return open_folder(flow, subject, album_level);
+    }
     if (!library_read_group(flow->config.library, group, subject, &record) ||
         record.link_count == 0) {
         return NULL;
     }
-    CoverFlowOrder order = {
-        .first_link = record.first_link, .count = record.link_count, .linked = true};
+    CoverFlowOrder order = {.first_link = record.first_link,
+                            .count = record.link_count,
+                            .linked = true,
+                            .kind = COVER_FLOW_ALBUMS,
+                            .links = record.link_count,
+                            .folder = LIBRARY_NONE};
     BrowseQuery parent = {
         .kind = BROWSE_GROUP_ALBUMS, .group = group, .subject = subject, .artist = LIBRARY_NONE};
+    if (group == LIBRARY_PLAYLISTS) {
+        order.kind = COVER_FLOW_PLAYLIST;
+        order.count = playlist_runs(flow->config.library, order);
+        parent.kind = BROWSE_PLAYLIST_TRACKS;
+    }
     use_order(flow, order, (int32_t)group << 16 | subject, parent, album_level);
     return &flow->screen;
 }
@@ -546,6 +867,7 @@ Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config)
     flow->config = config;
     flow->artist_order = cover_flow_order_make(config.library);
     flow->order_key = ORDER_BY_ARTIST;
+    flow->origin = 0;
     flow->held_repeats = 0;
     use_order(flow, flow->artist_order, ORDER_BY_ARTIST, browse_root_query(BROWSE_ALBUMS), 0);
     flow->target = 0;

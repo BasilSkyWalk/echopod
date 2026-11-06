@@ -31,6 +31,7 @@ typedef enum TagField {
     TAG_DATE,
     TAG_DISC,
     TAG_TRACK,
+    TAG_ALBUM_VERSION,
     TAG_FIELD_COUNT
 } TagField;
 

@@ -94,6 +94,54 @@ static FatReserveResult step(FatVolume *volume, FatFile *directory, const FatNew
     return FAT_RESERVE_EXISTS;
 }
 
+static const char *next_component(const char *path, size_t length)
+{
+    path += length;
+    while (*path == '/') {
+        path++;
+    }
+    return path;
+}
+
+FatReserveResult fat_grow(FatVolume *volume, const char *path, uint32_t size)
+{
+    volume->parent_valid = false;
+    if (size == 0 || volume->device.write == NULL) {
+        return FAT_RESERVE_FAILED;
+    }
+    FatFile directory = fat_root_directory(volume);
+    FatFile found;
+    path = next_component(path, 0);
+    for (;;) {
+        size_t length = component_length(path);
+        const char *rest = next_component(path, length);
+        if (length == 0 || !fat_find_entry(volume, &directory, path, length, &found)) {
+            return FAT_RESERVE_FAILED;
+        }
+        if (*rest == '\0') {
+            break;
+        }
+        if (!found.directory) {
+            return FAT_RESERVE_FAILED;
+        }
+        found.cursor_index = 0;
+        found.cursor_cluster = 0;
+        directory = found;
+        path = rest;
+    }
+    if (found.directory || found.size == 0) {
+        return FAT_RESERVE_FAILED;
+    }
+    if (found.size >= size) {
+        return FAT_RESERVE_EXISTS;
+    }
+    uint32_t index = volume->found_entry;
+    if (volume->type == FAT_TYPE_EXFAT) {
+        return exfat_grow_entry(volume, &directory, index, found, size);
+    }
+    return fat_grow_entry(volume, &directory, index, found, size);
+}
+
 FatReserveResult fat_reserve(FatVolume *volume, const char *path, uint32_t size)
 {
     volume->parent_valid = false;

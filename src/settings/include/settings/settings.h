@@ -52,7 +52,8 @@ typedef enum Language {
     LANGUAGE_FINNISH,
     LANGUAGE_RUSSIAN,
     LANGUAGE_UKRAINIAN,
-    LANGUAGE_POLISH
+    LANGUAGE_POLISH,
+    LANGUAGE_INDONESIAN
 } Language;
 
 typedef enum Orientation {
@@ -77,6 +78,9 @@ typedef enum SettingOption {
     OPTION_USB_PROMPT,
     OPTION_LISTEN_HISTORY,
     OPTION_TIME_ZONE,
+    OPTION_THEME,
+    OPTION_LYRICS,
+    OPTION_FOLDER_VIEW,
     SETTINGS_OPTION_COUNT
 } SettingOption;
 
@@ -117,6 +121,16 @@ enum {
     LISTEN_HISTORY_OFF
 };
 
+enum {
+    THEME_DARK,
+    THEME_LIGHT
+};
+
+enum {
+    LYRICS_ON,
+    LYRICS_OFF
+};
+
 typedef enum RockerMode {
     ROCKER_VOLUME_SKIP,
     ROCKER_SKIP_VOLUME,
@@ -135,7 +149,7 @@ enum {
     START_SCREEN_COUNT = START_ALL_SONGS + 1,
     USB_MODE_COUNT = USB_MODE_DAC + 1,
     ORIENTATION_COUNT = ORIENTATION_PORTRAIT_FLIPPED + 1,
-    LANGUAGE_COUNT = LANGUAGE_POLISH + 1,
+    LANGUAGE_COUNT = LANGUAGE_INDONESIAN + 1,
     SETTINGS_BRIGHTNESS_MIN = 1,
     SETTINGS_BRIGHTNESS_MAX = 10,
     SETTINGS_VOLUME_MAX = 50,
@@ -176,5 +190,6 @@ uint32_t settings_screen_timeout_ms(const Settings *settings);
 uint32_t settings_auto_off_option_minutes(int option);
 uint32_t settings_auto_off_ms(const Settings *settings);
 uint8_t settings_option_count(SettingOption option);
+uint32_t settings_animation_ms(const uint8_t *options, uint32_t normal_ms);
 void settings_encode(const Settings *settings, uint8_t *bytes);
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings);

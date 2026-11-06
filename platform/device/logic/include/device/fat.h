@@ -63,6 +63,7 @@ typedef struct FatVolume {
     FatFile parent;
     uint32_t parent_length;
     bool parent_valid;
+    uint32_t found_entry;
     bool parent_named;
     char parent_path[FAT_PARENT_CAPACITY];
 } FatVolume;
@@ -89,6 +90,7 @@ bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, u
 bool fat_write(FatVolume *volume, FatFile *file, uint32_t offset, const void *bytes,
                uint32_t length);
 FatReserveResult fat_reserve(FatVolume *volume, const char *path, uint32_t size);
+FatReserveResult fat_grow(FatVolume *volume, const char *path, uint32_t size);
 void fat_set_new_stamp(uint32_t dos_stamp);
 uint32_t fat_new_stamp(void);
 bool fat_file_sector(FatVolume *volume, FatFile *file, uint32_t sector_index, uint32_t *lba);
