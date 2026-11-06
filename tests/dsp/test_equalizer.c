@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdlib.h>
 
 #include "check.h"
 #include "dsp/equalizer.h"
@@ -11,6 +12,7 @@ enum {
 
 static const double PI = 3.14159265358979323846;
 static const double HALF_SCALE = 4194304.0;
+static const double TOP = 8388607.0;
 
 static EqualizerCurve one_band(uint16_t frequency, int gain, uint8_t q_tenths)
 {
@@ -276,6 +278,88 @@ static void an_invalid_band_at_the_current_rate_is_rejected_whole(void)
     CHECK(equalizer_valid(&equalizer));
 }
 
+static int32_t saturated(double value)
+{
+    double rounded = floor(value + 0.5);
+    return rounded > TOP ? FULL_SCALE : rounded < -TOP - 1.0 ? -FULL_SCALE - 1 : (int32_t)rounded;
+}
+
+static int worst_error_against_a_double_model(EqualizerCurve curve, uint32_t rate, double frequency,
+                                              int frames)
+{
+    Equalizer equalizer = equalizer_for(curve, rate);
+    const EqualizerChain *chain = &equalizer.current;
+    double preamp = chain->preamp / 1073741824.0;
+    double band[EQUALIZER_MAX_BANDS] = {0};
+    double low[EQUALIZER_MAX_BANDS] = {0};
+    int worst = 0;
+    for (int frame = 0; frame < frames; frame++) {
+        int32_t sample = (int32_t)(TOP * sin(2.0 * PI * frequency * frame / rate));
+        double x = sample * 16.0 * preamp;
+        for (int index = 0; index < chain->stage_count; index++) {
+            EqualizerStage stage = chain->stages[index];
+            double g = stage.g / 16384.0;
+            double v1 = stage.a1 / 16384.0 * (band[index] + g * (x - low[index]));
+            double v2 = low[index] + g * v1;
+            band[index] = 2.0 * v1 - band[index];
+            low[index] = 2.0 * v2 - low[index];
+            x += stage.m1 / 8192.0 * v1;
+        }
+        int32_t expected = saturated(x / 16.0);
+        int32_t left = sample;
+        int32_t right = sample;
+        process_pair(&equalizer, &left, &right);
+        int error = abs(left - expected);
+        worst = error > worst ? error : worst;
+    }
+    return worst;
+}
+
+static void a_band_at_the_q_cap_holds_a_full_scale_tone_at_its_centre(void)
+{
+    static const uint32_t RATES[] = {44100, 48000, 96000};
+    static const uint16_t CENTRES[] = {20, 100, 1000, 5000, 10000, 16000, 19000, 40000};
+    static const int16_t GAINS[] = {1, 20, 40, 120, -120};
+    for (size_t rate = 0; rate < sizeof RATES / sizeof RATES[0]; rate++) {
+        for (size_t centre = 0; centre < sizeof CENTRES / sizeof CENTRES[0]; centre++) {
+            if (CENTRES[centre] * 20u >= RATES[rate] * 9u) {
+                continue;
+            }
+            for (size_t gain = 0; gain < sizeof GAINS / sizeof GAINS[0]; gain++) {
+                EqualizerCurve curve = {.band_count = 1};
+                curve.bands[0] =
+                    (EqualizerBand){CENTRES[centre], GAINS[gain], EQUALIZER_Q_MAX_TENTHS};
+                int frames = (int)RATES[rate] / 2 + (int)(RATES[rate] * 4u / CENTRES[centre]);
+                CHECK(worst_error_against_a_double_model(curve, RATES[rate], CENTRES[centre],
+                                                         frames) <= 16);
+            }
+        }
+    }
+}
+
+static void stacked_boosts_at_the_q_cap_never_wrap(void)
+{
+    EqualizerCurve curve = {.band_count = 3};
+    for (int band = 0; band < 3; band++) {
+        curve.bands[band] = (EqualizerBand){2000, 120, EQUALIZER_Q_MAX_TENTHS};
+    }
+    CHECK(worst_error_against_a_double_model(curve, 48000, 2000.0, 48000) <= 16);
+}
+
+static void ordinary_curves_keep_their_preamp(void)
+{
+    EqualizerCurve curve = {.band_count = 7};
+    static const uint16_t CENTRES[7] = {63, 160, 400, 1000, 2500, 6300, 16000};
+    for (int band = 0; band < 7; band++) {
+        curve.bands[band] = (EqualizerBand){CENTRES[band], 120, 10};
+    }
+    static const uint32_t RATES[] = {44100, 48000, 96000};
+    for (size_t rate = 0; rate < sizeof RATES / sizeof RATES[0]; rate++) {
+        Equalizer equalizer = equalizer_for(curve, RATES[rate]);
+        CHECK(near(-12.0, 20.0 * log10(equalizer.current.preamp / 1073741824.0), 0.05));
+    }
+}
+
 static void a_deep_file_preamp_is_honoured(void)
 {
     EqualizerCurve curve = {.band_count = 0, .preamp_set = 1, .preamp_tenths = -240};
@@ -305,6 +389,9 @@ int main(void)
         TEST_CASE(a_file_preamp_never_removes_automatic_headroom),
         TEST_CASE(an_invalid_band_at_the_current_rate_is_rejected_whole),
         TEST_CASE(a_deep_file_preamp_is_honoured),
+        TEST_CASE(a_band_at_the_q_cap_holds_a_full_scale_tone_at_its_centre),
+        TEST_CASE(stacked_boosts_at_the_q_cap_never_wrap),
+        TEST_CASE(ordinary_curves_keep_their_preamp),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

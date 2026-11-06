@@ -4,8 +4,7 @@
 
 enum {
     COEFFICIENT_BITS = 14,
-    M1_BITS = 20,
-    M1_HALF = 1 << (M1_BITS - 1),
+    M1_BITS = 13,
     LOW_MASK = (1 << COEFFICIENT_BITS) - 1,
     HALF = 1 << (COEFFICIENT_BITS - 1),
     PREAMP_BITS = 30,
@@ -19,13 +18,17 @@ enum {
 
 static const int32_t UNITY = INT32_C(1) << PREAMP_BITS;
 
+static int32_t scaled_by(int32_t coefficient, int32_t value, int bits)
+{
+    uint32_t low = (uint32_t)value & ((1U << bits) - 1U);
+    int32_t high = value >> bits;
+    int32_t low_product = (int32_t)((uint32_t)coefficient * low);
+    return (int32_t)((uint32_t)coefficient * (uint32_t)high + (uint32_t)(low_product >> bits));
+}
+
 static int32_t scaled(int32_t coefficient, int32_t value)
 {
-    uint32_t low = (uint32_t)value & LOW_MASK;
-    int32_t high = value >> COEFFICIENT_BITS;
-    int32_t low_product = (int32_t)((uint32_t)coefficient * low);
-    return (int32_t)((uint32_t)coefficient * (uint32_t)high +
-                     (uint32_t)(low_product >> COEFFICIENT_BITS));
+    return scaled_by(coefficient, value, COEFFICIENT_BITS);
 }
 
 static int32_t plus(int32_t first, int32_t second)
@@ -36,14 +39,6 @@ static int32_t plus(int32_t first, int32_t second)
 static int32_t minus(int32_t first, int32_t second)
 {
     return (int32_t)((uint32_t)first - (uint32_t)second);
-}
-
-static int32_t scaled_m1(int32_t coefficient, int32_t value)
-{
-    int64_t product = (int64_t)coefficient * value;
-    int64_t rounded =
-        product >= 0 ? (product + M1_HALF) >> M1_BITS : -((-product + M1_HALF) >> M1_BITS);
-    return (int32_t)rounded;
 }
 
 static int32_t doubled_minus(int32_t value, int32_t previous)
@@ -81,7 +76,7 @@ static void filter_channel(EqualizerStage stage, int32_t *history, Run run)
         int32_t next_low = plus(low, scaled_carried(stage.g, next_band, &carry_low));
         band = doubled_minus(next_band, band);
         low = doubled_minus(next_low, low);
-        samples[index] = plus(x, scaled_m1(stage.m1, next_band));
+        samples[index] = plus(x, scaled_by(stage.m1, next_band, M1_BITS));
     }
     history[0] = band;
     history[1] = low;

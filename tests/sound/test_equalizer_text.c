@@ -93,6 +93,9 @@ static void malformed_and_out_of_range_values_are_rejected(void)
     CHECK_EQUAL(EQUALIZER_TEXT_SYNTAX, error.problem);
     CHECK(!parse("Filter 1: ON PK Fc 100 Hz Gain 1 dB Q 0\n", &curve, &error));
     CHECK_EQUAL(EQUALIZER_TEXT_Q, error.problem);
+    CHECK(!parse("Filter 1: ON PK Fc 100 Hz Gain 1 dB Q 10.1\n", &curve, &error));
+    CHECK_EQUAL(EQUALIZER_TEXT_Q, error.problem);
+    CHECK(parse("Filter 1: ON PK Fc 100 Hz Gain 1 dB Q 10\n", &curve, &error));
     CHECK(!parse("Filter 1: ON PK Fc 100 Hz Gain 13 dB Q 1\n", &curve, &error));
     CHECK_EQUAL(EQUALIZER_TEXT_GAIN, error.problem);
     CHECK(!parse("Filter 1: ON PK Fc 43200 Hz Gain 1 dB Q 1\n", &curve, &error));

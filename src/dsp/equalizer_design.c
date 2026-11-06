@@ -5,8 +5,11 @@
 enum {
     COEFFICIENT_BITS = 14,
     COEFFICIENT_MAX = (1 << 16) - 1,
-    M1_BITS = 20,
-    M1_MAX = (1 << 27) - 1,
+    M1_BITS = 13,
+    M1_MAX = (1 << 18) - 1,
+    RESPONSE_BITS = 16,
+    STATE_LIMIT = 12,
+    DOWN_ONE_DB = 22,
     PRODUCT_SHIFT = 8,
     TABLE_BITS = 30,
     GAIN_TABLE_OFFSET = 24,
@@ -18,6 +21,11 @@ enum {
 };
 
 static const int64_t ONE = INT64_C(1) << TABLE_BITS;
+static const int64_t R_ONE = INT64_C(1) << RESPONSE_BITS;
+static const int64_t R_CAP = INT64_C(1) << 38;
+static const int64_t R_WIDE = INT64_C(1) << 31;
+static const int64_t OMEGA_MIN = INT64_C(1) << (RESPONSE_BITS - 6);
+static const int64_t OMEGA_MAX = INT64_C(1) << (RESPONSE_BITS + 6);
 static const int64_t HALF = INT64_C(1) << (TABLE_BITS - 1);
 static const uint64_t PI_Q30 = UINT64_C(3373259426);
 
@@ -205,6 +213,100 @@ static void clear_histories(EqualizerChain *chain)
     }
 }
 
+typedef struct Shape {
+    int64_t g;
+    int64_t k;
+    int64_t m1;
+    int64_t m2;
+} Shape;
+
+static int64_t times(int64_t first, int64_t second)
+{
+    int64_t larger = first > second ? first : second;
+    int64_t smaller = first > second ? second : first;
+    larger = larger > R_CAP ? R_CAP : larger;
+    int64_t result =
+        larger < R_WIDE ? (larger * smaller) >> RESPONSE_BITS : (larger >> RESPONSE_BITS) * smaller;
+    return result > R_CAP ? R_CAP : result;
+}
+
+static Shape shape_of(const EqualizerStage *stage)
+{
+    int64_t g = widened(stage->g);
+    return (Shape){.g = g >> (TABLE_BITS - RESPONSE_BITS),
+                   .k = effective_damping(stage->a1, g) >> (TABLE_BITS - RESPONSE_BITS),
+                   .m1 = (int64_t)stage->m1 * (1 << (RESPONSE_BITS - M1_BITS)),
+                   .m2 = 0};
+}
+
+static int64_t response_squared(const Shape *shape, int64_t tangent)
+{
+    int64_t omega = divided(tangent << RESPONSE_BITS, shape->g);
+    if (omega < OMEGA_MIN) {
+        return times(R_ONE + shape->m2, R_ONE + shape->m2);
+    }
+    if (omega > OMEGA_MAX) {
+        return R_ONE;
+    }
+    int64_t w = (omega * omega) >> RESPONSE_BITS;
+    int64_t real_top = R_ONE + shape->m2 - w;
+    int64_t imaginary_top = ((shape->k + shape->m1) * omega) >> RESPONSE_BITS;
+    int64_t real_bottom = R_ONE - w;
+    int64_t imaginary_bottom = (shape->k * omega) >> RESPONSE_BITS;
+    int64_t top = real_top * real_top + imaginary_top * imaginary_top;
+    int64_t bottom =
+        (real_bottom * real_bottom + imaginary_bottom * imaginary_bottom) >> RESPONSE_BITS;
+    return top / (bottom > 0 ? bottom : 1);
+}
+
+static int64_t state_peak_squared(const Shape *shape)
+{
+    int64_t g_squared = (shape->g * shape->g) >> RESPONSE_BITS;
+    int64_t k = shape->k > 0 ? shape->k : 1;
+    int64_t peak = R_ONE + shape->g + divided((R_ONE + g_squared) << RESPONSE_BITS, k);
+    return times(peak, peak);
+}
+
+static int64_t largest(int64_t first, int64_t second)
+{
+    return first > second ? first : second;
+}
+
+static int64_t worst_peak_squared(const EqualizerChain *chain)
+{
+    Shape shapes[EQUALIZER_MAX_BANDS];
+    int64_t worst = R_ONE;
+    for (int index = 0; index < chain->stage_count; index++) {
+        shapes[index] = shape_of(&chain->stages[index]);
+        worst = times(worst, times(R_ONE + shapes[index].m2, R_ONE + shapes[index].m2));
+    }
+    for (int stage = 0; stage < chain->stage_count; stage++) {
+        int64_t gain = R_ONE;
+        for (int index = 0; index < chain->stage_count; index++) {
+            if (index == stage) {
+                worst = largest(worst, times(gain, state_peak_squared(&shapes[stage])));
+            }
+            gain = times(gain, response_squared(&shapes[index], shapes[stage].g));
+        }
+        worst = largest(worst, gain);
+    }
+    return worst;
+}
+
+static int32_t within_headroom(const EqualizerChain *chain, int64_t preamp)
+{
+    int64_t worst = worst_peak_squared(chain);
+    int64_t limit = (int64_t)STATE_LIMIT * STATE_LIMIT * R_ONE;
+    while (preamp > 0) {
+        int64_t level = preamp >> (TABLE_BITS - RESPONSE_BITS);
+        if (times(times(level, level), worst) <= limit) {
+            break;
+        }
+        preamp = multiply(preamp, GAIN_Q30[DOWN_ONE_DB]);
+    }
+    return (int32_t)preamp;
+}
+
 static void design_chain(EqualizerChain *chain, const EqualizerCurve *curve, uint32_t rate,
                          bool keep_history)
 {
@@ -225,7 +327,6 @@ static void design_chain(EqualizerChain *chain, const EqualizerCurve *curve, uin
         return;
     }
     chain->valid = 1;
-    chain->preamp = (int32_t)linear_for_preamp_tenths(equalizer_preamp_tenths(&chain->curve, rate));
     for (int band = 0; band < chain->curve.band_count; band++) {
         if (!equalizer_band_audible(chain->curve.bands[band], rate)) {
             continue;
@@ -234,6 +335,8 @@ static void design_chain(EqualizerChain *chain, const EqualizerCurve *curve, uin
         *stage = design_stage(chain->curve.bands[band], rate);
         stage->band = (uint8_t)band;
     }
+    chain->preamp = within_headroom(
+        chain, linear_for_preamp_tenths(equalizer_preamp_tenths(&chain->curve, rate)));
 }
 
 static bool same_layout(const EqualizerCurve *first, const EqualizerCurve *second)
