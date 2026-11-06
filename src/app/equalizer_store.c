@@ -87,6 +87,12 @@ static bool unchanged(const EqualizerStore *store, const uint8_t *bytes)
     return store->has_saved;
 }
 
+static bool read_preset(void *context, uint32_t offset, char *buffer, uint32_t length)
+{
+    const HalFile *file = context;
+    return hal_file_read(*file, offset, buffer, length);
+}
+
 bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, EqualizerTextError *error)
 {
     EqualizerTextError local = {MISSING_NONE, EQUALIZER_TEXT_UNREADABLE, 0};
@@ -113,14 +119,10 @@ bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, Equaliz
         error->problem = EQUALIZER_TEXT_EMPTY;
         return false;
     }
-    static char text[EQUALIZER_TEXT_MAX_BYTES];
-    bool read = hal_file_read(file, 0, text, file.size);
+    EqualizerTextSource source = {read_preset, &file};
+    bool parsed = equalizer_text_parse_from(source, file.size, curve, error);
     hal_file_close(&file);
-    if (!read) {
-        error->problem = EQUALIZER_TEXT_UNREADABLE;
-        return false;
-    }
-    return equalizer_text_parse(text, file.size, curve, error);
+    return parsed;
 }
 
 void equalizer_store_load(EqualizerStore *store)

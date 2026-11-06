@@ -202,6 +202,41 @@ static void a_long_line_is_rejected(void)
     CHECK_EQUAL(EQUALIZER_TEXT_LINE_TOO_LONG, error.problem);
 }
 
+static void a_line_of_the_longest_length_is_read_whole_even_after_a_bom(void)
+{
+    char text[3 + EQUALIZER_TEXT_MAX_LINE + 2];
+    memcpy(text, "\xEF\xBB\xBF", 3);
+    memset(text + 3, ' ', EQUALIZER_TEXT_MAX_LINE);
+    static const char FILTER[] = "Filter 1: ON PK Fc 100 Hz Gain 1 dB Q 1";
+    memcpy(text + 3, FILTER, sizeof FILTER - 1);
+    text[3 + EQUALIZER_TEXT_MAX_LINE] = '\n';
+    EqualizerCurve curve;
+    EqualizerTextError error;
+    CHECK(equalizer_text_parse(text, 3 + EQUALIZER_TEXT_MAX_LINE + 1, &curve, &error));
+    CHECK_EQUAL(1, curve.band_count);
+    text[3 + EQUALIZER_TEXT_MAX_LINE] = ' ';
+    text[3 + EQUALIZER_TEXT_MAX_LINE + 1] = '\n';
+    CHECK(!equalizer_text_parse(text, sizeof text, &curve, &error));
+    CHECK_EQUAL(EQUALIZER_TEXT_LINE_TOO_LONG, error.problem);
+}
+
+static bool refuse(void *context, uint32_t offset, char *buffer, uint32_t length)
+{
+    (void)context;
+    (void)offset;
+    (void)buffer;
+    (void)length;
+    return false;
+}
+
+static void a_read_error_is_reported(void)
+{
+    EqualizerCurve curve;
+    EqualizerTextError error;
+    CHECK(!equalizer_text_parse_from((EqualizerTextSource){refuse, NULL}, 10, &curve, &error));
+    CHECK_EQUAL(EQUALIZER_TEXT_UNREADABLE, error.problem);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -215,6 +250,8 @@ int main(void)
         TEST_CASE(malformed_and_out_of_range_values_are_rejected),
         TEST_CASE(eleven_filters_are_too_many),
         TEST_CASE(a_long_line_is_rejected),
+        TEST_CASE(a_line_of_the_longest_length_is_read_whole_even_after_a_bom),
+        TEST_CASE(a_read_error_is_reported),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

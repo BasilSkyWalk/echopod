@@ -8,7 +8,9 @@ enum {
     MAX_FILTER_LINES = 32,
     TENTHS = 1,
     HUNDREDTHS = 2,
-    NONE = -1
+    NONE = -1,
+    BOM_BYTES = 3,
+    WINDOW_BYTES = BOM_BYTES + EQUALIZER_TEXT_MAX_LINE + 1
 };
 
 typedef enum FilterKind {
@@ -409,48 +411,51 @@ static bool parse_line(char *line, uint32_t line_number, EqualizerCurve *curve, 
     return false;
 }
 
-bool equalizer_text_parse(const char *text, uint32_t length, EqualizerCurve *curve,
-                          EqualizerTextError *error)
+bool equalizer_text_parse_from(EqualizerTextSource source, uint32_t length, EqualizerCurve *curve,
+                               EqualizerTextError *error)
 {
-    *error = (EqualizerTextError){.line = 0, .problem = EQUALIZER_TEXT_OK};
+    *error = (EqualizerTextError){.line = 0, .problem = EQUALIZER_TEXT_OK, .skipped = 0};
     *curve = (EqualizerCurve){0};
     if (length > EQUALIZER_TEXT_MAX_BYTES) {
         error->problem = EQUALIZER_TEXT_TOO_LARGE;
         return false;
     }
-    uint32_t start = 0;
-    if (length >= 3 && (uint8_t)text[0] == 0xEF && (uint8_t)text[1] == 0xBB &&
-        (uint8_t)text[2] == 0xBF) {
-        start = 3;
-    }
+    char window[WINDOW_BYTES + 1];
+    uint32_t position = 0;
+    uint32_t line_number = 1;
     bool preamp_seen = false;
     uint16_t ids[MAX_FILTER_LINES] = {0};
     int filter_count = 0;
-    uint32_t position = start;
-    uint32_t line_number = 1;
     while (position < length) {
-        uint32_t end = position;
-        while (end < length && text[end] != '\n') {
+        uint32_t wanted = length - position;
+        wanted = wanted < WINDOW_BYTES ? wanted : WINDOW_BYTES;
+        if (!source.read(source.context, position, window, wanted)) {
+            error->problem = EQUALIZER_TEXT_UNREADABLE;
+            return false;
+        }
+        uint32_t start = 0;
+        if (position == 0 && wanted >= 3 && (uint8_t)window[0] == 0xEF &&
+            (uint8_t)window[1] == 0xBB && (uint8_t)window[2] == 0xBF) {
+            start = 3;
+        }
+        uint32_t end = start;
+        while (end < wanted && window[end] != '\n') {
             end++;
         }
-        uint32_t line_length = end - position;
-        if (line_length > EQUALIZER_TEXT_MAX_LINE) {
-            error->line = line_number;
-            error->problem = EQUALIZER_TEXT_LINE_TOO_LONG;
-            return false;
+        uint32_t line_length = end - start;
+        if (line_length > EQUALIZER_TEXT_MAX_LINE ||
+            (end == wanted && position + wanted < length)) {
+            return fail(error, line_number, EQUALIZER_TEXT_LINE_TOO_LONG);
         }
-        if (line_length > 0 && text[position + line_length - 1] == '\r') {
+        if (line_length > 0 && window[start + line_length - 1] == '\r') {
             line_length--;
         }
-        char line[EQUALIZER_TEXT_MAX_LINE + 1];
-        for (uint32_t index = 0; index < line_length; index++) {
-            line[index] = text[position + index];
-        }
-        line[line_length] = '\0';
-        if (!parse_line(line, line_number, curve, &preamp_seen, ids, &filter_count, error)) {
+        window[start + line_length] = '\0';
+        if (!parse_line(window + start, line_number, curve, &preamp_seen, ids, &filter_count,
+                        error)) {
             return false;
         }
-        position = end < length ? end + 1 : length;
+        position += end < wanted ? end + 1 : wanted;
         line_number++;
     }
     if (!preamp_seen && filter_count == 0) {
@@ -458,4 +463,20 @@ bool equalizer_text_parse(const char *text, uint32_t length, EqualizerCurve *cur
         return false;
     }
     return true;
+}
+
+static bool read_memory(void *context, uint32_t offset, char *buffer, uint32_t length)
+{
+    const char *text = context;
+    for (uint32_t index = 0; index < length; index++) {
+        buffer[index] = text[offset + index];
+    }
+    return true;
+}
+
+bool equalizer_text_parse(const char *text, uint32_t length, EqualizerCurve *curve,
+                          EqualizerTextError *error)
+{
+    EqualizerTextSource source = {read_memory, (void *)(uintptr_t)text};
+    return equalizer_text_parse_from(source, length, curve, error);
 }

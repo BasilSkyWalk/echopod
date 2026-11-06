@@ -36,5 +36,12 @@ typedef struct EqualizerTextError {
     uint32_t skipped;
 } EqualizerTextError;
 
+typedef struct EqualizerTextSource {
+    bool (*read)(void *context, uint32_t offset, char *buffer, uint32_t length);
+    void *context;
+} EqualizerTextSource;
+
+bool equalizer_text_parse_from(EqualizerTextSource source, uint32_t length, EqualizerCurve *curve,
+                               EqualizerTextError *error);
 bool equalizer_text_parse(const char *text, uint32_t length, EqualizerCurve *curve,
                           EqualizerTextError *error);
