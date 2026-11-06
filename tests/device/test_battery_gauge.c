@@ -108,60 +108,103 @@ static void the_average_spans_several_seconds_of_readings(void)
     CHECK(BATTERY_GAUGE_READINGS >= 64);
 }
 
+enum {
+    STEP = BATTERY_DISPLAY_STEP_MS,
+    HOLD = BATTERY_DISPLAY_HOLD_MS
+};
+
 static void the_shown_percent_starts_at_the_first_level(void)
 {
     BatteryDisplay display;
     battery_display_init(&display);
-    CHECK_EQUAL(34, battery_display_update(&display, 34, false));
+    CHECK_EQUAL(34, battery_display_update(&display, 34, false, 1000));
 }
 
 static void a_one_point_wobble_keeps_the_shown_percent(void)
 {
     BatteryDisplay display;
     battery_display_init(&display);
-    battery_display_update(&display, 34, false);
-    CHECK_EQUAL(34, battery_display_update(&display, 33, false));
-    CHECK_EQUAL(34, battery_display_update(&display, 35, false));
-    CHECK_EQUAL(34, battery_display_update(&display, 34, false));
+    battery_display_update(&display, 34, false, 0);
+    CHECK_EQUAL(34, battery_display_update(&display, 33, false, 1000));
+    CHECK_EQUAL(34, battery_display_update(&display, 35, false, 1000 + STEP));
+    CHECK_EQUAL(34, battery_display_update(&display, 33, false, 2000 + STEP));
+    CHECK_EQUAL(34, battery_display_update(&display, 34, false, 3000 + 2 * STEP));
 }
 
-static void on_battery_the_shown_percent_falls_freely_and_rises_reluctantly(void)
+static void a_lasting_fall_moves_the_shown_percent_one_point_at_a_time(void)
 {
     BatteryDisplay display;
     battery_display_init(&display);
-    battery_display_update(&display, 34, false);
-    CHECK_EQUAL(32, battery_display_update(&display, 32, false));
-    CHECK_EQUAL(32, battery_display_update(&display, 36, false));
-    CHECK_EQUAL(42, battery_display_update(&display, 42, false));
+    battery_display_update(&display, 34, false, 0);
+    CHECK_EQUAL(34, battery_display_update(&display, 31, false, 100));
+    CHECK_EQUAL(34, battery_display_update(&display, 31, false, 100 + STEP - 1));
+    CHECK_EQUAL(33, battery_display_update(&display, 31, false, 100 + STEP));
+    CHECK_EQUAL(33, battery_display_update(&display, 31, false, 100 + STEP + 1));
+    CHECK_EQUAL(32, battery_display_update(&display, 31, false, 100 + 2 * STEP));
+    CHECK_EQUAL(31, battery_display_update(&display, 31, false, 100 + 3 * STEP));
+    CHECK_EQUAL(31, battery_display_update(&display, 31, false, 100 + 4 * STEP));
 }
 
-static void on_usb_power_the_shown_percent_rises_freely_and_falls_reluctantly(void)
+static void on_battery_the_shown_percent_rises_only_on_a_big_jump(void)
 {
     BatteryDisplay display;
     battery_display_init(&display);
-    battery_display_update(&display, 34, true);
-    CHECK_EQUAL(36, battery_display_update(&display, 36, true));
-    CHECK_EQUAL(36, battery_display_update(&display, 30, true));
-    CHECK_EQUAL(26, battery_display_update(&display, 26, true));
+    battery_display_update(&display, 34, false, 0);
+    CHECK_EQUAL(34, battery_display_update(&display, 40, false, STEP));
+    CHECK_EQUAL(34, battery_display_update(&display, 40, false, 5 * STEP));
+    CHECK_EQUAL(44, battery_display_update(&display, 44, false, 6 * STEP));
+}
+
+static void on_usb_power_the_shown_percent_rises_slowly_and_falls_only_on_a_big_jump(void)
+{
+    BatteryDisplay display;
+    battery_display_init(&display);
+    battery_display_update(&display, 34, true, 0);
+    CHECK_EQUAL(34, battery_display_update(&display, 36, true, 1));
+    CHECK_EQUAL(35, battery_display_update(&display, 36, true, 1 + STEP));
+    CHECK_EQUAL(35, battery_display_update(&display, 30, true, 1 + 3 * STEP));
+    CHECK_EQUAL(25, battery_display_update(&display, 25, true, 1 + 4 * STEP));
+}
+
+static void plugging_in_holds_the_shown_percent_for_half_a_minute(void)
+{
+    BatteryDisplay display;
+    battery_display_init(&display);
+    battery_display_update(&display, 60, false, 0);
+    CHECK_EQUAL(60, battery_display_update(&display, 75, true, 1000));
+    CHECK_EQUAL(60, battery_display_update(&display, 75, true, 1000 + HOLD - 1));
+    CHECK_EQUAL(60, battery_display_update(&display, 62, true, 1000 + HOLD));
+    CHECK_EQUAL(61, battery_display_update(&display, 62, true, 1000 + HOLD + STEP));
 }
 
 static void plugging_in_does_not_drop_the_shown_percent(void)
 {
     BatteryDisplay display;
     battery_display_init(&display);
-    battery_display_update(&display, 60, false);
-    CHECK_EQUAL(60, battery_display_update(&display, 53, true));
-    CHECK_EQUAL(60, battery_display_update(&display, 59, true));
-    CHECK_EQUAL(62, battery_display_update(&display, 62, true));
+    battery_display_update(&display, 60, false, 0);
+    CHECK_EQUAL(60, battery_display_update(&display, 53, true, 100));
+    CHECK_EQUAL(60, battery_display_update(&display, 53, true, 100 + HOLD));
+    CHECK_EQUAL(60, battery_display_update(&display, 59, true, 100 + HOLD + STEP));
 }
 
-static void unplugging_does_not_raise_the_shown_percent(void)
+static void unplugging_holds_then_does_not_raise_the_shown_percent(void)
 {
     BatteryDisplay display;
     battery_display_init(&display);
-    battery_display_update(&display, 70, true);
-    CHECK_EQUAL(70, battery_display_update(&display, 75, false));
-    CHECK_EQUAL(68, battery_display_update(&display, 68, false));
+    battery_display_update(&display, 70, true, 0);
+    CHECK_EQUAL(70, battery_display_update(&display, 62, false, 100));
+    CHECK_EQUAL(70, battery_display_update(&display, 75, false, 100 + HOLD));
+    CHECK_EQUAL(70, battery_display_update(&display, 68, false, 200 + HOLD));
+    CHECK_EQUAL(69, battery_display_update(&display, 68, false, 200 + HOLD + STEP));
+}
+
+static void the_clock_wrapping_keeps_the_steps(void)
+{
+    BatteryDisplay display;
+    battery_display_init(&display);
+    battery_display_update(&display, 50, false, UINT32_MAX - 100);
+    battery_display_update(&display, 48, false, UINT32_MAX - 50);
+    CHECK_EQUAL(49, battery_display_update(&display, 48, false, STEP));
 }
 
 static void a_boot_below_3400_mv_on_battery_switches_off(void)
@@ -187,10 +230,13 @@ int main(void)
         TEST_CASE(the_average_spans_several_seconds_of_readings),
         TEST_CASE(the_shown_percent_starts_at_the_first_level),
         TEST_CASE(a_one_point_wobble_keeps_the_shown_percent),
-        TEST_CASE(on_battery_the_shown_percent_falls_freely_and_rises_reluctantly),
-        TEST_CASE(on_usb_power_the_shown_percent_rises_freely_and_falls_reluctantly),
+        TEST_CASE(a_lasting_fall_moves_the_shown_percent_one_point_at_a_time),
+        TEST_CASE(on_battery_the_shown_percent_rises_only_on_a_big_jump),
+        TEST_CASE(on_usb_power_the_shown_percent_rises_slowly_and_falls_only_on_a_big_jump),
+        TEST_CASE(plugging_in_holds_the_shown_percent_for_half_a_minute),
         TEST_CASE(plugging_in_does_not_drop_the_shown_percent),
-        TEST_CASE(unplugging_does_not_raise_the_shown_percent),
+        TEST_CASE(unplugging_holds_then_does_not_raise_the_shown_percent),
+        TEST_CASE(the_clock_wrapping_keeps_the_steps),
         TEST_CASE(a_boot_below_3400_mv_on_battery_switches_off),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

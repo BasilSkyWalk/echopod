@@ -313,12 +313,37 @@ bool core1_stream_step(Core1Stream *stream)
     return true;
 }
 
+void core1_stream_set_wait(Core1Stream *stream, void (*wait)(void))
+{
+    stream->wait = wait;
+}
+
+void core1_stream_serve(Core1Stream *stream)
+{
+    if (!core1_stream_step(stream) && stream->wait != NULL &&
+        stream->region.control->sleep_allowed != 0) {
+        stream->wait();
+    }
+}
+
 void core1_source_init(Core1Source *source, StreamRegion region, FlacFileOpener files,
                        FlacDecoder *decoder, uint32_t fill_budget)
 {
     *source = (Core1Source){
         .region = region, .ring_capacity = region.ring_bytes, .fill_budget = fill_budget};
     flac_source_init(&source->flac, files, decoder);
+}
+
+void core1_source_set_wake(Core1Source *source, void (*wake)(void))
+{
+    source->wake = wake;
+}
+
+static void wake_core1(const Core1Source *source)
+{
+    if (source->wake != NULL) {
+        source->wake();
+    }
 }
 
 static void use_ring(Core1Source *source, uint32_t bytes)
@@ -332,6 +357,7 @@ static void stop_streaming(Core1Source *source)
     if (source->streaming) {
         source->region.control->generation = 0;
         source->streaming = false;
+        wake_core1(source);
     }
     flac_source_close(&source->flac);
     if (source->file_open) {
@@ -385,6 +411,7 @@ static bool open_stream(void *context, const char *path, uint32_t start_ms, Audi
     publish();
     control->generation = next_generation(source);
     source->streaming = true;
+    wake_core1(source);
     return true;
 }
 
@@ -412,6 +439,7 @@ void core1_source_fill(Core1Source *source)
         budget -= length;
         publish();
         control->written = source->written;
+        wake_core1(source);
     }
 }
 
@@ -422,6 +450,7 @@ static void drop_stale_slots(Core1Source *source)
         volatile StreamSlot *slot = &control->slots[index];
         if (slot->state == STREAM_SLOT_FULL && slot->generation != source->generation) {
             slot->state = STREAM_SLOT_EMPTY;
+            wake_core1(source);
         }
     }
 }
@@ -430,6 +459,7 @@ static void advance_slot(Core1Source *source)
 {
     source->region.control->slots[source->slot].state = STREAM_SLOT_EMPTY;
     source->slot = (source->slot + 1) % STREAM_SLOTS;
+    wake_core1(source);
 }
 
 static AudioFrameResult next_frame(void *context, AudioFrame *frame)
@@ -543,6 +573,7 @@ static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTr
     publish();
     control->generation = next_generation(source);
     source->streaming = true;
+    wake_core1(source);
     return true;
 }
 
@@ -621,6 +652,7 @@ static bool open_mp4(void *context, const char *path, uint32_t start_ms, AudioTr
     publish();
     control->generation = next_generation(source);
     source->streaming = true;
+    wake_core1(source);
     return true;
 }
 
@@ -680,6 +712,7 @@ static bool open_ogg(void *context, const char *path, uint32_t start_ms, AudioTr
     publish();
     control->generation = next_generation(source);
     source->streaming = true;
+    wake_core1(source);
     return true;
 }
 

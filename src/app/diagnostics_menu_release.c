@@ -6,7 +6,7 @@
 #include "diagnostics_rows.h"
 
 enum {
-    RELEASE_DIAGNOSTICS_COUNT = 15
+    RELEASE_DIAGNOSTICS_COUNT = 17
 };
 
 static MenuItem value_item(StringId label, const char *(*value)(const void *context))
@@ -40,6 +40,9 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
     items[12] = value_item(STR_DIAG_LAST_UPDATE, diagnostics_row_last_update);
     items[13] = value_item(STR_DIAG_LAST_STACK, diagnostics_row_last_stack);
     items[14] = value_item(STR_DIAG_STACK, diagnostics_row_stack);
+    items[15] = value_item(STR_DIAG_POWER, diagnostics_row_power);
+    items[16] =
+        action_item(STR_DIAG_SAVINGS, diagnostics_row_savings_next, diagnostics_row_savings);
     app_screens_build_menu(&screens->diagnostics, i18n_text(STR_DIAG_TITLE), items,
                            RELEASE_DIAGNOSTICS_COUNT, theme);
 }

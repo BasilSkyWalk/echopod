@@ -10,6 +10,7 @@
 #include "gpio.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
+#include "hal/system.h"
 #include "i2c.h"
 #include "registers.h"
 
@@ -110,6 +111,18 @@ static bool muted;
 static uint8_t applied_volume;
 static void (*fade_service)(void);
 static bool fades_off;
+static bool amp_on;
+static bool amp_wanted;
+
+bool dac_path_is_up(void)
+{
+    return dac_up;
+}
+
+bool dac_path_amp_on(void)
+{
+    return amp_on;
+}
 
 HalToneDetail hal_audio_tone_detail(void)
 {
@@ -148,7 +161,19 @@ static void dac_set_pin(void *context, DacPin pin, bool level)
     if (pin == DAC_PIN_MUTE || pin == DAC_PIN_ENABLE_A) {
         level = board_bluetooth_pin(pin == DAC_PIN_MUTE, level);
     }
+    if (pin == DAC_PIN_AMP) {
+        amp_wanted = level;
+        level = level && !(board_bluetooth_routed() && board_saving(HAL_SAVING_AMP_OFF));
+        amp_on = level;
+    }
     gpio_output(DAC_PINS[pin], level);
+}
+
+void dac_path_follow_route(void)
+{
+    if (amp_wanted) {
+        dac_set_pin(NULL, DAC_PIN_AMP, true);
+    }
 }
 
 static void dac_delay(void *context, uint32_t microseconds)

@@ -6,6 +6,22 @@ enum {
 };
 
 static uint32_t clock_mhz = BOOT_CLOCK_MHZ;
+static uint32_t savings = HAL_SAVINGS_DEFAULT;
+
+void hal_system_set_power_savings(uint32_t wanted)
+{
+    savings = wanted;
+}
+
+uint32_t hal_system_power_savings(void)
+{
+    return savings;
+}
+
+HalPowerInfo hal_system_power_info(void)
+{
+    return (HalPowerInfo){.clock_mhz = clock_mhz, .panel_on = true};
+}
 
 const char *hal_system_version(void)
 {

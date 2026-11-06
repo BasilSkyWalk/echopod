@@ -46,6 +46,12 @@ static Core1Stream stream;
 static AudioSource interface;
 static Fixture opened;
 static int close_count;
+static bool core1_sleeps;
+static bool core1_asleep;
+static bool core1_event;
+static int core1_naps;
+static int core1_wakes;
+static int held_rounds;
 
 static Fixture load(const char *name, const char *extension)
 {
@@ -105,6 +111,8 @@ static void close_file(void *context)
 
 static void start_with(uint32_t ring_bytes, bool mp3)
 {
+    core1_sleeps = false;
+    held_rounds = 0;
     memset(&control, 0, sizeof control);
     memset(ring, 0, sizeof ring);
     close_count = 0;
@@ -142,6 +150,48 @@ static void start_aac(uint32_t ring_bytes)
     core1_stream_set_decoder(&stream, STREAM_CODEC_AAC, core1_aac_decoder(&core1_aac, NULL));
 }
 
+static void wait_for_event(void)
+{
+    if (core1_event) {
+        core1_event = false;
+        return;
+    }
+    core1_asleep = true;
+    core1_naps++;
+}
+
+static void send_event(void)
+{
+    core1_wakes++;
+    if (core1_asleep) {
+        core1_asleep = false;
+    } else {
+        core1_event = true;
+    }
+}
+
+static void let_core1_sleep(bool allowed)
+{
+    core1_sleeps = true;
+    core1_asleep = false;
+    core1_event = false;
+    core1_naps = 0;
+    core1_wakes = 0;
+    held_rounds = 4;
+    control.sleep_allowed = allowed ? 1u : 0u;
+    core1_stream_set_wait(&stream, wait_for_event);
+    core1_source_set_wake(&source, send_event);
+}
+
+static void run_core1(void)
+{
+    if (!core1_sleeps) {
+        core1_stream_step(&stream);
+    } else if (!core1_asleep) {
+        core1_stream_serve(&stream);
+    }
+}
+
 static AudioFrameResult next_frame(AudioFrame *frame)
 {
     for (int round = 0; round < MAX_ROUNDS; round++) {
@@ -149,7 +199,7 @@ static AudioFrameResult next_frame(AudioFrame *frame)
         if (result != AUDIO_FRAME_WAIT) {
             return result;
         }
-        core1_stream_step(&stream);
+        run_core1();
     }
     return AUDIO_FRAME_WAIT;
 }
@@ -191,6 +241,9 @@ static bool plays_exactly(const char *name, int channels)
         ok = frame.first_sample == next_sample && frame_matches(&pcm, &frame, channels) &&
              frame.bits == info.stream.bits_per_sample;
         next_sample += frame.samples;
+        for (int round = 0; round < held_rounds; round++) {
+            run_core1();
+        }
         interface.release(interface.context);
     }
     ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples;
@@ -319,6 +372,80 @@ static void core_1_waits_while_its_slots_are_full(void)
     CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
     CHECK_EQUAL(1152u, frame.first_sample);
     interface.close(interface.context);
+}
+
+static void a_sleeping_core_1_is_woken_for_every_change_and_plays_exactly(void)
+{
+    start(SMALL_RING_BYTES);
+    let_core1_sleep(true);
+    CHECK(plays_exactly("lpc_24_96k_stereo", 2));
+    CHECK(core1_naps > 0);
+    CHECK(core1_wakes >= core1_naps);
+    start(BIG_RING_BYTES);
+    let_core1_sleep(true);
+    CHECK(plays_exactly("lpc_16_44k_stereo", 2));
+    CHECK(plays_exactly("fixed_16_mono", 1));
+    CHECK(core1_naps > 0);
+}
+
+static void a_sleeping_core_1_streams_mp3_and_alac_exactly(void)
+{
+    start_with(SMALL_RING_BYTES, true);
+    let_core1_sleep(true);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "mp3/cbr_128_44k_stereo_tagged", 0, &info));
+    AudioFrame frame;
+    uint32_t next_sample = 0;
+    AudioFrameResult result;
+    while ((result = next_frame(&frame)) == AUDIO_FRAME_READY) {
+        CHECK_EQUAL(next_sample, frame.first_sample);
+        next_sample += frame.samples;
+        for (int round = 0; round < held_rounds; round++) {
+            run_core1();
+        }
+        interface.release(interface.context);
+    }
+    CHECK_EQUAL(AUDIO_FRAME_END, result);
+    CHECK_EQUAL(info.stream.total_samples, next_sample);
+    interface.close(interface.context);
+    CHECK(core1_naps > 0);
+    start_mp4(SMALL_RING_BYTES);
+    let_core1_sleep(true);
+    CHECK(plays_exactly("alac/stereo_16_44k", 2));
+}
+
+static void core_1_never_waits_unless_core_0_allows_it(void)
+{
+    start(SMALL_RING_BYTES);
+    let_core1_sleep(false);
+    CHECK(plays_exactly("lpc_24_96k_stereo", 2));
+    CHECK_EQUAL(0, core1_naps);
+    CHECK(core1_wakes > 0);
+}
+
+static void a_sleeping_core_1_wakes_for_a_reopen_and_a_close(void)
+{
+    start(BIG_RING_BYTES);
+    let_core1_sleep(true);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "fixed_16_mono", 0, &info));
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    for (int round = 0; round < 50; round++) {
+        run_core1();
+    }
+    CHECK(core1_asleep);
+    CHECK(interface.open(interface.context, "lpc_16_44k_stereo", 0, &info));
+    CHECK(!core1_asleep);
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    for (int round = 0; round < 50; round++) {
+        run_core1();
+    }
+    CHECK(core1_asleep);
+    interface.close(interface.context);
+    CHECK(!core1_asleep);
+    run_core1();
+    CHECK_EQUAL(0u, control.generation);
 }
 
 static void reopening_part_way_drops_the_old_frames(void)
@@ -765,6 +892,9 @@ static bool aac_plays_closely(const char *name, int channels, uint32_t ring_byte
         ok = ok && frame.first_sample == next_sample && frame.bits == 24 &&
              close_to_reference(&pcm, &frame, channels);
         next_sample += frame.samples;
+        for (int round = 0; round < held_rounds; round++) {
+            run_core1();
+        }
         interface.release(interface.context);
     }
     ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples;
@@ -814,6 +944,10 @@ int main(void)
         TEST_CASE(a_mono_track_plays_its_channel_on_both_sides),
         TEST_CASE(a_ring_smaller_than_the_track_wraps_and_stays_exact),
         TEST_CASE(core_1_waits_while_its_slots_are_full),
+        TEST_CASE(a_sleeping_core_1_is_woken_for_every_change_and_plays_exactly),
+        TEST_CASE(a_sleeping_core_1_streams_mp3_and_alac_exactly),
+        TEST_CASE(core_1_never_waits_unless_core_0_allows_it),
+        TEST_CASE(a_sleeping_core_1_wakes_for_a_reopen_and_a_close),
         TEST_CASE(reopening_part_way_drops_the_old_frames),
         TEST_CASE(closing_idles_core_1_and_closes_the_file),
         TEST_CASE(a_missing_track_does_not_start_core_1),

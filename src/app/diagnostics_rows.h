@@ -17,3 +17,6 @@ const char *diagnostics_row_usb_errors(const void *context);
 const char *diagnostics_row_panel(const void *context);
 ScreenAction diagnostics_row_clock_read(void *context);
 const char *diagnostics_row_clock(const void *context);
+const char *diagnostics_row_power(const void *context);
+ScreenAction diagnostics_row_savings_next(void *context);
+const char *diagnostics_row_savings(const void *context);

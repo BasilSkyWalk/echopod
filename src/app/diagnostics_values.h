@@ -46,3 +46,6 @@ void diagnostics_update_text(HalUpdateRecord update, char *text, size_t capacity
 void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t capacity);
 void diagnostics_core1_text(bool run, HalCore1Test test, char *text, size_t capacity);
 void diagnostics_core1_accel_text(bool run, HalCore1Accel result, char *text, size_t capacity);
+void diagnostics_power_text(HalPowerInfo info, char *text, size_t capacity);
+void diagnostics_savings_text(uint32_t savings, char *text, size_t capacity);
+uint32_t diagnostics_next_savings(uint32_t savings);

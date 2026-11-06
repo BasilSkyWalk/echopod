@@ -517,10 +517,58 @@ static void the_watchdog_test_is_named_in_the_last_step_row(void)
     CHECK(strcmp("In watchdog test at 12 s", text) == 0);
 }
 
+static void the_power_row_shows_the_clock_the_sleep_share_and_what_is_powered(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    HalPowerInfo info = {.clock_mhz = 200,
+                         .sleep_percent = 37,
+                         .core1_load = 45,
+                         .panel_on = true,
+                         .dac_on = true,
+                         .amp_on = false,
+                         .core1_on = true,
+                         .underruns = 3};
+    diagnostics_power_text(info, text, sizeof text);
+    CHECK(text_is("200 MHz s37% c45% PDaC u3", text));
+    diagnostics_power_text((HalPowerInfo){.clock_mhz = 96}, text, sizeof text);
+    CHECK(text_is("96 MHz s0% c0% pdac u0", text));
+}
+
+static void the_savings_row_names_each_preset_and_cycles_through_them(void)
+{
+    char text[DIAGNOSTICS_VALUE_CAPACITY];
+    diagnostics_savings_text(HAL_SAVINGS_DEFAULT, text, sizeof text);
+    CHECK(text_is("All", text));
+    uint32_t next = diagnostics_next_savings(HAL_SAVINGS_DEFAULT);
+    CHECK_EQUAL(HAL_SAVINGS_DEFAULT & ~HAL_SAVING_CORE1_SLEEP, next);
+    diagnostics_savings_text(next, text, sizeof text);
+    CHECK(text_is("No core 1 sleep", text));
+    next = diagnostics_next_savings(next);
+    CHECK_EQUAL(HAL_SAVINGS_DEFAULT & ~HAL_SAVING_SLOW_CLOCK, next);
+    next = diagnostics_next_savings(next);
+    CHECK_EQUAL(HAL_SAVINGS_DEFAULT & ~HAL_SAVING_PAUSE_OFF, next);
+    next = diagnostics_next_savings(next);
+    CHECK_EQUAL(HAL_SAVINGS_DEFAULT & ~HAL_SAVING_PANEL_SLEEP, next);
+    next = diagnostics_next_savings(next);
+    CHECK_EQUAL(0u, next);
+    diagnostics_savings_text(next, text, sizeof text);
+    CHECK(text_is("None", text));
+    next = diagnostics_next_savings(next);
+    CHECK_EQUAL(HAL_SAVINGS_DEFAULT | HAL_SAVING_AMP_OFF, next);
+    diagnostics_savings_text(next, text, sizeof text);
+    CHECK(text_is("All + amp off", text));
+    CHECK_EQUAL(HAL_SAVINGS_DEFAULT, diagnostics_next_savings(next));
+    CHECK_EQUAL(HAL_SAVINGS_DEFAULT, diagnostics_next_savings(0x80));
+    diagnostics_savings_text(0x80, text, sizeof text);
+    CHECK(text_is("80", text));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_watchdog_test_is_named_in_the_last_step_row),
+        TEST_CASE(the_power_row_shows_the_clock_the_sleep_share_and_what_is_powered),
+        TEST_CASE(the_savings_row_names_each_preset_and_cycles_through_them),
         TEST_CASE(an_untried_tone_shows_nothing),
         TEST_CASE(the_loop_row_is_empty_until_run),
         TEST_CASE(the_last_start_row_tells_cold_starts_resets_and_faults_apart),

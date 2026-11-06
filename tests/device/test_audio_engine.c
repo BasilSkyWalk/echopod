@@ -347,6 +347,52 @@ static void seeking_restarts_the_ring_at_the_new_place(void)
     CHECK_EQUAL(5u, audio_engine_status(&engine).token);
 }
 
+static void seeking_after_the_next_track_opened_queues_it_again(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_16_44k_stereo", 4);
+    pump_until_full(0);
+    CHECK(audio_engine_seek(&engine, 20));
+    pump_until_full(0);
+    CHECK_EQUAL(3u, audio_engine_status(&engine).token);
+    audio_engine_pump(&engine, 3001 - 882 + 441);
+    CHECK_EQUAL(4u, audio_engine_status(&engine).token);
+    CHECK_EQUAL(10u, audio_engine_status(&engine).position_ms);
+}
+
+static void a_seek_while_a_new_rate_waits_keeps_the_next_track(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_24_96k_stereo", 4);
+    pump_until_full(0);
+    CHECK(audio_engine_seek(&engine, 0));
+    pump_until_full(0);
+    audio_engine_pump(&engine, 3001);
+    uint32_t rate = 0;
+    CHECK(audio_engine_wants_rate(&engine, &rate));
+    CHECK_EQUAL(96000u, rate);
+}
+
+static void closing_the_source_keeps_the_pause_and_the_position(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 5));
+    pump_until_full(0);
+    audio_engine_pump(&engine, 2205);
+    audio_engine_pause(&engine);
+    audio_engine_close_source(&engine);
+    AudioEngineStatus status = audio_engine_status(&engine);
+    CHECK_EQUAL(AUDIO_ENGINE_PAUSED, status.state);
+    CHECK_EQUAL(50u, status.position_ms);
+    CHECK_EQUAL(5u, status.token);
+    CHECK(audio_engine_seek(&engine, status.position_ms));
+    CHECK_EQUAL(AUDIO_ENGINE_PAUSED, audio_engine_status(&engine).state);
+    pump_until_full(0);
+    CHECK(ring_holds("lpc_16_44k_stereo", 2205, 0, 1000, 16));
+}
+
 static void volume_scales_the_samples(void)
 {
     start_engine();
@@ -570,6 +616,9 @@ int main(void)
         TEST_CASE(a_next_track_at_another_rate_waits_for_the_ring_to_drain),
         TEST_CASE(starting_part_way_skips_to_that_sample),
         TEST_CASE(seeking_restarts_the_ring_at_the_new_place),
+        TEST_CASE(seeking_after_the_next_track_opened_queues_it_again),
+        TEST_CASE(a_seek_while_a_new_rate_waits_keeps_the_next_track),
+        TEST_CASE(closing_the_source_keeps_the_pause_and_the_position),
         TEST_CASE(volume_scales_the_samples),
         TEST_CASE(mono_plays_on_both_channels),
         TEST_CASE(low_rates_play_at_a_rate_they_divide),

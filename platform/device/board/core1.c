@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "board.h"
+#include "core1_region.h"
 #include "device/core1_control.h"
 #include "device/core1_stream.h"
 #include "device/image_crc.h"
@@ -178,6 +179,18 @@ void board_core1_set_equalizer(const EqualizerCurve *curve)
     }
 }
 
+static void share_sleep(void)
+{
+    core1_region().control->sleep_allowed = board_saving(HAL_SAVING_CORE1_SLEEP) ? 1u : 0u;
+}
+
+void board_core1_follow_savings(void)
+{
+    if (streaming) {
+        share_sleep();
+    }
+}
+
 bool board_core1_start_stream(Core1Program program)
 {
     if (streaming && streaming_program == program &&
@@ -202,6 +215,7 @@ bool board_core1_start_stream(Core1Program program)
         register_write(CORE1_SHARED_COMMAND, CORE1_COMMAND_STREAM);
         register_write(CORE1_SHARED_ACCEL_CLASSES, accel_classes);
         share_equalizer(equalizing(program) && divider == 1);
+        share_sleep();
         result = core1_run(&BUS, REPLY_TIMEOUT_MS);
     }
     board_start_record_step_done();
@@ -228,6 +242,11 @@ void board_core1_stop(void)
 bool board_core1_streaming(void)
 {
     return streaming;
+}
+
+uint8_t board_core1_load_percent(void)
+{
+    return streaming ? (uint8_t)core1_region().control->load_percent : 0;
 }
 
 HalCore1Test hal_system_core1_test(void)

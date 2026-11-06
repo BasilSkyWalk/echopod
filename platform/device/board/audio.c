@@ -31,12 +31,19 @@ enum {
     PREFILL_TIMEOUT_MS = 1000,
     FILL_BUDGET_BYTES = 8192,
     IDLE_SHUTDOWN_MS = 3000,
+    PAUSE_REST_MS = 30000,
     AUDIO_CLOCK_MHZ = 200,
+    SLOW_CLOCK_MHZ = 96,
+    SLOW_CLOCK_MAX_RATE = 48000,
+    FLAC_RATE_OFFSET = 18,
+    WAV_FORMAT_OFFSET = 12,
+    WAV_RATE_OFFSET = 24,
     TONE_PERIOD_SAMPLES = 100,
     TONE_AMPLITUDE = 9000,
     MILLISECONDS_PER_SECOND = 1000,
     JACK_POLL_MS = 10,
-    SNIFF_BYTES = 12
+    SNIFF_BYTES = 12,
+    LIGHT_SNIFF_BYTES = 28
 };
 
 typedef enum SourceKind {
@@ -88,6 +95,15 @@ static uint32_t last_jack_poll_ms;
 static HalAudioStats stats;
 static uint32_t read_us_pending;
 static uint32_t output_started_us;
+static uint32_t total_underruns;
+static bool resting;
+static bool slow_allowed;
+static bool deferred;
+static bool queued_light;
+static uint32_t queued_token;
+static char queued_path[AUDIO_ENGINE_PATH_CAPACITY];
+static uint32_t rest_position_ms;
+static uint32_t paused_since_ms;
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
@@ -211,14 +227,14 @@ static AudioSource chosen_source(void)
                        : flac_source_interface(&software_source);
 }
 
-static void remember_path(const char *path)
+static void remember(char *copy, const char *path)
 {
     uint32_t index = 0;
     while (path[index] != '\0' && index + 1 < AUDIO_ENGINE_PATH_CAPACITY) {
-        last_path[index] = path[index];
+        copy[index] = path[index];
         index++;
     }
-    last_path[index] = '\0';
+    copy[index] = '\0';
 }
 
 const char *board_audio_last_path(void)
@@ -229,7 +245,7 @@ const char *board_audio_last_path(void)
 static bool open_chosen(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     (void)context;
-    remember_path(path);
+    remember(last_path, path);
     source_kind = kind_of(path);
     unknown_format = source_kind == SOURCE_UNKNOWN;
     if (unknown_format) {
@@ -274,6 +290,12 @@ static uint32_t *ring(void)
     return music_ring;
 }
 
+static void signal_core1(void)
+{
+    __asm__ volatile("dsb" ::: "memory");
+    __asm__ volatile("sev" ::: "memory");
+}
+
 static void ensure_engine(void)
 {
     if (engine_ready) {
@@ -282,6 +304,7 @@ static void ensure_engine(void)
     FlacFileOpener files = {.open = open_file, .close = close_file, .context = NULL};
     flac_source_init(&software_source, files, &decoding.flac);
     core1_source_init(&core1_source, core1_region(), files, &decoding.flac, FILL_BUDGET_BYTES);
+    core1_source_set_wake(&core1_source, signal_core1);
     wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
     audio_engine_init(
@@ -411,12 +434,88 @@ static void ensure_audio_clock(void)
     }
 }
 
+static uint32_t le32_at(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 | (uint32_t)bytes[2] << 16 |
+           (uint32_t)bytes[3] << 24;
+}
+
+static uint32_t light_rate(HalFile *open)
+{
+    uint8_t bytes[LIGHT_SNIFF_BYTES] = {0};
+    FlacInput input = {.read = read_file, .context = open, .size = open->size};
+    if (open->size < LIGHT_SNIFF_BYTES || !read_file(open, 0, bytes, sizeof bytes)) {
+        return 0;
+    }
+    if (tag_is(bytes, "fLaC")) {
+        const uint8_t *rate = bytes + FLAC_RATE_OFFSET;
+        return (uint32_t)rate[0] << 12 | (uint32_t)rate[1] << 4 | (uint32_t)rate[2] >> 4;
+    }
+    if (tag_is(bytes, "RIFF") && tag_is(bytes + 8, "WAVE") &&
+        tag_is(bytes + WAV_FORMAT_OFFSET, "fmt ")) {
+        return le32_at(bytes + WAV_RATE_OFFSET);
+    }
+    if (mp4_signature(bytes)) {
+        Mp4Track track;
+        return mp4_probe(input, &track) && track.codec == MP4_CODEC_ALAC ? track.sample_rate : 0;
+    }
+    return !ogg_signature(bytes) && mp3_signature(bytes) ? SLOW_CLOCK_MAX_RATE : 0;
+}
+
+static bool light_track(const char *path)
+{
+    HalFile open;
+    if (path == NULL || !hal_file_open(&open, path)) {
+        return false;
+    }
+    uint32_t rate = light_rate(&open);
+    hal_file_close(&open);
+    return rate > 0 && rate <= SLOW_CLOCK_MAX_RATE;
+}
+
+static bool equalizer_on(void)
+{
+    for (int band = 0; band < equalizer_curve.band_count; band++) {
+        if (equalizer_curve.bands[band].gain_db != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static uint32_t clock_for(bool light)
+{
+    bool slow = light && slow_allowed && board_saving(HAL_SAVING_SLOW_CLOCK) && !equalizer_on();
+    return slow ? SLOW_CLOCK_MHZ : AUDIO_CLOCK_MHZ;
+}
+
+static void choose_clock(const char *path)
+{
+    uint32_t mhz = clock_for(light_track(path));
+    if (hal_system_clock_mhz() != mhz) {
+        audio_engine_close_source(&engine);
+        hal_system_set_clock_mhz(mhz);
+    }
+}
+
+static void follow_queue(void)
+{
+    if (!engine_ready || queued_path[0] == '\0') {
+        return;
+    }
+    bool restart = stream_service == NULL && clock_for(queued_light) != hal_system_clock_mhz();
+    audio_engine_queue_next(&engine, restart ? NULL : queued_path, queued_token);
+    deferred = restart;
+}
+
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 {
     ensure_engine();
-    ensure_audio_clock();
+    resting = false;
+    deferred = false;
     stop_tone();
     stop_transfer();
+    choose_clock(path);
     if (!audio_engine_play(&engine, path, start_ms, token)) {
         return false;
     }
@@ -430,7 +529,37 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 void hal_audio_queue_next(const char *path, uint32_t token)
 {
     ensure_engine();
+    deferred = false;
+    queued_path[0] = '\0';
     audio_engine_queue_next(&engine, path, token);
+    if (path == NULL) {
+        return;
+    }
+    queued_light = board_saving(HAL_SAVING_SLOW_CLOCK) && light_track(path);
+    queued_token = token;
+    remember(queued_path, path);
+    follow_queue();
+}
+
+void hal_audio_allow_slow_clock(bool allowed)
+{
+    if (allowed == slow_allowed) {
+        return;
+    }
+    slow_allowed = allowed;
+    if (deferred || (engine_ready && audio_engine_next_pending(&engine))) {
+        follow_queue();
+    }
+}
+
+static void start_deferred(void)
+{
+    if (!deferred || audio_engine_status(&engine).state != AUDIO_ENGINE_STOPPED ||
+        audio_engine_status(&engine).failed) {
+        return;
+    }
+    deferred = false;
+    hal_audio_play(queued_path, 0, queued_token);
 }
 
 void hal_audio_pause(void)
@@ -444,12 +573,37 @@ void hal_audio_pause(void)
         dmac_suspend();
     }
     audio_engine_pause(&engine);
+    paused_since_ms = hal_clock_milliseconds();
+}
+
+static void seek_to(uint32_t position_ms, bool paused, bool choose)
+{
+    ensure_engine();
+    resting = false;
+    stop_transfer();
+    if (choose) {
+        choose_clock(audio_engine_current_path(&engine));
+    }
+    if (!audio_engine_seek(&engine, position_ms) || !start_output(!paused)) {
+        audio_engine_stop(&engine);
+        return;
+    }
+    if (paused) {
+        audio_engine_pause(&engine);
+        dac_path_set_muted(true);
+        dmac_suspend();
+        paused_since_ms = hal_clock_milliseconds();
+    }
 }
 
 void hal_audio_resume(void)
 {
     ensure_engine();
     if (audio_engine_status(&engine).state != AUDIO_ENGINE_PAUSED) {
+        return;
+    }
+    if (resting) {
+        seek_to(rest_position_ms, false, true);
         return;
     }
     if (transferring) {
@@ -459,26 +613,10 @@ void hal_audio_resume(void)
     audio_engine_resume(&engine);
 }
 
-static void seek_to(uint32_t position_ms, bool paused)
-{
-    ensure_engine();
-    ensure_audio_clock();
-    stop_transfer();
-    if (!audio_engine_seek(&engine, position_ms) || !start_output(!paused)) {
-        audio_engine_stop(&engine);
-        return;
-    }
-    if (paused) {
-        audio_engine_pause(&engine);
-        dac_path_set_muted(true);
-        dmac_suspend();
-    }
-}
-
 void hal_audio_seek(uint32_t position_ms)
 {
     ensure_engine();
-    seek_to(position_ms, audio_engine_status(&engine).state == AUDIO_ENGINE_PAUSED);
+    seek_to(position_ms, audio_engine_status(&engine).state == AUDIO_ENGINE_PAUSED, true);
 }
 
 static DacCurve output_curve(void)
@@ -551,8 +689,17 @@ void hal_audio_set_equalizer(const EqualizerCurve *curve)
 {
     equalizer_curve = *curve;
     board_core1_set_equalizer(curve);
-    if (engine_ready) {
-        audio_engine_set_equalizer(&engine, &equalizer_curve);
+    if (!engine_ready) {
+        return;
+    }
+    audio_engine_set_equalizer(&engine, &equalizer_curve);
+    AudioEngineState state = audio_engine_status(&engine).state;
+    if (transferring && state != AUDIO_ENGINE_STOPPED && equalizer_on() &&
+        hal_system_clock_mhz() < AUDIO_CLOCK_MHZ) {
+        seek_to(audio_engine_status(&engine).position_ms, state == AUDIO_ENGINE_PAUSED, true);
+    }
+    if (deferred || audio_engine_next_pending(&engine)) {
+        follow_queue();
     }
 }
 
@@ -630,6 +777,7 @@ HalAudioStatus hal_audio_status(void)
     ensure_engine();
     update_consumed();
     audio_engine_observe(&engine, consumed);
+    start_deferred();
     AudioEngineStatus status = audio_engine_status(&engine);
     return (HalAudioStatus){.state = state_of(status.state),
                             .token = status.token,
@@ -672,6 +820,21 @@ static void shut_down_when_idle(void)
     }
 }
 
+static void rest_when_paused(void)
+{
+    if (!board_saving(HAL_SAVING_PAUSE_OFF) ||
+        audio_engine_status(&engine).state != AUDIO_ENGINE_PAUSED ||
+        hal_clock_milliseconds() - paused_since_ms < PAUSE_REST_MS) {
+        return;
+    }
+    rest_position_ms = audio_engine_status(&engine).position_ms;
+    audio_engine_close_source(&engine);
+    stop_path();
+    board_core1_stop();
+    using_core1 = false;
+    resting = true;
+}
+
 static void poll_jack(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
@@ -689,6 +852,7 @@ void hal_audio_service(void)
     poll_jack();
     if ((transferring || tone_active) && dac_path_take_underrun()) {
         stats.output_underruns++;
+        total_underruns++;
     }
     if (stream_service != NULL) {
         stream_service();
@@ -699,8 +863,10 @@ void hal_audio_service(void)
     }
     update_consumed();
     pump(consumed);
+    start_deferred();
     change_rate();
     shut_down_when_idle();
+    rest_when_paused();
 }
 
 HalAudioStats hal_audio_stats(void)
@@ -795,11 +961,13 @@ void board_audio_after_clock_change(void)
         return;
     }
     resume_after_clock_change = false;
-    seek_to(position_before_clock_change, paused_before_clock_change);
+    seek_to(position_before_clock_change, paused_before_clock_change, false);
 }
 
 void board_audio_shut_down(void)
 {
+    resting = false;
+    deferred = false;
     if (engine_ready) {
         audio_engine_stop(&engine);
     }
@@ -807,6 +975,11 @@ void board_audio_shut_down(void)
     stop_path();
     board_core1_stop();
     using_core1 = false;
+}
+
+uint32_t board_audio_underruns(void)
+{
+    return total_underruns;
 }
 
 uint8_t board_audio_volume_level(void)

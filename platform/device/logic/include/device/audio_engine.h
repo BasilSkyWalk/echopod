@@ -136,6 +136,8 @@ bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms,
 const char *audio_engine_current_path(const AudioEngine *engine);
 void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token);
 bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms);
+void audio_engine_close_source(AudioEngine *engine);
+bool audio_engine_next_pending(const AudioEngine *engine);
 void audio_engine_pause(AudioEngine *engine);
 void audio_engine_resume(AudioEngine *engine);
 void audio_engine_stop(AudioEngine *engine);

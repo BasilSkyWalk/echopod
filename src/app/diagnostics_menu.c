@@ -143,5 +143,8 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
     items[count++] = value_item(STR_DIAG_LAST_UPDATE, diagnostics_row_last_update);
     items[count++] = value_item(STR_DIAG_LAST_STACK, diagnostics_row_last_stack);
     items[count++] = value_item(STR_DIAG_STACK, diagnostics_row_stack);
+    items[count++] = value_item(STR_DIAG_POWER, diagnostics_row_power);
+    items[count++] =
+        action_item(STR_DIAG_SAVINGS, diagnostics_row_savings_next, NULL, diagnostics_row_savings);
     app_screens_build_menu(&screens->diagnostics, i18n_text(STR_DIAG_TITLE), items, count, theme);
 }

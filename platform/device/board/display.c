@@ -5,8 +5,10 @@
 #include "device/backlight.h"
 #include "device/panel.h"
 #include "gpio.h"
+#include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/display.h"
+#include "hal/system.h"
 #include "registers.h"
 
 #define PANEL_DIRECTION_BITS 0x03FF9000u
@@ -30,7 +32,8 @@ enum {
     CLEAR_ROWS = 2,
     PWM_GATE = 0x90,
     PWM_RESET = 0x17,
-    PWM_RESET_MS = 1
+    PWM_RESET_MS = 1,
+    PANEL_SPIN_PER_MHZ = 30000
 };
 
 static const GpioPin BACKLIGHT = {2, 4};
@@ -44,6 +47,8 @@ static bool pwm_running;
 static uint32_t pwm_period;
 static bool ramping;
 static uint32_t ramp_started_ms;
+static bool panel_asleep;
+static uint32_t panel_changed_ms;
 
 static void write_port(uint32_t word)
 {
@@ -215,6 +220,54 @@ bool board_display_lit(void)
     return backlight_on;
 }
 
+bool board_display_awake(void)
+{
+    return !panel_asleep;
+}
+
+static void settle_panel(void)
+{
+    while (hal_clock_milliseconds() - panel_changed_ms < PANEL_SLEEP_SETTLE_MS) {
+        hal_audio_service();
+    }
+}
+
+static void sleep_panel(void)
+{
+    if (panel_asleep || !board_saving(HAL_SAVING_PANEL_SLEEP)) {
+        return;
+    }
+    settle_panel();
+    panel_sleep(&BUS);
+    panel_asleep = true;
+    panel_changed_ms = hal_clock_milliseconds();
+}
+
+static void wake_panel(void)
+{
+    if (!panel_asleep) {
+        return;
+    }
+    settle_panel();
+    panel_wake(&BUS);
+    panel_changed_ms = hal_clock_milliseconds();
+    settle_panel();
+    panel_show(&BUS);
+    panel_asleep = false;
+}
+
+void board_display_wake_now(void)
+{
+    if (panel_asleep) {
+        panel_wake(&BUS);
+        for (volatile uint32_t spin = 0; spin < hal_system_clock_mhz() * PANEL_SPIN_PER_MHZ;
+             spin = spin + 1) {
+        }
+        panel_show(&BUS);
+        panel_asleep = false;
+    }
+}
+
 void board_backlight_full(void)
 {
     ramping = false;
@@ -286,6 +339,7 @@ void hal_display_set_rotation(HalDisplayRotation turned)
 
 void hal_display_write(int x, int y, int width, int height, const uint16_t *pixels)
 {
+    wake_panel();
     panel_begin_write(&BUS, (PanelWindow){x, y, width, height, rotation});
     bus_pixels(NULL, pixels, (uint32_t)(width * height));
 }
@@ -300,10 +354,16 @@ void hal_display_set_power(bool on)
     bool was_on = backlight_on;
     backlight_on = on;
     ramping = false;
+    if (on) {
+        wake_panel();
+    }
     if (on && !was_on) {
         start_fade_in();
     } else {
         apply_backlight();
+    }
+    if (!on) {
+        sleep_panel();
     }
     board_start_record_step_done();
 }

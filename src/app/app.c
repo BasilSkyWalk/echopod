@@ -260,17 +260,13 @@ static void read_input(void)
 
 static void use_screen_key_behaviors(void);
 
-static uint32_t wanted_clock_mhz(void)
-{
-    if (app.display_on || !hal_audio_status().idle) {
-        return SCREEN_ON_CLOCK_MHZ;
-    }
-    return IDLE_CLOCK_MHZ;
-}
-
 static void use_wanted_clock(void)
 {
-    uint32_t wanted = wanted_clock_mhz();
+    hal_audio_allow_slow_clock(!app.display_on);
+    if (!hal_audio_status().idle) {
+        return;
+    }
+    uint32_t wanted = app.display_on ? SCREEN_ON_CLOCK_MHZ : IDLE_CLOCK_MHZ;
     if (hal_system_clock_mhz() != wanted) {
         hal_system_set_clock_mhz(wanted);
     }
@@ -289,7 +285,9 @@ static void set_display(bool on)
     app.display_on = on;
     app.light_after_frame = on;
     app.frame_stable = false;
-    if (!on) {
+    if (on) {
+        frame_diff_forget(&app.frame_diff);
+    } else {
         hal_display_set_power(false);
     }
     use_wanted_clock();

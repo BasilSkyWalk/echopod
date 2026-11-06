@@ -1,5 +1,6 @@
 #include <stdint.h>
 
+#include "core1_ticks.h"
 #include "registers.h"
 
 #define CORE1_STACK_TOP 0x0102E000u
@@ -30,8 +31,15 @@ __attribute__((section(".core1_vectors"), used)) static const Handler CORE1_VECT
     core1_default_handler,
     0,
     core1_default_handler,
-    core1_default_handler,
+    core1_systick,
 };
+
+volatile uint32_t core1_tick_periods;
+
+void core1_systick(void)
+{
+    core1_tick_periods++;
+}
 
 void core1_default_handler(void)
 {

@@ -1,6 +1,7 @@
 #include "hal/bluetooth.h"
 #include "board.h"
 #include "cru.h"
+#include "dac.h"
 #include "device/bt_module.h"
 #include "gpio.h"
 #include "hal/clock.h"
@@ -171,6 +172,7 @@ static void route_to_module(bool to_module)
         rerouted_ms = hal_clock_milliseconds();
     }
     routed = to_module;
+    dac_path_follow_route();
 }
 
 bool board_bluetooth_pin(bool mute_pin, bool level)

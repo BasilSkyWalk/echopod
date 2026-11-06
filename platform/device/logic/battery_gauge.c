@@ -110,24 +110,53 @@ uint8_t battery_gauge_percent(const BatteryGauge *gauge, bool charging)
 
 void battery_display_init(BatteryDisplay *display)
 {
-    *display = (BatteryDisplay){.shown_known = false, .shown = 0};
+    *display = (BatteryDisplay){.shown_known = false};
 }
 
-static uint8_t step_needed(bool rising, bool usb_power)
+static bool waited(const BatteryDisplay *display, uint32_t now_ms, uint32_t wait_ms)
 {
-    return rising == usb_power ? BATTERY_DISPLAY_STEP : BATTERY_DISPLAY_REVERSE_STEP;
+    return now_ms - display->since_ms >= wait_ms;
 }
 
-uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent, bool usb_power)
+uint8_t battery_display_update(BatteryDisplay *display, uint8_t percent, bool usb_power,
+                               uint32_t now_ms)
 {
     if (!display->shown_known) {
-        *display = (BatteryDisplay){.shown_known = true, .shown = percent};
+        *display = (BatteryDisplay){.shown_known = true, .shown = percent, .usb_power = usb_power};
         return percent;
+    }
+    if (usb_power != display->usb_power) {
+        display->usb_power = usb_power;
+        display->holding = true;
+        display->moving = false;
+        display->since_ms = now_ms;
+    }
+    if (display->holding) {
+        if (!waited(display, now_ms, BATTERY_DISPLAY_HOLD_MS)) {
+            return display->shown;
+        }
+        display->holding = false;
     }
     bool rising = percent > display->shown;
     uint8_t difference = rising ? percent - display->shown : display->shown - percent;
-    if (difference >= step_needed(rising, usb_power)) {
-        display->shown = percent;
+    if (rising != usb_power && difference > 0) {
+        if (difference >= BATTERY_DISPLAY_REVERSE_STEP) {
+            display->shown = percent;
+        }
+        display->moving = false;
+        return display->shown;
+    }
+    if (difference == 0) {
+        display->moving = false;
+        return display->shown;
+    }
+    if (!display->moving || display->moving_up != rising) {
+        display->moving = true;
+        display->moving_up = rising;
+        display->since_ms = now_ms;
+    } else if (waited(display, now_ms, BATTERY_DISPLAY_STEP_MS)) {
+        display->shown = rising ? (uint8_t)(display->shown + 1) : (uint8_t)(display->shown - 1);
+        display->since_ms = now_ms;
     }
     return display->shown;
 }
