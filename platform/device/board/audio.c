@@ -88,6 +88,7 @@ static uint32_t last_jack_poll_ms;
 static HalAudioStats stats;
 static uint32_t read_us_pending;
 static uint32_t output_started_us;
+static uint32_t total_underruns;
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
@@ -689,6 +690,7 @@ void hal_audio_service(void)
     poll_jack();
     if ((transferring || tone_active) && dac_path_take_underrun()) {
         stats.output_underruns++;
+        total_underruns++;
     }
     if (stream_service != NULL) {
         stream_service();
@@ -807,6 +809,11 @@ void board_audio_shut_down(void)
     stop_path();
     board_core1_stop();
     using_core1 = false;
+}
+
+uint32_t board_audio_underruns(void)
+{
+    return total_underruns;
 }
 
 uint8_t board_audio_volume_level(void)

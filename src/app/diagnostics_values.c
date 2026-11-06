@@ -454,6 +454,80 @@ void diagnostics_high_ram_text(bool run, HalHighRamTest test, char *text, size_t
     }
 }
 
+static void append_percent(StringBuilder *builder, const char *prefix, uint32_t percent)
+{
+    string_builder_append(builder, prefix);
+    string_builder_append_unsigned(builder, percent);
+    string_builder_append_char(builder, '%');
+}
+
+static void append_flag(StringBuilder *builder, bool on, char letter)
+{
+    string_builder_append_char(builder, on ? letter : (char)(letter - 'A' + 'a'));
+}
+
+void diagnostics_power_text(HalPowerInfo info, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    string_builder_append_unsigned(&builder, info.clock_mhz);
+    string_builder_append(&builder, " MHz");
+    append_percent(&builder, " s", info.sleep_percent);
+    append_percent(&builder, " c", info.core1_load);
+    string_builder_append_char(&builder, ' ');
+    append_flag(&builder, info.panel_on, 'P');
+    append_flag(&builder, info.dac_on, 'D');
+    append_flag(&builder, info.amp_on, 'A');
+    append_flag(&builder, info.core1_on, 'C');
+    string_builder_append(&builder, " u");
+    string_builder_append_unsigned(&builder, info.underruns);
+}
+
+typedef struct SavingsPreset {
+    uint32_t savings;
+    const char *name;
+} SavingsPreset;
+
+static const SavingsPreset SAVINGS_PRESETS[] = {
+    {HAL_SAVINGS_DEFAULT, "All"},
+    {HAL_SAVINGS_DEFAULT & ~HAL_SAVING_CORE1_SLEEP, "No core 1 sleep"},
+    {HAL_SAVINGS_DEFAULT & ~HAL_SAVING_SLOW_CLOCK, "No 96 MHz"},
+    {HAL_SAVINGS_DEFAULT & ~HAL_SAVING_PAUSE_OFF, "No pause stop"},
+    {HAL_SAVINGS_DEFAULT & ~HAL_SAVING_PANEL_SLEEP, "No panel sleep"},
+    {0, "None"},
+    {HAL_SAVINGS_DEFAULT | HAL_SAVING_AMP_OFF, "All + amp off"},
+};
+
+enum {
+    SAVINGS_PRESET_COUNT = sizeof SAVINGS_PRESETS / sizeof SAVINGS_PRESETS[0]
+};
+
+static int savings_preset(uint32_t savings)
+{
+    for (int index = 0; index < SAVINGS_PRESET_COUNT; index++) {
+        if (SAVINGS_PRESETS[index].savings == savings) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+void diagnostics_savings_text(uint32_t savings, char *text, size_t capacity)
+{
+    StringBuilder builder = string_builder_make(text, capacity);
+    int preset = savings_preset(savings);
+    if (preset >= 0) {
+        string_builder_append(&builder, SAVINGS_PRESETS[preset].name);
+        return;
+    }
+    append_hex(&builder, savings, 2);
+}
+
+uint32_t diagnostics_next_savings(uint32_t savings)
+{
+    int preset = savings_preset(savings);
+    return SAVINGS_PRESETS[(preset + 1) % SAVINGS_PRESET_COUNT].savings;
+}
+
 void diagnostics_jack_pin_text(HalJackPin pin, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);

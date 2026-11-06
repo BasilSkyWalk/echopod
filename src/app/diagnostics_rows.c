@@ -110,3 +110,28 @@ const char *diagnostics_row_clock(const void *context)
     diagnostics_time_text(clock_time, clock_text, sizeof clock_text);
     return clock_text;
 }
+
+static char power_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+const char *diagnostics_row_power(const void *context)
+{
+    (void)context;
+    diagnostics_power_text(hal_system_power_info(), power_text, sizeof power_text);
+    return power_text;
+}
+
+static char savings_text[DIAGNOSTICS_VALUE_CAPACITY];
+
+ScreenAction diagnostics_row_savings_next(void *context)
+{
+    (void)context;
+    hal_system_set_power_savings(diagnostics_next_savings(hal_system_power_savings()));
+    return screen_action_none();
+}
+
+const char *diagnostics_row_savings(const void *context)
+{
+    (void)context;
+    diagnostics_savings_text(hal_system_power_savings(), savings_text, sizeof savings_text);
+    return savings_text;
+}

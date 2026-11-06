@@ -137,6 +137,7 @@ void fake_hal_reset(void)
     fake = (FakeHal){0};
     fake.audio.jack = HAL_AUDIO_JACK_SINGLE_ENDED;
     fake.audio.status.idle = true;
+    hal_system_set_power_savings(HAL_SAVINGS_DEFAULT);
 }
 
 void fake_hal_set_version(const char *version)
@@ -193,6 +194,23 @@ const char *hal_system_version(void)
 void fake_hal_refuse_clock_switch(void)
 {
     fake.refuse_clock_switch = true;
+}
+
+static uint32_t savings = HAL_SAVINGS_DEFAULT;
+
+void hal_system_set_power_savings(uint32_t wanted)
+{
+    savings = wanted;
+}
+
+uint32_t hal_system_power_savings(void)
+{
+    return savings;
+}
+
+HalPowerInfo hal_system_power_info(void)
+{
+    return (HalPowerInfo){.clock_mhz = hal_system_clock_mhz()};
 }
 
 uint32_t hal_system_clock_mhz(void)

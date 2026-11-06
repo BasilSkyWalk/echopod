@@ -7,6 +7,31 @@ const char *hal_system_version(void);
 uint32_t hal_system_clock_mhz(void);
 bool hal_system_set_clock_mhz(uint32_t mhz);
 
+enum {
+    HAL_SAVING_CORE1_SLEEP = 1u << 0,
+    HAL_SAVING_SLOW_CLOCK = 1u << 1,
+    HAL_SAVING_PAUSE_OFF = 1u << 2,
+    HAL_SAVING_PANEL_SLEEP = 1u << 3,
+    HAL_SAVING_AMP_OFF = 1u << 4,
+    HAL_SAVINGS_DEFAULT = HAL_SAVING_CORE1_SLEEP | HAL_SAVING_SLOW_CLOCK | HAL_SAVING_PAUSE_OFF |
+        HAL_SAVING_PANEL_SLEEP
+};
+
+typedef struct HalPowerInfo {
+    uint32_t clock_mhz;
+    uint8_t sleep_percent;
+    uint8_t core1_load;
+    bool panel_on;
+    bool dac_on;
+    bool amp_on;
+    bool core1_on;
+    uint32_t underruns;
+} HalPowerInfo;
+
+HalPowerInfo hal_system_power_info(void);
+void hal_system_set_power_savings(uint32_t savings);
+uint32_t hal_system_power_savings(void);
+
 typedef struct HalBootClocks {
     uint32_t mode;
     uint32_t clock_select;

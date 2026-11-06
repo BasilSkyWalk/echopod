@@ -4,6 +4,7 @@
 #include "board.h"
 #include "core/i18n.h"
 #include "device/battery_gauge.h"
+#include "device/sleep_meter.h"
 #include "hal/clock.h"
 #include "hal/power.h"
 #include "hal/system.h"
@@ -41,6 +42,7 @@ static uint32_t ask_started_ms;
 static HalUsbMode usb_mode;
 static bool usb_prompt;
 static bool dac_session;
+static SleepMeter sleep_meter;
 
 void hal_system_set_usb_mode(HalUsbMode mode)
 {
@@ -223,9 +225,17 @@ static void switch_off_when_empty(uint32_t boot_millivolts)
 
 static void sleep_while_idle(void)
 {
+    sleep_meter_advance(&sleep_meter, hal_clock_microseconds());
     if (!board_display_lit() || app_idle()) {
+        uint32_t before_us = hal_clock_microseconds();
         __asm__ volatile("wfi" ::: "memory");
+        sleep_meter_slept(&sleep_meter, hal_clock_microseconds() - before_us);
     }
+}
+
+uint8_t board_sleep_percent(void)
+{
+    return sleep_meter_percent(&sleep_meter);
 }
 
 void board_main(void)
@@ -235,6 +245,7 @@ void board_main(void)
     board_bluetooth_off();
     board_clock_record_boot();
     board_clock_start();
+    sleep_meter_init(&sleep_meter, hal_clock_microseconds());
     board_stall_pause(true);
     hal_system_set_clock_mhz(START_CLOCK_MHZ);
     board_watchdog_start();

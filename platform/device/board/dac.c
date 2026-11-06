@@ -110,6 +110,17 @@ static bool muted;
 static uint8_t applied_volume;
 static void (*fade_service)(void);
 static bool fades_off;
+static bool amp_on;
+
+bool dac_path_is_up(void)
+{
+    return dac_up;
+}
+
+bool dac_path_amp_on(void)
+{
+    return amp_on;
+}
 
 HalToneDetail hal_audio_tone_detail(void)
 {
@@ -147,6 +158,9 @@ static void dac_set_pin(void *context, DacPin pin, bool level)
     (void)context;
     if (pin == DAC_PIN_MUTE || pin == DAC_PIN_ENABLE_A) {
         level = board_bluetooth_pin(pin == DAC_PIN_MUTE, level);
+    }
+    if (pin == DAC_PIN_AMP) {
+        amp_on = level;
     }
     gpio_output(DAC_PINS[pin], level);
 }

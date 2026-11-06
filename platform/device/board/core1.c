@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "board.h"
+#include "core1_region.h"
 #include "device/core1_control.h"
 #include "device/core1_stream.h"
 #include "device/image_crc.h"
@@ -228,6 +229,11 @@ void board_core1_stop(void)
 bool board_core1_streaming(void)
 {
     return streaming;
+}
+
+uint8_t board_core1_load_percent(void)
+{
+    return streaming ? (uint8_t)core1_region().control->load_percent : 0;
 }
 
 HalCore1Test hal_system_core1_test(void)

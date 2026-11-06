@@ -105,6 +105,7 @@ add_library(echo_device_logic STATIC
     pll.c
     start_record.c
     sd_card.c
+    sleep_meter.c
     stall_watch.c
     stream_drift.c
     tick_clock.c

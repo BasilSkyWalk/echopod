@@ -215,6 +215,11 @@ bool board_display_lit(void)
     return backlight_on;
 }
 
+bool board_display_awake(void)
+{
+    return true;
+}
+
 void board_backlight_full(void)
 {
     ramping = false;

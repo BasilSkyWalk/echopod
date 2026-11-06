@@ -2,6 +2,7 @@
 #include "board.h"
 #include "dac.h"
 #include "gpio.h"
+#include "hal/system.h"
 #include "registers.h"
 #include "usb.h"
 
@@ -15,6 +16,34 @@ static const GpioPin CHARGE_STATUS = {2, 3};
 static bool charge_status_ready;
 static HalPowerHold boot_hold;
 static bool usb_start;
+static uint32_t savings_changed;
+
+uint32_t hal_system_power_savings(void)
+{
+    return HAL_SAVINGS_DEFAULT ^ savings_changed;
+}
+
+bool board_saving(uint32_t saving)
+{
+    return (hal_system_power_savings() & saving) != 0;
+}
+
+void hal_system_set_power_savings(uint32_t wanted)
+{
+    savings_changed = wanted ^ HAL_SAVINGS_DEFAULT;
+}
+
+HalPowerInfo hal_system_power_info(void)
+{
+    return (HalPowerInfo){.clock_mhz = hal_system_clock_mhz(),
+                          .sleep_percent = board_sleep_percent(),
+                          .core1_load = board_core1_load_percent(),
+                          .panel_on = board_display_awake(),
+                          .dac_on = dac_path_is_up(),
+                          .amp_on = dac_path_amp_on(),
+                          .core1_on = board_core1_streaming(),
+                          .underruns = board_audio_underruns()};
+}
 
 void board_power_hold(void)
 {
