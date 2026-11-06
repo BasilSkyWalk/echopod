@@ -135,7 +135,7 @@ static void build_music(AppScreens *screens, AppScreensContext context)
     browse_pool_init(&screens->browse, browse);
     CoverFlowConfig cover_flow = {
         .library = &context.store->library,
-        .theme = context.theme,
+        .theme = context.stage_theme != NULL ? context.stage_theme : context.theme,
         .covers = context.covers,
         .favorites = context.favorites,
         .toast = context.toast,

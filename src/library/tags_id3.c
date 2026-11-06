@@ -34,7 +34,8 @@ typedef enum FrameKind {
     FRAME_GENRE,
     FRAME_YEAR,
     FRAME_PICTURE,
-    FRAME_OLD_PICTURE
+    FRAME_OLD_PICTURE,
+    FRAME_USER
 } FrameKind;
 
 typedef struct FrameName {
@@ -50,7 +51,7 @@ static const FrameName FRAMES[] = {
     {"TCON", "TCO", FRAME_GENRE, TAG_GENRE},       {"TDRC", "", FRAME_TEXT, TAG_DATE},
     {"TYER", "TYE", FRAME_YEAR, TAG_DATE},         {"TPOS", "TPA", FRAME_TEXT, TAG_DISC},
     {"TRCK", "TRK", FRAME_TEXT, TAG_TRACK},        {"APIC", "", FRAME_PICTURE, TAG_TITLE},
-    {"", "PIC", FRAME_OLD_PICTURE, TAG_TITLE},
+    {"", "PIC", FRAME_OLD_PICTURE, TAG_TITLE},     {"TXXX", "TXX", FRAME_USER, TAG_ALBUM_VERSION},
 };
 
 typedef struct Id3Tag {
@@ -287,6 +288,23 @@ static void read_text_frame(TagReader *reader, const Frame *frame, const FrameNa
     }
     if (frame->unsync) {
         length = remove_unsync(data, length);
+    }
+    if (name->kind == FRAME_USER) {
+        if (length == 0) {
+            return;
+        }
+        uint32_t width = terminator_width(data[0]);
+        uint32_t end = value_end(data, 1, length, width);
+        char description[TRACK_TAG_TEXT_CAPACITY];
+        decode_value(description, data + 1, end - 1, data[0]);
+        if (end + width > length ||
+            !tag_same_text_folded(description, length_of(description), "albumversion")) {
+            return;
+        }
+        data[end + width - 1] = data[0];
+        for_each_value(reader, name->field, data + end + width - 1, length - (end + width - 1),
+                       offer_value, tag);
+        return;
     }
     ValueSink sink = name->kind == FRAME_GENRE  ? offer_genre
                      : name->kind == FRAME_YEAR ? keep_year
