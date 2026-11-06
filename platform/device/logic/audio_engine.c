@@ -192,11 +192,21 @@ bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms)
     }
     AudioSegment playing = engine->segments[0];
     AudioEngineState state = engine->state;
+    if (engine->segment_count > 1) {
+        audio_engine_queue_next(engine, engine->segments[1].path, engine->segments[1].token);
+    } else if (engine->rate_pending) {
+        engine->has_next = true;
+    }
     bool started = start_track(engine, playing.path, position_ms, playing.token);
     if (started && state == AUDIO_ENGINE_PAUSED) {
         engine->state = AUDIO_ENGINE_PAUSED;
     }
     return started;
+}
+
+void audio_engine_close_source(AudioEngine *engine)
+{
+    close_file(engine);
 }
 
 void audio_engine_pause(AudioEngine *engine)
