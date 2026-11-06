@@ -7,6 +7,3 @@ target_link_libraries(echo_sound
     PUBLIC echo_core echo_dsp
     PRIVATE echo_options echo_compact echo_lto
 )
-if(CMAKE_CROSSCOMPILING)
-    target_compile_options(echo_sound PRIVATE -Oz)
-endif()
