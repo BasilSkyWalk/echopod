@@ -662,6 +662,7 @@ void hal_audio_resume(void)
         return;
     }
     if (resting) {
+        audio_engine_resume(&engine);
         seek_to(rest_position_ms, false, true);
         return;
     }
