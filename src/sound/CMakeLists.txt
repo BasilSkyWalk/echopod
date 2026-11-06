@@ -1,4 +1,4 @@
-add_library(echo_sound STATIC equalizer_file.c equalizer_presets.c)
+add_library(echo_sound STATIC equalizer_file.c equalizer_presets.c equalizer_text.c)
 target_include_directories(echo_sound PUBLIC include)
 if(CMAKE_CROSSCOMPILING)
     target_compile_definitions(echo_sound PRIVATE ECHO_RESIDENT_TABLES)

@@ -535,7 +535,7 @@ static bool light_track(const char *path)
 static bool equalizer_on(void)
 {
     for (int band = 0; band < equalizer_curve.band_count; band++) {
-        if (equalizer_curve.bands[band].gain_db != 0) {
+        if (equalizer_curve.bands[band].gain_tenths != 0) {
             return true;
         }
     }

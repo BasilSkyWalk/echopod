@@ -208,7 +208,7 @@ static void playing_fills_the_ring_with_the_track(void)
 static void use_a_cut_at_one_kilohertz(void)
 {
     EqualizerCurve curve = {.band_count = 1};
-    curve.bands[0] = (EqualizerBand){.frequency_hz = 1000, .gain_db = -6, .q_tenths = 10};
+    curve.bands[0] = (EqualizerBand){.frequency_hz = 1000, .gain_tenths = -60, .q_hundredths = 100};
     audio_engine_set_equalizer(&engine, &curve);
 }
 

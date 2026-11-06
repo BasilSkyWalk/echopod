@@ -18,9 +18,19 @@
 enum {
     TRANSITION_CAPACITY = 16,
     FILE_CAPACITY = 16,
+    DIR_CAPACITY = 12,
     WRITTEN_CAPACITY = 1100,
     PATH_CAPACITY = 260
 };
+
+static void copy_path(char *target, const char *source);
+
+typedef struct FakeDirEntry {
+    char path[PATH_CAPACITY];
+    char name[PATH_CAPACITY];
+    bool directory;
+    bool hidden;
+} FakeDirEntry;
 
 typedef struct FakeAudio {
     HalAudioStatus status;
@@ -50,7 +60,7 @@ typedef struct WrittenFile {
 } WrittenFile;
 
 typedef struct FakeFile {
-    const char *path;
+    char path[PATH_CAPACITY];
     const uint8_t *bytes;
     uint32_t size;
     uint32_t stored;
@@ -102,7 +112,12 @@ typedef struct FakeHal {
     int scratch_borrows;
     bool empty_card;
     int dir_opens;
+    int dir_nexts;
     int presents_at_dir_open;
+    FakeDirEntry dir_entries[DIR_CAPACITY];
+    int dir_count;
+    char dir_path[PATH_CAPACITY];
+    int dir_index;
     int library_writes;
     int covers_writes;
     const char *store_used[STORE_SLOTS];
@@ -232,8 +247,11 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
 
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size)
 {
-    fake.files[fake.file_count++] =
-        (FakeFile){.path = path, .bytes = bytes, .size = size, .stored = size};
+    FakeFile *file = &fake.files[fake.file_count++];
+    copy_path(file->path, path);
+    file->bytes = bytes;
+    file->size = size;
+    file->stored = size;
 }
 
 void fake_hal_set_milliseconds(uint32_t now_ms)
@@ -1019,11 +1037,34 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
 
 bool hal_dir_open(HalDir *dir, const char *path)
 {
-    (void)path;
     fake.dir_opens++;
     fake.presents_at_dir_open = fake.present_count;
-    dir->handle = fake.empty_card ? 0 : -1;
-    return fake.empty_card;
+    copy_path(fake.dir_path, path);
+    fake.dir_index = 0;
+    if (fake.empty_card) {
+        dir->handle = 0;
+        return true;
+    }
+    for (int index = 0; index < fake.dir_count; index++) {
+        if (strcmp(fake.dir_entries[index].path, path) == 0) {
+            dir->handle = 0;
+            return true;
+        }
+    }
+    dir->handle = -1;
+    return false;
+}
+
+void fake_hal_add_directory_entry(const char *path, const char *name, bool directory, bool hidden)
+{
+    if (fake.dir_count == DIR_CAPACITY) {
+        return;
+    }
+    FakeDirEntry *entry = &fake.dir_entries[fake.dir_count++];
+    copy_path(entry->path, path);
+    copy_path(entry->name, name);
+    entry->directory = directory;
+    entry->hidden = hidden;
 }
 
 void fake_hal_set_empty_card(bool empty)
@@ -1034,6 +1075,11 @@ void fake_hal_set_empty_card(bool empty)
 int fake_hal_dir_open_count(void)
 {
     return fake.dir_opens;
+}
+
+int fake_hal_dir_next_count(void)
+{
+    return fake.dir_nexts;
 }
 
 int fake_hal_presents_at_last_dir_open(void)
@@ -1053,8 +1099,21 @@ int fake_hal_library_writes(void)
 
 bool hal_dir_next(HalDir *dir, HalDirEntry *entry)
 {
-    (void)dir;
-    (void)entry;
+    if (dir->handle < 0 || fake.empty_card) {
+        return false;
+    }
+    while (fake.dir_index < fake.dir_count) {
+        FakeDirEntry *source = &fake.dir_entries[fake.dir_index++];
+        if (strcmp(source->path, fake.dir_path) != 0) {
+            continue;
+        }
+        *entry = (HalDirEntry){0};
+        copy_path(entry->name, source->name);
+        entry->directory = source->directory;
+        entry->hidden = source->hidden;
+        fake.dir_nexts++;
+        return true;
+    }
     return false;
 }
 

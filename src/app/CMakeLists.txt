@@ -13,6 +13,7 @@ add_library(echo_app STATIC
     diagnostics_rows.c
     $<IF:$<BOOL:${ECHO_RELEASE}>,diagnostics_menu_release.c,diagnostics_menu.c>
     draw_profile.c
+    equalizer_files.c
     equalizer_store.c
     frame_overlay.c
     home_art.c

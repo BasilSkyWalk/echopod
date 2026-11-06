@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "equalizer_files.h"
 #include "equalizer_store.h"
 #include "ui/list_view.h"
 #include "ui/screen.h"
@@ -10,7 +11,8 @@
 #include "ui/toast.h"
 
 enum {
-    EQUALIZER_TEXT_CAPACITY = 24
+    EQUALIZER_TEXT_CAPACITY = 24,
+    EQUALIZER_NOTICE_CAPACITY = 48
 };
 
 typedef struct EqualizerConfig {
@@ -36,6 +38,9 @@ typedef struct EqualizerScreen {
     ListView list;
     uint32_t now_ms;
     EqualizerEditor editor;
+    EqualizerFileList files;
+    int file_preview;
+    char notice[EQUALIZER_NOTICE_CAPACITY];
 } EqualizerScreen;
 
 Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config);
