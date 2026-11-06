@@ -1,6 +1,8 @@
 #include "card_files.h"
 #include "check.h"
+
 #include "core/hash.h"
+#include "equalizer_store.h"
 #include "fake_hal.h"
 #include "favorites_store.h"
 #include "fixture_library.h"
@@ -9,6 +11,7 @@
 #include "hal/system.h"
 #include "library/cover_build.h"
 #include "settings_store.h"
+#include <string.h>
 
 enum {
     BRIGHT = 9,
@@ -23,6 +26,7 @@ enum {
 static FixtureLibrary fixture;
 static SettingsStore settings;
 static FavoritesStore favorites;
+static EqualizerStore equalizer;
 
 static void without_a_file_the_defaults_are_used(void)
 {
@@ -234,6 +238,38 @@ static void without_a_covers_file_nothing_grows(void)
     CHECK_EQUAL(0, fake_hal_grow_count());
 }
 
+static void a_file_preset_is_loaded_and_applied(void)
+{
+    static const char TEXT[] = "Preamp: -1 dB\n"
+                               "Filter 1: ON PK Fc 1000 Hz Gain 2 dB Q 1.5\n";
+    EqualizerChoice choice = {.preset = EQUALIZER_PRESET_FILE, .preset_name = "test.txt"};
+    uint8_t bytes[EQUALIZER_FILE_SIZE];
+    equalizer_file_encode(&choice, bytes);
+    fake_hal_reset();
+    fake_hal_add_file(EQUALIZER_STORE_PATH, bytes, sizeof bytes);
+    fake_hal_add_file("/EQ/test.txt", (const uint8_t *)TEXT, sizeof TEXT - 1);
+    equalizer_store_load(&equalizer);
+    CHECK(equalizer_store_apply(&equalizer));
+    CHECK_EQUAL(EQUALIZER_PRESET_FILE, equalizer.choice.preset);
+    CHECK_EQUAL(1, fake_hal_equalizer().band_count);
+    CHECK_EQUAL(20, fake_hal_equalizer().bands[0].gain_tenths);
+    CHECK_EQUAL(-10, fake_hal_equalizer().preamp_tenths);
+}
+
+static void a_missing_file_preset_falls_back_to_off(void)
+{
+    EqualizerChoice choice = {.preset = EQUALIZER_PRESET_FILE, .preset_name = "missing.txt"};
+    uint8_t bytes[EQUALIZER_FILE_SIZE];
+    equalizer_file_encode(&choice, bytes);
+    fake_hal_reset();
+    fake_hal_add_file(EQUALIZER_STORE_PATH, bytes, sizeof bytes);
+    equalizer_store_load(&equalizer);
+    CHECK(!equalizer_store_apply(&equalizer));
+    CHECK_EQUAL(EQUALIZER_PRESET_OFF, equalizer.choice.preset);
+    CHECK_EQUAL('\0', equalizer.choice.preset_name[0]);
+    CHECK_EQUAL(0, fake_hal_equalizer().band_count);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -253,6 +289,8 @@ int main(void)
         TEST_CASE(a_covers_file_grows_for_more_albums),
         TEST_CASE(a_card_without_room_to_spare_gets_room_for_just_the_albums),
         TEST_CASE(without_a_covers_file_nothing_grows),
+        TEST_CASE(a_file_preset_is_loaded_and_applied),
+        TEST_CASE(a_missing_file_preset_falls_back_to_off),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

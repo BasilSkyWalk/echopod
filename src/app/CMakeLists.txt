@@ -13,6 +13,7 @@ add_library(echo_app STATIC
     diagnostics_rows.c
     $<IF:$<BOOL:${ECHO_RELEASE}>,diagnostics_menu_release.c,diagnostics_menu.c>
     draw_profile.c
+    equalizer_files.c
     equalizer_store.c
     frame_overlay.c
     home_art.c
@@ -44,3 +45,6 @@ target_link_libraries(echo_app
     PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_settings echo_sound echo_hal
     PRIVATE echo_options echo_compact echo_lto
 )
+if(CMAKE_CROSSCOMPILING)
+    target_compile_options(echo_app PRIVATE -Oz)
+endif()

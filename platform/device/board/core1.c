@@ -142,7 +142,7 @@ static Core1Result place_program(Core1Program program)
 static bool equalizer_moved(void)
 {
     for (int band = 0; band < equalizer_curve.band_count; band++) {
-        if (equalizer_curve.bands[band].gain_db != 0) {
+        if (equalizer_curve.bands[band].gain_tenths != 0) {
             return true;
         }
     }

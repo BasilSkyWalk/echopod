@@ -194,10 +194,23 @@ The translations were not checked by native speakers, and a few long texts may b
 Open it from Settings → Equalizer, or hold ≡ on Now Playing.
 
 - **Presets:** Off, Retro, Bass, Heavy, Pop, Jazz and Unique, the same ones FiiO's firmware has. Moving through the list plays each one, so you can hear them as you go. ↩ or ▶ keeps the one you're on.
+- **Preset files:** Put up to eight Equalizer APO-style `.txt` files in a folder called `EQ` at the top of the card (`/EQ`). Their names appear after Custom in the same list; highlighting one plays it. Supported files contain one `Preamp:` line and up to eight `Filter N: ON PK Fc <Hz> Hz Gain <dB> dB Q <Q>` lines; `OFF` filters are accepted but skipped. Gain is ±12 dB, preamp is −24 to +12 dB, Q is 0.1 to 20, and gain/Q are rounded to 0.1. A filter at or above 0.45 times the sample rate cannot be represented, so the whole preset is bypassed rather than partly applied. Unsupported directives, filter types other than PK, duplicate fields or filters, malformed lines, files over 4 KB, and more than eight filter lines are rejected with a line number. The player uses the smaller of the file's preamp and its automatic preamp, so overlapping boosts can still clip.
+- A minimal `/EQ` file looks like this:
+
+  ```text
+  Preamp: -1.3175 dB
+  Filter 1: ON PK Fc 22 Hz Gain -0.6 dB Q 4.8
+  Filter 2: ON PK Fc 34 Hz Gain -1.7 dB Q 0.1
+  Filter 3: ON PK Fc 430 Hz Gain 1.9 dB Q 0.9
+  Filter 4: ON PK Fc 1700 Hz Gain -1.6 dB Q 1.2
+  Filter 5: ON PK Fc 3000 Hz Gain 1.8 dB Q 3.3
+  ```
+
+  Blank lines, `#` comments, LF or CRLF line endings, and a UTF-8 BOM are accepted. Filter IDs must be unique; IDs need not be consecutive.
 - **Custom:** press ▶ on Custom to open a 7-band equalizer (63 Hz, 160 Hz, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz and 16 kHz). Vol+ and Vol− move between the bands. Press ▶ to grab the highlighted band (its column turns blue); Vol+ and Vol− then raise and lower it by 1 dB (hold to keep going), from −12 to +12 dB. Press ▶ or ↩ to let go and pick another band. Hold ▶ to set a band back to 0 dB, and press ↩ with no band grabbed to leave. Changes play straight away; they reach your ears after a fraction of a second, because the player keeps that much music ready ahead.
 - When a band is boosted, the player lowers the overall level by the largest boost (shown as "Preamp") so loud music doesn't distort. Turn the volume up a little to make up for it.
 
-The player remembers the equalizer you used last, including your Custom bands, in `/.echo/equalizer.bin`. The equalizer also applies to Bluetooth headphones. For FLAC and ALAC the second processor does the equalizing and runs at full speed while the equalizer is on, which costs a little battery; if you switch the equalizer on or off in the middle of a FLAC track, that change of processor happens from the next track. It's off for 176.4 and 192 kHz tracks (the screen says so) and in USB DAC mode.
+The player remembers the equalizer you used last, including your Custom bands and the name of a preset file, in `/.echo/equalizer.bin`. If a remembered preset file is missing, equalizer.bin loads but the player falls back to Off. The equalizer also applies to Bluetooth headphones. For FLAC and ALAC the second processor does the equalizing and runs at full speed while the equalizer is on, which costs a little battery; if you switch the equalizer on or off in the middle of a FLAC track, that change of processor happens from the next track. It's off for 176.4 and 192 kHz tracks (the screen says so) and in USB DAC mode.
 
 ## Charging
 
