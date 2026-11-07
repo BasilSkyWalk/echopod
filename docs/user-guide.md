@@ -260,17 +260,18 @@ Podcasts/
 
 ## Listen history and Last.fm
 
-The player keeps a log of the songs you play in `/.echo/history.bin` on the card (the last 2,000 or so), so you can add them to Last.fm or ListenBrainz from a computer. It's on by default; Settings → Listen history turns it off (the log already on the card stays until you delete it). Audiobooks and podcasts are never logged.
+The player keeps a log of the songs you play in `/.echo/history.bin` on the card (the last 2,000 or so), so you can add them to Last.fm or ListenBrainz from a computer. It's on by default; Settings → Listen history turns it off (the log already on the card stays until you delete it, and no `.scrobbler.log` is written while it's off). Audiobooks and podcasts are never logged.
 
-While the clock is set and has a time zone (a sync sets both; Date & time asks for the zone), each play is dated exactly. Before that the player only writes down the order of the plays and how long each one lasted, and the dates are worked out when you connect it to a computer:
+1. Connect the player to a computer over USB. As it connects, the player adds the songs played since the last time to `.scrobbler.log` at the root of the card, the "Rockbox" or "old iPod" log that scrobbler uploaders read. If there's no log (your uploader deleted it), it makes a new one with only the new plays.
+2. Upload `.scrobbler.log` with a tool that submits Rockbox scrobbler logs to Last.fm or ListenBrainz (for example rb-scrobbler). Such tools usually delete or rename the log after uploading; if a log is already there, the player adds to it.
 
-1. Connect the player over USB (as a drive).
-2. Run `python tools/echo_history.py E:\` with the player's card drive or mount folder. It writes the new plays to `.scrobbler.log` at the root of the card, the "Rockbox" or "old iPod" log that scrobbler uploaders read, and remembers what it exported (`/.echo/history-exported.txt`), so running it again only adds plays since the last time. If you sync with echo-sync, `--history` does this step at the end of a sync.
-3. Upload `.scrobbler.log` with a tool that submits Rockbox scrobbler logs to Last.fm or ListenBrainz (for example rb-scrobbler). Such tools usually delete or rename the log after uploading; if a log is already there, `echo_history.py` adds to it.
-
-- A song counts as listened, as Last.fm defines it, when it's longer than 30 s and you listened to at least half of it or 4 minutes. Pauses and skipped-over parts don't count. Other plays are left out; `--include-skipped` writes them too, marked as skipped (`S`).
+- A song counts as listened (`L`), as Last.fm defines it, when it's longer than 30 s and you listened to at least half of it or 4 minutes. Pauses and skipped-over parts don't count. Like Rockbox, the player also writes the other plays, marked as skipped (`S`); uploaders leave those out.
 - A song you stopped halfway, by connecting USB or turning the player off, and carried on later counts once.
-- Dates: run the tool while the player is still connected. Plays since the player was last switched on get their exact time. For plays before a power-off, the tool doesn't know how long the player was off, so it places them just before the next start: they can show up later in the day than you really played them. `--now <unix time>` sets the reference time if you run the tool later with a card reader.
+- Dates: while the clock is set and has a time zone (a sync sets both; Date & time asks for the zone), each play is dated exactly. Plays from a start before the clock was set are placed just before the next start that had it: the player doesn't know how long it was off in between, so they can show up later than you really played them. Plays the player can't date at all, because the clock has never been set since, stay off the log until it is; `tools/echo_history.py` can write them now (below).
+
+`python tools/echo_history.py E:\` (with the player's card drive or mount folder) does the same on a computer, and is optional. It shares the record of what was exported with the player (`/.echo/history-exported.txt`), so neither adds a play twice; it writes only listened plays unless you add `--include-skipped`. If you sync with echo-sync, `--history` runs it at the end of a sync. Without a set clock it works out the dates when it runs:
+
+- Run the tool while the player is still connected. Plays since the player was last switched on get their exact time. For plays before a power-off, the tool doesn't know how long the player was off, so it places them just before the next start: they can show up later in the day than you really played them. `--now <unix time>` sets the reference time if you run the tool later with a card reader.
 - `--output <file>` writes the log somewhere else, `--all` exports every play on the card again, and `--json` prints the new plays instead of writing anything.
 
 ## Updating EchoPod

@@ -7,12 +7,11 @@
 const char SCROBBLER_LOG_PATH[] = "/.scrobbler.log";
 const char SCROBBLER_MARK_PATH[] = "/.echo/history-exported.txt";
 
-static const char HEADER[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/EchoPod";
+static const char HEADER[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/EchoPod ";
 
 enum {
     LINE_LIMIT = HISTORY_CHECK_AT - HISTORY_TEXT_AT + 40,
     OUT_BYTES = 3 * LINE_LIMIT + 1,
-    VERSION_LIMIT = 32,
     TEXT_COUNT = 3,
     SHORTEST_SCROBBLE_MS = 30000,
     ENOUGH_LISTENING_MS = 240000,
@@ -53,25 +52,11 @@ static bool load(Export *export, uint32_t sequence, uint8_t *slot, HistoryRecord
            listen_history_decode(slot, record) && record->sequence == sequence;
 }
 
-static uint32_t text_end(const uint8_t *slot, uint32_t at)
-{
-    while (at < HISTORY_CHECK_AT && slot[at] != 0) {
-        at++;
-    }
-    return at;
-}
-
-static uint32_t after_text(const uint8_t *slot, uint32_t at)
-{
-    at = text_end(slot, at);
-    return at < HISTORY_CHECK_AT ? at + 1 : at;
-}
-
 static uint32_t texts_end(const uint8_t *slot)
 {
     uint32_t at = HISTORY_TEXT_AT;
-    for (int text = 0; text < TEXT_COUNT; text++) {
-        at = after_text(slot, at);
+    for (int ends = 0; at < HISTORY_CHECK_AT && ends < TEXT_COUNT; at++) {
+        ends += slot[at] == 0;
     }
     return at;
 }
@@ -107,15 +92,12 @@ static void emit(Export *export, const uint8_t *slot, const HistoryRecord *recor
     if (record->sequence < export->first) {
         return;
     }
-    uint32_t at = HISTORY_TEXT_AT;
-    for (int text = 0; text < TEXT_COUNT; text++) {
-        for (uint32_t end = text_end(slot, at); at < end; at++) {
-            char character = (char)slot[at];
-            bool breaks = character == '\t' || character == '\r' || character == '\n';
-            string_builder_append_char(&export->out, breaks ? ' ' : character);
-        }
-        string_builder_append_char(&export->out, '\t');
-        at = after_text(slot, at);
+    for (uint32_t at = HISTORY_TEXT_AT, end = texts_end(slot); at < end; at++) {
+        char character = (char)slot[at];
+        bool breaks = character == '\t' || character == '\r' || character == '\n';
+        string_builder_append_char(&export->out, character == '\0' ? '\t'
+                                                 : breaks          ? ' '
+                                                                   : character);
     }
     if (record->number != 0) {
         string_builder_append_unsigned(&export->out, record->number);
@@ -131,18 +113,8 @@ static void emit(Export *export, const uint8_t *slot, const HistoryRecord *recor
 
 static bool mark_ready(void)
 {
-    HalFile file;
-    HalReserveResult result = hal_file_reserve(SCROBBLER_MARK_PATH, SCROBBLER_MARK_BYTES);
-    if (result == HAL_RESERVE_CREATED) {
-        return true;
-    }
-    if (result != HAL_RESERVE_EXISTS || !hal_file_open(&file, SCROBBLER_MARK_PATH)) {
-        return false;
-    }
-    uint32_t size = file.size;
-    hal_file_close(&file);
-    return size >= SCROBBLER_MARK_BYTES ||
-           hal_file_grow(SCROBBLER_MARK_PATH, SCROBBLER_MARK_BYTES) == HAL_RESERVE_CREATED;
+    return hal_file_grow(SCROBBLER_MARK_PATH, SCROBBLER_MARK_BYTES) <= HAL_RESERVE_CREATED ||
+           hal_file_reserve(SCROBBLER_MARK_PATH, SCROBBLER_MARK_BYTES) == HAL_RESERVE_CREATED;
 }
 
 static HalReserveResult make_room(const Export *export, uint32_t length)
@@ -356,12 +328,7 @@ static void open_log(Export *export, const char *version)
     hal_file_close(&log);
     if (export->log_size == 0) {
         string_builder_append(&export->out, HEADER);
-        if (version[0] != '\0') {
-            string_builder_append_char(&export->out, ' ');
-        }
-        for (int index = 0; index < VERSION_LIMIT && version[index] != '\0'; index++) {
-            string_builder_append_char(&export->out, version[index]);
-        }
+        string_builder_append(&export->out, version);
         string_builder_append_char(&export->out, '\n');
     } else if (last != '\n') {
         string_builder_append_char(&export->out, '\n');
@@ -371,6 +338,7 @@ static void open_log(Export *export, const char *version)
 uint32_t scrobbler_log_write(ListenHistory *history, const char *version)
 {
     Export export;
+    __builtin_memset(&export, 0, sizeof export);
     if (!history->located || history->slots == 0 ||
         !hal_file_open(&export.history, LISTEN_HISTORY_PATH)) {
         return 0;
@@ -382,10 +350,6 @@ uint32_t scrobbler_log_write(ListenHistory *history, const char *version)
     export.first = exported + 1 > export.oldest ? exported + 1 : export.oldest;
     export.processed = export.first - 1;
     export.covered = exported;
-    export.lines = 0;
-    export.buffered = 0;
-    export.mark_made = false;
-    export.failed = false;
     open_log(&export, version);
     run(&export, history->slot);
     hal_file_close(&export.history);

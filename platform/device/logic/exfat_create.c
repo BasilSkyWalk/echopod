@@ -324,23 +324,17 @@ static FatReserveResult extend(FatVolume *volume, FatFile *bitmap, FatFile file,
     uint32_t have = fat_clusters_for(volume, fat_le32(stream + 24));
     uint32_t needed = fat_clusters_for(volume, size) - have;
     file.contiguous = contiguous;
-    if (have == 0 && fat_le32(stream + 20) == 0) {
-        uint32_t first = 0;
-        FatReserveResult found = find_free_run(volume, bitmap, needed, &first);
-        stream[1] |= FLAG_ALLOCATION_POSSIBLE | FLAG_NO_FAT_CHAIN;
-        put32(stream + 20, first);
-        return found != FAT_RESERVE_CREATED                    ? found
-               : mark_allocated(volume, bitmap, first, needed) ? FAT_RESERVE_CREATED
-                                                               : FAT_RESERVE_FAILED;
-    }
-    uint32_t last =
-        contiguous ? file.first_cluster + have - 1 : fat_last_cluster(volume, file, have);
-    if (have == 0 || last < FIRST_CLUSTER) {
+    bool empty = have == 0 && file.first_cluster == 0;
+    uint32_t last = empty        ? 0
+                    : contiguous ? file.first_cluster + have - 1
+                                 : fat_last_cluster(volume, file, have);
+    if (!empty && (have == 0 || last < FIRST_CLUSTER)) {
         return FAT_RESERVE_FAILED;
     }
     if (needed == 0) {
         return FAT_RESERVE_CREATED;
     }
+    contiguous = contiguous && !empty;
     if (contiguous && run_free(volume, bitmap, last + 1, needed)) {
         return mark_allocated(volume, bitmap, last + 1, needed) ? FAT_RESERVE_CREATED
                                                                 : FAT_RESERVE_FAILED;
@@ -349,9 +343,13 @@ static FatReserveResult extend(FatVolume *volume, FatFile *bitmap, FatFile file,
         return FAT_RESERVE_FAILED;
     }
     FatGrowth growth = {bitmap_free, claim_bits, bitmap, last + 1, needed, last};
-    uint32_t final = 0;
-    stream[1] &= (uint8_t)~FLAG_NO_FAT_CHAIN;
-    return fat_grow_chain(volume, &growth, &final);
+    uint32_t ends[2] = {0, 0};
+    stream[1] = (uint8_t)((stream[1] & ~FLAG_NO_FAT_CHAIN) | FLAG_ALLOCATION_POSSIBLE);
+    FatReserveResult result = fat_grow_chain(volume, &growth, ends);
+    if (empty) {
+        put32(stream + 20, ends[0]);
+    }
+    return result;
 }
 
 FatReserveResult exfat_grow_entry(FatVolume *volume, FatFile *parent, uint32_t index, FatFile file,

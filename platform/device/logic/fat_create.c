@@ -634,7 +634,7 @@ static bool add_run(FatVolume *volume, const FatGrowth *growth, uint32_t *last, 
     return added;
 }
 
-FatReserveResult fat_grow_chain(FatVolume *volume, const FatGrowth *growth, uint32_t *final)
+FatReserveResult fat_grow_chain(FatVolume *volume, const FatGrowth *growth, uint32_t *ends)
 {
     uint32_t end = volume->cluster_count + FIRST_CLUSTER;
     uint32_t start =
@@ -670,10 +670,11 @@ FatReserveResult fat_grow_chain(FatVolume *volume, const FatGrowth *growth, uint
         run_count = 1;
     }
     if (!add_run(volume, growth, &last, run_first, run_count) ||
-        !fat_link_cluster(volume, growth->last, head)) {
+        (growth->last != 0 && !fat_link_cluster(volume, growth->last, head))) {
         return FAT_RESERVE_FAILED;
     }
-    *final = last;
+    ends[0] = head;
+    ends[1] = last;
     return FAT_RESERVE_CREATED;
 }
 
@@ -703,29 +704,22 @@ FatReserveResult fat_grow_entry(FatVolume *volume, FatFile *parent, uint32_t ind
     uint32_t have = fat_clusters_for(volume, file.size);
     uint32_t needed = fat_clusters_for(volume, size) - have;
     uint32_t first = file.first_cluster;
-    uint32_t last = have == 0 ? 0 : fat_last_cluster(volume, file, have);
-    if (have == 0 && first == 0) {
-        FatReserveResult result = find_free_run(volume, needed, &first);
-        if (result != FAT_RESERVE_CREATED) {
-            return result;
-        }
-        if (!fat_write_chain(volume, first, needed) || !update_info(volume, first, needed)) {
-            return FAT_RESERVE_FAILED;
-        }
-        needed = 0;
-    } else if (last == 0) {
+    bool empty = have == 0 && first == 0;
+    uint32_t last = empty ? 0 : fat_last_cluster(volume, file, have);
+    if (!empty && last == 0) {
         return FAT_RESERVE_FAILED;
     }
     if (needed > 0) {
         FatGrowth growth = {fat_entry_free,       claim_by_chain, NULL,
                             search_start(volume), needed,         last};
-        uint32_t final = 0;
-        FatReserveResult result = fat_grow_chain(volume, &growth, &final);
+        uint32_t ends[2] = {0, 0};
+        FatReserveResult result = fat_grow_chain(volume, &growth, ends);
         if (result != FAT_RESERVE_CREATED) {
             return result;
         }
-        volume->free_hint = final + 1;
-        if (!update_info(volume, final + 1 - needed, needed)) {
+        first = empty ? ends[0] : first;
+        volume->free_hint = ends[1] + 1;
+        if (!update_info(volume, ends[1] + 1 - needed, needed)) {
             return FAT_RESERVE_FAILED;
         }
     }

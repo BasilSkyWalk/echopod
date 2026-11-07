@@ -40,8 +40,8 @@ static void start_ring(uint32_t slots, uint32_t newest)
     fake_hal_reset();
     fake_hal_set_reserve_result(HAL_RESERVE_CREATED);
     fake_hal_add_file(LISTEN_HISTORY_PATH, ring, slots * HISTORY_SLOT_BYTES);
-    history = (ListenHistory){
-        .located = true, .slots = slots, .sequence = newest + 1, .session = 3};
+    history =
+        (ListenHistory){.located = true, .slots = slots, .sequence = newest + 1, .session = 3};
 }
 
 static void start(void)
