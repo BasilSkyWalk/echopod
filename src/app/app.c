@@ -28,12 +28,14 @@
 #include "hal/input.h"
 #include "hal/language.h"
 #include "hal/power.h"
+#include "hal/system.h"
 #include "library_rescan.h"
 #include "library_store.h"
 #include "listen_history.h"
 #include "music_check.h"
 #include "player.h"
 #include "screens/charge_screen.h"
+#include "scrobbler_log.h"
 #include "settings/rocker.h"
 #include "settings_store.h"
 #include "ui/choice_screen.h"
@@ -990,6 +992,7 @@ void app_release_audio(void)
 {
     if (history_on()) {
         listen_history_note_computer(&app.history, hal_clock_milliseconds());
+        (void)scrobbler_log_write(&app.history, hal_system_version());
     }
     spoken_store_flush(&app.spoken, player_status(&app.player), hal_clock_milliseconds());
     player_release_output(&app.player);

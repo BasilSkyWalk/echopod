@@ -565,6 +565,101 @@ static void a_file_grows_into_scattered_free_clusters_and_a_full_card_refuses(vo
     check_fragmented("exfat_mbr");
 }
 
+static uint32_t le_at(const uint8_t *bytes, int count)
+{
+    uint32_t value = 0;
+    for (int index = count - 1; index >= 0; index--) {
+        value = value << 8 | bytes[index];
+    }
+    return value;
+}
+
+static void set_checksum(uint8_t *set)
+{
+    uint32_t length = (set[1] + 1u) * 32;
+    uint16_t sum = 0;
+    for (uint32_t index = 0; index < length; index++) {
+        if (index != 2 && index != 3) {
+            sum = (uint16_t)(((sum & 1u) ? 0x8000u : 0) + (sum >> 1) + set[index]);
+        }
+    }
+    set[2] = (uint8_t)sum;
+    set[3] = (uint8_t)(sum >> 8);
+}
+
+static bool empty_entry(uint8_t *entry, bool exfat, uint32_t first, uint32_t at)
+{
+    if (exfat && entry[0] == 0xC0 && le_at(entry + 20, 4) == first) {
+        CHECK(at >= 32);
+        entry[1] = 0x01;
+        memset(entry + 8, 0, 8);
+        memset(entry + 20, 0, 12);
+        set_checksum(entry - 32);
+        return true;
+    }
+    if (!exfat && entry[0] != 0 && entry[0] != 0xE5 && entry[11] != 0x0F &&
+        (le_at(entry + 26, 2) | le_at(entry + 20, 2) << 16) == first) {
+        memset(entry + 20, 0, 2);
+        memset(entry + 26, 0, 6);
+        return true;
+    }
+    return false;
+}
+
+static void make_empty(Card *card, const char *folder, const char *path)
+{
+    uint32_t first = first_cluster_of(card, path);
+    FatDirCursor cursor;
+    CHECK(fat_open_directory(&card->volume, folder, &cursor));
+    uint32_t lba = 0;
+    CHECK(fat_file_sector(&card->volume, &cursor.directory, 0, &lba));
+    BlockDevice device = sparse_card_device(&card->sparse);
+    uint8_t sector[SECTOR_SIZE];
+    CHECK(device.read(device.context, lba, 1, sector));
+    bool found = false;
+    for (uint32_t at = 0; at < SECTOR_SIZE; at += 32) {
+        found = empty_entry(sector + at, card->volume.type == FAT_TYPE_EXFAT, first, at) || found;
+    }
+    CHECK(found);
+    CHECK(device.write(device.context, lba, 1, sector));
+    free_cluster(card, first);
+    remount(card);
+}
+
+static void check_empty_grow(const char *name)
+{
+    Card *card = mounted(name);
+    uint32_t cluster = cluster_bytes(card);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/e/empty.txt", 100));
+    make_empty(card, "/e", "/e/empty.txt");
+    FatFile file;
+    CHECK(fat_open(&card->volume, "/e/empty.txt", &file));
+    CHECK_EQUAL(0, file.size);
+    CHECK_EQUAL(0, file.first_cluster);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_grow(&card->volume, "/e/empty.txt", 1000));
+    remount(card);
+    write_pattern(card, "/e/empty.txt", 21, 1000);
+    remount(card);
+    check_pattern_file(card, "/e/empty.txt", 21, 1000);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_grow(&card->volume, "/e/empty.txt", 3 * cluster + 5));
+    remount(card);
+    check_pattern_start(card, "/e/empty.txt", 21, 1000);
+    CHECK(fat_open(&card->volume, "/e/empty.txt", &file));
+    CHECK_EQUAL(3 * cluster + 5, file.size);
+    check_fixture_files(card);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/e/next.bin", cluster));
+    check_cleared_file(card, "/e/next.bin", cluster);
+    check_pattern_start(card, "/e/empty.txt", 21, 1000);
+    sparse_card_free(&card->sparse);
+}
+
+static void an_empty_file_grows_from_nothing(void)
+{
+    check_empty_grow("fat32_mbr");
+    check_empty_grow("fat16_superfloppy");
+    check_empty_grow("exfat_mbr");
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -582,6 +677,7 @@ int main(void)
         TEST_CASE(a_file_grows_past_the_files_after_it_and_keeps_its_data),
         TEST_CASE(an_exfat_file_with_free_clusters_after_it_stays_contiguous),
         TEST_CASE(a_file_grows_into_scattered_free_clusters_and_a_full_card_refuses),
+        TEST_CASE(an_empty_file_grows_from_nothing),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

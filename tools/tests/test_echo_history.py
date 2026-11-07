@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
+SHARED_DIRECTORY = TOOLS_DIRECTORY.parent / "tests" / "fixtures" / "history"
 sys.path.insert(0, str(TOOLS_DIRECTORY))
 
 import echo_history
@@ -25,6 +26,41 @@ def play(sequence, session, start_ms, played_ms, duration_ms=240_000, title="Son
 
 def mark(sequence, session, at_ms):
     return Record(sequence, session, COMPUTER, 0, at_ms, at_ms, 0, 0, 0, 0, 0)
+
+
+def timed(record, boot_ms):
+    record.unix_time = (boot_ms + record.end_ms) // 1000
+    return record
+
+
+SECOND_BOOT_MS = 1_790_000_000_000
+THIRD_BOOT_MS = 1_790_100_000_000
+EXISTING_LOG = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/Other\nA\tB\tC\t\t100\tL\t5"
+
+
+def shared_records():
+    """The ring tests/app/test_scrobbler_log.c reads too (tests/fixtures/history)."""
+    paused = dict(duration_ms=300_000, title="Paused Song", artist="\u00dcn\u00efcode",
+                  album="\u00c1lbum", number=3)
+    long_song = dict(duration_ms=600_000, title="Long Song", artist="Band", album="Epic",
+                     number=7)
+    return [play(1, 1, 10_000, 200_000, duration_ms=312_400, title="Hells Bells",
+                 artist="AC/DC", album="Back In Black", number=1),
+            play(2, 1, 220_000, 20_000, duration_ms=317_000, title="Shoot to Thrill",
+                 artist="AC/DC", album="Back In Black", number=2),
+            play(3, 1, 250_000, 150_000, duration_ms=200_000, title="Tab\tName",
+                 artist="Sigur R\u00f3s", album="", number=0),
+            play(4, 1, 410_000, 100_000, start_at=0, end_at=100_000, **long_song),
+            play(5, 2, 5_000, 150_000, start_at=100_500, end_at=250_500, **long_song),
+            timed(mark(6, 2, 200_000), SECOND_BOOT_MS),
+            timed(play(7, 3, 1_000, 60_000, start_at=0, end_at=60_000, **paused),
+                  THIRD_BOOT_MS),
+            timed(mark(8, 3, 61_500), THIRD_BOOT_MS),
+            timed(play(9, 3, 120_000, 100_000, start_at=62_000, end_at=162_000, **paused),
+                  THIRD_BOOT_MS),
+            timed(play(10, 3, 220_000, 25_000, duration_ms=25_000, title="Intro",
+                       artist="AC/DC", album="Live", number=1), THIRD_BOOT_MS),
+            timed(mark(11, 3, 250_000), THIRD_BOOT_MS)]
 
 
 def ring(records, slots=16):
@@ -171,7 +207,8 @@ class HistoryTest(unittest.TestCase):
             self.make_card(directory, later)
             summary = self.run_tool(root)
             lines = self.log_lines(root)
-            self.assertEqual("4\n", (root / ".echo" / "history-exported.txt").read_text())
+            self.assertEqual(b"0000000004\n",
+                             (root / ".echo" / "history-exported.txt").read_bytes())
         self.assertEqual(5, len(lines))
         self.assertEqual(1, sum(line.startswith("#AUDIOSCROBBLER") for line in lines))
         self.assertIn("\tTwo\t", lines[4])
@@ -209,6 +246,48 @@ class HistoryTest(unittest.TestCase):
         line = echo_history.log_line(echo_history.Play(1, "A\tB", "C", "D\nE", 0, 200, "L", 7,
                                                        200_000))
         self.assertEqual("A B\tC\tD E\t\t200\tL\t7\t\n", line)
+
+    def shared_export(self, directory, marker=None, existing=None):
+        root = self.make_card(directory, shared_records())
+        if marker is not None:
+            (root / ".echo" / "history-exported.txt").write_bytes(marker)
+        if existing is not None:
+            (root / ".scrobbler.log").write_bytes(existing.encode("utf-8"))
+        echo_history.export(root, now_ms=NOW * 1000, include_skipped=True, version="test")
+        return root
+
+    def test_the_shared_fixture_is_the_one_the_player_reads(self):
+        self.assertEqual(ring(shared_records()), (SHARED_DIRECTORY / "history.bin").read_bytes())
+        self.assertEqual(EXISTING_LOG.encode("utf-8"),
+                         (SHARED_DIRECTORY / "existing.log").read_bytes())
+
+    def test_the_player_and_the_tool_write_the_same_log(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.shared_export(directory)
+            written = (root / ".scrobbler.log").read_bytes()
+            marker = (root / ".echo" / "history-exported.txt").read_bytes()
+        self.assertEqual((SHARED_DIRECTORY / "all.log").read_bytes(), written)
+        self.assertEqual(b"0000000011\n", marker)
+
+    def test_a_play_resumed_after_the_last_export_is_dated_from_its_start(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.shared_export(directory, b"0000000008\n", EXISTING_LOG)
+            written = (root / ".scrobbler.log").read_bytes()
+        self.assertEqual((SHARED_DIRECTORY / "appended.log").read_bytes(), written)
+
+    def test_the_marker_the_player_writes_is_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_card(directory, [play(1, 1, 0, 200_000, title="Old"),
+                                              play(2, 1, 300_000, 200_000, title="New")])
+            marker = root / ".echo" / "history-exported.txt"
+            for text in (b"0000000001\n", b"1\r\n", b"0000000001\n\n"):
+                marker.write_bytes(text)
+                (root / ".scrobbler.log").unlink(missing_ok=True)
+                self.run_tool(root)
+                lines = self.log_lines(root)
+                self.assertEqual(4, len(lines))
+                self.assertIn("\tNew\t", lines[3])
+                self.assertEqual(b"0000000002\n", marker.read_bytes())
 
     def test_a_card_without_history_is_reported(self):
         with tempfile.TemporaryDirectory() as directory:

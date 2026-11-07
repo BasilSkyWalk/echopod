@@ -129,7 +129,7 @@ FatReserveResult fat_grow(FatVolume *volume, const char *path, uint32_t size)
         directory = found;
         path = rest;
     }
-    if (found.directory || found.size == 0) {
+    if (found.directory) {
         return FAT_RESERVE_FAILED;
     }
     if (found.size >= size) {

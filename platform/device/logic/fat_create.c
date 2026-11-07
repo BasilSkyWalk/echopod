@@ -37,7 +37,10 @@ enum {
     INFO_STRUCT_OFFSET = 484,
     INFO_FREE_OFFSET = 488,
     INFO_NEXT_OFFSET = 492,
-    READ_AHEAD_SECTORS = 8
+    READ_AHEAD_SECTORS = 8,
+    FIRST_CLUSTER_HIGH = 20,
+    FIRST_CLUSTER_LOW = 26,
+    FILE_SIZE_AT = 28
 };
 
 static const uint8_t LONG_NAME_OFFSETS[CHARACTERS_PER_LONG_ENTRY] = {1,  3,  5,  7,  9,  14, 16,
@@ -631,7 +634,7 @@ static bool add_run(FatVolume *volume, const FatGrowth *growth, uint32_t *last, 
     return added;
 }
 
-FatReserveResult fat_grow_chain(FatVolume *volume, const FatGrowth *growth, uint32_t *final)
+FatReserveResult fat_grow_chain(FatVolume *volume, const FatGrowth *growth, uint32_t *ends)
 {
     uint32_t end = volume->cluster_count + FIRST_CLUSTER;
     uint32_t start =
@@ -667,10 +670,11 @@ FatReserveResult fat_grow_chain(FatVolume *volume, const FatGrowth *growth, uint
         run_count = 1;
     }
     if (!add_run(volume, growth, &last, run_first, run_count) ||
-        !fat_link_cluster(volume, growth->last, head)) {
+        (growth->last != 0 && !fat_link_cluster(volume, growth->last, head))) {
         return FAT_RESERVE_FAILED;
     }
-    *final = last;
+    ends[0] = head;
+    ends[1] = last;
     return FAT_RESERVE_CREATED;
 }
 
@@ -699,27 +703,39 @@ FatReserveResult fat_grow_entry(FatVolume *volume, FatFile *parent, uint32_t ind
 {
     uint32_t have = fat_clusters_for(volume, file.size);
     uint32_t needed = fat_clusters_for(volume, size) - have;
-    uint32_t last = fat_last_cluster(volume, file, have);
-    if (last == 0) {
+    uint32_t first = file.first_cluster;
+    bool empty = have == 0 && first == 0;
+    uint32_t last = empty ? 0 : fat_last_cluster(volume, file, have);
+    if (!empty && last == 0) {
         return FAT_RESERVE_FAILED;
     }
     if (needed > 0) {
         FatGrowth growth = {fat_entry_free,       claim_by_chain, NULL,
                             search_start(volume), needed,         last};
-        uint32_t final = 0;
-        FatReserveResult result = fat_grow_chain(volume, &growth, &final);
+        uint32_t ends[2] = {0, 0};
+        FatReserveResult result = fat_grow_chain(volume, &growth, ends);
         if (result != FAT_RESERVE_CREATED) {
             return result;
         }
-        volume->free_hint = final + 1;
-        if (!update_info(volume, final + 1 - needed, needed)) {
+        first = empty ? ends[0] : first;
+        volume->free_hint = ends[1] + 1;
+        if (!update_info(volume, ends[1] + 1 - needed, needed)) {
             return FAT_RESERVE_FAILED;
         }
     }
-    uint8_t bytes[4];
+    uint8_t bytes[ENTRY_SIZE - FIRST_CLUSTER_HIGH];
     uint32_t lba = 0;
-    uint32_t offset = index * ENTRY_SIZE + 28;
-    put32(bytes, size);
+    uint32_t offset = index * ENTRY_SIZE + FIRST_CLUSTER_HIGH;
+    const uint8_t *entry = fat_read_entry(volume, parent, index);
+    if (entry == NULL) {
+        return FAT_RESERVE_FAILED;
+    }
+    for (uint32_t at = 0; at < sizeof bytes; at++) {
+        bytes[at] = entry[FIRST_CLUSTER_HIGH + at];
+    }
+    put16(bytes, first >> 16);
+    put16(bytes + (FIRST_CLUSTER_LOW - FIRST_CLUSTER_HIGH), first);
+    put32(bytes + (FILE_SIZE_AT - FIRST_CLUSTER_HIGH), size);
     bool written = fat_file_sector(volume, parent, offset / FAT_SECTOR_SIZE, &lba) &&
                    fat_update_bytes(volume, lba, offset % FAT_SECTOR_SIZE, bytes, sizeof bytes);
     return written ? FAT_RESERVE_CREATED : FAT_RESERVE_FAILED;

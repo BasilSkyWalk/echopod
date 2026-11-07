@@ -1,5 +1,9 @@
 """Turns the listen history EchoPod keeps on a card into a .scrobbler.log for Last.fm uploaders.
 
+The player writes /.scrobbler.log itself whenever it connects to a computer, so this tool is
+optional: it dates the plays the player couldn't (its clock wasn't set), writes the log somewhere
+else, or exports everything again.
+
 The player writes /.echo/history.bin, a ring of 512-byte records (see docs/library-format.md).
 A record says when a play started and ended in milliseconds since the player was switched on,
 plus a session number that goes up once per start, and, when the player's clock was set (by
@@ -11,9 +15,9 @@ the tool runs while the player is connected. Within one session the times are ex
 power-off the gap is unknown, so earlier sessions are placed back to back, ending where the next
 one started.
 
-The output is the Rockbox/iPod AudioScrobbler 1.1 log that existing uploaders read. Plays already
-exported are remembered in /.echo/history-exported.txt, so running the tool again only adds new
-ones.
+The output is the Rockbox/iPod AudioScrobbler 1.1 log that existing uploaders read. The player and
+this tool share /.echo/history-exported.txt, the sequence number of the newest record already
+exported (ten digits and a newline), so neither writes a play the other already wrote.
 """
 import argparse
 import json
@@ -248,7 +252,7 @@ def export(card, output=None, now_ms=None, include_skipped=False, everything=Fal
             write_log(Path(output) if output else root / LOG_NAME, chosen,
                       firmware_version() if version is None else version)
         if records:
-            marker.write_text(f"{newest}\n", encoding="ascii")
+            marker.write_bytes(f"{newest:010d}\n".encode("ascii"))
     return Export(chosen, len(fresh) - len([play for play in fresh if play.rating == "L"]),
                   lost)
 

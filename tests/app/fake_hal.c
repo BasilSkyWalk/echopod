@@ -1315,6 +1315,11 @@ HalReserveResult hal_file_grow(const char *path, uint32_t size)
         return HAL_RESERVE_NO_SPACE;
     }
     file->size = size;
+    for (int slot = 0; slot < STORE_SLOTS; slot++) {
+        if (file->bytes == stores[slot]) {
+            file->stored = size < STORE_CAPACITY ? size : STORE_CAPACITY;
+        }
+    }
     return HAL_RESERVE_CREATED;
 }
 
