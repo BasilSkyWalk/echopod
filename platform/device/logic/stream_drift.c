@@ -2,7 +2,7 @@
 
 void stream_drift_init(StreamDrift *drift, StreamDriftLimits limits)
 {
-    *drift = (StreamDrift){.limits = limits, .correction = 0};
+    *drift = (StreamDrift){.limits = limits, .correction = 0, .wait = 0};
 }
 
 static int32_t distance(int32_t value)
@@ -17,6 +17,15 @@ int32_t stream_drift_adjust(StreamDrift *drift, int32_t fill)
         drift->correction = 0;
     } else if (drift->correction == 0 && distance(offset) > drift->limits.window) {
         drift->correction = offset > 0 ? -1 : 1;
+        drift->wait = 0;
     }
+    if (drift->correction == 0) {
+        return 0;
+    }
+    if (drift->wait > 0) {
+        drift->wait--;
+        return 0;
+    }
+    drift->wait = drift->limits.spacing;
     return drift->correction;
 }

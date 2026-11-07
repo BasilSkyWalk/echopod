@@ -24,8 +24,7 @@ enum {
     HZ_PER_KHZ = 1000,
     BITS_PER_BYTE = 8,
     NOTICE_REFRESH_MS = 1000,
-    REPORT_QUEUE_CAPACITY = 8,
-    FRAME_NUMBER_MASK = 0x3FFF
+    REPORT_QUEUE_CAPACITY = 8
 };
 
 static const char TITLE[] = "USB DAC";
@@ -38,30 +37,17 @@ static uint32_t open_rate;
 static uint32_t last_packet_ms;
 static bool receiving;
 static bool playing;
-static bool frame_known;
-static uint16_t last_frame;
-static uint32_t missed_packets;
 static uint32_t notice_refreshed_ms;
 static char shown_text[NOTICE_CAPACITY];
 static uint8_t reports[REPORT_QUEUE_CAPACITY];
 static uint8_t report_start;
 static uint8_t report_count;
 
-static void count_missed_frames(void)
-{
-    uint16_t frame = port.packet_frame;
-    if (frame_known && playing) {
-        missed_packets += (uint16_t)(frame - last_frame - 1) & FRAME_NUMBER_MASK;
-    }
-    frame_known = true;
-    last_frame = frame;
-}
-
 static void receive_stream(const uint8_t *bytes, uint32_t length)
 {
     if (receiving) {
         last_packet_ms = hal_clock_milliseconds();
-        count_missed_frames();
+        usb_audio_sink_count_frame(&sink, port.packet_frame);
         usb_audio_sink_write(&sink, bytes, length, board_audio_stream_consumed());
     }
 }
@@ -102,7 +88,7 @@ static void append_counters(StringBuilder *line)
     char dropped[NUMBER_CAPACITY];
     char repeated[NUMBER_CAPACITY];
     char restarts[NUMBER_CAPACITY];
-    number_text(missed, sizeof missed, missed_packets);
+    number_text(missed, sizeof missed, sink.stats.missed);
     number_text(dropped, sizeof dropped, sink.stats.dropped);
     number_text(repeated, sizeof repeated, sink.stats.repeated);
     number_text(restarts, sizeof restarts, sink.stats.realigned);
@@ -164,7 +150,7 @@ static void show_state(void)
 static void refresh_state(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
-    if (now_ms - notice_refreshed_ms < NOTICE_REFRESH_MS) {
+    if (playing || now_ms - notice_refreshed_ms < NOTICE_REFRESH_MS) {
         return;
     }
     notice_refreshed_ms = now_ms;
@@ -191,7 +177,6 @@ static void stop_output(void)
         board_audio_stream_pause();
         playing = false;
     }
-    frame_known = false;
     usb_audio_sink_start(&sink, audio.rate, usb_audio_sample_bytes(&audio));
 }
 
@@ -307,8 +292,6 @@ static void start_session(void)
     open_rate = 0;
     receiving = false;
     playing = false;
-    frame_known = false;
-    missed_packets = 0;
     report_count = 0;
     port = (UsbPort){.link = shared->link,
                      .bulk_packet = USB_PACKET_SIZE,

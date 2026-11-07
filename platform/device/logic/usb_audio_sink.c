@@ -4,6 +4,7 @@ enum {
     TARGET_DIVISOR = 50,
     WINDOW_DIVISOR = 250,
     SETTLE_DIVISOR = 1000,
+    CORRECTION_SPACING = 7,
     GUARD_DIVISOR = 50,
     WORDS_PER_FRAME = 2,
     WORD_BYTES = 4,
@@ -33,9 +34,10 @@ void usb_audio_sink_start(UsbAudioSink *sink, uint32_t rate, uint8_t sample_byte
     sink->guard = rate / GUARD_DIVISOR;
     sink->sample_bytes = sample_bytes;
     sink->playing = false;
+    sink->frame_known = false;
     sink->gain = 0;
     StreamDriftLimits limits = {(int32_t)sink->target, (int32_t)(rate / WINDOW_DIVISOR),
-                                (int32_t)(rate / SETTLE_DIVISOR)};
+                                (int32_t)(rate / SETTLE_DIVISOR), CORRECTION_SPACING};
     stream_drift_init(&sink->drift, limits);
 }
 
@@ -59,6 +61,16 @@ int32_t usb_audio_sink_gain_for(uint8_t half_decibels)
 void usb_audio_sink_set_attenuation(UsbAudioSink *sink, uint8_t half_decibels)
 {
     sink->gain_target = usb_audio_sink_gain_for(half_decibels);
+}
+
+void usb_audio_sink_count_frame(UsbAudioSink *sink, uint16_t frame)
+{
+    uint16_t step = (uint16_t)(frame - sink->last_frame) & USB_AUDIO_SINK_FRAME_MASK;
+    if (sink->frame_known && sink->playing && step > 1) {
+        sink->stats.missed += (uint32_t)step - 1u;
+    }
+    sink->frame_known = true;
+    sink->last_frame = frame;
 }
 
 bool usb_audio_sink_primed(const UsbAudioSink *sink)
