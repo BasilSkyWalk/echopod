@@ -172,6 +172,7 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
         .bluetooth = &screens->bluetooth,
         .equalizer = &screens->equalizer,
         .date_time = &screens->date_time,
+        .folders = &screens->folders,
         .sleep_option = 0,
     };
     DateTimeConfig date_time = {.clock = context.clock,
@@ -179,6 +180,10 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
                                 .toast = context.toast,
                                 .theme = context.theme};
     date_time_screen_init(&screens->date_time, date_time);
+    FoldersConfig folders = {.toast = context.toast,
+                             .rescan_requested = context.rescan_requested,
+                             .theme = context.theme};
+    folders_screen_init(&screens->folders, folders);
     settings_screens_init(&screens->settings, settings, context.theme);
 }
 

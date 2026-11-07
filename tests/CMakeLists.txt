@@ -69,7 +69,7 @@ echo_add_unit_test(NAME test_equalizer
 echo_add_unit_test(NAME test_equalizer_file SOURCES sound/test_equalizer_file.c LIBRARIES echo_sound)
 echo_add_unit_test(NAME test_equalizer_text SOURCES sound/test_equalizer_text.c LIBRARIES echo_sound)
 
-foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader music_fingerprint)
+foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader music_fingerprint music_folders)
     echo_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES echo_library_fixtures
@@ -239,6 +239,11 @@ echo_add_unit_test(NAME test_clock_store
 )
 echo_add_unit_test(NAME test_date_time_screen
     SOURCES app/test_date_time_screen.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_scan
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+echo_add_unit_test(NAME test_folders_screen
+    SOURCES app/test_folders_screen.c app/fake_hal.c
     LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
@@ -500,6 +505,16 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             -DMUSIC=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music
             -DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music.db
             -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/scan_music.db
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_library_index.cmake
+    )
+    add_test(NAME scan_music_folders_up_to_date
+        COMMAND ${CMAKE_COMMAND}
+            -DPYTHON=${ECHO_TOOLS_PYTHON}
+            -DINDEXER=${PROJECT_SOURCE_DIR}/tools/library_index.py
+            -DMUSIC=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music
+            -DFOLDERS=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music_folders.bin
+            -DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/scan_music_folders.db
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/scan_music_folders.db
             -P ${CMAKE_CURRENT_SOURCE_DIR}/check_library_index.cmake
     )
     add_test(NAME two_drives_up_to_date

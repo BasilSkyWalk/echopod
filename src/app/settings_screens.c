@@ -454,11 +454,18 @@ Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,
                                                          .context = context.date_time,
                                                          .value = date_time_screen_summary,
                                                          .opens = true};
+    screens->items[SETTINGS_FOLDERS_ITEM] =
+        (MenuItem){.label = i18n_text(STR_SETTINGS_MUSIC_FOLDERS),
+                   .select = folders_screen_open,
+                   .context = context.folders,
+                   .value = folders_screen_summary,
+                   .opens = true};
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
         int item = index < SETTINGS_BLUETOOTH_ITEM ? index : index + 1;
         item = item < SETTINGS_EQUALIZER_ITEM ? item : item + 1;
         item = item < SETTINGS_RESCAN_ITEM ? item : item + 1;
+        item = item < SETTINGS_FOLDERS_ITEM ? item : item + 1;
         screens->items[item] = (MenuItem){.label = i18n_text(CHOICES[index].title),
                                           .select = open_choice,
                                           .context = &screens->entries[index],

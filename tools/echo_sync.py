@@ -7,7 +7,6 @@ import struct
 import subprocess
 import sys
 import time
-import unicodedata
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -150,13 +149,23 @@ def fingerprint_counts(name, directory):
         len(folded) > len(suffix) and folded.endswith(suffix) for suffix in COUNTED_SUFFIXES)
 
 
+def left_out(folder, name, excluded):
+    if not excluded:
+        return False
+    if folder == b"/":
+        return library_index.folder_key(name) in excluded
+    return folder == b"/" + INTERNAL_NAME and library_index.folder_key(name, True) in excluded
+
+
 def child_path(folder, name):
     return (b"" if folder == b"/" else folder) + b"/" + name
 
 
-def walk_folder(state, list_folder, folder, entries, depth):
+def walk_folder(state, list_folder, folder, entries, depth, excluded=frozenset()):
     for entry in entries:
         if entry.name.startswith(b".") or not fingerprint_counts(entry.name, entry.directory):
+            continue
+        if entry.directory and left_out(folder, entry.name, excluded):
             continue
         state.mix_entry(folder, entry)
         if not entry.directory:
@@ -165,15 +174,16 @@ def walk_folder(state, list_folder, folder, entries, depth):
         if depth + 1 >= MAX_DEPTH or len(path) + 1 > PATH_CAPACITY:
             return False
         listing = list_folder(entry.location)
-        if listing is not None and not walk_folder(state, list_folder, path, listing, depth + 1):
+        if listing is not None and not walk_folder(state, list_folder, path, listing, depth + 1,
+                                                   excluded):
             return False
     return True
 
 
-def music_fingerprint(list_folder, root_location):
+def music_fingerprint(list_folder, root_location, excluded=frozenset()):
     state = FingerprintHash()
     listing = list_folder(root_location)
-    complete = listing is not None and walk_folder(state, list_folder, b"/", listing, 0)
+    complete = listing is not None and walk_folder(state, list_folder, b"/", listing, 0, excluded)
     return Fingerprint(complete, state.first, state.second, state.entries)
 
 
@@ -191,11 +201,7 @@ def current_offset():
 
 
 def card_name(name, platform=sys.platform):
-    if platform == "win32":
-        return name.encode("utf-8", "surrogatepass")
-    if platform == "darwin":
-        name = unicodedata.normalize("NFC", name)
-    return name.encode("utf-8", "surrogateescape")
+    return library_index.name_bytes(name, platform)
 
 
 def card_stamp(stat, volume):
@@ -245,8 +251,8 @@ def drives_lister(card, volume, internal):
     return list_folder
 
 
-def card_fingerprint(card, volume, internal=None):
-    return music_fingerprint(drives_lister(card, volume, internal), str(card))
+def card_fingerprint(card, volume, internal=None, excluded=frozenset()):
+    return music_fingerprint(drives_lister(card, volume, internal), str(card), excluded)
 
 
 def player_includes_internal(data):
@@ -575,9 +581,9 @@ def internal_root(internal):
     return None if internal is None else internal.root
 
 
-def build_library(card, internal=None):
+def build_library(card, internal=None, excluded=frozenset()):
     step("Reading the music...")
-    tracks, playlists, failures = library_index.scan(card, internal_root(internal))
+    tracks, playlists, failures = library_index.scan(card, internal_root(internal), excluded)
     model = library_index.build_library(tracks, playlists)
     try:
         data = library_index.encode_library(model)
@@ -594,14 +600,14 @@ def build_library(card, internal=None):
     return model, data
 
 
-def album_sources(card, model, library_path, internal=None):
+def album_sources(card, model, library_path, internal=None, excluded=frozenset()):
     if model is not None:
         return cover_export.album_sources(model)
     try:
         return cover_export.album_sources_from_library(library_path.read_bytes())
     except (OSError, ValueError):
         print("(no library on the card yet, reading the music first)")
-        return cover_export.album_sources(build_library(card, internal)[0])
+        return cover_export.album_sources(build_library(card, internal, excluded)[0])
 
 
 def art_describer(volume, internal=None):
@@ -634,9 +640,9 @@ def build_covers(card, sources, volume, options, internal=None):
     return data
 
 
-def take_fingerprint(card, volume, internal=None):
+def take_fingerprint(card, volume, internal=None, excluded=frozenset()):
     try:
-        return card_fingerprint(card, volume, internal)
+        return card_fingerprint(card, volume, internal, excluded)
     except OSError as error:
         print(f"  couldn't read {error.filename}: {error.strerror}")
         return Fingerprint(False, 0, 0, 0)
@@ -657,9 +663,10 @@ def write_or_report(path, data, card_file, options):
     print(f"  {card_file.name:<11} {human_size(len(data))} in a {human_size(size)} file")
 
 
-def record_fingerprint(echo, card, volume, before, options, internal=None):
+def record_fingerprint(echo, card, volume, before, options, internal=None,
+                       excluded=frozenset()):
     step("Checking the music again...")
-    after = take_fingerprint(card, volume, internal)
+    after = take_fingerprint(card, volume, internal, excluded)
     if not (before.complete and after.complete):
         print("incomplete")
         print("  The music couldn't be fingerprinted completely (folders more than 31 levels "
@@ -676,19 +683,19 @@ def record_fingerprint(echo, card, volume, before, options, internal=None):
     return True
 
 
-def sync(card, volume, options, internal=None, internal_missing=False):
+def sync(card, volume, options, internal=None, internal_missing=False, excluded=frozenset()):
     echo = card / ECHO_FOLDER
     library_path = echo / LIBRARY_FILE.name
     before = None
     if options.library and options.fingerprint and not internal_missing:
         step("Fingerprinting the music...")
-        before = take_fingerprint(card, volume, internal)
+        before = take_fingerprint(card, volume, internal, excluded)
         print(f"{before.entries:,} files and folders" if before.complete else "incomplete")
     model, library_data, covers_data = None, None, None
     if options.library:
-        model, library_data = build_library(card, internal)
+        model, library_data = build_library(card, internal, excluded)
     if options.covers:
-        sources = album_sources(card, model, library_path, internal)
+        sources = album_sources(card, model, library_path, internal, excluded)
         covers_data = build_covers(card, sources, volume, options, internal)
     forget = before is not None or (internal_missing and options.library)
     if forget and not options.dry_run:
@@ -699,7 +706,7 @@ def sync(card, volume, options, internal=None, internal_missing=False):
     if covers_data is not None:
         write_or_report(echo / COVERS_FILE.name, covers_data, COVERS_FILE, options)
     recorded = before is not None and record_fingerprint(echo, card, volume, before, options,
-                                                         internal)
+                                                         internal, excluded)
     if options.clock:
         write_clock(echo, options)
     return recorded
@@ -735,11 +742,11 @@ def export_history(card, dry_run):
     print(f"Listen history: {listened} new plays added to {card / echo_history.LOG_NAME}.")
 
 
-def run_check(card, volume, internal=None):
+def run_check(card, volume, internal=None, excluded=frozenset()):
     print(f"Checking {card} ({volume.file_system})")
     if internal is not None:
         print(f"  with the internal storage {internal.root} ({internal.volume.file_system})")
-    computed = take_fingerprint(card, volume, internal)
+    computed = take_fingerprint(card, volume, internal, excluded)
     stored = stored_fingerprint(read_prefix(card / ECHO_FOLDER / SCAN_FILE.name,
                                             SCAN_RECORD.size))
     print(f"  this computer: {describe(computed)}")
@@ -873,15 +880,19 @@ def run(arguments):
         check_target(card, volume, echo.is_dir())
         interactive = arguments.card is None and sys.stdin.isatty()
         internal, internal_missing = internal_drive(arguments, card, echo, interactive)
+        excluded = library_index.read_excluded_folders(echo / library_index.FOLDERS_NAME)
+        if excluded:
+            print(f"Leaving out {plural(len(excluded), 'top-level folder')} (Settings, Music "
+                  "folders on the player).")
         if arguments.check:
-            return run_check(card, volume, internal)
+            return run_check(card, volume, internal, excluded)
         require_dependencies()
         options = options_from(arguments)
         print(f"EchoPod sync: {card} ({volume.file_system})")
         if internal is not None:
             print(f"  and the internal storage {internal.root} ({internal.volume.file_system})")
         ensure_echo_folder(echo, options, arguments.yes)
-        recorded = sync(card, volume, options, internal, internal_missing)
+        recorded = sync(card, volume, options, internal, internal_missing, excluded)
         if arguments.history:
             export_history(card, options.dry_run)
     except SyncError as error:

@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "folders_store.h"
 #include "hal/storage.h"
 #include "hal/system.h"
 
@@ -54,7 +55,9 @@ static void close_dir(void *context, uint32_t level)
 
 MusicFingerprint music_check_fingerprint(void)
 {
-    FingerprintFiles files = {open_dir, next_entry, close_dir, &walk};
+    MusicFolders skip;
+    folders_store_load(&skip);
+    FingerprintFiles files = {open_dir, next_entry, close_dir, &walk, &skip};
     return music_fingerprint(&files, &work);
 }
 

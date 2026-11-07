@@ -189,6 +189,21 @@ Dating the records. The Unix-time field holds the UTC time the record was writte
 
 `/.echo/history-exported.txt` is the sequence number of the newest record already exported, as ten digits and a newline (`0000000042`), shared by the player and `echo_history.py`; both export only records with a higher number, so a log the uploader deleted comes back with just the new plays. Either reads the leading number (older versions of the tool wrote it without the zeros) and treats a number above the ring's newest record (a new history file) as 0. The player only writes it after the lines are on the card; when it can't write them all (the card is full) it marks the last record it did write. Plays in sessions it can't date (no timed record in that session or any later one) are left unmarked for a later connection or the PC tool.
 
+## Music folders file
+
+`/.echo/folders.bin` (reserved at 4 KB by `card_files`; 140 bytes used, little-endian) lists the top-level folders Settings → Music folders leaves out of the library. A missing, zeroed or damaged file leaves nothing out.
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 | `EMMF` |
+| 4 | 1 | version, 1 |
+| 5 | 1 | count, at most 32 |
+| 6 | 2 | reserved, 0 |
+| 8 | 128 | 32 folder keys (`u32`), the first `count` used, the rest 0 |
+| 136 | 4 | FNV-1a of bytes 0–135 |
+
+A folder key is the FNV-1a hash of the folder's library path: its name as the file system lists it (UTF-8, case kept) for a folder in the card's root, `:internal/` followed by the name for a folder in the internal storage's root. Keys name folders rather than positions, so new folders are included and a folder that is gone keeps its choice. Both the player's scan and fingerprint and `library_index.py --folders` / echo-sync skip a top-level folder (never a file, never a deeper folder) whose key is listed; `library_index.encode_excluded_folders` writes the file. `tests/fixtures/scan_music_folders.bin` leaves `Artist B` and `Lists` out of `scan_music`, and `scan_music_folders.db` is the PC indexer's library for it (`scan_music_folders_up_to_date`); `test_library_scan` scans the same folder with the same file and must mean the same.
+
 ## Clock record
 
 `/.echo/clock.bin` (20 bytes, little-endian) is written by echo-sync as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends (see `docs/architecture.md`, Clock). The player never writes it.

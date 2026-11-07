@@ -15,6 +15,7 @@ add_library(echo_app STATIC
     draw_profile.c
     equalizer_files.c
     equalizer_store.c
+    folders_store.c
     frame_overlay.c
     home_art.c
     library_rescan.c
@@ -32,6 +33,7 @@ add_library(echo_app STATIC
     screens/cover_flow_screen.c
     screens/date_time_screen.c
     screens/equalizer_screen.c
+    screens/folders_screen.c
     screens/font_sample_screen.c
     screens/now_playing_screen.c
     screens/up_next_screen.c

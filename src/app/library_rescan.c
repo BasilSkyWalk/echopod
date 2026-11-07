@@ -6,6 +6,7 @@
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
+#include "folders_store.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
 #include "hal/system.h"
@@ -48,6 +49,8 @@ typedef struct RescanFiles {
     HalFile scratch;
     HalDirEntry entry;
     RescanProgress progress;
+    const char *folder;
+    const MusicFolders *skip;
 } RescanFiles;
 
 static bool open_dir(void *context, const char *path)
@@ -56,16 +59,21 @@ static bool open_dir(void *context, const char *path)
     uint32_t since = hal_clock_microseconds();
     bool opened = hal_dir_open(&files->dir, path);
     spend(TIME_LIST, since);
+    files->folder = path;
     return opened;
 }
 
 static bool next_entry(void *context, ScanEntry *entry)
 {
     RescanFiles *files = context;
-    hal_system_keep_alive();
-    uint32_t since = hal_clock_microseconds();
-    bool listed = hal_dir_next(&files->dir, &files->entry);
-    spend(TIME_LIST, since);
+    bool listed = false;
+    do {
+        hal_system_keep_alive();
+        uint32_t since = hal_clock_microseconds();
+        listed = hal_dir_next(&files->dir, &files->entry);
+        spend(TIME_LIST, since);
+    } while (listed && files->entry.directory &&
+             music_folders_skips(files->skip, files->folder, files->entry.name));
     if (!listed) {
         return false;
     }
@@ -260,6 +268,9 @@ RescanOutcome library_rescan_run(RescanProgress progress)
         return outcome;
     }
     files.progress = progress;
+    MusicFolders skip;
+    folders_store_load(&skip);
+    files.skip = &skip;
     uint32_t size = 0;
     void *memory = hal_system_borrow_scratch(&size);
     uint32_t listing_size = 0;

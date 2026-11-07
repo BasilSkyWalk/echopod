@@ -8,6 +8,7 @@
 #include "screens/bluetooth_screen.h"
 #include "screens/date_time_screen.h"
 #include "screens/equalizer_screen.h"
+#include "screens/folders_screen.h"
 #include "settings_store.h"
 #include "ui/choice_screen.h"
 #include "ui/menu_screen.h"
@@ -19,7 +20,8 @@ enum {
     SETTINGS_BLUETOOTH_ITEM = 2,
     SETTINGS_EQUALIZER_ITEM = 3,
     SETTINGS_RESCAN_ITEM = 14,
-    SETTINGS_ITEM_COUNT = SETTINGS_CHOICE_COUNT + 4,
+    SETTINGS_FOLDERS_ITEM = 34,
+    SETTINGS_ITEM_COUNT = SETTINGS_CHOICE_COUNT + 5,
     SETTINGS_DATE_TIME_ITEM = SETTINGS_ITEM_COUNT - 1
 };
 
@@ -32,6 +34,7 @@ typedef struct SettingsContext {
     BluetoothScreen *bluetooth;
     EqualizerScreen *equalizer;
     DateTimeScreen *date_time;
+    FoldersScreen *folders;
     int sleep_option;
 } SettingsContext;
 

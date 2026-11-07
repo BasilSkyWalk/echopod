@@ -2,6 +2,9 @@ set(internal_arguments "")
 if(DEFINED INTERNAL)
     set(internal_arguments --internal ${INTERNAL})
 endif()
+if(DEFINED FOLDERS)
+    list(APPEND internal_arguments --folders ${FOLDERS})
+endif()
 execute_process(
     COMMAND ${PYTHON} ${INDEXER} --music ${MUSIC} ${internal_arguments} --output ${OUTPUT}
     RESULT_VARIABLE indexed

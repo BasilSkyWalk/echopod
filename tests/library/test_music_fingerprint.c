@@ -27,6 +27,9 @@ typedef struct Tree {
     int most_open;
 } Tree;
 
+static const uint32_t INTERNAL_LEFT_OUT_FIRST = 4104151954u;
+static const uint32_t INTERNAL_LEFT_OUT_SECOND = 1967075651u;
+
 static Tree tree;
 static FingerprintWork work;
 static char paths[FINGERPRINT_MAX_DEPTH][FINGERPRINT_PATH_CAPACITY];
@@ -73,7 +76,7 @@ static void close_dir(void *context, uint32_t level)
     state->open_dirs--;
 }
 
-static const FingerprintFiles FILES = {open_dir, next_entry, close_dir, &tree};
+static FingerprintFiles FILES = {open_dir, next_entry, close_dir, &tree, NULL};
 
 static void add(const char *parent, const char *name, bool directory, uint32_t size,
                 uint32_t modified)
@@ -284,6 +287,76 @@ static void a_card_without_a_root_is_not_complete(void)
     CHECK(!fingerprint().complete);
 }
 
+static MusicFolders folders_without(const char *folder, const char *name)
+{
+    MusicFolders folders = {.count = 1};
+    CHECK(music_folders_key(folder, name, &folders.keys[0]));
+    return folders;
+}
+
+static MusicFingerprint fingerprint_without(const MusicFolders *folders)
+{
+    FILES.skip = folders;
+    MusicFingerprint print = fingerprint();
+    FILES.skip = NULL;
+    return print;
+}
+
+static void a_left_out_folder_counts_as_if_it_were_not_there(void)
+{
+    music_card();
+    MusicFingerprint card = fingerprint();
+    add("/", "Spoken", true, 0, 20);
+    add("/Spoken", "Talk.mp3", false, 3000, 21);
+    MusicFingerprint with_spoken = fingerprint();
+    CHECK(!music_fingerprints_match(card, with_spoken));
+    MusicFolders folders = folders_without("/", "Spoken");
+    CHECK(music_fingerprints_match(card, fingerprint_without(&folders)));
+    node_named("Talk.mp3")->size = 4000;
+    add("/Spoken", "More.mp3", false, 3000, 22);
+    CHECK(music_fingerprints_match(card, fingerprint_without(&folders)));
+}
+
+static void leaving_a_folder_out_changes_it(void)
+{
+    music_card();
+    MusicFingerprint all = fingerprint();
+    MusicFolders folders = folders_without("/", "AC DC");
+    MusicFingerprint fewer = fingerprint_without(&folders);
+    CHECK(fewer.complete);
+    CHECK(!music_fingerprints_match(all, fewer));
+    CHECK_EQUAL(1u, fewer.entries);
+    CHECK_EQUAL(1, tree.opens - 3);
+}
+
+static void only_a_top_level_folder_is_left_out(void)
+{
+    music_card();
+    MusicFingerprint all = fingerprint();
+    MusicFolders folders = folders_without("/", "Back In Black");
+    CHECK(music_fingerprints_match(all, fingerprint_without(&folders)));
+}
+
+static void an_internal_storage_folder_is_left_out_by_its_path(void)
+{
+    music_card();
+    add("/", ":internal", true, 0, 0);
+    add("/:internal", "Artist", true, 0, 11);
+    add("/:internal/Artist", "01 - Song.flac", false, 5000000, 12);
+    add("/:internal", "Album", true, 0, 15);
+    add("/:internal/Album", "02 - Other.flac", false, 6000000, 16);
+    MusicFolders card_artist = folders_without("/", "Artist");
+    MusicFingerprint all = fingerprint();
+    CHECK(music_fingerprints_match(all, fingerprint_without(&card_artist)));
+    MusicFolders folders = folders_without("/:internal", "Artist");
+    MusicFingerprint print = fingerprint_without(&folders);
+    CHECK(print.complete);
+    CHECK(!music_fingerprints_match(all, print));
+    CHECK_EQUAL(INTERNAL_LEFT_OUT_FIRST, print.first);
+    CHECK_EQUAL(INTERNAL_LEFT_OUT_SECOND, print.second);
+    CHECK_EQUAL(9u, print.entries);
+}
+
 static void incomplete_fingerprints_never_match(void)
 {
     MusicFingerprint broken = {.complete = false};
@@ -311,6 +384,10 @@ int main(void)
         TEST_CASE(a_card_deeper_than_the_limit_is_incomplete_and_closed),
         TEST_CASE(a_card_without_a_root_is_not_complete),
         TEST_CASE(incomplete_fingerprints_never_match),
+        TEST_CASE(a_left_out_folder_counts_as_if_it_were_not_there),
+        TEST_CASE(leaving_a_folder_out_changes_it),
+        TEST_CASE(only_a_top_level_folder_is_left_out),
+        TEST_CASE(an_internal_storage_folder_is_left_out_by_its_path),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

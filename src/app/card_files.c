@@ -8,6 +8,7 @@
 #include "cover_cache.h"
 #include "equalizer_store.h"
 #include "favorites_store.h"
+#include "folders_store.h"
 #include "hal/storage.h"
 #include "library/cover_build.h"
 #include "library/covers.h"
@@ -42,6 +43,7 @@ static const CardFile CARD_FILES[] = {
     {LIBRARY_SCRATCH_PATH, SCRATCH_FILE_BYTES}, {RESCAN_TIMES_PATH, SMALL_FILE_BYTES},
     {BLUETOOTH_STORE_PATH, SMALL_FILE_BYTES},   {EQUALIZER_STORE_PATH, SMALL_FILE_BYTES},
     {LISTEN_HISTORY_PATH, HISTORY_FILE_BYTES},  {UPDATE_RECORD_PATH, SMALL_FILE_BYTES},
+    {FOLDERS_STORE_PATH, SMALL_FILE_BYTES},
 };
 
 static uint32_t slots_for(uint32_t albums)

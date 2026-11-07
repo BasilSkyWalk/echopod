@@ -165,7 +165,8 @@ MusicFingerprint music_fingerprint(const FingerprintFiles *files, FingerprintWor
             continue;
         }
         const FingerprintEntry *entry = &work->entry;
-        if (entry->name[0] == '.' || !music_fingerprint_counts(entry->name, entry->directory)) {
+        if (entry->name[0] == '.' || !music_fingerprint_counts(entry->name, entry->directory) ||
+            (entry->directory && music_folders_skips(files->skip, work->path, entry->name))) {
             continue;
         }
         mix_entry(&walk, entry);

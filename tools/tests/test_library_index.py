@@ -1,3 +1,5 @@
+import contextlib
+import io
 import struct
 import sys
 import unicodedata
@@ -130,6 +132,79 @@ class InternalStorageTest(unittest.TestCase):
         self.assertEqual(":internal/Band", playlists[0].folder)
         model = library_index.build_library(tracks, playlists)
         self.assertEqual([1], model.playlists[0].tracks)
+
+
+FIXTURES = TOOLS_DIRECTORY.parent / "tests" / "fixtures"
+
+
+class ExcludedFoldersTest(unittest.TestCase):
+    def test_keys_are_the_ones_the_player_uses(self):
+        self.assertEqual(3125253844, library_index.folder_key(b"Rock"))
+        self.assertEqual(910752148, library_index.folder_key(b"Rock", internal=True))
+        self.assertEqual(491043282, library_index.folder_key("Électro".encode()))
+
+    def test_names_are_read_as_the_player_lists_them(self):
+        decomposed = unicodedata.normalize("NFD", "Électro")
+        self.assertEqual("Électro".encode(), library_index.name_bytes(decomposed, "darwin"))
+        self.assertEqual(decomposed.encode(), library_index.name_bytes(decomposed, "win32"))
+
+    def test_the_file_round_trips(self):
+        keys = {library_index.folder_key(b"Rock"), 7}
+        data = library_index.encode_excluded_folders(sorted(keys))
+        self.assertEqual(140, len(data))
+        self.assertEqual(b"EMMF\x01\x02\x00\x00", data[:8])
+        self.assertEqual(keys, library_index.decode_excluded_folders(data))
+
+    def test_a_damaged_or_missing_file_leaves_nothing_out(self):
+        data = bytearray(library_index.encode_excluded_folders([5]))
+        data[9] ^= 1
+        self.assertEqual(frozenset(), library_index.decode_excluded_folders(bytes(data)))
+        self.assertEqual(frozenset(), library_index.decode_excluded_folders(bytes(140)))
+        self.assertEqual(frozenset(), library_index.decode_excluded_folders(b"EMMF"))
+        self.assertEqual(frozenset(),
+                         library_index.read_excluded_folders(Path("no such") / "folders.bin"))
+        with self.assertRaises(ValueError):
+            library_index.encode_excluded_folders(range(33))
+
+    def test_the_fixture_leaves_out_artist_b_and_lists(self):
+        excluded = library_index.read_excluded_folders(FIXTURES / "scan_music_folders.bin")
+        self.assertEqual({library_index.folder_key(b"Artist B"),
+                          library_index.folder_key(b"Lists")}, excluded)
+
+    def test_left_out_folders_are_not_scanned_on_either_drive(self):
+        with tempfile.TemporaryDirectory() as card_directory, \
+                tempfile.TemporaryDirectory() as internal_directory:
+            card, internal = Path(card_directory), Path(internal_directory)
+            for root, relative in ((card, "Rock/01.flac"), (card, "Jazz/01.flac"),
+                                   (card, "Rock.flac"), (internal, "Rock/01.flac"),
+                                   (internal, "Jazz/Deep/01.flac"), (card, "Keep/Rock/01.flac")):
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                write_silent_flac(root / relative, 1)
+            (card / "Jazz" / "Mix.m3u").write_text("01.flac\n", encoding="utf-8")
+            excluded = {library_index.folder_key(b"Jazz"),
+                        library_index.folder_key(b"Rock", internal=True)}
+            tracks, playlists, failures = library_index.scan(card, internal, excluded)
+        self.assertEqual([], failures)
+        self.assertEqual([], playlists)
+        self.assertEqual([":internal/Jazz/Deep/01.flac", "Keep/Rock/01.flac", "Rock/01.flac",
+                          "Rock.flac"], [track.path for track in tracks])
+
+    def test_the_indexer_takes_a_folders_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "library.db"
+            arguments = ["library_index.py", "--music", str(FIXTURES / "scan_music"),
+                         "--folders", str(FIXTURES / "scan_music_folders.bin"),
+                         "--output", str(output)]
+            saved = sys.argv
+            sys.argv = arguments
+            try:
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    library_index.main()
+            finally:
+                sys.argv = saved
+            self.assertEqual((FIXTURES / "scan_music_folders.db").read_bytes(),
+                             output.read_bytes())
 
 
 class BuildLibraryTest(unittest.TestCase):
