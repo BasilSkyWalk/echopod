@@ -4,6 +4,7 @@
 #include "core/resident.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
+#include "hal/storage.h"
 
 enum {
     BRIGHTNESS_LEVEL_COUNT = SETTINGS_BRIGHTNESS_MAX - SETTINGS_BRIGHTNESS_MIN + 1,
@@ -95,7 +96,9 @@ static void save(SettingsContext *context)
 {
     settings_store_capture(context->store, player_status(context->player));
     if (!settings_store_save(context->store)) {
-        toast_show(context->toast, i18n_text(STR_SETTINGS_SAVE_FAILED), hal_clock_milliseconds());
+        StringId text =
+            hal_storage_card_ready() ? STR_SETTINGS_SAVE_FAILED : STR_SETTINGS_SAVE_NEEDS_CARD;
+        toast_show(context->toast, i18n_text(text), hal_clock_milliseconds());
     }
 }
 

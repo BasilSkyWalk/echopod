@@ -239,6 +239,11 @@ void hal_storage_show_internal(bool shown)
     internal_shown = shown;
 }
 
+bool hal_storage_card_ready(void)
+{
+    return mounted(CARD_VOLUME) != NULL;
+}
+
 bool hal_dir_open(HalDir *dir, const char *path)
 {
     dir->handle = -1;
