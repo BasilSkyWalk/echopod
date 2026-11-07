@@ -7,7 +7,6 @@
 #include "ui/navigation.h"
 
 enum {
-    MESSAGE_LINES = 4,
     LINE_CAPACITY = 128,
     LINE_GAP = 2
 };
@@ -60,9 +59,37 @@ static size_t next_line(const Font *font, const char *text, int width, bool last
     return fitted;
 }
 
+static size_t line_length(const char *line)
+{
+    size_t length = 0;
+    while (line[length] != '\0') {
+        length++;
+    }
+    return length;
+}
+
+static void lay_out(MessageLayout *layout, const char *message, const Font *font, int width)
+{
+    if (layout->font == font && layout->width == width) {
+        return;
+    }
+    *layout = (MessageLayout){.font = font, .width = width};
+    char line[LINE_CAPACITY];
+    const char *rest = message;
+    bool fits = text_width(font, rest) <= width;
+    while (*rest != '\0' && layout->count < MESSAGE_SCREEN_LINES) {
+        bool last = fits || layout->count == MESSAGE_SCREEN_LINES - 1;
+        size_t taken = next_line(font, rest, width, last, line);
+        layout->start[layout->count] = (uint16_t)(rest - message);
+        layout->length[layout->count] = (uint16_t)line_length(line);
+        layout->count++;
+        rest += taken;
+    }
+}
+
 static void draw(void *context, Canvas *canvas)
 {
-    const MessageScreen *message = context;
+    MessageScreen *message = context;
     const Theme *theme = message->config.theme;
     Rect content = theme_content_area(theme);
     TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
@@ -70,21 +97,19 @@ static void draw(void *context, Canvas *canvas)
     header_draw(canvas, theme, message->config.title);
     int padding = theme->metrics.padding;
     int width = content.width - 2 * padding;
-    char lines[MESSAGE_LINES][LINE_CAPACITY];
-    int count = 0;
-    const char *rest = message->config.message;
-    bool fits = text_width(style.font, rest) <= width;
-    while (*rest != '\0' && count < MESSAGE_LINES) {
-        rest +=
-            next_line(style.font, rest, width, fits || count == MESSAGE_LINES - 1, lines[count]);
-        count++;
-    }
+    MessageLayout *layout = &message->layout;
+    lay_out(layout, message->config.message, style.font, width);
     int line_height = font_line_height(style.font) + LINE_GAP;
-    int top = content.y + (content.height - count * line_height) / 2;
-    for (int index = 0; index < count; index++) {
+    int top = content.y + (content.height - layout->count * line_height) / 2;
+    for (int index = 0; index < layout->count; index++) {
         Rect row = {content.x + padding, top + index * line_height, width, line_height};
-        Rect area = label_centered_area(style.font, row, lines[index]);
-        label_draw(canvas, style, (Label){.area = area, .text = lines[index]});
+        if (rect_is_empty(rect_intersection(row, canvas->clip))) {
+            continue;
+        }
+        char line[LINE_CAPACITY];
+        copy_span(line, message->config.message + layout->start[index], layout->length[index]);
+        Rect area = label_centered_area(style.font, row, line);
+        label_draw(canvas, style, (Label){.area = area, .text = line});
     }
 }
 
