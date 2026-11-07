@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "library/music_folders.h"
+
 enum {
     FINGERPRINT_NAME_CAPACITY = 768,
     FINGERPRINT_PATH_CAPACITY = 1024,
@@ -21,6 +23,7 @@ typedef struct FingerprintFiles {
     bool (*next_entry)(void *context, uint32_t level, FingerprintEntry *entry);
     void (*close_dir)(void *context, uint32_t level);
     void *context;
+    const MusicFolders *skip;
 } FingerprintFiles;
 
 typedef struct MusicFingerprint {

@@ -6,6 +6,7 @@
 #include "hal/storage.h"
 #include "library/library.h"
 #include "library/library_scan.h"
+#include "library/music_folders.h"
 #include "library_compare.h"
 #include "sim_storage.h"
 
@@ -19,7 +20,10 @@ typedef struct HostFiles {
     HalDir dir;
     HalFile file;
     HalDirEntry entry;
+    const char *folder;
 } HostFiles;
+
+static const MusicFolders *host_skip;
 
 typedef struct Output {
     uint8_t bytes[OUTPUT_CAPACITY];
@@ -29,15 +33,19 @@ typedef struct Output {
 static bool open_dir(void *context, const char *path)
 {
     HostFiles *files = context;
+    files->folder = path;
     return hal_dir_open(&files->dir, path);
 }
 
 static bool next_entry(void *context, ScanEntry *entry)
 {
     HostFiles *files = context;
-    if (!hal_dir_next(&files->dir, &files->entry)) {
-        return false;
-    }
+    do {
+        if (!hal_dir_next(&files->dir, &files->entry)) {
+            return false;
+        }
+    } while (files->entry.directory &&
+             music_folders_skips(host_skip, files->folder, files->entry.name));
     entry->directory = files->entry.directory;
     memcpy(entry->name, files->entry.name, sizeof entry->name);
     return true;
@@ -216,6 +224,34 @@ static void internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer(v
     free(expected);
 }
 
+static MusicFolders fixture_folders(void)
+{
+    uint32_t size = 0;
+    uint8_t *bytes = read_fixture("scan_music_folders.bin", &size);
+    MusicFolders folders = {.count = 0};
+    CHECK(music_folders_decode(bytes, size, &folders));
+    free(bytes);
+    return folders;
+}
+
+static void left_out_folders_match_the_pc_indexer(void)
+{
+    static Output output;
+    Progress progress = {.calls = 0};
+    ScanStats stats;
+    MusicFolders folders = fixture_folders();
+    CHECK_EQUAL(2u, folders.count);
+    host_skip = &folders;
+    ScanResult result = scan_folder(ECHO_FIXTURE_DIR "/scan_music", &output, &progress, &stats);
+    host_skip = NULL;
+    CHECK_EQUAL(SCAN_OK, result);
+    CHECK_EQUAL(3u, stats.tracks);
+    uint32_t expected_size = 0;
+    uint8_t *expected = read_fixture("scan_music_folders.db", &expected_size);
+    CHECK(library_compare(expected, expected_size, output.bytes, stats.length));
+    free(expected);
+}
+
 static void a_separate_listing_leaves_the_memory_to_the_builder(void)
 {
     static uint8_t memory[128 * 1024];
@@ -269,6 +305,7 @@ typedef struct Tree {
     uint32_t listed;
     uint32_t cursor;
     uint32_t opens;
+    const char *refused;
     uint8_t blob[FRAMES * FRAME_BYTES];
 } Tree;
 
@@ -286,6 +323,9 @@ static bool tree_open_dir(void *context, const char *path)
     tree.listed = 0;
     tree.cursor = 0;
     tree.opens++;
+    if (tree.refused != NULL && strcmp(path, tree.refused) == 0) {
+        return false;
+    }
     for (uint32_t index = 0; index < tree.count; index++) {
         const char *file = tree.paths[index];
         if (strncmp(file, path, prefix) != 0) {
@@ -353,6 +393,7 @@ static void start_tree(void)
 {
     tree.count = 0;
     tree.opens = 0;
+    tree.refused = NULL;
     memset(tree.blob, 0, sizeof tree.blob);
     for (uint32_t frame = 0; frame < FRAMES; frame++) {
         uint8_t *header = tree.blob + frame * FRAME_BYTES;
@@ -474,6 +515,19 @@ static void a_big_folder_nested_in_big_folders_is_read_in_batches(void)
     CHECK(library_holds_every_path(&output));
 }
 
+static void a_folder_that_cannot_be_opened_leaves_the_next_ones_scanned(void)
+{
+    static Output output;
+    start_tree();
+    tree_add("/A Locked/01 - One.mp3");
+    tree_add("/B Open/01 - Two.mp3");
+    tree_add("/C Open/Inner/01 - Three.mp3");
+    tree.refused = "/A Locked/";
+    ScanStats stats;
+    CHECK_EQUAL(SCAN_OK, scan_tree(96 * 1024, &output, &stats));
+    CHECK_EQUAL(2u, stats.tracks);
+}
+
 static void batches_build_the_same_library_as_one_whole_read(void)
 {
     static Output whole;
@@ -498,6 +552,8 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(scanning_the_tag_fixtures_matches_the_pc_indexer),
         TEST_CASE(scanning_folders_and_playlists_matches_the_pc_indexer),
+        TEST_CASE(left_out_folders_match_the_pc_indexer),
+        TEST_CASE(a_folder_that_cannot_be_opened_leaves_the_next_ones_scanned),
         TEST_CASE(a_missing_music_root_says_so),
         TEST_CASE(internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer),
         TEST_CASE(a_separate_listing_leaves_the_memory_to_the_builder),

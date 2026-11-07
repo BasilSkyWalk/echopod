@@ -8,6 +8,7 @@
 #include "default_theme.h"
 #include "fake_hal.h"
 #include "fixture_library.h"
+#include "folders_store.h"
 #include "frame_overlay.h"
 #include "gfx/text.h"
 #include "hal/display.h"
@@ -16,6 +17,7 @@
 #include "library/covers.h"
 #include "library_rescan.h"
 #include "listen_history.h"
+#include "music_check.h"
 #include "scrobbler_log.h"
 #include "settings/rocker.h"
 #include "settings/settings.h"
@@ -51,9 +53,10 @@ enum {
     SETTINGS_LYRICS_INDEX = 31,
     SETTINGS_FOLDER_VIEW_INDEX = 32,
     SETTINGS_INTERNAL_STORAGE_INDEX = 33,
-    SETTINGS_CLOCK_INDEX = 34,
-    SETTINGS_STATUS_BAR_INDEX = 35,
-    SETTINGS_POWER_ON_INDEX = 36,
+    SETTINGS_FOLDERS_INDEX = 34,
+    SETTINGS_CLOCK_INDEX = 35,
+    SETTINGS_STATUS_BAR_INDEX = 36,
+    SETTINGS_POWER_ON_INDEX = 37,
     SETTINGS_SWAP_INDEX = 20,
     SETTINGS_USB_PROMPT_INDEX = 27,
     DAC_VOLUME_WINDOW_MS = 3000,
@@ -1186,6 +1189,39 @@ static void turning_internal_storage_on_lists_it_and_rescans(void)
     CHECK(fake_hal_internal_shown());
 }
 
+static void music_folders_leaves_an_unticked_folder_out_of_the_rescan(void)
+{
+    start_app_with_library();
+    fake_hal_add_directory_entry("/", "Rock", true, false);
+    fake_hal_add_directory_entry("/", "Jazz", true, false);
+    fake_hal_add_file(MUSIC_CHECK_PATH, NULL, 4096);
+    fake_hal_watch_dir("/Rock/");
+    app_request_rescan();
+    step();
+    CHECK(toast_is("Library: 0 tracks"));
+    CHECK_EQUAL(1, fake_hal_watched_dir_opens());
+    open_setting(SETTINGS_FOLDERS_INDEX);
+    CHECK(title_is("Music folders"));
+    move_down(1);
+    tap(KEY_PLAY);
+    fake_hal_watch_dir("/Rock/");
+    tap(KEY_BACK);
+    step();
+    CHECK(toast_is("Library: 0 tracks"));
+    CHECK_EQUAL(0, fake_hal_watched_dir_opens());
+    fake_hal_watch_dir("/Rock");
+    CHECK(music_check_unchanged());
+    CHECK_EQUAL(0, fake_hal_watched_dir_opens());
+    uint32_t size = 0;
+    const uint8_t *bytes = fake_hal_file_bytes(FOLDERS_STORE_PATH, &size);
+    MusicFolders saved = {.count = 0};
+    CHECK(bytes != NULL && music_folders_decode(bytes, size, &saved));
+    CHECK_EQUAL(1u, saved.count);
+    uint32_t rock = 0;
+    CHECK(music_folders_key("/", "Rock", &rock));
+    CHECK_EQUAL(rock, saved.keys[0]);
+}
+
 static void rescanning_without_a_card_says_so(void)
 {
     start_app_with_library();
@@ -1243,7 +1279,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(14, fake_hal_reserve_count());
+    CHECK_EQUAL(15, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -2724,6 +2760,7 @@ int main(void)
         TEST_CASE(the_splash_draws_over_the_home_screen),
         TEST_CASE(the_sleep_timer_turns_the_player_off),
         TEST_CASE(a_refused_track_says_why_it_was_skipped),
+        TEST_CASE(music_folders_leaves_an_unticked_folder_out_of_the_rescan),
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),

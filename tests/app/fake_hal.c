@@ -18,7 +18,7 @@
 enum {
     TRANSITION_CAPACITY = 16,
     FILE_CAPACITY = 16,
-    DIR_CAPACITY = 12,
+    DIR_CAPACITY = 48,
     WRITTEN_CAPACITY = 1100,
     PATH_CAPACITY = 260
 };
@@ -112,6 +112,8 @@ typedef struct FakeHal {
     uint32_t grow_limit;
     int scratch_borrows;
     bool empty_card;
+    char watched_dir[PATH_CAPACITY];
+    int watched_opens;
     int dir_opens;
     int dir_nexts;
     int presents_at_dir_open;
@@ -1061,6 +1063,7 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
 bool hal_dir_open(HalDir *dir, const char *path)
 {
     fake.dir_opens++;
+    fake.watched_opens += strcmp(fake.watched_dir, path) == 0;
     fake.presents_at_dir_open = fake.present_count;
     fake.lit_at_dir_open = fake.display_on;
     copy_path(fake.dir_path, path);
@@ -1089,6 +1092,17 @@ void fake_hal_add_directory_entry(const char *path, const char *name, bool direc
     copy_path(entry->name, name);
     entry->directory = directory;
     entry->hidden = hidden;
+}
+
+void fake_hal_watch_dir(const char *path)
+{
+    copy_path(fake.watched_dir, path);
+    fake.watched_opens = 0;
+}
+
+int fake_hal_watched_dir_opens(void)
+{
+    return fake.watched_opens;
 }
 
 void fake_hal_set_empty_card(bool empty)

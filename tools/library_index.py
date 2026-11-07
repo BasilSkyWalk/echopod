@@ -25,6 +25,12 @@ PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
 URL_MARKER = "://"
 SPOKEN_FOLDERS = {b"audiobooks", b"audiobook", b"podcasts", b"podcast"}
 INTERNAL_FOLDER = ":internal"
+FOLDERS_NAME = "folders.bin"
+FOLDERS_MAGIC = b"EMMF"
+FOLDERS_VERSION = 1
+FOLDERS_MAX = 32
+FNV_OFFSET = 2166136261
+FNV_PRIME = 16777619
 
 HEADER_PREFIX = struct.Struct("<4sHH")
 SECTION_ENTRY = struct.Struct("<IIHH")
@@ -33,6 +39,11 @@ ALBUM_RECORD = struct.Struct("<IHHHHHH")
 GROUP_RECORD = struct.Struct("<IIHH")
 FOLDER_RECORD = struct.Struct("<IHHIHH")
 INDEX_RECORD = struct.Struct("<H")
+FOLDERS_HEAD = struct.Struct("<4sBBH")
+FOLDERS_KEYS = struct.Struct(f"<{FOLDERS_MAX}I")
+FOLDERS_CHECK = struct.Struct("<I")
+FOLDERS_CHECKED_BYTES = FOLDERS_HEAD.size + FOLDERS_KEYS.size
+FOLDERS_BYTES = FOLDERS_CHECKED_BYTES + FOLDERS_CHECK.size
 
 LEADING_ARTICLE = re.compile(r"^the\s+(?=\S)")
 DISC_TRACK_PREFIX = re.compile(r"^(\d+)-(\d+)\s*-\s*")
@@ -637,6 +648,53 @@ def encode_library(model):
     return bytes(header) + bytes(HEADER_SIZE - len(header)) + bytes(body)
 
 
+def fnv1a(data, value=FNV_OFFSET):
+    for byte in data:
+        value = ((value ^ byte) * FNV_PRIME) & 0xFFFFFFFF
+    return value
+
+
+def name_bytes(name, platform=sys.platform):
+    if platform == "win32":
+        return name.encode("utf-8", "surrogatepass")
+    if platform == "darwin":
+        name = unicodedata.normalize("NFC", name)
+    return name.encode("utf-8", "surrogateescape")
+
+
+def folder_key(name, internal=False):
+    prefix = f"{INTERNAL_FOLDER}/".encode("ascii") if internal else b""
+    return fnv1a(prefix + name)
+
+
+def encode_excluded_folders(keys):
+    keys = list(keys)
+    if len(keys) > FOLDERS_MAX:
+        raise ValueError(f"at most {FOLDERS_MAX} folders can be left out")
+    data = (FOLDERS_HEAD.pack(FOLDERS_MAGIC, FOLDERS_VERSION, len(keys), 0) +
+            FOLDERS_KEYS.pack(*keys, *[0] * (FOLDERS_MAX - len(keys))))
+    return data + FOLDERS_CHECK.pack(fnv1a(data))
+
+
+def decode_excluded_folders(data):
+    if len(data) < FOLDERS_BYTES:
+        return frozenset()
+    magic, version, count, _ = FOLDERS_HEAD.unpack_from(data)
+    checked = bytes(data[:FOLDERS_CHECKED_BYTES])
+    if (magic != FOLDERS_MAGIC or version != FOLDERS_VERSION or count > FOLDERS_MAX or
+            FOLDERS_CHECK.unpack_from(data, FOLDERS_CHECKED_BYTES)[0] != fnv1a(checked)):
+        return frozenset()
+    return frozenset(FOLDERS_KEYS.unpack_from(data, FOLDERS_HEAD.size)[:count])
+
+
+def read_excluded_folders(path):
+    try:
+        with open(path, "rb") as file:
+            return decode_excluded_folders(file.read(FOLDERS_BYTES))
+    except OSError:
+        return frozenset()
+
+
 def visible_files(root, suffixes):
     for path in sorted(root.rglob("*")):
         hidden = any(part.startswith(".") for part in path.relative_to(root).parts)
@@ -651,9 +709,14 @@ def read_playlist(root, path, prefix=""):
 
 
 class MusicRoots:
-    def __init__(self, card, internal=None):
+    def __init__(self, card, internal=None, excluded=frozenset()):
         self.card = Path(card)
         self.internal = None if internal is None else Path(internal)
+        self.excluded = frozenset(excluded)
+
+    def left_out(self, root, path, internal):
+        parts = path.relative_to(root).parts
+        return len(parts) > 1 and folder_key(name_bytes(parts[0]), internal) in self.excluded
 
     def __truediv__(self, relative):
         text = str(relative)
@@ -662,17 +725,19 @@ class MusicRoots:
         return self.card / text
 
     def files(self, suffixes):
-        found = [(path, self.card, path, "") for path in visible_files(self.card, suffixes)]
+        found = [(path, self.card, path, "") for path in visible_files(self.card, suffixes)
+                 if not self.left_out(self.card, path, False)]
         if self.internal is not None:
             found += [(self.card.joinpath(INTERNAL_FOLDER, path.relative_to(self.internal)),
                        self.internal, path, INTERNAL_FOLDER)
-                      for path in visible_files(self.internal, suffixes)]
+                      for path in visible_files(self.internal, suffixes)
+                      if not self.left_out(self.internal, path, True)]
         found.sort(key=lambda item: item[0])
         return [(root, path, prefix) for _, root, path, prefix in found]
 
 
-def scan(root, internal=None):
-    roots = MusicRoots(root, internal)
+def scan(root, internal=None, excluded=frozenset()):
+    roots = MusicRoots(root, internal, excluded)
     tracks, failures = [], []
     for base, path, prefix in roots.files(AUDIO_SUFFIXES):
         try:
@@ -690,6 +755,9 @@ def parse_arguments():
     parser.add_argument("--internal", type=Path,
                         help="the player's internal storage, indexed as the folder "
                              f"{INTERNAL_FOLDER} (read only)")
+    parser.add_argument("--folders", type=Path,
+                        help=f"a {FOLDERS_NAME} naming the top-level folders to leave out, as "
+                             "Settings, Music folders on the player does")
     parser.add_argument("--output", type=Path, required=True, help="library.db to write")
     return parser.parse_args()
 
@@ -697,7 +765,8 @@ def parse_arguments():
 def main():
     arguments = parse_arguments()
     internal = None if arguments.internal is None else arguments.internal.resolve()
-    tracks, playlists, failures = scan(arguments.music.resolve(), internal)
+    excluded = frozenset() if arguments.folders is None else read_excluded_folders(arguments.folders)
+    tracks, playlists, failures = scan(arguments.music.resolve(), internal, excluded)
     for failure in failures:
         print(f"skipped {failure}", file=sys.stderr)
     model = build_library(tracks, playlists)

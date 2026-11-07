@@ -52,8 +52,8 @@ class MemoryCard:
                                     echo_sync.child_path(parent.encode(), name.encode()).decode())
                 for parent, name, directory, size, modified in self.nodes if parent == path]
 
-    def fingerprint(self):
-        return echo_sync.music_fingerprint(self.list_folder, "/")
+    def fingerprint(self, excluded=frozenset()):
+        return echo_sync.music_fingerprint(self.list_folder, "/", excluded)
 
 
 def players_test_card():
@@ -90,6 +90,31 @@ class PlayerFingerprintTest(unittest.TestCase):
         card.add("/AC DC", "Live", True, 0, 7)
         self.assertEqual(echo_sync.Fingerprint(True, 732559337, 1706284886, 8),
                          card.fingerprint())
+
+    def test_a_left_out_internal_folder_gives_the_fingerprint_the_player_stores(self):
+        card = players_test_card()
+        card.add("/", ":internal", True, 0, 0)
+        card.add("/:internal", "Artist", True, 0, 11)
+        card.add("/:internal/Artist", "01 - Song.flac", False, 5000000, 12)
+        card.add("/:internal", "Album", True, 0, 15)
+        card.add("/:internal/Album", "02 - Other.flac", False, 6000000, 16)
+        card_artist = frozenset({library_index.folder_key(b"Artist")})
+        self.assertEqual(card.fingerprint(), card.fingerprint(card_artist))
+        internal_artist = frozenset({library_index.folder_key(b"Artist", internal=True)})
+        self.assertEqual(echo_sync.Fingerprint(True, 4104151954, 1967075651, 9),
+                         card.fingerprint(internal_artist))
+
+    def test_a_left_out_folder_counts_as_if_it_were_not_there(self):
+        card = players_test_card()
+        before = card.fingerprint()
+        card.add("/", "Spoken", True, 0, 20)
+        card.add("/Spoken", "Talk.mp3", False, 3000, 21)
+        left_out = frozenset({library_index.folder_key(b"Spoken")})
+        self.assertNotEqual(before, card.fingerprint())
+        self.assertEqual(before, card.fingerprint(left_out))
+        card.add("/AC DC", "Spoken", True, 0, 22)
+        card.add("/AC DC/Spoken", "Inner.mp3", False, 3000, 23)
+        self.assertNotEqual(before, card.fingerprint(left_out))
 
     def test_hidden_entries_do_not_count(self):
         card = players_test_card()
@@ -591,6 +616,31 @@ class SyncTest(unittest.TestCase):
         self.assertIn("--internal is ignored", output)
         self.assertNotIn(b":internal", (self.echo / "library.db").read_bytes())
         self.assertIn("will use this library", output)
+
+    def test_unticked_music_folders_are_left_out_of_the_library_and_the_fingerprint(self):
+        self.prepare_echo()
+        spoken = self.card / "Talks" / "Episode"
+        spoken.mkdir(parents=True)
+        write_silent_flac(spoken / "01 - Talk.flac", 1)
+        (self.echo / "folders.bin").write_bytes(library_index.encode_excluded_folders(
+            [library_index.folder_key(b"Talks")]) + bytes(4096 - 140))
+        status, output = self.run_sync()
+        self.assertEqual(0, status, output)
+        self.assertIn("Leaving out 1 top-level folder", output)
+        library = (self.echo / "library.db").read_bytes()
+        self.assertIn(b"Artist/Album/01 - Song.flac", library)
+        self.assertNotIn(b"Talks", library)
+        excluded = library_index.read_excluded_folders(self.echo / "folders.bin")
+        expected = library_index.encode_library(library_index.build_library(
+            *library_index.scan(self.card, None, excluded)[:2]))
+        self.assertEqual(expected, library[:len(expected)])
+        volume = echo_sync.detect_volume(self.card)
+        stored = echo_sync.stored_fingerprint((self.echo / "scan.bin").read_bytes())
+        self.assertEqual(echo_sync.card_fingerprint(self.card, volume, None, excluded), stored)
+        self.assertNotEqual(echo_sync.card_fingerprint(self.card, volume), stored)
+        self.assertEqual(0, self.run_sync("--check")[0])
+        write_silent_flac(spoken / "02 - More.flac", 1)
+        self.assertEqual(0, self.run_sync("--check")[0])
 
     def test_a_folder_that_is_not_a_card_is_refused(self):
         status, output = self.run_sync()

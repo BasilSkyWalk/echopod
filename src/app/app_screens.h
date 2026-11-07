@@ -79,6 +79,7 @@ typedef struct AppScreens {
     BluetoothScreen bluetooth;
     EqualizerScreen equalizer;
     DateTimeScreen date_time;
+    FoldersScreen folders;
     ClockOption clock;
     Core1Option core1;
     Core1AccelOption core1_accel;

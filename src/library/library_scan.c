@@ -452,7 +452,11 @@ static ScanResult visit_entry(ScanState *state, const ScanJob *job, ScanStats *s
     }
     ScanResult result = read_listing(state, &job->files, &state->levels[state->depth]);
     state->depth += result == SCAN_OK;
-    return result == SCAN_NO_MUSIC_ROOT ? SCAN_OK : result;
+    if (result != SCAN_NO_MUSIC_ROOT) {
+        return result;
+    }
+    truncate_path(state, state->levels[state->depth - 1].path_length);
+    return SCAN_OK;
 }
 
 static ScanResult walk(ScanState *state, const ScanJob *job, ScanStats *stats)
