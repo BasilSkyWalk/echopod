@@ -1,17 +1,18 @@
 # EchoPod release notes
 
-## 0.11.0 (release candidate 1)
+## 0.11.0 (release candidate 2)
 
-A test build. Built and unit-tested, not yet tried on a player.
+A test build, tried on one Echo Mini 8 GB.
 
 ### New
 
-- **Listen history for Last.fm and ListenBrainz** (issue 38). The player logs what you play to `/.echo/history.bin`; `tools/echo_history.py` (or `echo_sync.py --history`) writes a `.scrobbler.log` that Rockbox-style uploaders read. A play counts when the track is over 30 s and you heard half of it or 4 minutes. Audiobooks and podcasts aren't logged. Settings → Listen history turns it off.
-- **A clock** (issue 23). EchoPod reads the player's clock chip at start, sets it from your computer at the end of every echo-sync, and Settings → Date & time sets it by hand. Settings → Clock shows the time in the status bar. Listen history uses it for real play times; without a set clock, times are estimated by counting back from when you sync. Diagnostics → Clock shows what the chip holds.
+- **Listen history for Last.fm and ListenBrainz** (issue 38). Each time you connect to a computer, the player adds what you played to `/.scrobbler.log` on the card, the file Rockbox-style uploaders read (for example rb-scrobbler). `tools/echo_history.py` can also write it. A play counts when the track is over 30 s and you heard half of it or 4 minutes. Audiobooks and podcasts aren't logged. Settings → Listen history turns it off.
+- **A clock** (issue 23). EchoPod reads the player's clock chip at start, sets it from your computer at the end of every echo-sync, and Settings → Date & time sets it by hand. Settings → Clock shows the time in the status bar. Listen history uses it for real play times; without a set clock, times are estimated by counting back from when you connect. A clock dated before this firmware was built counts as not set, and the first start after installing asks once to set it. Diagnostics → Clock shows what the chip holds.
 - **Equalizer presets from files** (pull request 35, by mahyarrezghi). Put Equalizer APO or AutoEQ `ParametricEQ.txt` files in `/EQ`: up to 10 filters, peak and shelf. Unsupported filters are skipped with a notice.
 - **USB DAC mode:** play/pause, next and previous reach the computer; volume keys no longer crackle; the DAC screen shows the battery; Swap volume buttons and portrait apply.
 - **Ask when connected:** plugging into a computer asks Storage, DAC or Charge only (issue 5). Settings → Ask when connected turns it off.
 - **Music on internal storage** (issue 36). Music on the player's own storage is in the library too, as an "Internal storage" folder; Settings → Music folders leaves its folders out. echo-sync finds the player's internal storage drive by itself. The library files stay on the microSD card.
+- **Settings → Music folders:** untick top-level folders to leave them out of the library.
 - **Cover Flow for folders and playlists** (issue 17): Settings → Folders & playlists → Cover Flow. **Settings → Cover Flow** shows 5 or 3 covers, and the outer covers are smaller.
 - **Lyrics:** a `.lrc` file next to a track shows on Now Playing. Settings → Lyrics turns them off.
 - **Settings → Theme → Light.**
@@ -27,8 +28,11 @@ A test build. Built and unit-tested, not yet tried on a player.
 
 ### Fixed
 
+- **No microSD card:** Home and Music now say so, and saving a setting without a card asks for one (issue 42).
+- **SD card waits have a time limit**, so a card that stops answering gives an error instead of freezing the player (issue 43).
+- **The first start after an update** shows the start-up screen and a lit "Checking for changes" instead of a black screen.
 - **Battery:** the second core sleeps when it has nothing to decode; FLAC, WAV, ALAC and MP3 at 48 kHz or less play at 96 MHz with the screen off; after 30 s paused the audio hardware powers down; the screen sleeps when it's off; the percent moves 1 point at a time and holds still for 30 s after plugging in or out.
-- **Bluetooth:** headphones no longer need a tap to start; the opening of a track isn't lost; garbled replies from the Bluetooth chip no longer drop the link; Play wakes a module that switched itself off.
+- **Bluetooth:** the stream starts once the headphones report they're ready instead of straight away; the opening of a track isn't lost; garbled replies from the Bluetooth chip no longer drop the link; Play wakes a module that switched itself off.
 - **Clicks** at track changes between sample rates and at pause (issue 21), and the first part of a track no longer cut off.
 - **Embedded art in Opus and Ogg files** (issue 29), and albums sharing a folder get their own covers.
 - **USB storage:** short dips in USB power no longer end the session, card reads are retried, and a reseated card is found again.
