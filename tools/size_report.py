@@ -115,7 +115,8 @@ def object_name(origin):
     """`libecho_app.a(player.c.obj)` -> `app/player.c`; a plain object -> its source path."""
     if origin == FILL:
         return FILL
-    match = MEMBER.match(origin)
+    name = origin.replace("\\", "/")
+    match = MEMBER.match(name)
     if match:
         archive = Path(match.group(1)).stem
         for prefix in ("libecho_", "lib"):
@@ -123,7 +124,6 @@ def object_name(origin):
                 archive = archive[len(prefix):]
                 break
         return f"{archive}/{Path(match.group(2)).stem}"
-    name = origin.replace("\\", "/")
     if ".dir/" in name:
         return Path(name.split(".dir/", 1)[1]).with_suffix("").as_posix()
     return Path(name).stem
