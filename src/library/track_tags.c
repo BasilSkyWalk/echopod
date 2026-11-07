@@ -145,7 +145,8 @@ static uint32_t utf8_size(uint32_t code_point)
 static void put_code_point(TextBuilder *builder, uint32_t code_point)
 {
     static const uint8_t LEADS[5] = {0, 0x00, 0xC0, 0xE0, 0xF0};
-    if (code_point == 0 || (!builder->started && is_space(code_point))) {
+    bool space = is_space(code_point);
+    if (code_point == 0 || (!builder->started && space)) {
         return;
     }
     uint32_t size = utf8_size(code_point);
