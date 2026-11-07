@@ -204,7 +204,6 @@ static void internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer(v
     static Output output;
     sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
     sim_storage_configure_internal(ECHO_FIXTURE_DIR "/tags");
-    hal_storage_show_internal(true);
     output.length = 0;
     ScanJob job = {
         .files = {open_dir, next_entry, close_dir, open_file, close_file, &files},
@@ -215,7 +214,6 @@ static void internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer(v
     };
     ScanStats stats;
     ScanResult result = library_scan(&job, &stats);
-    hal_storage_show_internal(false);
     CHECK_EQUAL(SCAN_OK, result);
     CHECK_EQUAL(21u, stats.tracks);
     uint32_t expected_size = 0;

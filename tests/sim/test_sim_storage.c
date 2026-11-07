@@ -90,16 +90,15 @@ static void a_file_grows_and_keeps_its_bytes(void)
     CHECK(memcmp(seen, FRESH, sizeof FRESH) == 0);
 }
 
-static void use_both_drives(bool shown)
+static void use_both_drives(void)
 {
     sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", ECHO_TEST_OUTPUT_DIR);
     sim_storage_configure_internal(ECHO_FIXTURE_DIR "/tags");
-    hal_storage_show_internal(shown);
 }
 
-static void shown_internal_storage_is_the_last_folder_of_the_card_root(void)
+static void internal_storage_is_the_last_folder_of_the_card_root(void)
 {
-    use_both_drives(true);
+    use_both_drives();
     HalDir dir;
     static HalDirEntry entry;
     static char last[HAL_NAME_CAPACITY];
@@ -117,19 +116,12 @@ static void shown_internal_storage_is_the_last_folder_of_the_card_root(void)
     CHECK_EQUAL(0u, internal.entry.size);
     CHECK_EQUAL(0u, internal.entry.modified);
     CHECK(!find("/Artist A", VOLUME_INTERNAL_NAME).found);
-    hal_storage_show_internal(false);
-}
-
-static void hidden_internal_storage_is_not_listed_but_still_opens(void)
-{
-    use_both_drives(false);
-    CHECK(!find("/", VOLUME_INTERNAL_NAME).found);
-    CHECK(find("/:internal", "tagged.flac").found);
+    CHECK(!find("/:internal", VOLUME_INTERNAL_NAME).found);
 }
 
 static void internal_paths_read_the_internal_drive(void)
 {
-    use_both_drives(true);
+    use_both_drives();
     CHECK(find("/:internal/", "untagged.flac").found);
     CHECK(!find("/:internal", "Root Song.mp3").found);
     HalFile file;
@@ -141,27 +133,23 @@ static void internal_paths_read_the_internal_drive(void)
     CHECK(!hal_file_open(&file, "/tagged.flac"));
     CHECK(hal_file_open(&file, "/Root Song.mp3"));
     hal_file_close(&file);
-    hal_storage_show_internal(false);
 }
 
 static void the_player_never_writes_to_internal_storage(void)
 {
     static const uint8_t BYTES[4] = {1, 2, 3, 4};
-    use_both_drives(true);
+    use_both_drives();
     CHECK(!hal_file_write("/:internal/new.bin", BYTES, sizeof BYTES));
     CHECK(!hal_file_write_at("/:internal/tagged.flac", 0, BYTES, sizeof BYTES));
     CHECK_EQUAL(HAL_RESERVE_FAILED, hal_file_reserve("/:internal/.echo/x.bin", 4096));
-    hal_storage_show_internal(false);
 }
 
 static void without_internal_storage_nothing_is_listed(void)
 {
     sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
-    hal_storage_show_internal(true);
     HalDir dir;
     CHECK(!find("/", VOLUME_INTERNAL_NAME).found);
     CHECK(!hal_dir_open(&dir, "/:internal"));
-    hal_storage_show_internal(false);
 }
 
 int main(void)
@@ -172,8 +160,7 @@ int main(void)
         TEST_CASE(a_missing_folder_does_not_open),
         TEST_CASE(a_read_after_an_overwrite_sees_the_new_bytes),
         TEST_CASE(a_file_grows_and_keeps_its_bytes),
-        TEST_CASE(shown_internal_storage_is_the_last_folder_of_the_card_root),
-        TEST_CASE(hidden_internal_storage_is_not_listed_but_still_opens),
+        TEST_CASE(internal_storage_is_the_last_folder_of_the_card_root),
         TEST_CASE(internal_paths_read_the_internal_drive),
         TEST_CASE(the_player_never_writes_to_internal_storage),
         TEST_CASE(without_internal_storage_nothing_is_listed),

@@ -11,7 +11,7 @@ A test build. Built and unit-tested, not yet tried on a player.
 - **Equalizer presets from files** (pull request 35, by mahyarrezghi). Put Equalizer APO or AutoEQ `ParametricEQ.txt` files in `/EQ`: up to 10 filters, peak and shelf. Unsupported filters are skipped with a notice.
 - **USB DAC mode:** play/pause, next and previous reach the computer; volume keys no longer crackle; the DAC screen shows the battery; Swap volume buttons and portrait apply.
 - **Ask when connected:** plugging into a computer asks Storage, DAC or Charge only (issue 5). Settings → Ask when connected turns it off.
-- **Music on internal storage** (issue 36). Settings → Internal storage adds the player's own storage to the library, as an "Internal storage" folder. The library files stay on the microSD card.
+- **Music on internal storage** (issue 36). Music on the player's own storage is in the library too, as an "Internal storage" folder; Settings → Music folders leaves its folders out. echo-sync finds the player's internal storage drive by itself. The library files stay on the microSD card.
 - **Cover Flow for folders and playlists** (issue 17): Settings → Folders & playlists → Cover Flow. **Settings → Cover Flow** shows 5 or 3 covers, and the outer covers are smaller.
 - **Lyrics:** a `.lrc` file next to a track shows on Now Playing. Settings → Lyrics turns them off.
 - **Settings → Theme → Light.**

@@ -140,6 +140,7 @@ static void internal_storage_folds_in_as_the_last_root_folder(void)
     add("/:internal/Artist", "01 - Song.flac", false, 5000000, 12);
     add("/:internal", "System Volume Information", true, 0, 13);
     add("/:internal", "HIFIEC90.IMG", false, 9000000, 14);
+    add("/:internal", "HIFIEC90-not-for-install.bin", false, 9000000, 15);
     MusicFingerprint print = fingerprint();
     CHECK(print.complete);
     CHECK_EQUAL(1993034583u, print.first);

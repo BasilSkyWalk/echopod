@@ -40,14 +40,7 @@ ART_NAMES = frozenset(f"{stem}{suffix}".encode("ascii")
                       for suffix in cover_export.FOLDER_IMAGE_SUFFIXES)
 SYSTEM_FOLDER = b"system volume information"
 INTERNAL_NAME = library_index.INTERNAL_FOLDER.encode("ascii")
-SETTINGS_NAME = "settings.bin"
-SETTINGS_MAGIC = b"EMST"
-SETTINGS_BYTES = 48
-SETTINGS_CHECKED_BYTES = 44
-SETTINGS_WIDE_VERSION = 9
-SETTINGS_VERSION_AT = 4
-SETTINGS_INTERNAL_AT = 38
-SETTINGS_INTERNAL_ON = 1
+INTERNAL_LABEL = "ECHO MINI"
 UNIX_EPOCH = datetime(1970, 1, 1)
 DOS_FIRST_YEAR = 1980
 DOS_LAST_YEAR = 2107
@@ -253,15 +246,6 @@ def drives_lister(card, volume, internal):
 
 def card_fingerprint(card, volume, internal=None, excluded=frozenset()):
     return music_fingerprint(drives_lister(card, volume, internal), str(card), excluded)
-
-
-def player_includes_internal(data):
-    if (len(data) < SETTINGS_BYTES or data[:len(SETTINGS_MAGIC)] != SETTINGS_MAGIC or
-            data[SETTINGS_VERSION_AT] < SETTINGS_WIDE_VERSION):
-        return False
-    stored = struct.unpack_from("<I", data, SETTINGS_CHECKED_BYTES)[0]
-    checksum = cover_export.fnv1a(bytes(data[:SETTINGS_CHECKED_BYTES]), cover_export.FNV_OFFSET)
-    return stored == checksum and data[SETTINGS_INTERNAL_AT] == SETTINGS_INTERNAL_ON
 
 
 def scan_record(fingerprint, version):
@@ -489,6 +473,34 @@ def mounted_roots(platform=sys.platform):
         return sorted(Path("/Volumes").glob("*"))
     user = os.environ.get("USER", "")
     return sorted([*Path("/media", user).glob("*"), *Path("/run/media", user).glob("*")])
+
+
+def windows_volume_label(root):
+    import ctypes
+    label = ctypes.create_unicode_buffer(64)
+    found = ctypes.windll.kernel32.GetVolumeInformationW(
+        ctypes.c_wchar_p(str(root)), label, len(label), None, None, None, None, 0)
+    return label.value if found else None
+
+
+def volume_label(root, platform=sys.platform):
+    if platform == "win32":
+        return windows_volume_label(root)
+    return root.name
+
+
+def player_internal_drives(card, roots):
+    found = []
+    for root in roots:
+        try:
+            if (volume_label(root) or "").strip().upper() != INTERNAL_LABEL:
+                continue
+            if root.resolve() != card:
+                found.append((root, (root / ECHO_FOLDER).is_dir()))
+        except OSError:
+            continue
+    plain = [root for root, has_echo in found if not has_echo]
+    return plain or [root for root, _ in found]
 
 
 def player_cards(roots):
@@ -785,9 +797,8 @@ def parse_arguments(argv):
                         help="the card's drive or mount point, for example E:\\ or "
                              "/Volumes/CARD; without it, the tool asks")
     parser.add_argument("--internal",
-                        help="the player's internal storage drive (it shows up next to the card "
-                             "while the player is connected), for when Settings, Internal "
-                             "storage is On")
+                        help=f"the player's internal storage drive, when it isn't found by its "
+                             f"name ({INTERNAL_LABEL})")
     parts = parser.add_mutually_exclusive_group()
     parts.add_argument("--no-covers", action="store_true",
                        help="build the library only and leave covers.bin as it is")
@@ -819,34 +830,33 @@ def card_argument(arguments):
     return ask_for_card(player_cards(mounted_roots()))
 
 
-def ask_for_internal(read=input):
-    answer = typed_path(read("The player includes its internal storage (Settings, Internal "
-                             "storage). Its drive (Enter to leave it out): "))
-    return answer or None
-
-
-def internal_drive(arguments, card, echo, interactive):
-    wanted = player_includes_internal(read_prefix(echo / SETTINGS_NAME, SETTINGS_BYTES))
-    given = arguments.internal
-    if not wanted:
-        if given is not None:
-            print("The player leaves its internal storage out (Settings, Internal storage is "
-                  "Off), so --internal is ignored.")
-        return None, False
-    if given is None and interactive:
-        given = ask_for_internal()
-    if given is None:
-        print("The player includes its internal storage (Settings, Internal storage), but no "
-              "--internal drive was given: the library is built from the card only, and the "
-              "player will scan once more.")
-        return None, True
-    root = card_root(given)
+def given_internal(text, card):
+    root = card_root(text)
     if not root.is_dir():
         raise SyncError(f"{root} isn't a folder or drive. Give the player's internal storage "
                         "drive, for example F:\\")
     if root == card:
         raise SyncError("--internal names the card itself. Give the player's other drive.")
-    return InternalDrive(root, detect_volume(root)), False
+    return root
+
+
+def internal_drive(arguments, card):
+    if arguments.internal is not None:
+        root = given_internal(arguments.internal, card)
+    else:
+        found = player_internal_drives(card, mounted_roots())
+        if len(found) > 1:
+            raise SyncError(f"More than one drive is called {INTERNAL_LABEL} "
+                            f"({', '.join(str(root) for root in found)}). Give the player's "
+                            "internal storage with --internal DRIVE.")
+        if not found:
+            print(f"The player's internal storage (the drive called {INTERNAL_LABEL}) wasn't "
+                  "found, so the library is built from the card only and the player will scan "
+                  "once more. Sync with the card in the connected player, or give the drive "
+                  "with --internal DRIVE.")
+            return None
+        root = found[0]
+    return InternalDrive(root, detect_volume(root))
 
 
 def wait_before_closing():
@@ -878,8 +888,7 @@ def run(arguments):
         volume = detect_volume(card)
         echo = card / ECHO_FOLDER
         check_target(card, volume, echo.is_dir())
-        interactive = arguments.card is None and sys.stdin.isatty()
-        internal, internal_missing = internal_drive(arguments, card, echo, interactive)
+        internal = internal_drive(arguments, card)
         excluded = library_index.read_excluded_folders(echo / library_index.FOLDERS_NAME)
         if excluded:
             print(f"Leaving out {plural(len(excluded), 'top-level folder')} (Settings, Music "
@@ -892,7 +901,7 @@ def run(arguments):
         if internal is not None:
             print(f"  and the internal storage {internal.root} ({internal.volume.file_system})")
         ensure_echo_folder(echo, options, arguments.yes)
-        recorded = sync(card, volume, options, internal, internal_missing, excluded)
+        recorded = sync(card, volume, options, internal, internal is None, excluded)
         if arguments.history:
             export_history(card, options.dry_run)
     except SyncError as error:
