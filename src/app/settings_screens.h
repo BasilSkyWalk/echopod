@@ -15,14 +15,19 @@
 #include "ui/theme.h"
 #include "ui/toast.h"
 
+typedef enum SettingsGroup {
+    SETTINGS_SOUND,
+    SETTINGS_DISPLAY,
+    SETTINGS_LIBRARY,
+    SETTINGS_BUTTONS,
+    SETTINGS_SYSTEM,
+    SETTINGS_GROUP_COUNT
+} SettingsGroup;
+
 enum {
     SETTINGS_CHOICE_COUNT = 33,
-    SETTINGS_BLUETOOTH_ITEM = 2,
-    SETTINGS_EQUALIZER_ITEM = 3,
-    SETTINGS_RESCAN_ITEM = 14,
-    SETTINGS_FOLDERS_ITEM = 33,
-    SETTINGS_ITEM_COUNT = SETTINGS_CHOICE_COUNT + 5,
-    SETTINGS_DATE_TIME_ITEM = SETTINGS_ITEM_COUNT - 1
+    SETTINGS_TOP_COUNT = 5 + SETTINGS_GROUP_COUNT,
+    SETTINGS_GROUP_ROWS_MAX = 10
 };
 
 typedef struct SettingsContext {
@@ -56,13 +61,23 @@ typedef struct SettingsEntry {
     SettingsScreens *owner;
 } SettingsEntry;
 
+typedef struct SettingsGroupLink {
+    SettingsScreens *owner;
+    uint8_t group;
+} SettingsGroupLink;
+
 struct SettingsScreens {
     SettingsContext context;
     const Theme *theme;
     MenuScreen menu;
+    MenuScreen group;
     ChoiceScreen choice;
     SettingsEntry entries[SETTINGS_CHOICE_COUNT];
-    MenuItem items[SETTINGS_ITEM_COUNT];
+    SettingsGroupLink links[SETTINGS_GROUP_COUNT];
+    uint8_t selected[SETTINGS_GROUP_COUNT];
+    uint8_t shown;
+    MenuItem items[SETTINGS_TOP_COUNT];
+    MenuItem rows[SETTINGS_GROUP_ROWS_MAX];
 };
 
 Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,

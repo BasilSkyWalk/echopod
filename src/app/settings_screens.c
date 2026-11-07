@@ -426,49 +426,161 @@ static ScreenAction request_rescan(void *context)
     return screen_action_none();
 }
 
+enum {
+    CHOICE_SHUFFLE,
+    CHOICE_REPEAT,
+    CHOICE_SLEEP,
+    CHOICE_AUTO_OFF,
+    CHOICE_TIMEOUT,
+    CHOICE_BRIGHTNESS,
+    CHOICE_ORIENTATION,
+    CHOICE_GAIN,
+    CHOICE_FILTER,
+    CHOICE_BALANCE,
+    CHOICE_OUTPUT,
+    CHOICE_START,
+    CHOICE_USB_MODE,
+    CHOICE_LANGUAGE,
+    CHOICE_ACCENT,
+    CHOICE_HIGHLIGHT,
+    CHOICE_BATTERY,
+    CHOICE_SWAP,
+    CHOICE_ROCKER,
+    CHOICE_MENU_KEY,
+    CHOICE_COVER_ORDER,
+    CHOICE_ARTIST_VIEW,
+    CHOICE_HISTORY,
+    CHOICE_BLUETOOTH_LEVEL,
+    CHOICE_USB_PROMPT,
+    CHOICE_COVERS,
+    CHOICE_ANIMATIONS,
+    CHOICE_THEME,
+    CHOICE_LYRICS,
+    CHOICE_FOLDER_VIEW,
+    CHOICE_CLOCK,
+    CHOICE_STATUS_BAR,
+    CHOICE_POWER_ON,
+    ROW_BLUETOOTH = SETTINGS_CHOICE_COUNT,
+    ROW_EQUALIZER,
+    ROW_DATE_TIME,
+    ROW_FOLDERS,
+    ROW_RESCAN,
+    ROW_GROUP
+};
+
+typedef struct SettingsLink {
+    StringId label;
+    ScreenAction (*select)(void *context);
+    const char *(*value)(const void *context);
+} SettingsLink;
+
+typedef struct SettingsGroupRows {
+    StringId title;
+    uint8_t first;
+    uint8_t count;
+} SettingsGroupRows;
+
+ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
+    {STR_BT_TITLE, bluetooth_screen_open, bluetooth_screen_summary},
+    {STR_SETTINGS_EQUALIZER, equalizer_screen_open, equalizer_screen_summary},
+    {STR_SETTINGS_DATE_TIME, date_time_screen_open, date_time_screen_summary},
+    {STR_SETTINGS_MUSIC_FOLDERS, folders_screen_open, folders_screen_summary},
+    {STR_SETTINGS_RESCAN, request_rescan, NULL},
+};
+
+ECHO_RESIDENT static const uint8_t ROWS[] = {
+    CHOICE_SHUFFLE,     CHOICE_REPEAT,      ROW_BLUETOOTH,
+    ROW_EQUALIZER,      CHOICE_SLEEP,       ROW_GROUP,
+    ROW_GROUP + 1,      ROW_GROUP + 2,      ROW_GROUP + 3,
+    ROW_GROUP + 4,      CHOICE_GAIN,        CHOICE_OUTPUT,
+    CHOICE_FILTER,      CHOICE_BALANCE,     CHOICE_BLUETOOTH_LEVEL,
+    CHOICE_THEME,       CHOICE_ACCENT,      CHOICE_HIGHLIGHT,
+    CHOICE_BRIGHTNESS,  CHOICE_TIMEOUT,     CHOICE_ORIENTATION,
+    CHOICE_ANIMATIONS,  CHOICE_BATTERY,     CHOICE_STATUS_BAR,
+    CHOICE_CLOCK,       ROW_FOLDERS,        ROW_RESCAN,
+    CHOICE_START,       CHOICE_COVERS,      CHOICE_COVER_ORDER,
+    CHOICE_ARTIST_VIEW, CHOICE_FOLDER_VIEW, CHOICE_LYRICS,
+    CHOICE_HISTORY,     CHOICE_ROCKER,      CHOICE_SWAP,
+    CHOICE_MENU_KEY,    CHOICE_POWER_ON,    CHOICE_LANGUAGE,
+    ROW_DATE_TIME,      CHOICE_AUTO_OFF,    CHOICE_USB_MODE,
+    CHOICE_USB_PROMPT};
+
+ECHO_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
+    {STR_SETTINGS_SOUND, 10, 5},
+    {STR_SETTINGS_DISPLAY, 15, 10},
+    {STR_SETTINGS_LIBRARY, 25, 9},
+    {STR_SETTINGS_BUTTONS, 34, 4},
+    {STR_SETTINGS_SYSTEM, 38, 5}};
+
+static ScreenAction open_group(void *context);
+
+static MenuItem row_item(SettingsScreens *screens, int row)
+{
+    if (row < SETTINGS_CHOICE_COUNT) {
+        return (MenuItem){.label = i18n_text(CHOICES[row].title),
+                          .select = open_choice,
+                          .context = &screens->entries[row],
+                          .value = choice_value,
+                          .opens = true};
+    }
+    if (row >= ROW_GROUP) {
+        return (MenuItem){.label = i18n_text(GROUPS[row - ROW_GROUP].title),
+                          .select = open_group,
+                          .context = &screens->links[row - ROW_GROUP],
+                          .opens = true};
+    }
+    SettingsContext *settings = &screens->context;
+    void *contexts[] = {settings->bluetooth, settings->equalizer, settings->date_time,
+                        settings->folders, settings};
+    const SettingsLink *link = &LINKS[row - ROW_BLUETOOTH];
+    return (MenuItem){.label = i18n_text(link->label),
+                      .select = link->select,
+                      .context = contexts[row - ROW_BLUETOOTH],
+                      .value = link->value,
+                      .opens = link->value != NULL};
+}
+
+static void fill_rows(SettingsScreens *screens, MenuItem *items, int first, int count)
+{
+    for (int index = 0; index < count; index++) {
+        items[index] = row_item(screens, ROWS[first + index]);
+    }
+}
+
+static ScreenAction open_group(void *context)
+{
+    SettingsGroupLink *link = context;
+    SettingsScreens *screens = link->owner;
+    const SettingsGroupRows *group = &GROUPS[link->group];
+    screens->selected[screens->shown] = (uint8_t)screens->group.list.selected;
+    fill_rows(screens, screens->rows, group->first, group->count);
+    MenuConfig menu = {.title = i18n_text(group->title),
+                       .items = screens->rows,
+                       .item_count = group->count,
+                       .theme = screens->theme};
+    menu_screen_init(&screens->group, menu);
+    list_view_select(&screens->group.list, screens->selected[link->group], 0);
+    screens->shown = link->group;
+    return screen_action_push(&screens->group.screen);
+}
+
 Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context, const Theme *theme)
 {
     screens->context = context;
     screens->theme = theme;
-    screens->items[SETTINGS_RESCAN_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_RESCAN),
-                                                      .select = request_rescan,
-                                                      .context = &screens->context};
-    screens->items[SETTINGS_BLUETOOTH_ITEM] = (MenuItem){.label = i18n_text(STR_BT_TITLE),
-                                                         .select = bluetooth_screen_open,
-                                                         .context = context.bluetooth,
-                                                         .value = bluetooth_screen_summary,
-                                                         .opens = true};
-    screens->items[SETTINGS_EQUALIZER_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_EQUALIZER),
-                                                         .select = equalizer_screen_open,
-                                                         .context = context.equalizer,
-                                                         .value = equalizer_screen_summary,
-                                                         .opens = true};
-    screens->items[SETTINGS_DATE_TIME_ITEM] = (MenuItem){.label = i18n_text(STR_SETTINGS_DATE_TIME),
-                                                         .select = date_time_screen_open,
-                                                         .context = context.date_time,
-                                                         .value = date_time_screen_summary,
-                                                         .opens = true};
-    screens->items[SETTINGS_FOLDERS_ITEM] =
-        (MenuItem){.label = i18n_text(STR_SETTINGS_MUSIC_FOLDERS),
-                   .select = folders_screen_open,
-                   .context = context.folders,
-                   .value = folders_screen_summary,
-                   .opens = true};
+    screens->shown = 0;
+    screens->group.list.selected = 0;
     for (int index = 0; index < SETTINGS_CHOICE_COUNT; index++) {
         screens->entries[index] = (SettingsEntry){.choice = &CHOICES[index], .owner = screens};
-        int item = index < SETTINGS_BLUETOOTH_ITEM ? index : index + 1;
-        item = item < SETTINGS_EQUALIZER_ITEM ? item : item + 1;
-        item = item < SETTINGS_RESCAN_ITEM ? item : item + 1;
-        item = item < SETTINGS_FOLDERS_ITEM ? item : item + 1;
-        screens->items[item] = (MenuItem){.label = i18n_text(CHOICES[index].title),
-                                          .select = open_choice,
-                                          .context = &screens->entries[index],
-                                          .value = choice_value,
-                                          .opens = true};
     }
+    for (int group = 0; group < SETTINGS_GROUP_COUNT; group++) {
+        screens->links[group] = (SettingsGroupLink){.owner = screens, .group = (uint8_t)group};
+        screens->selected[group] = 0;
+    }
+    fill_rows(screens, screens->items, 0, SETTINGS_TOP_COUNT);
     MenuConfig menu = {.title = i18n_text(STR_MENU_SETTINGS),
                        .items = screens->items,
-                       .item_count = SETTINGS_ITEM_COUNT,
+                       .item_count = SETTINGS_TOP_COUNT,
                        .theme = theme};
     return menu_screen_init(&screens->menu, menu);
 }
