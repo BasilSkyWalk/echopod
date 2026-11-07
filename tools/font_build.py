@@ -44,8 +44,8 @@ def pack_nibbles(levels):
     return bytes((padded[index] << 4) | padded[index + 1] for index in range(0, len(padded), 2))
 
 
-def load_font(path, size):
-    return ImageFont.truetype(str(path), size)
+def load_font(path, size, layout_engine=None):
+    return ImageFont.truetype(str(path), size, layout_engine=layout_engine)
 
 
 def covered_codepoints(path, ranges):

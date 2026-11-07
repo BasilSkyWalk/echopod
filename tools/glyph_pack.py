@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
+from PIL import ImageFont
 
 import font_build
 import make_image
@@ -31,6 +32,7 @@ HEADER = struct.Struct("<4sBBHIIIIII")
 MAX_DIRECTORY = 320
 MAX_BITMAP_BYTES = 144
 MAX_CODEPOINT = 0xFFFF
+PACK_LAYOUT = ImageFont.Layout.BASIC
 
 
 class PackError(Exception):
@@ -146,7 +148,7 @@ def build_face(spec, codepoints, font_directory):
     path = font_directory / spec["file"]
     if not path.exists():
         return None
-    font = font_build.load_font(path, spec["size"])
+    font = font_build.load_font(path, spec["size"], PACK_LAYOUT)
     glyphs, dropped = [], []
     for codepoint in covered(path, codepoints):
         glyph = font_build.render_glyph(font, codepoint)

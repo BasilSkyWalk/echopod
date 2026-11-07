@@ -142,7 +142,7 @@ class BuildFaceTest(unittest.TestCase):
     def test_rendering_matches_the_built_in_fonts(self):
         spec = {"name": "latin", "file": "inter/Inter-Regular.ttf", "size": 16}
         face = glyph_pack.build_face(spec, {ord("H")}, ASSETS_DIRECTORY)
-        font = font_build.load_font(ASSETS_DIRECTORY / spec["file"], 16)
+        font = font_build.load_font(ASSETS_DIRECTORY / spec["file"], 16, glyph_pack.PACK_LAYOUT)
         expected = font_build.render_glyph(font, ord("H"))
         width, height, left, top, advance, bitmap = glyph_pack.read_face(face.blob)[ord("H")]
         self.assertEqual((expected.width, expected.height, expected.left, expected.top,
