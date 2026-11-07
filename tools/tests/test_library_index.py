@@ -125,6 +125,8 @@ class InternalStorageTest(unittest.TestCase):
                 (root / relative).parent.mkdir(parents=True, exist_ok=True)
                 write_silent_flac(root / relative, 1)
             (internal / "Band" / "Mix.m3u").write_text("01.flac\n", encoding="utf-8")
+            (internal / "HIFIEC90.IMG").write_bytes(bytes(4096))
+            (internal / "HIFIEC90-not-for-install.bin").write_bytes(bytes(4096))
             tracks, playlists, failures = library_index.scan(card, internal)
         self.assertEqual([], failures)
         self.assertEqual(["0 Start/01.flac", ":internal/Band/01.flac", ":internal/Top.flac",

@@ -145,7 +145,6 @@ typedef struct FakeHal {
     int bluetooth_disconnect_count;
     HalUsbMode usb_mode;
     bool usb_prompt;
-    bool internal_shown;
     bool card_missing;
     uint8_t dac_volume;
     HalTime time;
@@ -717,11 +716,6 @@ void hal_system_set_usb_prompt(bool ask)
     fake.usb_prompt = ask;
 }
 
-void hal_storage_show_internal(bool shown)
-{
-    fake.internal_shown = shown;
-}
-
 bool hal_storage_card_ready(void)
 {
     return !fake.card_missing;
@@ -730,11 +724,6 @@ bool hal_storage_card_ready(void)
 void fake_hal_set_card_missing(bool missing)
 {
     fake.card_missing = missing;
-}
-
-bool fake_hal_internal_shown(void)
-{
-    return fake.internal_shown;
 }
 
 bool fake_hal_usb_prompt(void)

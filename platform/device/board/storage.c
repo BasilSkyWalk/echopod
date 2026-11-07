@@ -41,7 +41,6 @@ static FatDirCursor dirs[OPEN_DIR_CAPACITY];
 static bool dir_in_use[OPEN_DIR_CAPACITY];
 static uint8_t dir_volume[OPEN_DIR_CAPACITY];
 static bool owes_internal[OPEN_DIR_CAPACITY];
-static bool internal_shown;
 static FatDirEntry listed;
 
 static bool start_device(int which, BlockDevice *device)
@@ -234,11 +233,6 @@ static int free_dir_slot(void)
     return -1;
 }
 
-void hal_storage_show_internal(bool shown)
-{
-    internal_shown = shown;
-}
-
 bool hal_storage_card_ready(void)
 {
     return mounted(CARD_VOLUME) != NULL;
@@ -255,8 +249,7 @@ bool hal_dir_open(HalDir *dir, const char *path)
     }
     dir_in_use[slot] = true;
     dir_volume[slot] = (uint8_t)which;
-    owes_internal[slot] =
-        internal_shown && which == CARD_VOLUME && path[0] == '/' && path[1] == '\0';
+    owes_internal[slot] = which == CARD_VOLUME && path[0] == '/' && path[1] == '\0';
     dir->handle = slot;
     return true;
 }
