@@ -111,6 +111,7 @@ PlayerUpNextResult player_add_to_up_next(Player *player, uint16_t track);
 bool player_jump_to_up_next(Player *player, uint16_t index);
 bool player_jump_to_queue(Player *player, PlayQueueCursor cursor);
 void player_update(Player *player, uint32_t now_ms);
+void player_sync(Player *player);
 void player_refusal_text(HalAudioRefusal refusal, char *text, size_t capacity);
 bool player_save(Player *player);
 void player_flush_save(Player *player);

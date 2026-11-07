@@ -539,6 +539,7 @@ static bool ignored_power_tap(KeyEvent event)
 
 static void dispatch_key_events(uint32_t now_ms)
 {
+    player_sync(&app.player);
     KeyEvent event;
     while (!app.powered_off && key_tracker_next_event(&app.keys, &event)) {
         app.key_activity = true;

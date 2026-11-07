@@ -553,6 +553,40 @@ static void a_deep_file_preamp_is_honoured(void)
     CHECK(near(-24.0, gain_at(&equalizer, 1000.0, 48000), 0.2));
 }
 
+static void a_reset_clears_the_filter_state(void)
+{
+    EqualizerCurve curve = one_band(100, 60, 14);
+    Equalizer used = equalizer_for(curve, 44100);
+    for (int frame = 0; frame < SETTLE_FRAMES; frame++) {
+        int32_t sample = (int32_t)(HALF_SCALE * sin(2.0 * PI * 100.0 * frame / 44100));
+        int32_t pair[2] = {sample, sample};
+        equalizer_process(&used, pair, 1);
+    }
+    equalizer_reset(&used);
+    Equalizer fresh = equalizer_for(curve, 44100);
+    int32_t a[2] = {FULL_SCALE, FULL_SCALE};
+    int32_t b[2] = {FULL_SCALE, FULL_SCALE};
+    equalizer_process(&used, a, 1);
+    equalizer_process(&fresh, b, 1);
+    CHECK_EQUAL(b[0], a[0]);
+    CHECK_EQUAL(b[1], a[1]);
+}
+
+static void a_reset_applies_a_pending_curve(void)
+{
+    Equalizer used = equalizer_for(one_band(1000, 60, 14), 44100);
+    EqualizerCurve next = one_band(2000, -60, 14);
+    equalizer_set_curve(&used, &next);
+    equalizer_reset(&used);
+    Equalizer fresh = equalizer_for(next, 44100);
+    int32_t a[2] = {FULL_SCALE, FULL_SCALE};
+    int32_t b[2] = {FULL_SCALE, FULL_SCALE};
+    equalizer_process(&used, a, 1);
+    equalizer_process(&fresh, b, 1);
+    CHECK_EQUAL(b[0], a[0]);
+    CHECK_EQUAL(b[1], a[1]);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -576,6 +610,8 @@ int main(void)
         TEST_CASE(a_file_preamp_never_removes_automatic_headroom),
         TEST_CASE(a_band_too_high_for_the_rate_is_skipped_alone),
         TEST_CASE(a_deep_file_preamp_is_honoured),
+        TEST_CASE(a_reset_clears_the_filter_state),
+        TEST_CASE(a_reset_applies_a_pending_curve),
         TEST_CASE(a_band_at_the_q_cap_holds_a_full_scale_tone_at_its_centre),
         TEST_CASE(stacked_boosts_at_the_q_cap_never_wrap),
         TEST_CASE(ordinary_curves_keep_their_preamp),

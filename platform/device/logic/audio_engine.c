@@ -157,6 +157,7 @@ static bool start_track(AudioEngine *engine, const char *path, uint32_t start_ms
 {
     close_file(engine);
     reset_positions(engine);
+    equalizer_reset(&engine->equalizer);
     engine->held[0] = 0;
     engine->held[1] = 0;
     engine->stats = (AudioEngineStats){0};
@@ -176,6 +177,8 @@ static bool start_track(AudioEngine *engine, const char *path, uint32_t start_ms
 
 bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms, uint32_t token)
 {
+    engine->has_next = false;
+    engine->next_path[0] = '\0';
     return start_track(engine, path, start_ms, token);
 }
 

@@ -51,6 +51,7 @@ typedef struct StreamControl {
     uint32_t load_percent;
     uint32_t ring_bytes;
     uint32_t sleep_allowed;
+    uint32_t equalizer_reset;
     uint32_t slot_offset;
     uint32_t slot_samples;
     StreamSlot slots[STREAM_SLOTS];
@@ -165,12 +166,14 @@ typedef struct Core1Source {
     bool streaming;
     bool read_failed;
     bool file_open;
+    bool reset_equalizer;
 } Core1Source;
 
 void core1_source_init(Core1Source *source, StreamRegion region, FlacFileOpener files,
                        FlacDecoder *decoder, uint32_t fill_budget);
 void core1_source_fill(Core1Source *source);
 void core1_source_set_wake(Core1Source *source, void (*wake)(void));
+void core1_source_reset_equalizer(Core1Source *source);
 AudioSource core1_source_interface(Core1Source *source);
 AudioSource core1_source_mp3_interface(Core1Source *source);
 AudioSource core1_source_mp4_interface(Core1Source *source);

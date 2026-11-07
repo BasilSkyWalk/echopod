@@ -442,6 +442,36 @@ static void a_sleeping_core_1_streams_mp3_and_alac_exactly(void)
     CHECK(plays_exactly("alac/stereo_16_44k", 2));
 }
 
+static void a_flac_to_mp3_change_starts_at_the_first_sample(void)
+{
+    start(BIG_RING_BYTES);
+    let_core1_sleep(true);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "lpc_16_44k_stereo", 0, &info));
+    AudioFrame frame;
+    for (int played = 0; played < 4 && next_frame(&frame) == AUDIO_FRAME_READY; played++) {
+        interface.release(interface.context);
+    }
+    interface.close(interface.context);
+    control.generation = 0;
+    StreamRegion region = {
+        .control = &control, .samples = samples, .ring = ring, .ring_bytes = BIG_RING_BYTES};
+    core1_stream_init(&stream, region, core1_mp3_decoder(&core1_mp3, &mp3_decoder));
+    interface = core1_source_mp3_interface(&source);
+    let_core1_sleep(true);
+    CHECK(interface.open(interface.context, "mp3/cbr_128_44k_stereo_tagged", 0, &info));
+    uint32_t next_sample = 0;
+    AudioFrameResult result;
+    while ((result = next_frame(&frame)) == AUDIO_FRAME_READY) {
+        CHECK_EQUAL(next_sample, frame.first_sample);
+        next_sample += frame.samples;
+        interface.release(interface.context);
+    }
+    CHECK_EQUAL(AUDIO_FRAME_END, result);
+    CHECK_EQUAL(info.stream.total_samples, next_sample);
+    interface.close(interface.context);
+}
+
 static void core_1_never_waits_unless_core_0_allows_it(void)
 {
     start(SMALL_RING_BYTES);
@@ -1088,6 +1118,7 @@ int main(void)
         TEST_CASE(core_1_waits_while_its_slots_are_full),
         TEST_CASE(a_sleeping_core_1_is_woken_for_every_change_and_plays_exactly),
         TEST_CASE(a_sleeping_core_1_streams_mp3_and_alac_exactly),
+        TEST_CASE(a_flac_to_mp3_change_starts_at_the_first_sample),
         TEST_CASE(core_1_never_waits_unless_core_0_allows_it),
         TEST_CASE(a_sleeping_core_1_wakes_for_a_reopen_and_a_close),
         TEST_CASE(reopening_part_way_drops_the_old_frames),

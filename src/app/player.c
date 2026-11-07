@@ -507,9 +507,8 @@ static void follow_jack(Player *player)
     }
 }
 
-void player_update(Player *player, uint32_t now_ms)
+void player_sync(Player *player)
 {
-    follow_jack(player);
     if (!player->loaded) {
         return;
     }
@@ -519,6 +518,12 @@ void player_update(Player *player, uint32_t now_ms)
     } else if (status.state == HAL_AUDIO_STOPPED && status.token == player->current_token) {
         finish_track(player, status.failed);
     }
+}
+
+void player_update(Player *player, uint32_t now_ms)
+{
+    follow_jack(player);
+    player_sync(player);
     save_periodically(player, now_ms);
 }
 

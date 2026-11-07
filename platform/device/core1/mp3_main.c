@@ -11,6 +11,7 @@ void core1_main(void);
 static Mp3Decoder decoder;
 static Core1Mp3 mp3;
 static Core1Stream stream;
+static Equalizer equalizer;
 
 void core1_main(void)
 {
@@ -22,6 +23,8 @@ void core1_main(void)
         return;
     }
     core1_stream_init(&stream, core1_region(), core1_mp3_decoder(&mp3, &decoder));
+    core1_stream_set_equalizer(&stream, &equalizer,
+                               (volatile Core1EqualizerShare *)(uintptr_t)CORE1_SHARED_EQUALIZER);
     core1_ticks_start();
     core1_ticks_measure(&stream);
     for (;;) {
