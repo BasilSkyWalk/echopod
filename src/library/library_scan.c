@@ -488,18 +488,21 @@ static bool split_memory(ScanState **state, const ScanJob *job)
     uintptr_t start = (uintptr_t)job->memory;
     uint32_t skip = (uint32_t)((ALIGNMENT - start % ALIGNMENT) % ALIGNMENT);
     uint32_t header = (uint32_t)((sizeof(ScanState) + ALIGNMENT - 1) & ~(size_t)(ALIGNMENT - 1));
-    bool separate = job->listing != NULL && job->listing_size >= MINIMUM_LISTING;
+    uintptr_t listing_start = (uintptr_t)job->listing;
+    uint32_t listing_skip = (uint32_t)((ALIGNMENT - listing_start % ALIGNMENT) % ALIGNMENT);
+    bool separate = job->listing != NULL && job->listing_size >= listing_skip + MINIMUM_LISTING;
     if (job->size < skip + header + MINIMUM_LISTING * (separate ? 1u : 2u)) {
         return false;
     }
     uint32_t size = job->size - skip;
-    uint32_t listing = separate ? job->listing_size : size / LISTING_SHARE;
+    uint32_t listing = separate ? job->listing_size - listing_skip : size / LISTING_SHARE;
     listing = listing < MINIMUM_LISTING ? MINIMUM_LISTING : listing;
     listing = listing > MAXIMUM_LISTING ? MAXIMUM_LISTING : listing;
+    listing &= ~(uint32_t)(ALIGNMENT - 1);
     uint8_t *memory = (uint8_t *)job->memory + skip;
     uint32_t taken = separate ? 0 : listing;
     *state = (ScanState *)(void *)memory;
-    (*state)->listing = separate ? (uint8_t *)job->listing : memory + header;
+    (*state)->listing = separate ? (uint8_t *)job->listing + listing_skip : memory + header;
     (*state)->listing_size = listing;
     (*state)->listing_used = 0;
     (*state)->playlist_floor = listing;

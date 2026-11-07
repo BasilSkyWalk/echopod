@@ -253,7 +253,7 @@ static void left_out_folders_match_the_pc_indexer(void)
 static void a_separate_listing_leaves_the_memory_to_the_builder(void)
 {
     static uint8_t memory[128 * 1024];
-    static uint8_t listing[16 * 1024];
+    static _Alignas(8) uint8_t listing[16 * 1024];
     static HostFiles files;
     static Output output;
     sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
@@ -402,22 +402,28 @@ static void start_tree(void)
     }
 }
 
-static ScanResult scan_tree(uint32_t listing_size, Output *output, ScanStats *stats)
+static ScanResult scan_tree_at(uint32_t listing_skip, uint32_t listing_size, Output *output,
+                               ScanStats *stats)
 {
     static uint8_t memory[MEMORY_SIZE];
-    static uint8_t listing[96 * 1024];
+    static _Alignas(8) uint8_t listing[96 * 1024 + 8];
     output->length = 0;
     ScanJob job = {
         .files = {tree_open_dir, tree_next_entry, tree_close_dir, tree_open_file, tree_close_file,
                   NULL},
         .memory = memory,
         .size = sizeof memory,
-        .listing = listing,
+        .listing = listing + listing_skip,
         .listing_size = listing_size,
         .scratch = SCRATCH,
         .sink = {write_output, output},
     };
     return library_scan(&job, stats);
+}
+
+static ScanResult scan_tree(uint32_t listing_size, Output *output, ScanStats *stats)
+{
+    return scan_tree_at(0, listing_size, output, stats);
 }
 
 static bool output_read(void *context, uint32_t offset, void *buffer, uint32_t length)
@@ -545,6 +551,24 @@ static void batches_build_the_same_library_as_one_whole_read(void)
     CHECK(library_compare(whole.bytes, whole.length, batched.bytes, batched.length));
 }
 
+static void a_listing_at_an_odd_address_builds_the_same_library(void)
+{
+    static Output aligned;
+    static Output odd;
+    start_tree();
+    char path[TREE_PATH];
+    for (uint32_t outer = 0; outer < 700; outer++) {
+        for (uint32_t inner = 0; inner < 5; inner++) {
+            snprintf(path, sizeof path, "/Outer folder %03u/Inner %u.mp3", outer, inner);
+            tree_add(path);
+        }
+    }
+    ScanStats stats;
+    CHECK_EQUAL(SCAN_OK, scan_tree(16 * 1024, &aligned, &stats));
+    CHECK_EQUAL(SCAN_OK, scan_tree_at(1, 16 * 1024 + 7, &odd, &stats));
+    CHECK(library_compare(aligned.bytes, aligned.length, odd.bytes, odd.length));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -559,6 +583,7 @@ int main(void)
         TEST_CASE(many_sibling_folders_fit_a_small_listing),
         TEST_CASE(a_big_folder_nested_in_big_folders_is_read_in_batches),
         TEST_CASE(batches_build_the_same_library_as_one_whole_read),
+        TEST_CASE(a_listing_at_an_odd_address_builds_the_same_library),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
