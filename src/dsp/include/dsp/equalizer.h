@@ -74,6 +74,7 @@ typedef struct Equalizer {
 } Equalizer;
 
 void equalizer_init(Equalizer *equalizer);
+void equalizer_reset(Equalizer *equalizer);
 void equalizer_set_curve(Equalizer *equalizer, const EqualizerCurve *curve);
 void equalizer_set_rate(Equalizer *equalizer, uint32_t rate);
 void equalizer_apply_pending(Equalizer *equalizer);

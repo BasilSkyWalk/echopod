@@ -14,6 +14,7 @@ static int16_t output[CORE1_OPUS_MAX_FRAME * FLAC_MAX_CHANNELS]
     __attribute__((section(".core1_big"), aligned(4)));
 static Core1Opus opus;
 static Core1Stream stream;
+static Equalizer equalizer;
 
 void core1_main(void)
 {
@@ -28,6 +29,8 @@ void core1_main(void)
                               output};
     Core1Decoder decoder = core1_opus_decoder(&opus, memory);
     core1_stream_init(&stream, core1_region(), decoder);
+    core1_stream_set_equalizer(&stream, &equalizer,
+                               (volatile Core1EqualizerShare *)(uintptr_t)CORE1_SHARED_EQUALIZER);
     core1_ticks_start();
     core1_ticks_measure(&stream);
     core1_stream_set_decoder(&stream, STREAM_CODEC_OPUS, decoder);

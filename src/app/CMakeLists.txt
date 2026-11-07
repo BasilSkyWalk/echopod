@@ -42,7 +42,7 @@ add_library(echo_app STATIC
 )
 target_include_directories(echo_app PUBLIC include PRIVATE .)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_app PRIVATE ECHO_RESIDENT_TABLES ECHO_EQ_FILES_HIDDEN)
+    target_compile_definitions(echo_app PRIVATE ECHO_RESIDENT_TABLES)
 endif()
 target_link_libraries(echo_app
     PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_settings echo_sound echo_hal

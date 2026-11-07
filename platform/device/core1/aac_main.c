@@ -26,6 +26,7 @@ void free(void *pointer);
 static size_t window_used[SLOT_ROWS];
 static Core1Aac aac;
 static Core1Stream stream;
+static Equalizer equalizer;
 
 static uint8_t *window_start(uint32_t row)
 {
@@ -80,6 +81,8 @@ void core1_main(void)
     }
     Core1Decoder decoder = core1_aac_decoder(&aac, reset_heap);
     core1_stream_init(&stream, core1_region(), decoder);
+    core1_stream_set_equalizer(&stream, &equalizer,
+                               (volatile Core1EqualizerShare *)(uintptr_t)CORE1_SHARED_EQUALIZER);
     core1_ticks_start();
     core1_ticks_measure(&stream);
     core1_stream_set_decoder(&stream, STREAM_CODEC_AAC, decoder);

@@ -113,11 +113,14 @@ static bool resting;
 static bool slow_allowed;
 static bool deferred;
 static bool queued_light;
+static int queued_program;
 static uint32_t queued_token;
 static char queued_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint32_t rest_position_ms;
 static uint32_t paused_since_ms;
 static uint32_t lead_frames;
+
+static void clear_ring(void);
 
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
@@ -181,16 +184,17 @@ static bool tag_is(const uint8_t *bytes, const char *tag)
 
 static SourceKind kind_of(const char *path)
 {
-    FlacInput input;
-    if (!open_file(NULL, path, &input)) {
+    HalFile local;
+    if (!hal_file_open(&local, path)) {
         return SOURCE_FLAC;
     }
+    FlacInput input = {.read = read_file, .context = &local, .size = local.size};
     uint8_t magic[SNIFF_BYTES] = {0};
-    bool read = input.size >= SNIFF_BYTES && input.read(input.context, 0, magic, sizeof magic);
+    bool read = local.size >= SNIFF_BYTES && read_file(&local, 0, magic, sizeof magic);
     if (read && mp4_signature(magic)) {
         Mp4Track track;
         bool probed = mp4_probe(input, &track);
-        close_file(NULL);
+        hal_file_close(&local);
         if (probed && track.codec == MP4_CODEC_ALAC) {
             return SOURCE_ALAC;
         }
@@ -199,10 +203,10 @@ static SourceKind kind_of(const char *path)
     if (read && ogg_signature(magic)) {
         OggOpusInfo opus;
         bool probed = ogg_opus_probe(input, &opus);
-        close_file(NULL);
+        hal_file_close(&local);
         return probed ? SOURCE_OPUS : SOURCE_UNKNOWN;
     }
-    close_file(NULL);
+    hal_file_close(&local);
     if (!read || tag_is(magic, "fLaC")) {
         return SOURCE_FLAC;
     }
@@ -221,6 +225,23 @@ static Core1Program program_for(SourceKind kind)
         return CORE1_PROGRAM_OPUS;
     }
     return kind == SOURCE_AAC ? CORE1_PROGRAM_AAC : CORE1_PROGRAM_FLAC;
+}
+
+static int program_of(SourceKind kind)
+{
+    switch (kind) {
+    case SOURCE_FLAC:
+    case SOURCE_ALAC:
+        return CORE1_PROGRAM_FLAC;
+    case SOURCE_MP3:
+        return CORE1_PROGRAM_MP3;
+    case SOURCE_AAC:
+        return CORE1_PROGRAM_AAC;
+    case SOURCE_OPUS:
+        return CORE1_PROGRAM_OPUS;
+    default:
+        return -1;
+    }
 }
 
 static AudioSource chosen_source(void)
@@ -455,6 +476,7 @@ static bool start_output(bool audible)
     if (!ensure_path(rate)) {
         return false;
     }
+    clear_ring();
     bool from_start = audio_engine_status(&engine).position_ms == 0;
     uint32_t lead = frames_in(cold ? COLD_LEAD_MS : WARM_LEAD_MS);
     audio_engine_lead_in(&engine, lead, frames_in(from_start ? START_RAMP_MS : RESUME_RAMP_MS));
@@ -562,7 +584,8 @@ static void follow_queue(void)
     if (!engine_ready || queued_path[0] == '\0') {
         return;
     }
-    bool restart = stream_service == NULL && clock_for(queued_light) != hal_system_clock_mhz();
+    bool restart = stream_service == NULL && (clock_for(queued_light) != hal_system_clock_mhz() ||
+                                              program_of(source_kind) != queued_program);
     audio_engine_queue_next(&engine, restart ? NULL : queued_path, queued_token);
     deferred = restart;
 }
@@ -575,6 +598,7 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
     stop_tone();
     stop_transfer();
     choose_clock(path);
+    core1_source_reset_equalizer(&core1_source);
     if (!audio_engine_play(&engine, path, start_ms, token)) {
         return false;
     }
@@ -592,9 +616,11 @@ void hal_audio_queue_next(const char *path, uint32_t token)
     queued_path[0] = '\0';
     audio_engine_queue_next(&engine, path, token);
     if (path == NULL) {
+        queued_program = -1;
         return;
     }
     queued_light = board_saving(HAL_SAVING_SLOW_CLOCK) && light_track(path);
+    queued_program = program_of(kind_of(path));
     queued_token = token;
     remember(queued_path, path);
     follow_queue();
@@ -643,6 +669,7 @@ static void seek_to(uint32_t position_ms, bool paused, bool choose)
     if (choose) {
         choose_clock(audio_engine_current_path(&engine));
     }
+    core1_source_reset_equalizer(&core1_source);
     if (!audio_engine_seek(&engine, position_ms) || !start_output(!paused)) {
         audio_engine_stop(&engine);
         return;

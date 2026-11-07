@@ -394,6 +394,16 @@ void equalizer_init(Equalizer *equalizer)
     *equalizer = (Equalizer){0};
 }
 
+void equalizer_reset(Equalizer *equalizer)
+{
+    EqualizerCurve curve =
+        equalizer->has_pending ? equalizer->pending_curve : equalizer->current.curve;
+    uint32_t rate = equalizer->rate;
+    *equalizer = (Equalizer){0};
+    equalizer->rate = rate;
+    design_chain(&equalizer->current, &curve, rate, false);
+}
+
 void equalizer_set_curve(Equalizer *equalizer, const EqualizerCurve *curve)
 {
     bool keep_history = !equalizer->has_pending && chain_active(&equalizer->current) &&

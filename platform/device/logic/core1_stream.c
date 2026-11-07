@@ -254,6 +254,10 @@ static void adopt(Core1Stream *stream, uint32_t generation)
     control->slot_samples = stream->slot_samples;
     if (stream->equalizer != NULL) {
         equalizer_set_rate(stream->equalizer, info.sample_rate);
+        if (control->equalizer_reset != 0) {
+            control->equalizer_reset = 0;
+            equalizer_reset(stream->equalizer);
+        }
     }
     FlacInput input = {
         .read = read_ring, .context = stream, .size = stream->end_offset - stream->start_offset};
@@ -432,6 +436,22 @@ static uint32_t next_generation(Core1Source *source)
     return source->generation;
 }
 
+void core1_source_reset_equalizer(Core1Source *source)
+{
+    source->reset_equalizer = true;
+}
+
+static void begin_generation(Core1Source *source)
+{
+    volatile StreamControl *control = source->region.control;
+    control->equalizer_reset = source->reset_equalizer ? 1u : 0u;
+    source->reset_equalizer = false;
+    publish();
+    control->generation = next_generation(source);
+    source->streaming = true;
+    wake_core1(source);
+}
+
 static bool open_stream(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     Core1Source *source = context;
@@ -465,10 +485,7 @@ static bool open_stream(void *context, const char *path, uint32_t start_ms, Audi
     control->written = source->written;
     control->codec = STREAM_CODEC_NATIVE;
     use_ring(source, source->ring_capacity);
-    publish();
-    control->generation = next_generation(source);
-    source->streaming = true;
-    wake_core1(source);
+    begin_generation(source);
     return true;
 }
 
@@ -643,10 +660,7 @@ static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = source->written;
     control->codec = STREAM_CODEC_NATIVE;
     use_ring(source, source->ring_capacity);
-    publish();
-    control->generation = next_generation(source);
-    source->streaming = true;
-    wake_core1(source);
+    begin_generation(source);
     return true;
 }
 
@@ -722,10 +736,7 @@ static bool open_mp4(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = 0;
     control->codec = stream_codec_of(probed.codec);
     use_ring(source, source->ring_capacity);
-    publish();
-    control->generation = next_generation(source);
-    source->streaming = true;
-    wake_core1(source);
+    begin_generation(source);
     return true;
 }
 
@@ -782,10 +793,7 @@ static bool open_ogg(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = source->written;
     control->codec = STREAM_CODEC_OPUS;
     use_ring(source, smaller(source->ring_capacity, CORE1_OPUS_RING_BYTES));
-    publish();
-    control->generation = next_generation(source);
-    source->streaming = true;
-    wake_core1(source);
+    begin_generation(source);
     return true;
 }
 
