@@ -40,6 +40,8 @@ if(CMAKE_CROSSCOMPILING)
     target_compile_definitions(echo_faad2 PRIVATE abs=__builtin_abs)
     target_compile_options(echo_faad2 PRIVATE -O2)
     target_include_directories(echo_faad2 SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
+else()
+    target_compile_definitions(echo_faad2 PRIVATE HAVE_STDINT_H=1)
 endif()
 
 set(ECHO_OPUS_DIR ${PROJECT_SOURCE_DIR}/third_party/opus)
