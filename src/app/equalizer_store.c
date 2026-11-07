@@ -99,6 +99,12 @@ bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, Equaliz
     if (error == NULL) {
         error = &local;
     }
+#ifdef ECHO_EQ_FILES_HIDDEN
+    (void)name;
+    (void)curve;
+    error->problem = EQUALIZER_TEXT_UNREADABLE;
+    return false;
+#endif
     char path[PATH_CAPACITY];
     if (!make_path(path, name)) {
         error->problem = EQUALIZER_TEXT_UNREADABLE;
