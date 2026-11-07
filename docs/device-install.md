@@ -44,7 +44,7 @@ The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's sha
 
 ## What to check after an install
 
-- **Home screen:** "EchoPod" with Music, Now Playing, Settings and Diagnostics. Without a card, Music says "No library".
+- **Home screen:** "EchoPod" with Music, Now Playing, Settings and Diagnostics. Without a card (none inserted, or one the player can't mount), the Home panel says "No microSD card", the Music lists say "No microSD card" with how to fix it, and changing a setting says "Insert a microSD card to save settings". With a card but no library, the Music lists say "No library".
 - **Diagnostics → Firmware:** the commit you built.
 - **Keys:** Diagnostics → Key test.
 - **Power:** a tap turns the screen off and on. Holding it for 2 s switches the player off; with a cable in, it shows the charge screen instead, and holding Power again turns the player back on.

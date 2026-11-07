@@ -30,6 +30,7 @@ typedef struct SdHost {
     void (*delay_ms)(void *context, uint32_t milliseconds);
     bool (*card_present)(void *context);
     void (*stop)(void *context);
+    uint32_t (*now_ms)(void *context);
     void *context;
 } SdHost;
 
@@ -55,10 +56,16 @@ typedef struct SdRetryStats {
 } SdRetryStats;
 
 enum {
-    SD_RETRY_ATTEMPTS = 2
+    SD_RETRY_ATTEMPTS = 2,
+    SD_READY_TRIES = 100,
+    SD_READY_BUDGET_MS = 2000,
+    SD_STATUS_TRIES = 1000,
+    SD_STATUS_BUDGET_MS = 2000
 };
 
 bool sd_card_init(SdCard *card, const SdHost *host);
 bool sd_card_retry(const SdRetry *retry, SdRetryStats *stats);
+bool sd_card_in_transfer(const SdHost *host, const SdCard *card);
+bool sd_card_wait_transfer(const SdHost *host, const SdCard *card);
 uint32_t sd_card_address(const SdCard *card, uint32_t lba);
 uint32_t sd_card_rca_argument(const SdCard *card);

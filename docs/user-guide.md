@@ -42,6 +42,7 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
 - Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
 - EchoPod keeps its own files in a hidden `/.echo` folder on the card, about 110 MB of them. Don't delete it unless you want the library rebuilt.
+- A card is needed: the library, your settings, favorites and resume points are all saved there. Without one, Home shows "No microSD card" and a changed setting isn't kept ("Insert a microSD card to save settings"). Put a card in and restart the player.
 - Music can also go on the player's internal storage (the drive called ECHO MINI, about 8 GB on the 8 GB model): turn on Settings → **Internal storage** (it's off at first). The library then holds the music of both: albums, artists, genres, songs and playlists mix the two, and under Folders the internal storage is one more folder, **Internal storage**, next to the card's own folders. An SD card is still needed, because the library and EchoPod's other files stay in `/.echo` on the card; the player never writes to internal storage. Turning the setting on or off rebuilds the library. Audiobooks and podcasts on internal storage play as music: the Audiobooks and Podcasts shelves only read the card's top-level `Audiobooks` and `Podcasts` folders.
 
 ## Copying music over USB

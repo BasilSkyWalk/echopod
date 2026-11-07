@@ -45,6 +45,7 @@ typedef struct HalDirEntry {
 } HalDirEntry;
 
 void hal_storage_show_internal(bool shown);
+bool hal_storage_card_ready(void);
 bool hal_dir_open(HalDir *dir, const char *path);
 bool hal_dir_next(HalDir *dir, HalDirEntry *entry);
 void hal_dir_close(HalDir *dir);

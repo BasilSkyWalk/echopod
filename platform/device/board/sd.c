@@ -7,6 +7,7 @@
 #include "device/card_write.h"
 #include "device/sd_card.h"
 #include "gpio.h"
+#include "hal/clock.h"
 #include "mmc.h"
 #include "registers.h"
 
@@ -21,17 +22,11 @@
 #define GRF_DETECT_PULL 0x14u
 #define GRF_DETECT_PULL_VALUE 0x00080008u
 #define CRU_MMC_DIVIDERS 0x30u
-#define STATUS_READY_FOR_DATA (1u << 8)
-#define STATUS_STATE_SHIFT 9
-#define STATUS_STATE_MASK 0xFu
-#define STATE_TRANSFER 4u
 
 enum {
     GATE_SD_BUS = 0x18,
     GATE_SD_CARD_CLOCK = 0x6B,
     RESET_SD = 0x12,
-    CMD_SEND_STATUS = 13,
-    STATUS_TRIES = 1000,
     POWER_SETTLE_MS = 1,
     DETECT_SETTLE_MS = 1
 };
@@ -90,9 +85,14 @@ static void host_stop(void *context)
     cru_gate(GATE_SD_BUS, false);
 }
 
-static const SdHost HOST = {host_command, host_set_clock,    host_set_bus_width,
-                            host_delay,   host_card_present, host_stop,
-                            NULL};
+static uint32_t host_now_ms(void *context)
+{
+    (void)context;
+    return hal_clock_milliseconds();
+}
+
+static const SdHost HOST = {host_command,      host_set_clock, host_set_bus_width, host_delay,
+                            host_card_present, host_stop,      host_now_ms,        NULL};
 
 static void start_card_detect(void)
 {
@@ -132,20 +132,12 @@ static bool start_card(void)
 
 static bool in_transfer_state(void)
 {
-    uint32_t words[4] = {0, 0, 0, 0};
-    SdCommand status = {CMD_SEND_STATUS, sd_card_rca_argument(&card), SD_RESPONSE_SHORT, false};
-    return mmc_command(&SD_HOST, status, words) && (words[0] & STATUS_READY_FOR_DATA) != 0 &&
-           ((words[0] >> STATUS_STATE_SHIFT) & STATUS_STATE_MASK) == STATE_TRANSFER;
+    return sd_card_in_transfer(&HOST, &card);
 }
 
 static bool wait_for_transfer_state(void)
 {
-    for (int attempt = 0; attempt < STATUS_TRIES; attempt++) {
-        if (in_transfer_state()) {
-            return true;
-        }
-    }
-    return false;
+    return sd_card_wait_transfer(&HOST, &card);
 }
 
 static void note_card_failure(void)

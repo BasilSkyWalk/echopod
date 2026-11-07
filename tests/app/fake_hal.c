@@ -144,6 +144,7 @@ typedef struct FakeHal {
     HalUsbMode usb_mode;
     bool usb_prompt;
     bool internal_shown;
+    bool card_missing;
     uint8_t dac_volume;
     HalTime time;
     int time_reads;
@@ -719,6 +720,16 @@ void hal_storage_show_internal(bool shown)
     fake.internal_shown = shown;
 }
 
+bool hal_storage_card_ready(void)
+{
+    return !fake.card_missing;
+}
+
+void fake_hal_set_card_missing(bool missing)
+{
+    fake.card_missing = missing;
+}
+
 bool fake_hal_internal_shown(void)
 {
     return fake.internal_shown;
@@ -830,7 +841,7 @@ static void register_written(const char *path, uint32_t length)
 bool hal_file_write(const char *path, const void *bytes, uint32_t length)
 {
     WrittenFile *slot = written_slot(path);
-    if (slot == NULL || length > WRITTEN_CAPACITY) {
+    if (fake.card_missing || slot == NULL || length > WRITTEN_CAPACITY) {
         return false;
     }
     copy_path(slot->path, path);
@@ -1278,6 +1289,9 @@ HalReserveResult hal_file_reserve(const char *path, uint32_t size)
     }
     fake.reserve_count++;
     HalFile existing;
+    if (fake.card_missing) {
+        return HAL_RESERVE_FAILED;
+    }
     if (hal_file_open(&existing, path)) {
         return HAL_RESERVE_EXISTS;
     }
