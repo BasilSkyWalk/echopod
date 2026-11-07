@@ -1,14 +1,13 @@
 # EchoPod release notes
 
-## 0.11.0 (release candidate 2)
+## 0.11.0
 
-A test build, tried on one Echo Mini 8 GB.
+This release answers most of the requests from GitHub and Reddit: listen history, a clock, music on internal storage, grouped settings, and fixes for battery life, Bluetooth, USB and the SD card. Tested on one Echo Mini 8 GB.
 
 ### New
 
 - **Listen history for Last.fm and ListenBrainz** (issue 38). Each time you connect to a computer, the player adds what you played to `/.scrobbler.log` on the card, the file Rockbox-style uploaders read (for example rb-scrobbler). `tools/echo_history.py` can also write it. A play counts when the track is over 30 s and you heard half of it or 4 minutes. Audiobooks and podcasts aren't logged. Settings → Listen history turns it off.
 - **A clock** (issue 23). EchoPod reads the player's clock chip at start, sets it from your computer at the end of every echo-sync, and Settings → Date & time sets it by hand. Settings → Clock shows the time in the status bar. Listen history uses it for real play times; without a set clock, times are estimated by counting back from when you connect. A clock dated before this firmware was built counts as not set, and the first start after installing asks once to set it. Diagnostics → Clock shows what the chip holds.
-- **Equalizer presets from files** (pull request 35, by mahyarrezghi). Put Equalizer APO or AutoEQ `ParametricEQ.txt` files in `/EQ`: up to 10 filters, peak and shelf. Unsupported filters are skipped with a notice.
 - **USB DAC mode:** play/pause, next and previous reach the computer; volume keys no longer crackle; the DAC screen shows the battery; Swap volume buttons and portrait apply.
 - **Ask when connected:** plugging into a computer asks Storage, DAC or Charge only (issue 5). Settings → Ask when connected turns it off.
 - **Music on internal storage** (issue 36). Music on the player's own storage is in the library too, as an "Internal storage" folder; Settings → Music folders leaves its folders out. echo-sync finds the player's internal storage drive by itself. The library files stay on the microSD card.
