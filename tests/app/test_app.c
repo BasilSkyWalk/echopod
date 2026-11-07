@@ -21,6 +21,7 @@
 #include "scrobbler_log.h"
 #include "settings/rocker.h"
 #include "settings/settings.h"
+#include "settings_screens.h"
 #include "settings_store.h"
 #include "ui/slide.h"
 #include "ui/status_bar.h"
@@ -40,24 +41,27 @@ enum {
     HOME_SETTINGS_INDEX = 1,
     HOME_NOW_PLAYING_INDEX = 3,
     SETTINGS_REPEAT_INDEX = 1,
+    SETTINGS_BLUETOOTH_INDEX = 2,
     SETTINGS_EQUALIZER_INDEX = 3,
     SETTINGS_SLEEP_INDEX = 4,
-    SETTINGS_TIMEOUT_INDEX = 6,
-    SETTINGS_BRIGHTNESS_INDEX = 7,
-    SETTINGS_ORIENTATION_INDEX = 8,
-    SETTINGS_GAIN_INDEX = 9,
-    SETTINGS_START_INDEX = 13,
-    SETTINGS_RESCAN_INDEX = 14,
-    SETTINGS_LANGUAGE_INDEX = 16,
-    SETTINGS_THEME_INDEX = 30,
-    SETTINGS_LYRICS_INDEX = 31,
-    SETTINGS_FOLDER_VIEW_INDEX = 32,
-    SETTINGS_FOLDERS_INDEX = 33,
-    SETTINGS_CLOCK_INDEX = 34,
-    SETTINGS_STATUS_BAR_INDEX = 35,
-    SETTINGS_POWER_ON_INDEX = 36,
-    SETTINGS_SWAP_INDEX = 20,
-    SETTINGS_USB_PROMPT_INDEX = 27,
+    SETTINGS_FIRST_GROUP_INDEX = 5,
+    SOUND_GAIN_ROW = 0,
+    DISPLAY_THEME_ROW = 0,
+    DISPLAY_BRIGHTNESS_ROW = 3,
+    DISPLAY_TIMEOUT_ROW = 4,
+    DISPLAY_ORIENTATION_ROW = 5,
+    DISPLAY_STATUS_BAR_ROW = 8,
+    DISPLAY_CLOCK_ROW = 9,
+    LIBRARY_FOLDERS_ROW = 0,
+    LIBRARY_RESCAN_ROW = 1,
+    LIBRARY_START_ROW = 2,
+    LIBRARY_FOLDER_VIEW_ROW = 6,
+    LIBRARY_LYRICS_ROW = 7,
+    BUTTONS_SWAP_ROW = 1,
+    BUTTONS_POWER_ON_ROW = 3,
+    SYSTEM_LANGUAGE_ROW = 0,
+    SYSTEM_DATE_TIME_ROW = 1,
+    SYSTEM_USB_PROMPT_ROW = 4,
     DAC_VOLUME_WINDOW_MS = 3000,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
@@ -511,7 +515,7 @@ static void the_home_menu_hides_now_playing_with_nothing_loaded(void)
     CHECK(title_is("Music"));
 }
 
-static void open_setting(int index)
+static void open_top_setting(int index)
 {
     move_down(HOME_SETTINGS_INDEX);
     tap(KEY_PLAY);
@@ -519,10 +523,17 @@ static void open_setting(int index)
     tap(KEY_PLAY);
 }
 
+static void open_setting(SettingsGroup group, int row)
+{
+    open_top_setting(SETTINGS_FIRST_GROUP_INDEX + (int)group);
+    move_down(row);
+    tap(KEY_PLAY);
+}
+
 static void settings_choose_shuffle_and_repeat(void)
 {
     start_app_with_library();
-    open_setting(0);
+    open_top_setting(0);
     CHECK(title_is("Shuffle"));
     move_down(1);
     tap(KEY_PLAY);
@@ -547,7 +558,7 @@ static void brightness_is_applied_and_saved(void)
 {
     start_app_with_library();
     CHECK_EQUAL(settings_defaults().brightness, fake_hal_display_brightness());
-    open_setting(SETTINGS_BRIGHTNESS_INDEX);
+    open_setting(SETTINGS_DISPLAY, DISPLAY_BRIGHTNESS_ROW);
     CHECK(title_is("Brightness"));
     move_down(1);
     tap(KEY_PLAY);
@@ -561,7 +572,7 @@ static void the_equalizer_opens_from_settings_and_is_applied(void)
 {
     start_app_with_library();
     CHECK_EQUAL(0, fake_hal_equalizer().band_count);
-    open_setting(SETTINGS_EQUALIZER_INDEX);
+    open_top_setting(SETTINGS_EQUALIZER_INDEX);
     CHECK(title_is("Equalizer"));
     move_down(2);
     CHECK_EQUAL(2, fake_hal_equalizer().band_count);
@@ -572,7 +583,7 @@ static void the_equalizer_opens_from_settings_and_is_applied(void)
 static void gain_is_applied(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_GAIN_INDEX);
+    open_setting(SETTINGS_SOUND, SOUND_GAIN_ROW);
     move_down(1);
     tap(KEY_PLAY);
     CHECK_EQUAL(HAL_AUDIO_GAIN_HIGH, fake_hal_audio_gain());
@@ -581,7 +592,7 @@ static void gain_is_applied(void)
 static void saved_settings_are_restored_at_start(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_BRIGHTNESS_INDEX);
+    open_setting(SETTINGS_DISPLAY, DISPLAY_BRIGHTNESS_ROW);
     move_down(2);
     tap(KEY_PLAY);
     restart_app();
@@ -596,11 +607,11 @@ static Orientation swapping_portrait(void)
 
 static void choose_orientation(Orientation orientation)
 {
-    open_setting(SETTINGS_ORIENTATION_INDEX);
+    open_setting(SETTINGS_DISPLAY, DISPLAY_ORIENTATION_ROW);
     CHECK(title_is("Orientation"));
     move_down((int)orientation);
     tap(KEY_PLAY);
-    CHECK(title_is("Settings"));
+    CHECK(title_is("Display"));
 }
 
 static void the_orientation_setting_is_saved(void)
@@ -618,12 +629,12 @@ static void a_swapping_portrait_turns_the_rocker_around_in_lists(void)
     choose_orientation(swapping_portrait());
     tap(KEY_VOLUME_UP);
     tap(KEY_PLAY);
-    CHECK(title_is("Brightness"));
+    CHECK(title_is("Screen timeout"));
     tap(KEY_BACK);
     tap(KEY_VOLUME_DOWN);
     tap(KEY_VOLUME_DOWN);
     tap(KEY_PLAY);
-    CHECK(title_is("Gain"));
+    CHECK(title_is("Animations"));
 }
 
 static void the_other_portrait_and_landscape_keep_the_rocker(void)
@@ -634,7 +645,7 @@ static void the_other_portrait_and_landscape_keep_the_rocker(void)
     choose_orientation(keeping);
     tap(KEY_VOLUME_UP);
     tap(KEY_PLAY);
-    CHECK(title_is("Gain"));
+    CHECK(title_is("Animations"));
 }
 
 static void dac_press(Key key, uint32_t held_ms)
@@ -666,7 +677,7 @@ static void dac_keys_follow_the_swap_setting(void)
     CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_DOWN));
     CHECK_EQUAL(APP_DAC_KEY_NONE, app_dac_next_key());
     app_dac_keys_stop();
-    open_setting(SETTINGS_SWAP_INDEX);
+    open_setting(SETTINGS_BUTTONS, BUTTONS_SWAP_ROW);
     CHECK(title_is("Swap volume buttons"));
     move_down(1);
     tap(KEY_PLAY);
@@ -730,7 +741,7 @@ static void dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again
     CHECK_EQUAL(APP_DAC_KEY_LEAVE, app_dac_next_key());
     dac_release(KEY_BACK);
     app_dac_keys_stop();
-    open_setting(0);
+    open_top_setting(0);
     CHECK(title_is("Shuffle"));
 }
 
@@ -751,7 +762,7 @@ static void a_usb_choice_is_picked_with_play(void)
     dac_release(KEY_PLAY);
     CHECK_EQUAL(2, app_choice_step());
     app_choice_close();
-    open_setting(0);
+    open_top_setting(0);
     CHECK(title_is("Shuffle"));
 }
 
@@ -782,11 +793,11 @@ static void the_last_setting_asks_whether_to_prompt_on_usb(void)
 {
     start_app_with_library();
     CHECK(fake_hal_usb_prompt());
-    open_setting(SETTINGS_USB_PROMPT_INDEX);
+    open_setting(SETTINGS_SYSTEM, SYSTEM_USB_PROMPT_ROW);
     CHECK(title_is("Ask when connected"));
     move_down(1);
     tap(KEY_PLAY);
-    CHECK(title_is("Settings"));
+    CHECK(title_is("System"));
     CHECK(!fake_hal_usb_prompt());
     Settings settings;
     CHECK(saved_settings(&settings));
@@ -834,7 +845,7 @@ static bool toast_is(const char *expected);
 static void the_chosen_language_is_loaded_when_the_app_starts_again(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_LANGUAGE_INDEX);
+    open_setting(SETTINGS_SYSTEM, SYSTEM_LANGUAGE_ROW);
     CHECK(title_is("Language"));
     move_down((int)LANGUAGE_GERMAN);
     tap(KEY_PLAY);
@@ -863,7 +874,7 @@ static void choosing_landscape_again_turns_the_screen_back(void)
     tap(KEY_PLAY);
     step();
     CHECK_EQUAL(HAL_DISPLAY_LANDSCAPE, fake_hal_display_rotation());
-    CHECK(title_is("Settings"));
+    CHECK(title_is("Display"));
 }
 
 static void the_rocker_stays_turned_around_after_a_restart(void)
@@ -1015,7 +1026,7 @@ static void after_a_timeout_volume_changes_without_waking(void)
 static void the_timeout_setting_is_used(void)
 {
     start_app();
-    open_setting(SETTINGS_TIMEOUT_INDEX);
+    open_setting(SETTINGS_DISPLAY, DISPLAY_TIMEOUT_ROW);
     CHECK(title_is("Screen timeout"));
     move_up(2);
     tap(KEY_PLAY);
@@ -1152,7 +1163,7 @@ static void without_a_card_the_lists_ask_for_one(void)
 static void without_a_card_a_setting_change_asks_for_one(void)
 {
     start_without_a_card();
-    open_setting(SETTINGS_LYRICS_INDEX);
+    open_setting(SETTINGS_LIBRARY, LIBRARY_LYRICS_ROW);
     move_down(1);
     tap(KEY_PLAY);
     CHECK(toast_is("Insert a microSD card to save settings"));
@@ -1180,7 +1191,7 @@ static void music_folders_leaves_an_unticked_folder_out_of_the_rescan(void)
     step();
     CHECK(toast_is("Library: 0 tracks"));
     CHECK_EQUAL(1, fake_hal_watched_dir_opens());
-    open_setting(SETTINGS_FOLDERS_INDEX);
+    open_setting(SETTINGS_LIBRARY, LIBRARY_FOLDERS_ROW);
     CHECK(title_is("Music folders"));
     move_down(1);
     tap(KEY_PLAY);
@@ -1211,7 +1222,7 @@ static void toggling_music_folders_again_and_again_keeps_rescanning(void)
     fake_hal_add_file(MUSIC_CHECK_PATH, NULL, 4096);
     int held = fake_hal_open_files();
     for (int cycle = 0; cycle < 6; cycle++) {
-        open_setting(SETTINGS_FOLDERS_INDEX);
+        open_setting(SETTINGS_LIBRARY, LIBRARY_FOLDERS_ROW);
         CHECK(title_is("Music folders"));
         move_down(1);
         tap(KEY_PLAY);
@@ -1245,7 +1256,7 @@ static void a_missing_library_file_on_a_full_card_says_there_is_no_room(void)
 static void rescanning_without_a_card_says_so(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_RESCAN_INDEX);
+    open_setting(SETTINGS_LIBRARY, LIBRARY_RESCAN_ROW);
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
     CHECK(toast_is("No music found on the card"));
@@ -1498,7 +1509,7 @@ static void the_sleep_timer_turns_the_player_off(void)
     start_app_with_library();
     fake_hal_set_battery(
         (HalBattery){.known = true, .percent = 80, .millivolts = 3900, .usb_power = true});
-    open_setting(SETTINGS_SLEEP_INDEX);
+    open_top_setting(SETTINGS_SLEEP_INDEX);
     CHECK(title_is("Sleep timer"));
     move_down(1);
     tap(KEY_PLAY);
@@ -1744,7 +1755,7 @@ static void playlists_open_from_the_music_menu(void)
 static void start_with(StartScreen start)
 {
     start_app_with_library();
-    open_setting(SETTINGS_START_INDEX);
+    open_setting(SETTINGS_LIBRARY, LIBRARY_START_ROW);
     CHECK(title_is("Start screen"));
     move_down((int)start);
     tap(KEY_PLAY);
@@ -1850,7 +1861,7 @@ static void holding_play_in_cover_flow_toggles_a_favorite(void)
 static void start_with_folder_flows(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_FOLDER_VIEW_INDEX);
+    open_setting(SETTINGS_LIBRARY, LIBRARY_FOLDER_VIEW_ROW);
     CHECK(title_is("Folders & playlists"));
     move_down(1);
     tap(KEY_PLAY);
@@ -2363,20 +2374,70 @@ static void played_songs_go_to_the_listen_history_with_a_mark_for_usb(void)
     CHECK_EQUAL(now_ms, records[count - 1].end_ms);
 }
 
-static void the_clock_and_date_time_rows_end_the_settings_list(void)
+static void the_clock_is_under_display_and_date_time_under_system(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_CLOCK_INDEX);
+    open_setting(SETTINGS_DISPLAY, DISPLAY_CLOCK_ROW);
     CHECK(title_is("Clock"));
     move_down(1);
     tap(KEY_PLAY);
-    CHECK(title_is("Settings"));
+    CHECK(title_is("Display"));
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(CLOCK_ON, settings.options[OPTION_CLOCK]);
-    move_down(SETTINGS_POWER_ON_INDEX - SETTINGS_CLOCK_INDEX + 1);
+    tap(KEY_BACK);
+    CHECK(title_is("Settings"));
+    move_down(SETTINGS_SYSTEM - SETTINGS_DISPLAY);
+    tap(KEY_PLAY);
+    CHECK(title_is("System"));
+    move_down(SYSTEM_DATE_TIME_ROW);
     tap(KEY_PLAY);
     CHECK(title_is("Date & time"));
+    tap(KEY_BACK);
+    CHECK(title_is("System"));
+    tap(KEY_BACK);
+    CHECK(title_is("Settings"));
+}
+
+static void back_leaves_a_setting_then_its_group_then_settings(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_SOUND, SOUND_GAIN_ROW);
+    CHECK(title_is("Gain"));
+    tap(KEY_BACK);
+    CHECK(title_is("Sound"));
+    tap(KEY_BACK);
+    CHECK(title_is("Settings"));
+    tap(KEY_BACK);
+    CHECK(title_is("EchoPod"));
+}
+
+static void settings_and_its_groups_keep_their_selected_rows(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_DISPLAY, DISPLAY_BRIGHTNESS_ROW);
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    tap(KEY_BACK);
+    CHECK(title_is("EchoPod"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Settings"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Display"));
+    tap(KEY_PLAY);
+    CHECK(title_is("Brightness"));
+}
+
+static void holding_menu_opens_settings_once(void)
+{
+    start_app_with_library();
+    hold(KEY_MENU);
+    CHECK(title_is("Settings"));
+    move_down(SETTINGS_FIRST_GROUP_INDEX + (int)SETTINGS_BUTTONS);
+    tap(KEY_PLAY);
+    CHECK(title_is("Buttons"));
+    hold(KEY_MENU);
+    CHECK(title_is("Buttons"));
     tap(KEY_BACK);
     CHECK(title_is("Settings"));
 }
@@ -2384,11 +2445,11 @@ static void the_clock_and_date_time_rows_end_the_settings_list(void)
 static void the_light_theme_lightens_the_screens_and_keeps_the_accent(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_THEME_INDEX);
+    open_setting(SETTINGS_DISPLAY, DISPLAY_THEME_ROW);
     CHECK(title_is("Theme"));
     move_down(1);
     tap(KEY_PLAY);
-    CHECK(title_is("Settings"));
+    CHECK(title_is("Display"));
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(THEME_LIGHT, settings.options[OPTION_THEME]);
@@ -2404,11 +2465,11 @@ static void the_light_theme_lightens_the_screens_and_keeps_the_accent(void)
 static void a_large_status_bar_grows_the_portrait_status_band(void)
 {
     start_app_with_library();
-    open_setting(SETTINGS_STATUS_BAR_INDEX);
+    open_setting(SETTINGS_DISPLAY, DISPLAY_STATUS_BAR_ROW);
     CHECK(title_is("Portrait status bar"));
     move_down(1);
     tap(KEY_PLAY);
-    CHECK(title_is("Settings"));
+    CHECK(title_is("Display"));
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(STATUS_BAR_LARGE, settings.options[OPTION_STATUS_BAR]);
@@ -2431,11 +2492,11 @@ static void power_on_hold_is_asked_for_at_the_next_start(void)
 {
     start_app_with_library();
     CHECK(!fake_hal_start_hold_required());
-    open_setting(SETTINGS_POWER_ON_INDEX);
+    open_setting(SETTINGS_BUTTONS, BUTTONS_POWER_ON_ROW);
     CHECK(title_is("Power on"));
     move_down(1);
     tap(KEY_PLAY);
-    CHECK(title_is("Settings"));
+    CHECK(title_is("Buttons"));
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(POWER_ON_HOLD, settings.options[OPTION_POWER_ON]);
@@ -2473,7 +2534,7 @@ static void lyrics_in_capitals_are_found_and_the_setting_hides_them(void)
     play_first_album_track();
     CHECK(app_now_playing_lyric() != NULL);
     hold_back();
-    open_setting(SETTINGS_LYRICS_INDEX);
+    open_setting(SETTINGS_LIBRARY, LIBRARY_LYRICS_ROW);
     CHECK(title_is("Lyrics"));
     move_down(1);
     tap(KEY_PLAY);
@@ -2849,12 +2910,15 @@ int main(void)
         TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
         TEST_CASE(a_listen_history_turned_off_records_nothing),
         TEST_CASE(connecting_writes_the_scrobbler_log_while_the_history_is_on),
-        TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
+        TEST_CASE(the_clock_is_under_display_and_date_time_under_system),
         TEST_CASE(a_clock_dated_before_the_firmware_shows_no_time),
         TEST_CASE(the_listen_history_has_no_time_while_the_clock_predates_the_firmware),
         TEST_CASE(a_new_firmware_asks_once_for_the_clock_after_the_start_up_screen),
         TEST_CASE(set_now_opens_the_date_and_time_at_the_build_date),
         TEST_CASE(a_new_firmware_does_not_ask_when_the_clock_is_set),
+        TEST_CASE(back_leaves_a_setting_then_its_group_then_settings),
+        TEST_CASE(settings_and_its_groups_keep_their_selected_rows),
+        TEST_CASE(holding_menu_opens_settings_once),
         TEST_CASE(the_light_theme_lightens_the_screens_and_keeps_the_accent),
         TEST_CASE(a_large_status_bar_grows_the_portrait_status_band),
         TEST_CASE(power_on_hold_is_asked_for_at_the_next_start),

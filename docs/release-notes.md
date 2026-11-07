@@ -12,6 +12,7 @@ A test build, tried on one Echo Mini 8 GB.
 - **USB DAC mode:** play/pause, next and previous reach the computer; volume keys no longer crackle; the DAC screen shows the battery; Swap volume buttons and portrait apply.
 - **Ask when connected:** plugging into a computer asks Storage, DAC or Charge only (issue 5). Settings → Ask when connected turns it off.
 - **Music on internal storage** (issue 36). Music on the player's own storage is in the library too, as an "Internal storage" folder; Settings → Music folders leaves its folders out. echo-sync finds the player's internal storage drive by itself. The library files stay on the microSD card.
+- **Settings are grouped** into Sound, Display, Library, Buttons and System.
 - **Settings → Music folders:** untick top-level folders to leave them out of the library.
 - **Cover Flow for folders and playlists** (issue 17): Settings → Folders & playlists → Cover Flow. **Settings → Cover Flow** shows 5 or 3 covers, and the outer covers are smaller.
 - **Lyrics:** a `.lrc` file next to a track shows on Now Playing. Settings → Lyrics turns them off.
