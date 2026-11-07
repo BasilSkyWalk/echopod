@@ -27,13 +27,16 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 ## Build and run the simulator (macOS)
 
 ```sh
-brew install cmake sdl2 clang-format arm-none-eabi-gcc arm-none-eabi-binutils
+brew install cmake sdl2 clang-format
+brew install --cask gcc-arm-embedded
 python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt
 cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
 ./build/dev/platform/sim/echo_sim
 ```
+
+`ctest` also builds the firmware, which needs an `arm-none-eabi-gcc` with newlib's headers. Homebrew's `arm-none-eabi-gcc` formula has none (`math.h: No such file or directory`); Arm's toolchain (`gcc-arm-embedded`) has them. Uninstall the formula first if it's there, so the two don't clash.
 
 ## Build on Windows
 
