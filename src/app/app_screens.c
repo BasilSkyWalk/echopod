@@ -6,6 +6,7 @@
 #include "core/i18n.h"
 #include "diagnostics_values.h"
 #include "hal/power.h"
+#include "hal/storage.h"
 #include "hal/system.h"
 
 typedef enum MusicSource {
@@ -224,6 +225,7 @@ static void build_home(AppScreens *screens, AppScreensContext context)
     screens->home_items[5].shown = player_has_track;
     screens->home_items[5].shown_context = context.player;
     home_art_init(&screens->home_art, context.covers, context.store, context.player, theme);
+    screens->home_art.notice = hal_storage_card_ready() ? NULL : i18n_text(STR_MENU_NO_CARD);
     MenuConfig home = {.title = "EchoPod",
                        .items = screens->home_items,
                        .item_count = HOME_ITEM_COUNT,
@@ -239,9 +241,11 @@ static void build_home(AppScreens *screens, AppScreensContext context)
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
-    MessageConfig no_library = {.title = i18n_text(STR_MENU_NO_LIBRARY),
-                                .message = i18n_text(STR_MENU_NO_LIBRARY_HINT),
-                                .theme = theme};
+    bool card = hal_storage_card_ready();
+    MessageConfig no_library = {
+        .title = i18n_text(card ? STR_MENU_NO_LIBRARY : STR_MENU_NO_CARD),
+        .message = i18n_text(card ? STR_MENU_NO_LIBRARY_HINT : STR_MENU_NO_CARD_HINT),
+        .theme = theme};
     UpNextConfig up_next = {
         .library = &context.store->library, .theme = theme, .player = context.player};
     NowPlayingConfig now_playing = {.player = context.player,

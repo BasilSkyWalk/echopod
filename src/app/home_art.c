@@ -1,13 +1,16 @@
 #include "home_art.h"
 
 #include "gfx/image.h"
+#include "ui/label.h"
 
 enum {
     COVER_MARGIN_TOP = 8,
-    REFLECTION_LIGHT = 80
+    REFLECTION_LIGHT = 80,
+    NOTICE_MARGIN = 6
 };
 
 static const Color PANEL_BACKGROUND = COLOR_RGB(8, 8, 10);
+static const Color NOTICE_TEXT = COLOR_RGB(200, 200, 206);
 
 void home_art_init(HomeArt *art, CoverCache *covers, const LibraryStore *store, Player *player,
                    const Theme *theme)
@@ -89,6 +92,13 @@ void home_art_draw(void *context, Canvas *canvas, Rect area)
         below ? (Rect){area.x, area.y, area.width, 1} : (Rect){area.x, area.y, 1, area.height};
     canvas_fill_rect(canvas, area, PANEL_BACKGROUND);
     canvas_fill_rect(canvas, divider, art->theme->colors.divider);
+    if (art->notice != NULL) {
+        TextStyle style = {.font = art->theme->fonts.small, .color = NOTICE_TEXT};
+        Rect line = {area.x + NOTICE_MARGIN, area.y, area.width - 2 * NOTICE_MARGIN, area.height};
+        Rect text = label_centered_area(style.font, line, art->notice);
+        label_draw(canvas, style, (Label){.area = text, .text = art->notice});
+        return;
+    }
     Image cover;
     if (!art->has_album || cover_cache_full(art->covers, art->album, &cover) != COVER_LOADED) {
         return;

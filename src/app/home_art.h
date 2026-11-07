@@ -20,6 +20,7 @@ typedef struct HomeArt {
     const LibraryStore *store;
     Player *player;
     const Theme *theme;
+    const char *notice;
     bool cycling;
     bool has_album;
     uint16_t album;

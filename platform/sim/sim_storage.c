@@ -50,6 +50,11 @@ void hal_storage_show_internal(bool shown)
     storage.internal_shown = shown;
 }
 
+bool hal_storage_card_ready(void)
+{
+    return storage.card_directory != NULL;
+}
+
 bool sim_storage_host_path(const char *path, char *buffer, size_t capacity)
 {
     size_t prefix_length = sizeof SYSTEM_PREFIX - 1;

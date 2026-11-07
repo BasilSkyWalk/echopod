@@ -1130,6 +1130,31 @@ static bool toast_is(const char *expected)
     return app_toast_text() != NULL && strcmp(expected, app_toast_text()) == 0;
 }
 
+static void start_without_a_card(void)
+{
+    fake_hal_reset();
+    fake_hal_set_card_missing(true);
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+}
+
+static void without_a_card_the_lists_ask_for_one(void)
+{
+    start_without_a_card();
+    open_music_entry(MUSIC_ARTISTS_INDEX);
+    CHECK(title_is("No microSD card"));
+}
+
+static void without_a_card_a_setting_change_asks_for_one(void)
+{
+    start_without_a_card();
+    open_setting(SETTINGS_LYRICS_INDEX);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(toast_is("Insert a microSD card to save settings"));
+}
+
 static void a_refused_track_says_why_it_was_skipped(void)
 {
     start_app_with_library();
@@ -2609,6 +2634,8 @@ int main(void)
         TEST_CASE(back_returns_to_the_previous_list),
         TEST_CASE(folders_can_be_browsed_down_to_an_album),
         TEST_CASE(without_a_library_the_lists_explain_what_is_missing),
+        TEST_CASE(without_a_card_the_lists_ask_for_one),
+        TEST_CASE(without_a_card_a_setting_change_asks_for_one),
         TEST_CASE(selecting_a_track_plays_it_and_shows_now_playing),
         TEST_CASE(play_on_the_playing_track_opens_now_playing_without_restarting),
         TEST_CASE(play_on_another_track_starts_it),
