@@ -87,7 +87,10 @@ static bool emit_run(Prepared *prepared, Tail *tail, uint32_t run, const TrackRo
     }
     text[length] = '\0';
     key[0] = (char)row->spoken;
-    uint32_t key_length = 1u + (uint32_t)sort_key_make(text, key + 1, SORT_KEY_CAPACITY - 1);
+    size_t key_body_length = field == BUILDER_FILE
+                                 ? natural_key_make(text, key + 1, SORT_KEY_CAPACITY - 1)
+                                 : sort_key_make(text, key + 1, SORT_KEY_CAPACITY - 1);
+    uint32_t key_length = 1u + (uint32_t)key_body_length;
     uint8_t header[RECORD_HEADER];
     builder_put16(header, RECORD_HEADER + key_length + length);
     builder_put16(header + 2, run);

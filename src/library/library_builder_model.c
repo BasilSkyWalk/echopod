@@ -15,7 +15,10 @@ enum {
     FOLDER_FINAL = 16,
     TITLE_TUPLE = 8,
     KIND_CHILD = 0,
-    KIND_TRACK = 1
+    KIND_TRACK = 1,
+    FOLDER_ALBUM_UNSET = 0xFFFF,
+    MIXED_ALBUM_BITS = 8,
+    ALBUM_CHUNK = 256
 };
 
 typedef struct Tail {
@@ -766,6 +769,34 @@ static bool measure_folders(BuilderState *state, Prepared *prepared, FolderPhase
     return true;
 }
 
+static bool mark_multi_album_folders(BuilderState *state, Prepared *prepared,
+                                     const uint16_t *final_tracks, uint16_t *folder_album,
+                                     uint8_t *mixed_albums)
+{
+    uint8_t chunk[ALBUM_CHUNK * 2];
+    for (uint32_t done = 0; done < state->track_count; done += ALBUM_CHUNK) {
+        uint32_t step =
+            state->track_count - done < ALBUM_CHUNK ? state->track_count - done : ALBUM_CHUNK;
+        if (!store_read(&state->store, prepared->track_album.offset + done * 2, chunk, step * 2)) {
+            return false;
+        }
+        for (uint32_t index = 0; index < step; index++) {
+            TrackRow row;
+            if (!builder_read_row(&prepared->rows, state, final_tracks[done + index], &row)) {
+                return false;
+            }
+            uint16_t album = builder_get16(chunk + 2 * index);
+            if (folder_album[row.folder] == FOLDER_ALBUM_UNSET) {
+                folder_album[row.folder] = album;
+            } else if (folder_album[row.folder] != album) {
+                mixed_albums[row.folder / MIXED_ALBUM_BITS] |=
+                    (uint8_t)(1u << (row.folder % MIXED_ALBUM_BITS));
+            }
+        }
+    }
+    return true;
+}
+
 static int by_folder_link(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
@@ -799,7 +830,7 @@ static bool put_link_tuple(Tail *tail, uint32_t folder, uint32_t kind, uint32_t 
 }
 
 static bool emit_folder_links(BuilderState *state, Prepared *prepared, const uint16_t *final_tracks,
-                              const FolderPhase *phase, Region *input)
+                              const FolderPhase *phase, const uint8_t *mixed_albums, Region *input)
 {
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint16_t *files =
@@ -819,9 +850,13 @@ static bool emit_folder_links(BuilderState *state, Prepared *prepared, const uin
     for (uint32_t position = 0; position < state->track_count; position++) {
         uint32_t track = final_tracks[position];
         TrackRow row;
-        if (!builder_read_row(&prepared->rows, state, track, &row) ||
-            !put_link_tuple(&tail, phase->new_index[row.folder], KIND_TRACK, row.disc, row.number,
-                            files[track], position)) {
+        if (!builder_read_row(&prepared->rows, state, track, &row)) {
+            return false;
+        }
+        uint32_t mixed =
+            (mixed_albums[row.folder / MIXED_ALBUM_BITS] >> (row.folder % MIXED_ALBUM_BITS)) & 1u;
+        if (!put_link_tuple(&tail, phase->new_index[row.folder], KIND_TRACK, mixed ? 0 : row.disc,
+                            0, files[track], position)) {
             return false;
         }
     }
@@ -898,10 +933,27 @@ static bool build_folders(BuilderState *state, Prepared *prepared, const uint16_
     }
     state->arena.used = (uint32_t)((uint8_t *)phase.path_length - state->arena.base);
     phase.path_length = NULL;
+    uint32_t mixed_bits = (count + MIXED_ALBUM_BITS - 1) / MIXED_ALBUM_BITS;
+    uint8_t *mixed_albums = arena_take(&state->arena, mixed_bits + 1);
+    uint32_t mixed_mark = state->arena.used;
+    uint16_t *folder_album = arena_take(&state->arena, count * 2 + 2);
+    if (state->arena.failed) {
+        return false;
+    }
+    for (uint32_t index = 0; index < count; index++) {
+        folder_album[index] = FOLDER_ALBUM_UNSET;
+    }
+    for (uint32_t index = 0; index < mixed_bits + 1; index++) {
+        mixed_albums[index] = 0;
+    }
+    if (!mark_multi_album_folders(state, prepared, final_tracks, folder_album, mixed_albums)) {
+        return false;
+    }
+    state->arena.used = mixed_mark;
     uint32_t links_mark = state->arena.used;
     Region input;
     Region sorted;
-    if (!emit_folder_links(state, prepared, final_tracks, &phase, &input)) {
+    if (!emit_folder_links(state, prepared, final_tracks, &phase, mixed_albums, &input)) {
         return false;
     }
     state->arena.used = links_mark;
