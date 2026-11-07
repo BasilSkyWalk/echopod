@@ -156,6 +156,12 @@ echo_add_unit_test(NAME test_listen_history
     LIBRARIES echo_app echo_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+echo_add_unit_test(NAME test_scrobbler_log
+    SOURCES app/test_scrobbler_log.c app/fake_hal.c
+    LIBRARIES echo_app echo_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
+target_compile_definitions(test_scrobbler_log PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_spoken_word
     SOURCES app/test_spoken_word.c app/fake_hal.c
     LIBRARIES echo_app echo_library_fixtures

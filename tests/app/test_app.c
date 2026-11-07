@@ -16,6 +16,7 @@
 #include "library/covers.h"
 #include "library_rescan.h"
 #include "listen_history.h"
+#include "scrobbler_log.h"
 #include "settings/rocker.h"
 #include "settings/settings.h"
 #include "settings_store.h"
@@ -2474,6 +2475,34 @@ static void the_listen_history_has_no_time_while_the_clock_predates_the_firmware
     CHECK(last_play_time() >= day_of(2026, 11, 5) * 86400u);
 }
 
+static bool log_after_a_play(bool history_on)
+{
+    uint32_t size = 0;
+    start_app_with_history_and_chip(history_on, chip_on(2026, 11, 5), day_of(2026, 11, 1));
+    fake_hal_set_reserve_result(HAL_RESERVE_CREATED);
+    play_first_album_track();
+    wait_ms(40000);
+    app_release_audio();
+    const char *log = (const char *)fake_hal_file_bytes(SCROBBLER_LOG_PATH, &size);
+    static const char HEADER[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/EchoPod test\n";
+    if (log == NULL) {
+        return false;
+    }
+    CHECK(size > sizeof HEADER && memcmp(log, HEADER, sizeof HEADER - 1) == 0);
+    CHECK_EQUAL('\n', log[size - 1]);
+    CHECK(memchr(log + sizeof HEADER - 1, '\n', size - sizeof HEADER) == NULL);
+    uint32_t mark_size = 0;
+    const uint8_t *mark = fake_hal_file_bytes(SCROBBLER_MARK_PATH, &mark_size);
+    CHECK(mark != NULL && mark_size == SCROBBLER_MARK_BYTES);
+    return true;
+}
+
+static void connecting_writes_the_scrobbler_log_while_the_history_is_on(void)
+{
+    CHECK(log_after_a_play(true));
+    CHECK(!log_after_a_play(false));
+}
+
 static void start_with_new_firmware(HalTime chip)
 {
     start_on_a_fresh_card(HAL_RESERVE_CREATED);
@@ -2728,6 +2757,7 @@ int main(void)
         TEST_CASE(play_opens_a_menu_row_while_the_key_is_still_down),
         TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
         TEST_CASE(a_listen_history_turned_off_records_nothing),
+        TEST_CASE(connecting_writes_the_scrobbler_log_while_the_history_is_on),
         TEST_CASE(the_clock_and_date_time_rows_end_the_settings_list),
         TEST_CASE(a_clock_dated_before_the_firmware_shows_no_time),
         TEST_CASE(the_listen_history_has_no_time_while_the_clock_predates_the_firmware),

@@ -37,7 +37,10 @@ enum {
     INFO_STRUCT_OFFSET = 484,
     INFO_FREE_OFFSET = 488,
     INFO_NEXT_OFFSET = 492,
-    READ_AHEAD_SECTORS = 8
+    READ_AHEAD_SECTORS = 8,
+    FIRST_CLUSTER_HIGH = 20,
+    FIRST_CLUSTER_LOW = 26,
+    FILE_SIZE_AT = 28
 };
 
 static const uint8_t LONG_NAME_OFFSETS[CHARACTERS_PER_LONG_ENTRY] = {1,  3,  5,  7,  9,  14, 16,
@@ -699,8 +702,18 @@ FatReserveResult fat_grow_entry(FatVolume *volume, FatFile *parent, uint32_t ind
 {
     uint32_t have = fat_clusters_for(volume, file.size);
     uint32_t needed = fat_clusters_for(volume, size) - have;
-    uint32_t last = fat_last_cluster(volume, file, have);
-    if (last == 0) {
+    uint32_t first = file.first_cluster;
+    uint32_t last = have == 0 ? 0 : fat_last_cluster(volume, file, have);
+    if (have == 0 && first == 0) {
+        FatReserveResult result = find_free_run(volume, needed, &first);
+        if (result != FAT_RESERVE_CREATED) {
+            return result;
+        }
+        if (!fat_write_chain(volume, first, needed) || !update_info(volume, first, needed)) {
+            return FAT_RESERVE_FAILED;
+        }
+        needed = 0;
+    } else if (last == 0) {
         return FAT_RESERVE_FAILED;
     }
     if (needed > 0) {
@@ -716,10 +729,19 @@ FatReserveResult fat_grow_entry(FatVolume *volume, FatFile *parent, uint32_t ind
             return FAT_RESERVE_FAILED;
         }
     }
-    uint8_t bytes[4];
+    uint8_t bytes[ENTRY_SIZE - FIRST_CLUSTER_HIGH];
     uint32_t lba = 0;
-    uint32_t offset = index * ENTRY_SIZE + 28;
-    put32(bytes, size);
+    uint32_t offset = index * ENTRY_SIZE + FIRST_CLUSTER_HIGH;
+    const uint8_t *entry = fat_read_entry(volume, parent, index);
+    if (entry == NULL) {
+        return FAT_RESERVE_FAILED;
+    }
+    for (uint32_t at = 0; at < sizeof bytes; at++) {
+        bytes[at] = entry[FIRST_CLUSTER_HIGH + at];
+    }
+    put16(bytes, first >> 16);
+    put16(bytes + (FIRST_CLUSTER_LOW - FIRST_CLUSTER_HIGH), first);
+    put32(bytes + (FILE_SIZE_AT - FIRST_CLUSTER_HIGH), size);
     bool written = fat_file_sector(volume, parent, offset / FAT_SECTOR_SIZE, &lba) &&
                    fat_update_bytes(volume, lba, offset % FAT_SECTOR_SIZE, bytes, sizeof bytes);
     return written ? FAT_RESERVE_CREATED : FAT_RESERVE_FAILED;

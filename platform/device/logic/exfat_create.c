@@ -14,6 +14,7 @@ enum {
     ATTRIBUTE_DIRECTORY = 0x10,
     ATTRIBUTE_ARCHIVE = 0x20,
     STREAM_FLAGS = 0x03,
+    FLAG_ALLOCATION_POSSIBLE = 0x01,
     FLAG_NO_FAT_CHAIN = 0x02,
     MAXIMUM_GROW_SET = 19,
     NAME_UNITS_PER_ENTRY = 15,
@@ -323,6 +324,15 @@ static FatReserveResult extend(FatVolume *volume, FatFile *bitmap, FatFile file,
     uint32_t have = fat_clusters_for(volume, fat_le32(stream + 24));
     uint32_t needed = fat_clusters_for(volume, size) - have;
     file.contiguous = contiguous;
+    if (have == 0 && fat_le32(stream + 20) == 0) {
+        uint32_t first = 0;
+        FatReserveResult found = find_free_run(volume, bitmap, needed, &first);
+        stream[1] |= FLAG_ALLOCATION_POSSIBLE | FLAG_NO_FAT_CHAIN;
+        put32(stream + 20, first);
+        return found != FAT_RESERVE_CREATED                    ? found
+               : mark_allocated(volume, bitmap, first, needed) ? FAT_RESERVE_CREATED
+                                                               : FAT_RESERVE_FAILED;
+    }
     uint32_t last =
         contiguous ? file.first_cluster + have - 1 : fat_last_cluster(volume, file, have);
     if (have == 0 || last < FIRST_CLUSTER) {
