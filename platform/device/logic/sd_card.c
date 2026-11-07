@@ -4,6 +4,10 @@
 #define HIGH_CAPACITY_REQUEST 0x40000000u
 #define CARD_READY 0x80000000u
 #define CARD_HIGH_CAPACITY 0x40000000u
+#define STATUS_READY_FOR_DATA (1u << 8)
+#define STATUS_STATE_SHIFT 9
+#define STATUS_STATE_MASK 0xFu
+#define STATE_TRANSFER 4u
 
 enum {
     CMD_GO_IDLE = 0,
@@ -12,6 +16,7 @@ enum {
     CMD_SELECT = 7,
     CMD_SEND_IF_COND = 8,
     CMD_SEND_CSD = 9,
+    CMD_SEND_STATUS = 13,
     CMD_SET_BLOCK_LENGTH = 16,
     CMD_APP = 55,
     ACMD_SET_BUS_WIDTH = 6,
@@ -19,7 +24,6 @@ enum {
     ACMD_SET_CLEAR_CARD_DETECT = 42,
     IF_COND_PATTERN = 0x1AA,
     IF_COND_MASK = 0xFFF,
-    READY_TRIES = 100,
     READY_RETRY_MS = 10,
     RCA_ATTEMPTS = 4,
     BLOCK_LENGTH = 512,
@@ -60,10 +64,18 @@ static bool interface_condition(const SdHost *host, bool *version_2)
     return !*version_2 || (echo & IF_COND_MASK) == IF_COND_PATTERN;
 }
 
+static bool within(const SdHost *host, uint32_t started_ms, uint32_t budget_ms)
+{
+    return host->now_ms(host->context) - started_ms < budget_ms;
+}
+
 static bool wait_until_ready(const SdHost *host, SdCard *card, bool version_2)
 {
     uint32_t argument = VOLTAGE_WINDOW | (version_2 ? HIGH_CAPACITY_REQUEST : 0);
-    for (int attempt = 0; attempt < READY_TRIES && host->card_present(host->context); attempt++) {
+    uint32_t started_ms = host->now_ms(host->context);
+    for (int attempt = 0; attempt < SD_READY_TRIES && host->card_present(host->context) &&
+                          within(host, started_ms, SD_READY_BUDGET_MS);
+         attempt++) {
         uint32_t ocr = 0;
         if (send_app(host, card, ACMD_SEND_OP_COND, argument, &ocr) && (ocr & CARD_READY) != 0) {
             card->high_capacity = version_2 && (ocr & CARD_HIGH_CAPACITY) != 0;
@@ -178,6 +190,27 @@ uint32_t sd_card_address(const SdCard *card, uint32_t lba)
 uint32_t sd_card_rca_argument(const SdCard *card)
 {
     return (uint32_t)card->rca << 16;
+}
+
+bool sd_card_in_transfer(const SdHost *host, const SdCard *card)
+{
+    uint32_t status = 0;
+    return send_short(host, CMD_SEND_STATUS, sd_card_rca_argument(card), SD_RESPONSE_SHORT,
+                      &status) &&
+           (status & STATUS_READY_FOR_DATA) != 0 &&
+           ((status >> STATUS_STATE_SHIFT) & STATUS_STATE_MASK) == STATE_TRANSFER;
+}
+
+bool sd_card_wait_transfer(const SdHost *host, const SdCard *card)
+{
+    uint32_t started_ms = host->now_ms(host->context);
+    for (int attempt = 0;
+         attempt < SD_STATUS_TRIES && within(host, started_ms, SD_STATUS_BUDGET_MS); attempt++) {
+        if (sd_card_in_transfer(host, card)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static bool recover(const SdRetry *retry, SdRetryStats *stats, int attempt)

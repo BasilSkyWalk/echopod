@@ -2,6 +2,7 @@
 
 #include "check.h"
 #include "device/sd_card.h"
+#include "device/stall_watch.h"
 
 enum {
     LOG_CAPACITY = 256,
@@ -23,6 +24,10 @@ typedef struct FakeCard {
     uint8_t bus_width;
     uint32_t delays_ms;
     bool stopped;
+    uint32_t now_ms;
+    uint32_t command_ms;
+    bool programming;
+    int status_count;
 } FakeCard;
 
 static bool answer(FakeCard *card, SdCommand command, uint32_t response[4])
@@ -49,6 +54,10 @@ static bool answer(FakeCard *card, SdCommand command, uint32_t response[4])
         return true;
     case 6:
         return card->wide_bus;
+    case 13:
+        card->status_count++;
+        response[0] = card->programming ? 0xE00 : 0x900;
+        return true;
     default:
         response[0] = 0x900;
         return true;
@@ -61,6 +70,7 @@ static bool fake_command(void *context, SdCommand command, uint32_t response[4])
     if (card->log_count < LOG_CAPACITY) {
         card->log[card->log_count++] = command;
     }
+    card->now_ms += card->command_ms;
     return card->present && answer(card, command, response);
 }
 
@@ -77,6 +87,7 @@ static void fake_set_bus_width(void *context, uint8_t bits)
 static void fake_delay(void *context, uint32_t milliseconds)
 {
     ((FakeCard *)context)->delays_ms += milliseconds;
+    ((FakeCard *)context)->now_ms += milliseconds;
 }
 
 static bool fake_present(void *context)
@@ -89,11 +100,24 @@ static void fake_stop(void *context)
     ((FakeCard *)context)->stopped = true;
 }
 
+static uint32_t fake_now_ms(void *context)
+{
+    return ((FakeCard *)context)->now_ms;
+}
+
 static SdHost host_for(FakeCard *card)
 {
-    return (SdHost){fake_command, fake_set_clock, fake_set_bus_width,
-                    fake_delay,   fake_present,   fake_stop,
-                    card};
+    return (SdHost){fake_command, fake_set_clock, fake_set_bus_width, fake_delay,
+                    fake_present, fake_stop,      fake_now_ms,        card};
+}
+
+static int count_of(const FakeCard *card, uint8_t index)
+{
+    int count = 0;
+    for (int position = 0; position < card->log_count; position++) {
+        count += card->log[position].index == index;
+    }
+    return count;
 }
 
 static void set_bits(uint32_t csd[4], int start, int size, uint32_t value)
@@ -259,6 +283,62 @@ static void a_card_that_stays_busy_fails_after_100_tries(void)
     CHECK(card.stopped);
 }
 
+static void a_card_that_answers_slowly_gives_up_within_the_time_budget(void)
+{
+    FakeCard card = sdhc_card(100);
+    card.busy_tries = 1000;
+    card.command_ms = 1200;
+    SdHost host = host_for(&card);
+    SdCard sd;
+    CHECK(!sd_card_init(&sd, &host));
+    CHECK_EQUAL(1, count_of(&card, 41));
+    CHECK(card.now_ms < STALL_WATCH_LIMIT_MS);
+    CHECK(card.stopped);
+}
+
+static SdCard started_card(FakeCard *card)
+{
+    SdHost host = host_for(card);
+    SdCard sd;
+    CHECK(sd_card_init(&sd, &host));
+    card->log_count = 0;
+    card->now_ms = 0;
+    return sd;
+}
+
+static void a_card_in_transfer_state_is_ready_at_once(void)
+{
+    FakeCard card = sdhc_card(100);
+    SdCard sd = started_card(&card);
+    SdHost host = host_for(&card);
+    CHECK(sd_card_wait_transfer(&host, &sd));
+    CHECK_EQUAL(1, card.status_count);
+    CHECK_EQUAL(0x12340000, find_command(&card, 13, 0)->argument);
+}
+
+static void a_card_still_programming_is_asked_up_to_1000_times(void)
+{
+    FakeCard card = sdhc_card(100);
+    SdCard sd = started_card(&card);
+    card.programming = true;
+    SdHost host = host_for(&card);
+    CHECK(!sd_card_in_transfer(&host, &sd));
+    CHECK(!sd_card_wait_transfer(&host, &sd));
+    CHECK_EQUAL(1 + SD_STATUS_TRIES, card.status_count);
+}
+
+static void a_card_slow_to_answer_stops_the_status_wait_at_its_time_budget(void)
+{
+    FakeCard card = sdhc_card(100);
+    SdCard sd = started_card(&card);
+    card.programming = true;
+    card.command_ms = 1200;
+    SdHost host = host_for(&card);
+    CHECK(!sd_card_wait_transfer(&host, &sd));
+    CHECK_EQUAL(2, card.status_count);
+    CHECK(card.now_ms < SD_STATUS_BUDGET_MS + card.command_ms);
+}
+
 static void no_card_fails_without_sending_commands(void)
 {
     FakeCard card = sdhc_card(100);
@@ -418,6 +498,10 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(an_sdhc_card_initialises_with_its_size_and_a_4_bit_bus),
+        TEST_CASE(a_card_that_answers_slowly_gives_up_within_the_time_budget),
+        TEST_CASE(a_card_in_transfer_state_is_ready_at_once),
+        TEST_CASE(a_card_still_programming_is_asked_up_to_1000_times),
+        TEST_CASE(a_card_slow_to_answer_stops_the_status_wait_at_its_time_budget),
         TEST_CASE(the_commands_follow_the_sd_init_order),
         TEST_CASE(command_arguments_and_responses_match_the_facts_sheet),
         TEST_CASE(the_card_is_asked_again_every_10_ms_while_busy),
