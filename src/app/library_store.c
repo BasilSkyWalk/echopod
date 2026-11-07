@@ -10,9 +10,17 @@ static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t len
     return hal_file_read(store->file, offset, buffer, length);
 }
 
+void library_store_close(LibraryStore *store)
+{
+    if (store->available) {
+        hal_file_close(&store->file);
+    }
+    store->available = false;
+}
+
 bool library_store_open(LibraryStore *store)
 {
-    store->available = false;
+    library_store_close(store);
     store->library = (Library){.source = {.read = NULL, .context = NULL}};
     if (!hal_file_open(&store->file, LIBRARY_STORE_PATH)) {
         return false;

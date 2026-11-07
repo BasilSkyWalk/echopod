@@ -40,6 +40,7 @@ typedef struct CoverCache {
 extern const char COVER_CACHE_PATH[];
 
 void cover_cache_open(CoverCache *cache, const Library *library);
+void cover_cache_close(CoverCache *cache);
 CoverState cover_cache_half(const CoverCache *cache, int position, uint16_t album, Image *image);
 CoverState cover_cache_full(const CoverCache *cache, uint16_t album, Image *image);
 bool cover_cache_load_half(CoverCache *cache, int position, uint16_t album);

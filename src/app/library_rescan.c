@@ -179,6 +179,11 @@ static uint32_t reserved_size_of(const char *path)
     return size;
 }
 
+static ScanResult unopened(const char *path)
+{
+    return card_files_reserve(path) == HAL_RESERVE_NO_SPACE ? SCAN_NO_ROOM : SCAN_CARD_UNREADABLE;
+}
+
 static bool music_root_exists(void)
 {
     HalDir dir;
@@ -196,7 +201,7 @@ static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *sca
     uint32_t capacity = reserved_size_of(COVER_CACHE_PATH);
     *stats = (CoverStats){.albums = 0, .covers = 0, .reused = 0, .missing = 0};
     if (capacity == 0) {
-        return SCAN_NO_ROOM;
+        return unopened(COVER_CACHE_PATH);
     }
     if (!hal_file_open(&files->library, LIBRARY_STORE_PATH)) {
         return SCAN_WRITE_FAILED;
@@ -257,8 +262,12 @@ RescanOutcome library_rescan_run(RescanProgress progress)
     if (!music_root_exists()) {
         return outcome;
     }
-    if (capacity == 0 || !hal_file_open(&files.scratch, LIBRARY_SCRATCH_PATH)) {
-        outcome.result = SCAN_NO_ROOM;
+    if (capacity == 0) {
+        outcome.result = unopened(LIBRARY_STORE_PATH);
+        return outcome;
+    }
+    if (!hal_file_open(&files.scratch, LIBRARY_SCRATCH_PATH)) {
+        outcome.result = unopened(LIBRARY_SCRATCH_PATH);
         return outcome;
     }
     const LibraryScanEntry *entry = hal_system_load_rescan_code();
@@ -317,6 +326,8 @@ static const char *error_text(ScanResult result)
         return i18n_text(STR_RESCAN_NO_CODE);
     case SCAN_RESTART_NEEDED:
         return i18n_text(STR_RESCAN_RESTART_NEEDED);
+    case SCAN_CARD_UNREADABLE:
+        return i18n_text(STR_RESCAN_CARD_UNREADABLE);
     }
     return "";
 }

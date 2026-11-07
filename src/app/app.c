@@ -798,6 +798,7 @@ static void draw_notice(void *context, Canvas *canvas)
 
 static void start_playback(void)
 {
+    cover_cache_close(&app.covers);
     library_store_open(&app.library);
     player_init(&app.player, &app.library.library);
     settings_store_restore_playback(&app.settings, &app.player, hal_clock_microseconds());

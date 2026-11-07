@@ -150,6 +150,9 @@ typedef struct FakeHal {
     HalTime time;
     int time_reads;
     int time_writes;
+    int open_files;
+    int opens[FILE_CAPACITY];
+    int open_file_limit;
 } FakeHal;
 
 static FakeHal fake;
@@ -409,14 +412,29 @@ uint32_t hal_clock_microseconds(void)
 
 bool hal_file_open(HalFile *file, const char *path)
 {
+    *file = (HalFile){.handle = -1, .size = 0};
+    if (fake.open_file_limit > 0 && fake.open_files >= fake.open_file_limit) {
+        return false;
+    }
     for (int index = 0; index < fake.file_count; index++) {
         if (strcmp(fake.files[index].path, path) == 0) {
             *file = (HalFile){.handle = index, .size = fake.files[index].size};
+            fake.open_files++;
+            fake.opens[index]++;
             return true;
         }
     }
-    *file = (HalFile){.handle = -1, .size = 0};
     return false;
+}
+
+void fake_hal_set_open_file_limit(int limit)
+{
+    fake.open_file_limit = limit;
+}
+
+int fake_hal_open_files(void)
+{
+    return fake.open_files;
 }
 
 bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
@@ -438,6 +456,10 @@ bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
 
 void hal_file_close(HalFile *file)
 {
+    if (file->handle >= 0 && file->handle < FILE_CAPACITY && fake.opens[file->handle] > 0) {
+        fake.opens[file->handle]--;
+        fake.open_files--;
+    }
     file->handle = -1;
 }
 
@@ -1291,11 +1313,10 @@ HalReserveResult hal_file_reserve(const char *path, uint32_t size)
         fake.reserved_sizes[fake.reserve_count] = size;
     }
     fake.reserve_count++;
-    HalFile existing;
     if (fake.card_missing) {
         return HAL_RESERVE_FAILED;
     }
-    if (hal_file_open(&existing, path)) {
+    if (fake_file(path) != NULL) {
         return HAL_RESERVE_EXISTS;
     }
     if (fake.reserve_result == HAL_RESERVE_CREATED) {
