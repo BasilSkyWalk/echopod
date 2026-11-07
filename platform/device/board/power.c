@@ -83,6 +83,11 @@ bool hal_power_take_usb_start(void)
 
 void hal_power_confirm_start(bool hold_required)
 {
+    static bool checked;
+    if (checked) {
+        return;
+    }
+    checked = true;
     if (!hold_required || boot_hold.usb_power || usb_vbus_present() ||
         hal_system_start_info().warm) {
         return;
