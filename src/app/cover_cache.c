@@ -17,6 +17,14 @@ static void clear_slots(CoverCache *cache)
     cache->full_state = COVER_EMPTY;
 }
 
+void cover_cache_close(CoverCache *cache)
+{
+    if (cache->available) {
+        hal_file_close(&cache->file);
+    }
+    cache->available = false;
+}
+
 void cover_cache_open(CoverCache *cache, const Library *library)
 {
     cache->library = library;

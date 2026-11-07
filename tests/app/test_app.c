@@ -1202,6 +1202,46 @@ static void music_folders_leaves_an_unticked_folder_out_of_the_rescan(void)
     CHECK_EQUAL(rock, saved.keys[0]);
 }
 
+static void toggling_music_folders_again_and_again_keeps_rescanning(void)
+{
+    start_app_with_library();
+    fake_hal_set_open_file_limit(8);
+    fake_hal_add_directory_entry("/", "Rock", true, false);
+    fake_hal_add_directory_entry("/", "Jazz", true, false);
+    fake_hal_add_file(MUSIC_CHECK_PATH, NULL, 4096);
+    int held = fake_hal_open_files();
+    for (int cycle = 0; cycle < 6; cycle++) {
+        open_setting(SETTINGS_FOLDERS_INDEX);
+        CHECK(title_is("Music folders"));
+        move_down(1);
+        tap(KEY_PLAY);
+        tap(KEY_BACK);
+        step();
+        CHECK(toast_is("Library: 0 tracks"));
+        CHECK_EQUAL(held, fake_hal_open_files());
+    }
+}
+
+static void a_library_file_that_cannot_be_opened_is_not_called_a_full_card(void)
+{
+    start_app_with_library();
+    fake_hal_set_empty_card(true);
+    fake_hal_set_open_file_limit(fake_hal_open_files());
+    app_request_rescan();
+    step();
+    CHECK(toast_is("Couldn't read the card"));
+}
+
+static void a_missing_library_file_on_a_full_card_says_there_is_no_room(void)
+{
+    start_app();
+    fake_hal_set_empty_card(true);
+    fake_hal_set_reserve_result(HAL_RESERVE_NO_SPACE);
+    app_request_rescan();
+    step();
+    CHECK(toast_is("No room for the library on the card"));
+}
+
 static void rescanning_without_a_card_says_so(void)
 {
     start_app_with_library();
@@ -1282,9 +1322,11 @@ static void a_new_firmware_checks_the_music_once_without_rescanning(void)
     fake_hal_set_version("newer");
     int walks_before = fake_hal_dir_open_count();
     restart_app();
+    int held = fake_hal_open_files();
     step();
     CHECK(fake_hal_dir_open_count() > walks_before);
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
+    CHECK_EQUAL(held, fake_hal_open_files());
     restart_app();
     int walks_after_restart = fake_hal_dir_open_count();
     step();
@@ -1418,6 +1460,8 @@ static void each_way_a_scan_runs_out_has_its_own_message(void)
 {
     CHECK(rescan_message_is(SCAN_OUT_OF_MEMORY, "Library too big for the player's memory"));
     CHECK(rescan_message_is(SCAN_TOO_MANY, "Too many tracks for the player"));
+    CHECK(rescan_message_is(SCAN_NO_ROOM, "No room for the library on the card"));
+    CHECK(rescan_message_is(SCAN_CARD_UNREADABLE, "Couldn't read the card"));
 }
 
 static void a_rescan_borrows_the_idle_audio_buffer_for_its_listing(void)
@@ -2741,6 +2785,9 @@ int main(void)
         TEST_CASE(the_sleep_timer_turns_the_player_off),
         TEST_CASE(a_refused_track_says_why_it_was_skipped),
         TEST_CASE(music_folders_leaves_an_unticked_folder_out_of_the_rescan),
+        TEST_CASE(toggling_music_folders_again_and_again_keeps_rescanning),
+        TEST_CASE(a_library_file_that_cannot_be_opened_is_not_called_a_full_card),
+        TEST_CASE(a_missing_library_file_on_a_full_card_says_there_is_no_room),
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),

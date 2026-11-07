@@ -43,7 +43,8 @@ typedef enum ScanResult {
     SCAN_NO_ROOM,
     SCAN_NO_CODE,
     SCAN_RESTART_NEEDED,
-    SCAN_NO_SCRATCH
+    SCAN_NO_SCRATCH,
+    SCAN_CARD_UNREADABLE
 } ScanResult;
 
 typedef struct ScanStats {

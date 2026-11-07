@@ -104,5 +104,7 @@ int fake_hal_equalizer_changes(void);
 int fake_hal_usb_mode(void);
 bool fake_hal_usb_prompt(void);
 void fake_hal_set_card_missing(bool missing);
+void fake_hal_set_open_file_limit(int limit);
+int fake_hal_open_files(void);
 int fake_hal_dac_volume(void);
 const uint8_t *fake_hal_file_bytes(const char *path, uint32_t *size);

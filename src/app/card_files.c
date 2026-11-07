@@ -74,6 +74,16 @@ void card_files_fit_covers(uint32_t albums)
                         COVERS_HEADER_SIZE + slots_for(albums) * COVER_SLOT_BYTES);
 }
 
+HalReserveResult card_files_reserve(const char *path)
+{
+    for (size_t index = 0; index < sizeof CARD_FILES / sizeof CARD_FILES[0]; index++) {
+        if (CARD_FILES[index].path == path) {
+            return hal_file_reserve(path, CARD_FILES[index].size);
+        }
+    }
+    return HAL_RESERVE_FAILED;
+}
+
 CardFilesReport card_files_prepare(void (*creating)(void))
 {
     CardFilesReport report = {.library_created = false, .card_full = false};
