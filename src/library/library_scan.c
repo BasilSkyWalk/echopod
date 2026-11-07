@@ -587,6 +587,9 @@ ScanResult library_scan(const ScanJob *job, ScanStats *stats)
     state->path[0] = '/';
     truncate_path(state, 1);
     ScanResult result = walk(state, job, stats);
+    if (result == SCAN_OK && job->progress.report != NULL) {
+        job->progress.report(job->progress.context, 0, stats->tracks);
+    }
     if (result == SCAN_OK) {
         result = read_playlists(state, job);
     }

@@ -124,14 +124,15 @@ static const BuilderScratch SCRATCH = {scratch_read, scratch_write, NULL, SCRATC
 
 typedef struct Progress {
     uint32_t calls;
+    uint32_t last_files;
     uint32_t last_tracks;
 } Progress;
 
 static void report(void *context, uint32_t files, uint32_t tracks)
 {
     Progress *progress = context;
-    (void)files;
     progress->calls++;
+    progress->last_files = files;
     progress->last_tracks = tracks;
 }
 
@@ -176,7 +177,8 @@ static void scanning_the_tag_fixtures_matches_the_pc_indexer(void)
     CHECK_EQUAL(SCAN_OK, scan_folder(ECHO_FIXTURE_DIR "/tags", &output, &progress, &stats));
     CHECK_EQUAL(13u, stats.tracks);
     CHECK_EQUAL(13u, progress.last_tracks);
-    CHECK(progress.calls >= 13);
+    CHECK_EQUAL(0u, progress.last_files);
+    CHECK(progress.calls >= 14);
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("tags_library.db", &expected_size);
     CHECK_EQUAL(stats.length, output.length);
