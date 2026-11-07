@@ -4,6 +4,7 @@
 
 #include "check.h"
 #include "library/library.h"
+#include "library/library_browse.h"
 #include "library/library_builder.h"
 #include "library_compare.h"
 #include "memory_source.h"
@@ -574,6 +575,63 @@ static void tagged_album_artists_and_other_folders_keep_their_albums(void)
     free(opened.built.output.bytes);
 }
 
+static BrowseItem folder_named(Library *library, BrowseQuery query, const char *name)
+{
+    char label[64];
+    char detail[8];
+    for (uint32_t position = 0; position < browse_count(library, query); position++) {
+        BrowseItem item;
+        BrowseText text = {label, sizeof label, detail, sizeof detail};
+        if (browse_item(library, query, position, &item) && item.kind == BROWSE_ITEM_FOLDER &&
+            browse_item_text(library, query, item, text) && strcmp(label, name) == 0) {
+            return item;
+        }
+    }
+    BrowseItem missing = {.kind = BROWSE_ITEM_FOLDER, .group = LIBRARY_ARTISTS,
+                          .index = LIBRARY_NONE};
+    return missing;
+}
+
+static bool browse_label(Library *library, BrowseQuery query, uint32_t position, char *label,
+                         size_t capacity)
+{
+    BrowseItem item;
+    char detail[8];
+    BrowseText text = {label, capacity, detail, sizeof detail};
+    return browse_item(library, query, position, &item) &&
+           browse_item_text(library, query, item, text);
+}
+
+static void folder_tracks_sort_by_file_name_not_tags(void)
+{
+    const BuilderTrack tracks[] = {
+        track("Various Artists/Mix/B Song.flac", "Tag Two", "Two", "Various Artists", "Mix", "Pop",
+              2025, 2),
+        track("Various Artists/Mix/C Song.flac", "Tag One", "One", "Various Artists", "Mix", "Pop",
+              2025, 1),
+        track("Various Artists/Mix/A Song.flac", "Tag Three", "Three", "Various Artists", "Mix",
+              "Pop", 2025, 3),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseItem various = folder_named(&opened.library, root, "Various Artists");
+    BrowseQuery various_folder;
+    CHECK(browse_child(root, various, &various_folder));
+    BrowseItem mix = folder_named(&opened.library, various_folder, "Mix");
+    BrowseQuery mix_folder;
+    CHECK(browse_child(various_folder, mix, &mix_folder));
+    CHECK_EQUAL(3, browse_count(&opened.library, mix_folder));
+    char label[64];
+    CHECK(browse_label(&opened.library, mix_folder, 0, label, sizeof label) &&
+          strcmp(label, "A Song") == 0);
+    CHECK(browse_label(&opened.library, mix_folder, 1, label, sizeof label) &&
+          strcmp(label, "B Song") == 0);
+    CHECK(browse_label(&opened.library, mix_folder, 2, label, sizeof label) &&
+          strcmp(label, "C Song") == 0);
+    free(opened.built.output.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -592,6 +650,7 @@ int main(void)
         TEST_CASE(a_featured_artist_stays_with_the_album),
         TEST_CASE(a_tie_goes_to_the_artist_first_in_order),
         TEST_CASE(tagged_album_artists_and_other_folders_keep_their_albums),
+        TEST_CASE(folder_tracks_sort_by_file_name_not_tags),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     free(scratch_of_size(1)->bytes);
