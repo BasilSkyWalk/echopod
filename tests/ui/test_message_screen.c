@@ -68,6 +68,59 @@ static void a_message_too_wide_for_the_screen_wraps_onto_more_lines(void)
     CHECK(last - first >= font_line_height(TEST_THEME.fonts.body));
 }
 
+enum {
+    STRIP_ROWS = 7,
+    SCREEN_PIXELS = TEST_SCREEN_WIDTH * TEST_SCREEN_HEIGHT
+};
+
+static const char LONG_MESSAGE[] = "AB AB AB AB AB AB AB AB AB AB AB AB AB AB AB AB AB AB AB AB";
+static Color whole[SCREEN_PIXELS];
+static Color strips[SCREEN_PIXELS];
+
+static void draw_whole(Screen *screen, Color *copy)
+{
+    Canvas canvas = ui_test_canvas();
+    screen->draw(screen->context, &canvas);
+    for (int index = 0; index < SCREEN_PIXELS; index++) {
+        copy[index] = canvas.pixels[index];
+    }
+}
+
+static bool same_pixels(void)
+{
+    for (int index = 0; index < SCREEN_PIXELS; index++) {
+        if (whole[index] != strips[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void a_message_drawn_in_strips_matches_one_drawn_whole(void)
+{
+    MessageConfig config = {.title = "Note", .message = LONG_MESSAGE, .theme = &TEST_THEME};
+    Screen *screen = message_screen_init(&message, config);
+    draw_whole(screen, whole);
+    for (int top = 0; top < TEST_SCREEN_HEIGHT; top += STRIP_ROWS) {
+        int rows = TEST_SCREEN_HEIGHT - top < STRIP_ROWS ? TEST_SCREEN_HEIGHT - top : STRIP_ROWS;
+        Canvas strip =
+            canvas_make(strips + top * TEST_SCREEN_WIDTH, (Rect){0, top, TEST_SCREEN_WIDTH, rows});
+        canvas_clear(&strip, 0x0821);
+        screen->draw(screen->context, &strip);
+    }
+    CHECK(same_pixels());
+}
+
+static void a_new_message_is_wrapped_again(void)
+{
+    MessageConfig short_config = {.title = "Note", .message = "AB", .theme = &TEST_THEME};
+    MessageConfig long_config = {.title = "Note", .message = LONG_MESSAGE, .theme = &TEST_THEME};
+    draw_whole(message_screen_init(&message, short_config), whole);
+    draw_whole(message_screen_init(&message, long_config), strips);
+    draw_whole(message_screen_init(&message, short_config), strips);
+    CHECK(same_pixels());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -76,6 +129,8 @@ int main(void)
         TEST_CASE(other_keys_do_nothing),
         TEST_CASE(the_message_is_drawn_below_the_header),
         TEST_CASE(a_message_too_wide_for_the_screen_wraps_onto_more_lines),
+        TEST_CASE(a_message_drawn_in_strips_matches_one_drawn_whole),
+        TEST_CASE(a_new_message_is_wrapped_again),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

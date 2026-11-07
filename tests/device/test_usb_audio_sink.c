@@ -120,7 +120,7 @@ static void silence_is_kept_ahead_of_the_last_packet(void)
     CHECK_EQUAL(0xDEADBEEFu, ring[2 * (PACKET_FRAMES + TARGET)]);
 }
 
-static void a_full_buffer_while_playing_drops_one_frame_per_packet(void)
+static void a_full_buffer_while_playing_drops_a_frame(void)
 {
     UsbAudioSink sink = started_sink(2);
     write_packets(&sink, 40, 0);
@@ -129,6 +129,19 @@ static void a_full_buffer_while_playing_drops_one_frame_per_packet(void)
     write_packets(&sink, 1, before - TARGET - 400);
     CHECK_EQUAL(before + PACKET_FRAMES - 1, sink.written);
     CHECK_EQUAL(1, sink.stats.dropped);
+}
+
+static void corrections_are_spread_one_in_eight_packets(void)
+{
+    UsbAudioSink sink = started_sink(2);
+    write_packets(&sink, 40, 0);
+    usb_audio_sink_set_playing(&sink, true);
+    uint32_t consumed = sink.written - TARGET - 400;
+    for (int packet = 0; packet < 16; packet++) {
+        write_packets(&sink, 1, consumed);
+        consumed += PACKET_FRAMES;
+    }
+    CHECK_EQUAL(2, sink.stats.dropped);
 }
 
 static void a_low_buffer_while_playing_repeats_the_last_frame(void)
@@ -199,14 +212,14 @@ static void a_gap_in_the_packets_is_made_up_by_repeats_until_the_fill_is_back(vo
     CHECK_EQUAL(0, sink.stats.repeated);
     consumed += 5 * PACKET_FRAMES;
     uint32_t written_before = sink.written;
-    for (int packet = 0; packet < 400; packet++) {
+    for (int packet = 0; packet < 2000; packet++) {
         consumed += PACKET_FRAMES;
         write_packets(&sink, 1, consumed);
     }
     CHECK_EQUAL(0, sink.stats.dropped);
     CHECK(sink.stats.repeated > 3 * PACKET_FRAMES);
     CHECK_EQUAL(0, sink.stats.realigned);
-    CHECK_EQUAL(written_before + 400 * PACKET_FRAMES + sink.stats.repeated, sink.written);
+    CHECK_EQUAL(written_before + 2000 * PACKET_FRAMES + sink.stats.repeated, sink.written);
     CHECK((int32_t)(sink.written - consumed) >= TARGET - RATE / 1000);
 }
 
@@ -288,6 +301,44 @@ static void negative_samples_scale_the_same_way(void)
     CHECK(left < tenth + 0x10000);
 }
 
+static void only_gaps_in_the_frame_numbers_while_playing_count_as_missed(void)
+{
+    UsbAudioSink sink = started_sink(2);
+    usb_audio_sink_count_frame(&sink, 10);
+    usb_audio_sink_count_frame(&sink, 14);
+    CHECK_EQUAL(0, sink.stats.missed);
+    usb_audio_sink_set_playing(&sink, true);
+    usb_audio_sink_count_frame(&sink, 15);
+    CHECK_EQUAL(0, sink.stats.missed);
+    usb_audio_sink_count_frame(&sink, 18);
+    CHECK_EQUAL(2, sink.stats.missed);
+    usb_audio_sink_count_frame(&sink, 18);
+    CHECK_EQUAL(2, sink.stats.missed);
+}
+
+static void full_speed_frame_numbers_wrap_after_2047_without_a_miss(void)
+{
+    UsbAudioSink sink = started_sink(2);
+    usb_audio_sink_set_playing(&sink, true);
+    for (uint16_t frame = 2040; frame < 2060; frame++) {
+        usb_audio_sink_count_frame(&sink, frame & 0x7FF);
+    }
+    CHECK_EQUAL(0, sink.stats.missed);
+    usb_audio_sink_count_frame(&sink, 13);
+    CHECK_EQUAL(1, sink.stats.missed);
+}
+
+static void a_restart_forgets_the_last_frame_number(void)
+{
+    UsbAudioSink sink = started_sink(2);
+    usb_audio_sink_set_playing(&sink, true);
+    usb_audio_sink_count_frame(&sink, 5);
+    usb_audio_sink_start(&sink, RATE, 2);
+    usb_audio_sink_set_playing(&sink, true);
+    usb_audio_sink_count_frame(&sink, 900);
+    CHECK_EQUAL(0, sink.stats.missed);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -297,7 +348,8 @@ int main(void)
         TEST_CASE(nothing_is_written_while_streaming_is_off),
         TEST_CASE(the_sink_is_primed_after_twenty_milliseconds),
         TEST_CASE(silence_is_kept_ahead_of_the_last_packet),
-        TEST_CASE(a_full_buffer_while_playing_drops_one_frame_per_packet),
+        TEST_CASE(a_full_buffer_while_playing_drops_a_frame),
+        TEST_CASE(corrections_are_spread_one_in_eight_packets),
         TEST_CASE(a_low_buffer_while_playing_repeats_the_last_frame),
         TEST_CASE(no_frames_are_dropped_or_repeated_before_playing),
         TEST_CASE(an_underrun_restarts_twenty_milliseconds_ahead_of_the_output),
@@ -310,6 +362,9 @@ int main(void)
         TEST_CASE(a_volume_change_ramps_instead_of_jumping),
         TEST_CASE(mute_fades_to_silence),
         TEST_CASE(negative_samples_scale_the_same_way),
+        TEST_CASE(only_gaps_in_the_frame_numbers_while_playing_count_as_missed),
+        TEST_CASE(full_speed_frame_numbers_wrap_after_2047_without_a_miss),
+        TEST_CASE(a_restart_forgets_the_last_frame_number),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -51,6 +51,8 @@
 
 enum {
     STRIP_HEIGHT = 34,
+    NOTICE_STRIP_HEIGHT = 6,
+    SEND_ROWS = 4,
     RESCAN_PROGRESS_MS = 250,
     BATTERY_CHECK_MS = 250,
     CHARGE_LIT_MS = 5000,
@@ -694,9 +696,14 @@ static void write_to_display(void *context, Rect area, const Color *pixels)
         return;
     }
     const Color *first_row = pixels + (size_t)(changed.y - area.y) * (size_t)area.width;
-    uint32_t started_us = hal_clock_microseconds();
-    hal_display_write(changed.x, changed.y, changed.width, changed.height, first_row);
-    app.send_us += hal_clock_microseconds() - started_us;
+    for (int sent = 0; sent < changed.height; sent += SEND_ROWS) {
+        int rows = changed.height - sent < SEND_ROWS ? changed.height - sent : SEND_ROWS;
+        uint32_t started_us = hal_clock_microseconds();
+        hal_display_write(changed.x, changed.y + sent, changed.width, rows,
+                          first_row + (size_t)sent * (size_t)area.width);
+        app.send_us += hal_clock_microseconds() - started_us;
+        hal_audio_service();
+    }
 }
 
 static StatusPlayback playback_of(PlayerState state)
@@ -746,13 +753,13 @@ static StatusBarState current_status_bar(void)
     };
 }
 
-static void render(FrameDrawer drawer, bool drawer_paints_everything)
+static void render(FrameDrawer drawer, bool drawer_paints_everything, int strip_height)
 {
     StripRenderer renderer = {
         .strip_pixels = strip_pixels,
         .screen_width = current_theme()->metrics.screen_width,
         .screen_height = current_theme()->metrics.screen_height,
-        .strip_height = STRIP_HEIGHT,
+        .strip_height = strip_height,
         .background = current_theme()->colors.background,
         .drawer_paints_everything = drawer_paints_everything,
     };
@@ -769,7 +776,7 @@ static void render_frame(void)
     app.status_bar = current_status_bar();
     bool screen_paints = top_screen()->paints_every_pixel && !fade_running() && !slide_running();
     marquee_frame_start();
-    render((FrameDrawer){.draw = draw_frame, .context = &app}, screen_paints);
+    render((FrameDrawer){.draw = draw_frame, .context = &app}, screen_paints, STRIP_HEIGHT);
     uint32_t render_us = hal_clock_microseconds() - started_us;
     frame_stats_record(&app.send_stats, app.send_us);
     frame_stats_record(&app.draw_stats, render_us - app.send_us);
@@ -1123,7 +1130,7 @@ int app_choice_step(void)
     follow_prompt_keys(now_ms);
     Screen *screen = &app.prompt.screen;
     screen->update(screen->context, now_ms);
-    render((FrameDrawer){.draw = draw_prompt, .context = screen}, false);
+    render((FrameDrawer){.draw = draw_prompt, .context = screen}, false, STRIP_HEIGHT);
     light_after_first_frame();
     return app.prompt_result;
 }
@@ -1252,7 +1259,7 @@ static void charge_step(uint32_t now_ms)
         set_display(false);
     }
     if (app.display_on) {
-        render((FrameDrawer){.draw = draw_charge, .context = NULL}, true);
+        render((FrameDrawer){.draw = draw_charge, .context = NULL}, true, STRIP_HEIGHT);
         light_after_first_frame();
     } else {
         use_wanted_clock();
@@ -1351,7 +1358,7 @@ void app_show_notice(const char *title, const char *message)
     if (!app.display_on) {
         set_display(true);
     }
-    render((FrameDrawer){.draw = draw_notice, .context = screen}, false);
+    render((FrameDrawer){.draw = draw_notice, .context = screen}, false, NOTICE_STRIP_HEIGHT);
     light_after_first_frame();
 }
 

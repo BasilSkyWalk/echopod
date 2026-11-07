@@ -38,6 +38,20 @@ static void a_correction_continues_until_the_fill_settles_near_the_target(void)
     CHECK_EQUAL(0, stream_drift_adjust(&drift, 960 + 150));
 }
 
+static void a_spaced_correction_adjusts_one_packet_in_each_spacing(void)
+{
+    StreamDrift drift;
+    stream_drift_init(
+        &drift, (StreamDriftLimits){.target = 960, .window = 192, .settle = 48, .spacing = 3});
+    CHECK_EQUAL(1, stream_drift_adjust(&drift, 700));
+    CHECK_EQUAL(0, stream_drift_adjust(&drift, 700));
+    CHECK_EQUAL(0, stream_drift_adjust(&drift, 700));
+    CHECK_EQUAL(0, stream_drift_adjust(&drift, 700));
+    CHECK_EQUAL(1, stream_drift_adjust(&drift, 700));
+    CHECK_EQUAL(0, stream_drift_adjust(&drift, 960));
+    CHECK_EQUAL(-1, stream_drift_adjust(&drift, 1200));
+}
+
 static void a_correction_that_overshoots_stops_instead_of_running_away(void)
 {
     StreamDrift drift = ready_drift();
@@ -52,6 +66,7 @@ int main(void)
         TEST_CASE(a_fill_above_the_window_drops_frames),
         TEST_CASE(a_fill_below_the_window_repeats_frames),
         TEST_CASE(a_correction_continues_until_the_fill_settles_near_the_target),
+        TEST_CASE(a_spaced_correction_adjusts_one_packet_in_each_spacing),
         TEST_CASE(a_correction_that_overshoots_stops_instead_of_running_away),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
