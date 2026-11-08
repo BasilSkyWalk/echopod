@@ -23,6 +23,10 @@ add_library(echo_sim_language STATIC sim_language.c)
 target_compile_definitions(echo_sim_language PRIVATE ECHO_LANGUAGE_PACK_PATHS="${ECHO_LANGUAGE_PACK_PATHS}")
 target_link_libraries(echo_sim_language PUBLIC echo_hal PRIVATE echo_options)
 
+add_library(echo_sim_speed STATIC sim_speed.c)
+target_include_directories(echo_sim_speed PUBLIC .)
+target_link_libraries(echo_sim_speed PUBLIC echo_hal PRIVATE echo_options)
+
 add_library(echo_sim_storage STATIC sim_storage.c)
 target_include_directories(echo_sim_storage PUBLIC .)
 target_link_libraries(echo_sim_storage PUBLIC echo_hal PRIVATE echo_core echo_options)
@@ -40,4 +44,4 @@ add_executable(echo_sim
 )
 string(TIMESTAMP ECHO_SIM_BUILD_DATE "%Y%m%d" UTC)
 target_compile_definitions(echo_sim PRIVATE SDL_MAIN_HANDLED ECHO_SIM_BUILD_DATE=${ECHO_SIM_BUILD_DATE})
-target_link_libraries(echo_sim PRIVATE echo_app echo_sim_glyphs echo_sim_language echo_library_scan echo_sim_options echo_sim_decoder echo_sim_storage echo_options SDL2::SDL2)
+target_link_libraries(echo_sim PRIVATE echo_app echo_sim_glyphs echo_sim_language echo_library_scan echo_sim_options echo_sim_decoder echo_sim_speed echo_sim_storage echo_dsp echo_options SDL2::SDL2)

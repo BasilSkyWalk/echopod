@@ -389,6 +389,10 @@ if(ECHO_BUILD_SIM)
         SOURCES sim/test_sim_options.c
         LIBRARIES echo_sim_options
     )
+    echo_add_unit_test(NAME test_sim_speed
+        SOURCES sim/test_sim_speed.c
+        LIBRARIES echo_sim_speed
+    )
     echo_add_unit_test(NAME test_sim_script
         SOURCES sim/test_sim_script.c
         LIBRARIES echo_sim_options
