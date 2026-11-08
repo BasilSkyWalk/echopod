@@ -1308,6 +1308,20 @@ static void rescanning_without_a_card_says_so(void)
     CHECK(toast_is("No music found on the card"));
 }
 
+static void a_failed_rescan_leaves_the_playing_track_paused_and_released(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    fake_hal_audio_set_position(7000);
+    app_request_rescan();
+    step();
+    CHECK(toast_is("No music found on the card"));
+    PlayerStatus status = app_player_status();
+    CHECK_EQUAL(PLAYER_PAUSED, status.state);
+    CHECK_EQUAL(7000, status.position_ms);
+    CHECK_EQUAL(1, fake_hal_audio_play_count());
+}
+
 static void a_rescan_of_an_empty_card_writes_an_empty_library(void)
 {
     start_app_with_library();
@@ -3579,6 +3593,7 @@ int main(void)
         TEST_CASE(a_library_file_that_cannot_be_opened_is_not_called_a_full_card),
         TEST_CASE(a_missing_library_file_on_a_full_card_says_there_is_no_room),
         TEST_CASE(rescanning_without_a_card_says_so),
+        TEST_CASE(a_failed_rescan_leaves_the_playing_track_paused_and_released),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),
         TEST_CASE(a_rescan_rebuilds_the_covers_file),

@@ -1009,9 +1009,16 @@ static void explain_refusals(uint32_t now_ms)
     }
 }
 
+static void release_player(void)
+{
+    spoken_store_flush(&app.spoken, player_status(&app.player), hal_clock_milliseconds());
+    player_release_output(&app.player);
+}
+
 static void run_rescan(void)
 {
     listen_history_close(&app.history, hal_clock_milliseconds());
+    release_player();
     app_show_notice(i18n_text(STR_RESCAN_TITLE), i18n_text(STR_RESCAN_STARTING));
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
     RescanOutcome outcome = library_rescan_run(progress);
@@ -1031,8 +1038,7 @@ void app_release_audio(void)
         listen_history_note_computer(&app.history, hal_clock_milliseconds());
         (void)scrobbler_log_write(&app.history, hal_system_version());
     }
-    spoken_store_flush(&app.spoken, player_status(&app.player), hal_clock_milliseconds());
-    player_release_output(&app.player);
+    release_player();
 }
 
 void app_remember_dac_volume(uint8_t level)

@@ -621,6 +621,18 @@ static void a_speed_change_during_a_song_keeps_a_queued_chapter_and_applies_it_a
     CHECK(speed_is(fake_hal_audio_speed(), 6, true));
 }
 
+static void a_hand_over_the_hal_already_made_is_followed_before_the_speed_changes(void)
+{
+    start();
+    play(SPOKEN_CHAPTER_ONE_PATH, true);
+    fake_hal_audio_finish_track();
+    player_set_spoken_speed(&player, speed_of(6, true));
+    CHECK_EQUAL(spoken_library_track(library, SPOKEN_CHAPTER_TWO_PATH),
+                player_status(&player).track);
+    CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_CHAPTER_THREE_PATH));
+    CHECK_EQUAL(1, fake_hal_audio_play_count());
+}
+
 static void a_paused_chapter_gets_the_new_speed_while_paused(void)
 {
     start();
@@ -719,6 +731,7 @@ int main(void)
         TEST_CASE(going_back_to_normal_speed_makes_a_deferred_song_gapless),
         TEST_CASE(changing_the_speed_during_a_song_leaves_the_song_alone),
         TEST_CASE(a_speed_change_during_a_song_keeps_a_queued_chapter_and_applies_it_after),
+        TEST_CASE(a_hand_over_the_hal_already_made_is_followed_before_the_speed_changes),
         TEST_CASE(a_paused_chapter_gets_the_new_speed_while_paused),
         TEST_CASE(a_released_chapter_starts_again_at_the_new_speed),
         TEST_CASE(a_deferred_song_that_cannot_open_stops_like_the_end_of_the_queue),
