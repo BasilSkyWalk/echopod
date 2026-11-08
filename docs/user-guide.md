@@ -178,7 +178,7 @@ At the top of an artist's, album artist's or genre's album list, **Play all** pl
 
 Choose Settings on Home, or hold ≡ anywhere except on Now Playing. The top of the list holds the settings you change most: **Shuffle**, **Repeat**, **Bluetooth** (see Bluetooth headphones), **Equalizer** (see Equalizer) and **Sleep timer**. The rest are in five groups: ▶ opens a group, and Back goes back to Settings. Each row shows its current value, and a change applies as soon as you pick it.
 
-- **Sound:** **Gain** (Low or High), **Output** (Auto, 3.5 mm or 4.4 mm), **Filter**, **Balance**, and **Bluetooth level**, which makes Bluetooth headphones louder (see Bluetooth headphones).
+- **Sound:** **Gain** (Low or High), **Output** (Auto, 3.5 mm or 4.4 mm), **Filter**, **Balance**, **Bluetooth level**, which makes Bluetooth headphones louder (see Bluetooth headphones), and **Book & podcast speed** and **Book & podcast pitch** (see Audiobooks and podcasts).
 - **Display:** **Theme** picks the look of menus, lists, headers and Now Playing:
   - **Dark:** the default, light text on near-black, with a blue bar.
   - **Light:** dark text on a light background.
@@ -294,7 +294,7 @@ Podcasts/
 - An episode or book counts as finished once it played to its last tenth (at most its last 30 s).
 - These folders still appear under Music (Albums, Artists, Folders and so on), as all tracks on the card do. Give them a genre such as "Audiobook" if you want to find them there.
 - An .m4b (or .m4a) with chapters shows "Chapter 3 of 13" on Now Playing, and the Menu button opens the chapter list with each chapter's start time: pick one to jump to it. Holding Vol+ and Vol− still jump 30 s and 15 s. The chapters are read from the file's chapter list (`chpl`); chapter names aren't shown.
-- Playback speed can't be changed yet.
+- **Speed:** Settings → Sound → **Book & podcast speed** plays books and episodes at 0.75x, 1x (the default), 1.25x, 1.5x, 1.75x or 2x. Music always plays at 1x. **Book & podcast pitch** chooses how: *Keep pitch* (the default) keeps voices sounding natural, and *Follows speed* changes the speed the way a faster tape would, so voices sound higher at 1.5x and lower at 0.75x. *Keep pitch* works on files up to 48 kHz, which covers nearly every book and podcast; a file above 48 kHz plays at the chosen speed with the pitch following. Now Playing shows the speed, for example "1.5x", next to shuffle and repeat. A new speed applies at once, from where you are. Times, the progress bar, bookmarks and "23:10 left" stay in the book's own time, so at 2x the clock moves twice as fast. When a book and a song follow each other in the queue at a speed other than 1x, there's a short gap between them.
 - To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `python tools/echo_bookmarks.py E:\ --finished` with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
 
 ## Listen history and Last.fm
