@@ -85,6 +85,8 @@ typedef enum SettingOption {
     OPTION_STATUS_BAR,
     OPTION_POWER_ON,
     OPTION_NOW_PLAYING_FACE,
+    OPTION_SPOKEN_SPEED,
+    OPTION_SPOKEN_PITCH,
     SETTINGS_OPTION_COUNT
 } SettingOption;
 
@@ -163,6 +165,28 @@ enum {
     POWER_ON_HOLD
 };
 
+typedef enum SpokenSpeed {
+    SPOKEN_SPEED_1X,
+    SPOKEN_SPEED_0_75X,
+    SPOKEN_SPEED_1_25X,
+    SPOKEN_SPEED_1_5X,
+    SPOKEN_SPEED_1_75X,
+    SPOKEN_SPEED_2X,
+    SPOKEN_SPEED_COUNT
+} SpokenSpeed;
+
+typedef enum SpokenPitch {
+    SPOKEN_PITCH_KEEP,
+    SPOKEN_PITCH_FOLLOWS_SPEED,
+    SPOKEN_PITCH_COUNT
+} SpokenPitch;
+
+enum {
+    SPOKEN_SPEED_SLOWEST_QUARTERS = 3,
+    SPOKEN_SPEED_NORMAL_QUARTERS = 4,
+    SPOKEN_SPEED_FASTEST_QUARTERS = 8
+};
+
 typedef enum RockerMode {
     ROCKER_VOLUME_SKIP,
     ROCKER_SKIP_VOLUME,
@@ -223,5 +247,8 @@ uint32_t settings_auto_off_option_minutes(int option);
 uint32_t settings_auto_off_ms(const Settings *settings);
 uint8_t settings_option_count(SettingOption option);
 uint32_t settings_animation_ms(const uint8_t *options, uint32_t normal_ms);
+uint8_t settings_spoken_quarters(const uint8_t *options);
+bool settings_spoken_keep_pitch(const uint8_t *options);
+uint8_t settings_spoken_speed_option(uint8_t quarters);
 void settings_encode(const Settings *settings, uint8_t *bytes);
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings);

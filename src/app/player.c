@@ -46,6 +46,7 @@ static void become_idle(Player *player)
     player->state = PLAYER_IDLE;
     player->loaded = false;
     player->has_next = false;
+    player->next_deferred = false;
     player->paused_position_ms = 0;
 }
 
@@ -81,13 +82,52 @@ static bool upcoming_track(Player *player, PlayQueueCursor *cursor, uint16_t *tr
            play_queue_track_at(&player->queue, *cursor, track);
 }
 
+static bool same_speed(HalAudioSpeed a, HalAudioSpeed b)
+{
+    return a.quarters == b.quarters && a.keep_pitch == b.keep_pitch;
+}
+
+static HalAudioSpeed normal_speed(void)
+{
+    return (HalAudioSpeed){.quarters = HAL_AUDIO_SPEED_UNITY_QUARTERS, .keep_pitch = true};
+}
+
+static bool spoken_path(const char *path)
+{
+    return spoken_kind_of(path) != SPOKEN_NONE;
+}
+
+static HalAudioSpeed speed_for(const Player *player, bool spoken)
+{
+    bool normal = !spoken || player->spoken_speed.quarters == HAL_AUDIO_SPEED_UNITY_QUARTERS;
+    return normal ? normal_speed() : player->spoken_speed;
+}
+
+static void send_speed(Player *player)
+{
+    player->sent_speed = speed_for(player, player->spoken);
+    hal_audio_set_speed(player->sent_speed);
+}
+
+static bool follow_speed(Player *player)
+{
+    bool changed = !same_speed(speed_for(player, player->spoken), player->sent_speed);
+    if (changed) {
+        send_speed(player);
+    }
+    return changed;
+}
+
 static void queue_upcoming(Player *player)
 {
     char path[PLAYER_PATH_CAPACITY];
     PlayQueueCursor upcoming = player->queue.cursor;
     uint16_t track = 0;
-    player->has_next =
+    bool found =
         upcoming_track(player, &upcoming, &track) && track_path(player, track, path, sizeof path);
+    player->next_deferred =
+        found && !same_speed(speed_for(player, spoken_path(path)), player->sent_speed);
+    player->has_next = found && !player->next_deferred;
     if (!player->has_next) {
         hal_audio_queue_next(NULL, 0);
         return;
@@ -127,8 +167,7 @@ static void load_chapters(Player *player, uint16_t track)
 static void note_spoken(Player *player, uint16_t track)
 {
     char path[PLAYER_PATH_CAPACITY];
-    player->spoken =
-        track_path(player, track, path, sizeof path) && spoken_kind_of(path) != SPOKEN_NONE;
+    player->spoken = track_path(player, track, path, sizeof path) && spoken_path(path);
     load_chapters(player, track);
 }
 
@@ -140,6 +179,13 @@ static uint32_t resume_point(const Player *player, uint16_t track, uint32_t star
     return player->resume.position_for(player->resume.context, track);
 }
 
+static void note_refusal(Player *player)
+{
+    player->refusal = hal_audio_refusal();
+    player->refusal_count++;
+    become_idle(player);
+}
+
 static bool start_current(Player *player, uint32_t start_ms)
 {
     char path[PLAYER_PATH_CAPACITY];
@@ -148,17 +194,16 @@ static bool start_current(Player *player, uint32_t start_ms)
         become_idle(player);
         return false;
     }
-    player->spoken = spoken_kind_of(path) != SPOKEN_NONE;
+    player->spoken = spoken_path(path);
     load_chapters(player, track);
     start_ms = resume_point(player, track, start_ms);
     player->track = track;
     player->has_track = true;
     player->current_token = new_token(player);
+    send_speed(player);
     player->loaded = hal_audio_play(path, start_ms, player->current_token);
     if (!player->loaded) {
-        player->refusal = hal_audio_refusal();
-        player->refusal_count++;
-        become_idle(player);
+        note_refusal(player);
         return false;
     }
     player->state = PLAYER_PLAYING;
@@ -250,6 +295,8 @@ void player_init(Player *player, const Library *library)
     player->refusal_count = 0;
     player->refusal = (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_NONE};
     player->spoken = false;
+    player->spoken_speed = normal_speed();
+    player->sent_speed = normal_speed();
     player->resume = (PlayerResume){.position_for = NULL, .context = NULL};
     become_idle(player);
     hal_audio_set_volume(player->volume);
@@ -440,17 +487,51 @@ static void advance_to_next(Player *player)
     take_next_and_note(player);
     player->current_token = player->next_token;
     player->has_next = false;
+    follow_speed(player);
     queue_upcoming(player);
     save_later(player);
 }
 
+static bool start_deferred(Player *player)
+{
+    if (!player->next_deferred || !move_and_start(player, 1, player->repeat != REPEAT_OFF)) {
+        return false;
+    }
+    save_later(player);
+    return true;
+}
+
 static void finish_track(Player *player, bool failed)
 {
-    if (failed && move_and_start(player, 1, player->repeat != REPEAT_OFF)) {
+    if (failed ? move_and_start(player, 1, player->repeat != REPEAT_OFF) : start_deferred(player)) {
         return;
     }
     become_idle(player);
     save_later(player);
+}
+
+static void follow_audio(Player *player)
+{
+    HalAudioStatus status = hal_audio_status();
+    if (player->has_next && status.token == player->next_token) {
+        advance_to_next(player);
+    } else if (status.state == HAL_AUDIO_STOPPED && status.token == player->current_token) {
+        finish_track(player, status.failed);
+    }
+}
+
+void player_set_spoken_speed(Player *player, HalAudioSpeed speed)
+{
+    if (same_speed(speed, player->spoken_speed)) {
+        return;
+    }
+    player->spoken_speed = speed;
+    if (player->loaded) {
+        follow_audio(player);
+    }
+    if (player->loaded && (follow_speed(player) || player->next_deferred)) {
+        queue_upcoming(player);
+    }
 }
 
 static PlayerUpNextResult enqueue(Player *player, uint16_t track, bool next)
@@ -513,6 +594,7 @@ void player_release_output(Player *player)
     player_save(player);
     player->loaded = false;
     player->has_next = false;
+    player->next_deferred = false;
     if (player->state == PLAYER_PLAYING) {
         player->state = PLAYER_PAUSED;
     }
@@ -543,12 +625,7 @@ void player_update(Player *player, uint32_t now_ms)
     if (!player->loaded) {
         return;
     }
-    HalAudioStatus status = hal_audio_status();
-    if (player->has_next && status.token == player->next_token) {
-        advance_to_next(player);
-    } else if (status.state == HAL_AUDIO_STOPPED && status.token == player->current_token) {
-        finish_track(player, status.failed);
-    }
+    follow_audio(player);
     save_periodically(player, now_ms);
 }
 

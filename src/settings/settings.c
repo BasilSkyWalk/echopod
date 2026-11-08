@@ -52,6 +52,7 @@ static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
 static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
 static const uint8_t ANIMATION_PERCENT[ANIMATION_SPEED_COUNT] = {100, 150, 60};
+static const uint8_t SPOKEN_QUARTERS[SPOKEN_SPEED_COUNT] = {4, 3, 5, 6, 7, 8};
 static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_BATTERY] = 2,
     [OPTION_VOLUME_KEYS] = 2,
@@ -74,7 +75,9 @@ static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_RETIRED_INTERNAL_STORAGE] = 2,
     [OPTION_STATUS_BAR] = 2,
     [OPTION_POWER_ON] = 2,
-    [OPTION_NOW_PLAYING_FACE] = NP_FACE_OPTION_SLOTS};
+    [OPTION_NOW_PLAYING_FACE] = NP_FACE_OPTION_SLOTS,
+    [OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_COUNT,
+    [OPTION_SPOKEN_PITCH] = SPOKEN_PITCH_COUNT};
 
 _Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
                "the options must fit the file");
@@ -131,6 +134,27 @@ uint32_t settings_animation_ms(const uint8_t *options, uint32_t normal_ms)
     uint8_t speed = options != NULL ? options[OPTION_ANIMATION_SPEED] : ANIMATION_NORMAL;
     uint32_t percent = speed < ANIMATION_SPEED_COUNT ? ANIMATION_PERCENT[speed] : 100;
     return normal_ms * percent / 100;
+}
+
+uint8_t settings_spoken_quarters(const uint8_t *options)
+{
+    uint8_t speed = options != NULL ? options[OPTION_SPOKEN_SPEED] : SPOKEN_SPEED_1X;
+    return speed < SPOKEN_SPEED_COUNT ? SPOKEN_QUARTERS[speed] : SPOKEN_SPEED_NORMAL_QUARTERS;
+}
+
+bool settings_spoken_keep_pitch(const uint8_t *options)
+{
+    return options == NULL || options[OPTION_SPOKEN_PITCH] != SPOKEN_PITCH_FOLLOWS_SPEED;
+}
+
+uint8_t settings_spoken_speed_option(uint8_t quarters)
+{
+    for (uint8_t speed = 0; speed < SPOKEN_SPEED_COUNT; speed++) {
+        if (SPOKEN_QUARTERS[speed] == quarters) {
+            return speed;
+        }
+    }
+    return SPOKEN_SPEED_1X;
 }
 
 uint8_t settings_option_count(SettingOption option)

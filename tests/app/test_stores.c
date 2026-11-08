@@ -134,6 +134,7 @@ static void hardware_settings_reach_the_hal(void)
     chosen.usb_mode = USB_MODE_DAC;
     chosen.options[OPTION_BLUETOOTH_LEVEL] = BLUETOOTH_LEVEL_LOUDER;
     chosen.options[OPTION_USB_PROMPT] = USB_PROMPT_ON;
+    chosen.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_2X;
     settings_store_apply_hardware(&chosen);
     CHECK_EQUAL(BRIGHT, fake_hal_display_brightness());
     CHECK_EQUAL(HAL_AUDIO_GAIN_HIGH, fake_hal_audio_gain());
@@ -142,6 +143,34 @@ static void hardware_settings_reach_the_hal(void)
     CHECK_EQUAL(HAL_USB_MODE_DAC, fake_hal_usb_mode());
     CHECK(fake_hal_usb_prompt());
     CHECK_EQUAL(SETTINGS_DEFAULT_DAC_VOLUME, fake_hal_dac_volume());
+    CHECK_EQUAL(0, fake_hal_audio_speed_calls());
+}
+
+static void the_spoken_speed_setting_becomes_a_hal_speed(void)
+{
+    Settings chosen = settings_defaults();
+    HalAudioSpeed normal = settings_store_spoken_speed(&chosen);
+    CHECK_EQUAL(4, normal.quarters);
+    CHECK(normal.keep_pitch);
+    chosen.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_1_5X;
+    chosen.options[OPTION_SPOKEN_PITCH] = SPOKEN_PITCH_FOLLOWS_SPEED;
+    HalAudioSpeed fast = settings_store_spoken_speed(&chosen);
+    CHECK_EQUAL(6, fast.quarters);
+    CHECK(!fast.keep_pitch);
+}
+
+static void the_saved_spoken_speed_reaches_the_player_at_start(void)
+{
+    fake_hal_reset();
+    Player player;
+    player_init(&player, fixture_library_open(&fixture));
+    settings.settings = settings_defaults();
+    settings.settings.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_2X;
+    settings.settings.options[OPTION_SPOKEN_PITCH] = SPOKEN_PITCH_FOLLOWS_SPEED;
+    settings_store_restore_playback(&settings, &player, 1);
+    CHECK_EQUAL(8, player.spoken_speed.quarters);
+    CHECK(!player.spoken_speed.keep_pitch);
+    CHECK_EQUAL(0, fake_hal_audio_speed_calls());
 }
 
 static void toggling_an_album_adds_it_and_saves(void)
@@ -281,6 +310,8 @@ int main(void)
         TEST_CASE(a_32_byte_version_8_settings_file_loads_and_is_saved_as_version_9),
         TEST_CASE(the_orientation_is_loaded_again),
         TEST_CASE(hardware_settings_reach_the_hal),
+        TEST_CASE(the_spoken_speed_setting_becomes_a_hal_speed),
+        TEST_CASE(the_saved_spoken_speed_reaches_the_player_at_start),
         TEST_CASE(toggling_an_album_adds_it_and_saves),
         TEST_CASE(favorites_are_loaded_again),
         TEST_CASE(an_empty_favorites_list_answers_without_reading_the_library),
