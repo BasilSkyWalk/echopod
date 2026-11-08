@@ -52,7 +52,8 @@ typedef enum Core1Program {
     CORE1_PROGRAM_OPUS
 } Core1Program;
 
-bool board_core1_start_stream(Core1Program program);
+bool board_core1_needs_restart(Core1Program program, uint32_t rate);
+bool board_core1_start_stream(Core1Program program, uint32_t rate);
 void board_core1_set_equalizer(const EqualizerCurve *curve);
 void board_core1_stop(void);
 bool board_core1_streaming(void);
