@@ -112,12 +112,40 @@ QuadLight cover_flow_light(const CoverFlowLayout *layout, int32_t relative)
     return relative > 0 ? (QuadLight){near, far} : (QuadLight){far, near};
 }
 
+enum {
+    APPROACH_STEPS_PER_CONSTANT = 16,
+    APPROACH_TABLE_SIZE = 65,
+    APPROACH_SHIFT = 16
+};
+
+static const uint16_t APPROACH_FRACTIONS[APPROACH_TABLE_SIZE] = {
+    0,     3971,  7701,  11205, 14497, 17589, 20494, 23223, 25786, 28195, 30457, 32582, 34579,
+    36455, 38217, 39872, 41427, 42887, 44260, 45549, 46760, 47897, 48966, 49970, 50913, 51799,
+    52631, 53413, 54148, 54838, 55486, 56095, 56667, 57204, 57709, 58183, 58629, 59047, 59440,
+    59810, 60156, 60482, 60789, 61076, 61346, 61600, 61839, 62063, 62273, 62471, 62657, 62831,
+    62995, 63149, 63293, 63429, 63557, 63677, 63790, 63895, 63995, 64088, 64176, 64258, 64336};
+
+static uint32_t approach_fraction(uint32_t elapsed_ms, uint32_t time_constant_ms)
+{
+    uint64_t scaled =
+        ((uint64_t)elapsed_ms * APPROACH_STEPS_PER_CONSTANT << APPROACH_SHIFT) / time_constant_ms;
+    uint64_t index = scaled >> APPROACH_SHIFT;
+    if (index >= APPROACH_TABLE_SIZE - 1) {
+        return 1u << APPROACH_SHIFT;
+    }
+    uint32_t low = APPROACH_FRACTIONS[index];
+    uint32_t high = APPROACH_FRACTIONS[index + 1];
+    uint64_t within = scaled & ((1u << APPROACH_SHIFT) - 1u);
+    return low + (uint32_t)(((high - low) * within) >> APPROACH_SHIFT);
+}
+
 int32_t cover_flow_approach(int32_t position, int32_t target, uint32_t elapsed_ms,
                             uint32_t time_constant_ms)
 {
     int32_t difference = target - position;
     int32_t distance = abs_of(difference);
-    int32_t step = (int32_t)((int64_t)distance * elapsed_ms / time_constant_ms);
+    uint32_t fraction = approach_fraction(elapsed_ms, time_constant_ms);
+    int32_t step = (int32_t)(((int64_t)distance * fraction) >> APPROACH_SHIFT);
     int32_t minimum = (int32_t)elapsed_ms * MIN_UNITS_PER_MS;
     step = step < minimum ? minimum : step;
     step = step > distance ? distance : step;

@@ -133,6 +133,22 @@ static void no_time_means_no_movement(void)
     CHECK_EQUAL(ONE, cover_flow_approach(ONE, 4 * ONE, 0, TIME_CONSTANT_MS));
 }
 
+static void one_long_frame_moves_as_far_as_two_short_ones(void)
+{
+    int32_t target = 20 * ONE;
+    int32_t once = cover_flow_approach(0, target, 2 * FRAME_MS, TIME_CONSTANT_MS);
+    int32_t half = cover_flow_approach(0, target, FRAME_MS, TIME_CONSTANT_MS);
+    int32_t twice = cover_flow_approach(half, target, FRAME_MS, TIME_CONSTANT_MS);
+    CHECK(once - twice <= ONE / 64 && twice - once <= ONE / 64);
+}
+
+static void a_slow_frame_does_not_jump_straight_to_the_target(void)
+{
+    int32_t target = 20 * ONE;
+    int32_t moved = cover_flow_approach(0, target, TIME_CONSTANT_MS, TIME_CONSTANT_MS);
+    CHECK(moved > target / 2 && moved < target * 2 / 3);
+}
+
 static int frames_to_arrive(uint32_t time_constant_ms)
 {
     int32_t position = 0;
@@ -240,6 +256,8 @@ int main(void)
         TEST_CASE(the_position_never_overshoots_and_arrives),
         TEST_CASE(the_position_also_moves_back),
         TEST_CASE(no_time_means_no_movement),
+        TEST_CASE(one_long_frame_moves_as_far_as_two_short_ones),
+        TEST_CASE(a_slow_frame_does_not_jump_straight_to_the_target),
         TEST_CASE(a_longer_time_constant_moves_more_slowly),
         TEST_CASE(further_covers_shrink_with_depth),
         TEST_CASE(stacked_covers_shrink_with_depth),
