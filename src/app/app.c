@@ -480,7 +480,7 @@ static void dispatch_to_screen(KeyEvent event, uint32_t now_ms)
                               : screen->handle_key(screen->context, event, now_ms);
     if (screen_stack_apply(&app.stack, action, now_ms)) {
         use_screen_key_behaviors();
-        start_slide(screen, depth_before, now_ms);
+        start_slide(screen, depth_before, hal_clock_milliseconds());
     }
 }
 
@@ -788,6 +788,15 @@ static void render_frame(void)
         !deadline_reached(app.now_ms + marquee_wait_ms, app.idle_render_ms)) {
         app.idle_render_ms = app.now_ms + marquee_wait_ms;
     }
+}
+
+static void flush_save(void)
+{
+    if (!app.player.save_pending || slide_running() || fade_running()) {
+        return;
+    }
+    hal_audio_service();
+    player_flush_save(&app.player);
 }
 
 static bool frame_needed(uint32_t now_ms)
@@ -1331,13 +1340,14 @@ void app_step(void)
     update_screen(now_ms);
     frame_stats_record(&app.update_stats, hal_clock_microseconds() - started_us);
     if (app.display_on && frame_needed(now_ms)) {
+        app.now_ms = hal_clock_milliseconds();
         render_frame();
         light_after_first_frame();
     } else {
         app.idle = app.display_on;
     }
     app.key_activity = false;
-    player_flush_save(&app.player);
+    flush_save();
     frame_stats_record(&app.frame_stats, hal_clock_microseconds() - started_us);
 }
 
