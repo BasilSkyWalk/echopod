@@ -23,6 +23,7 @@ static FlacSource source;
 static uint32_t ring[RING_WORDS];
 static AudioEngine engine;
 static Fixture opened;
+static SpeedStage stage;
 
 static Fixture load(const char *name, const char *extension)
 {
@@ -68,7 +69,7 @@ static void close_file(void *context)
     (void)context;
 }
 
-static void start_engine(void)
+static void start_engine_with(SpeedStage *speed_stage, SpeedSetting speed)
 {
     flac_use_block_buffer(&decoder, &block);
     flac_source_init(&source,
@@ -76,8 +77,20 @@ static void start_engine(void)
                      &decoder);
     audio_engine_init(&engine, (AudioEngineConfig){.source = flac_source_interface(&source),
                                                    .ring = ring,
-                                                   .ring_words = RING_WORDS});
+                                                   .ring_words = RING_WORDS,
+                                                   .speed_stage = speed_stage});
     audio_engine_set_volume(&engine, FULL_VOLUME);
+    audio_engine_set_speed(&engine, speed);
+}
+
+static void start_engine(void)
+{
+    start_engine_with(NULL, (SpeedSetting){0});
+}
+
+static void start_engine_at(SpeedSetting speed)
+{
+    start_engine_with(&stage, speed);
 }
 
 typedef struct ScriptedSource {
@@ -89,6 +102,8 @@ typedef struct ScriptedSource {
     int closes;
     uint32_t rate;
     bool equalized;
+    bool fail_at_end;
+    int ends;
 } ScriptedSource;
 
 static ScriptedSource scripted;
@@ -112,7 +127,8 @@ static AudioFrameResult scripted_next(void *context, AudioFrame *frame)
         return AUDIO_FRAME_WAIT;
     }
     if (source_state->frames_left == 0) {
-        return AUDIO_FRAME_END;
+        source_state->ends++;
+        return source_state->fail_at_end ? AUDIO_FRAME_ERROR : AUDIO_FRAME_END;
     }
     source_state->frames_left--;
     *frame = (AudioFrame){.left = source_state->left,
@@ -134,7 +150,8 @@ static void scripted_close(void *context)
     ((ScriptedSource *)context)->closes++;
 }
 
-static void start_scripted_engine(int waits, int frames)
+static void start_scripted_engine_with(int waits, int frames, SpeedStage *speed_stage,
+                                       SpeedSetting speed)
 {
     scripted = (ScriptedSource){.waits_before_frame = waits, .frames_left = frames};
     for (int index = 0; index < 16; index++) {
@@ -143,9 +160,22 @@ static void start_scripted_engine(int waits, int frames)
     }
     AudioSource interface = {scripted_open, scripted_next, scripted_release, scripted_close,
                              &scripted};
-    audio_engine_init(
-        &engine, (AudioEngineConfig){.source = interface, .ring = ring, .ring_words = RING_WORDS});
+    audio_engine_init(&engine, (AudioEngineConfig){.source = interface,
+                                                   .ring = ring,
+                                                   .ring_words = RING_WORDS,
+                                                   .speed_stage = speed_stage});
     audio_engine_set_volume(&engine, FULL_VOLUME);
+    audio_engine_set_speed(&engine, speed);
+}
+
+static void start_scripted_engine(int waits, int frames)
+{
+    start_scripted_engine_with(waits, frames, NULL, (SpeedSetting){0});
+}
+
+static void start_scripted_engine_at(int waits, int frames, SpeedSetting speed)
+{
+    start_scripted_engine_with(waits, frames, &stage, speed);
 }
 
 static int32_t expected_at(const Fixture *pcm, uint32_t index)
@@ -188,6 +218,13 @@ static bool ring_holds(const char *name, uint32_t first_frame, uint32_t ring_sta
 static void pump_until_full(uint32_t consumed)
 {
     for (int round = 0; round < 64; round++) {
+        audio_engine_pump(&engine, consumed);
+    }
+}
+
+static void pump_rounds(uint32_t consumed, int rounds)
+{
+    for (int round = 0; round < rounds; round++) {
         audio_engine_pump(&engine, consumed);
     }
 }
@@ -678,6 +715,331 @@ static void a_frame_is_released_once_its_samples_are_in_the_ring(void)
     CHECK_EQUAL(1, scripted.closes);
 }
 
+enum {
+    STRETCH_LEAD_OUT = 1320,
+    PUMP_ROUNDS = 700
+};
+
+static const SpeedSetting UNITY_KEEP = {4, true};
+static const SpeedSetting UNITY_FOLLOW = {4, false};
+static const SpeedSetting DOUBLE_KEEP = {8, true};
+static const SpeedSetting DOUBLE_FOLLOW = {8, false};
+static const SpeedSetting THREE_FOLLOW = {3, false};
+static const SpeedSetting SIX_KEEP = {6, true};
+
+static void a_stage_at_unity_speed_leaves_the_ring_bit_identical(void)
+{
+    const SpeedSetting settings[] = {UNITY_KEEP, UNITY_FOLLOW};
+    for (int index = 0; index < 2; index++) {
+        start_engine_at(settings[index]);
+        CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+        pump_until_full(0);
+        CHECK(ring_holds("lpc_16_44k_stereo", 0, 0, 6000, 16));
+        audio_engine_observe(&engine, 4410);
+        CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+    }
+}
+
+static void the_position_is_track_time_at_double_speed(void)
+{
+    const SpeedSetting settings[] = {DOUBLE_KEEP, DOUBLE_FOLLOW};
+    for (int index = 0; index < 2; index++) {
+        start_engine_at(settings[index]);
+        CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+        pump_rounds(0, PUMP_ROUNDS);
+        audio_engine_observe(&engine, 4410);
+        CHECK_EQUAL(200u, audio_engine_status(&engine).position_ms);
+    }
+}
+
+static void the_position_is_track_time_at_three_quarter_speed(void)
+{
+    start_engine_at(THREE_FOLLOW);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_observe(&engine, 4410);
+    CHECK_EQUAL(75u, audio_engine_status(&engine).position_ms);
+}
+
+static void a_lead_in_does_not_count_as_track_time_at_speed(void)
+{
+    start_engine_at(SIX_KEEP);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+    audio_engine_lead_in(&engine, 100, 0);
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_observe(&engine, 100 + 4410);
+    CHECK_EQUAL(150u, audio_engine_status(&engine).position_ms);
+}
+
+static void starting_part_way_at_speed_counts_from_the_start_position(void)
+{
+    start_engine_at(DOUBLE_FOLLOW);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 100, 5));
+    pump_rounds(0, PUMP_ROUNDS);
+    CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+    audio_engine_observe(&engine, 441);
+    CHECK_EQUAL(120u, audio_engine_status(&engine).position_ms);
+}
+
+static void a_queued_track_at_the_same_speed_follows_without_a_gap(void)
+{
+    start_engine_at(DOUBLE_FOLLOW);
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_16_44k_stereo", 4);
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_observe(&engine, 1500);
+    CHECK_EQUAL(3u, audio_engine_status(&engine).token);
+    audio_engine_observe(&engine, 1501 + 441);
+    AudioEngineStatus status = audio_engine_status(&engine);
+    CHECK_EQUAL(4u, status.token);
+    CHECK_EQUAL(20u, status.position_ms);
+}
+
+static uint32_t first_frame_of_token(uint32_t token)
+{
+    for (uint32_t frame = 0; frame < RING_FRAMES; frame++) {
+        audio_engine_observe(&engine, frame);
+        if (audio_engine_status(&engine).token == token) {
+            return frame;
+        }
+    }
+    return 0;
+}
+
+static void a_stretched_track_hands_over_after_its_tail(void)
+{
+    start_engine_at(SIX_KEEP);
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_16_44k_stereo", 4);
+    pump_rounds(0, PUMP_ROUNDS);
+    uint32_t boundary = first_frame_of_token(4);
+    CHECK(boundary >= 3001 * 4 / 6);
+    CHECK(boundary <= 3001 * 4 / 6 + 1 + STRETCH_LEAD_OUT);
+    audio_engine_observe(&engine, boundary + 441);
+    CHECK_EQUAL(15u, audio_engine_status(&engine).position_ms);
+}
+
+static void the_end_of_a_stretched_track_plays_its_tail_before_stopping(void)
+{
+    start_engine_at(SIX_KEEP);
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    pump_rounds(0, PUMP_ROUNDS);
+    CHECK(engine.ended);
+    CHECK(engine.end_at >= 3001 * 4 / 6);
+    CHECK(engine.end_at <= 3001 * 4 / 6 + 1 + STRETCH_LEAD_OUT);
+    audio_engine_observe(&engine, engine.end_at - 1);
+    CHECK_EQUAL(AUDIO_ENGINE_PLAYING, audio_engine_status(&engine).state);
+    audio_engine_observe(&engine, engine.end_at);
+    CHECK_EQUAL(AUDIO_ENGINE_STOPPED, audio_engine_status(&engine).state);
+}
+
+static void seeking_at_speed_resets_the_stage(void)
+{
+    start_engine_at(SIX_KEEP);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 5));
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_pump(&engine, 1000);
+    CHECK(audio_engine_seek(&engine, 50));
+    pump_rounds(0, PUMP_ROUNDS);
+    CHECK(ring_holds("lpc_16_44k_stereo", 2205, 0, STRETCH_LEAD_OUT, 16));
+    CHECK_EQUAL(50u, audio_engine_status(&engine).position_ms);
+}
+
+static void a_speed_set_while_playing_waits_for_the_next_start(void)
+{
+    start_engine_at(UNITY_KEEP);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 5));
+    pump_until_full(0);
+    audio_engine_set_speed(&engine, DOUBLE_FOLLOW);
+    audio_engine_observe(&engine, 4410);
+    CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+    CHECK(audio_engine_seek(&engine, 0));
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_observe(&engine, 4410);
+    CHECK_EQUAL(200u, audio_engine_status(&engine).position_ms);
+}
+
+static void a_ramp_at_speed_rises_over_output_frames(void)
+{
+    start_scripted_engine_at(0, 400, SIX_KEEP);
+    for (int index = 0; index < 16; index++) {
+        scripted.left[index] = 2000;
+        scripted.right[index] = -2000;
+    }
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    audio_engine_lead_in(&engine, 10, 8);
+    pump_rounds(0, PUMP_ROUNDS);
+    for (uint32_t step = 0; step < 8; step++) {
+        CHECK(frame_is(10 + step, (int32_t)(250 * step), -(int32_t)(250 * step), 16));
+    }
+    for (uint32_t frame = 18; frame < 10 + 500; frame++) {
+        CHECK(frame_is(frame, 2000, -2000, 16));
+    }
+}
+
+static void a_next_track_at_another_rate_waits_for_the_stretched_tail(void)
+{
+    start_engine_at(SIX_KEEP);
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_24_96k_stereo", 4);
+    pump_rounds(0, PUMP_ROUNDS);
+    uint32_t rate = 0;
+    audio_engine_observe(&engine, 3001 * 4 / 6 - 1);
+    CHECK(!audio_engine_wants_rate(&engine, &rate));
+    CHECK(engine.rate_end <= 3001 * 4 / 6 + 1 + STRETCH_LEAD_OUT);
+    audio_engine_observe(&engine, engine.rate_end);
+    CHECK(audio_engine_wants_rate(&engine, &rate));
+    CHECK_EQUAL(96000u, rate);
+    audio_engine_restart(&engine);
+    CHECK_EQUAL(SPEED_RESAMPLE, speed_method(&stage));
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_observe(&engine, 9600);
+    CHECK_EQUAL(150u, audio_engine_status(&engine).position_ms);
+    CHECK_EQUAL(4u, audio_engine_status(&engine).token);
+}
+
+static void a_22_khz_track_at_speed_is_sped_up_before_it_is_doubled(void)
+{
+    start_engine_at(DOUBLE_FOLLOW);
+    CHECK(audio_engine_play(&engine, "independent_16", 0, 1));
+    CHECK_EQUAL(44100u, audio_engine_rate(&engine));
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_observe(&engine, 44100);
+    CHECK_EQUAL(2000u, audio_engine_status(&engine).position_ms);
+}
+
+static void without_a_stage_the_speed_is_ignored(void)
+{
+    start_engine_with(NULL, DOUBLE_FOLLOW);
+    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 7));
+    pump_until_full(0);
+    CHECK(ring_holds("lpc_16_44k_stereo", 0, 0, 6000, 16));
+    audio_engine_observe(&engine, 4410);
+    CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+}
+
+static void double_speed_keeps_the_ring_fed(void)
+{
+    start_scripted_engine_at(0, 4000, DOUBLE_KEEP);
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    pump_rounds(0, 400);
+    uint32_t consumed = 0;
+    for (int round = 0; round < 20; round++) {
+        consumed += 1024;
+        pump_rounds(consumed, 140);
+    }
+    CHECK_EQUAL(0u, audio_engine_stats(&engine).underruns);
+    CHECK(audio_engine_buffered(&engine, consumed) > 0);
+    CHECK_EQUAL(1024u * 20, consumed);
+}
+
+static void an_error_while_speeding_leaves_the_stage_unused(void)
+{
+    start_scripted_engine_at(0, 300, SIX_KEEP);
+    scripted.fail_at_end = true;
+    memset(ring, 0x55, sizeof ring);
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    pump_rounds(0, PUMP_ROUNDS);
+    CHECK(audio_engine_status(&engine).failed);
+    CHECK(!engine.speeding);
+    CHECK(!engine.draining);
+    CHECK(engine.ended);
+    uint32_t end = engine.end_at;
+    CHECK(end > 0);
+    pump_rounds(0, 50);
+    CHECK_EQUAL(end, engine.end_at);
+    for (uint32_t frame = end; frame < end + 600; frame++) {
+        CHECK(frame_is(frame, 0, 0, 16));
+    }
+}
+
+static void a_stage_never_decodes_past_the_end_of_the_source(void)
+{
+    start_scripted_engine_at(0, 160, SIX_KEEP);
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    pump_rounds(0, PUMP_ROUNDS);
+    CHECK_EQUAL(1, scripted.closes);
+    CHECK_EQUAL(160u, audio_engine_stats(&engine).frames);
+    CHECK_EQUAL(1, scripted.ends);
+}
+
+enum {
+    EQUALIZED_SOURCE_FRAMES = 40,
+    EQUALIZED_CHECK_FRAMES = 320
+};
+
+static int32_t reference_ring_frames[2 * EQUALIZED_CHECK_FRAMES];
+
+static void reference_through_stage(bool equalize)
+{
+    static SpeedStage reference_stage;
+    static int32_t input[2 * 16 * EQUALIZED_SOURCE_FRAMES];
+    EqualizerCurve curve = {.band_count = 1};
+    curve.bands[0] = (EqualizerBand){.frequency_hz = 1000, .gain_tenths = -60, .q_hundredths = 100};
+    Equalizer reference_eq;
+    equalizer_init(&reference_eq);
+    equalizer_set_rate(&reference_eq, 44100);
+    equalizer_set_curve(&reference_eq, &curve);
+    for (uint32_t frame = 0; frame < 16 * EQUALIZED_SOURCE_FRAMES; frame++) {
+        input[2 * frame] = (int32_t)(frame % 16 + 1) * 256 * 100;
+        input[2 * frame + 1] = -(int32_t)(frame % 16 + 1) * 256 * 100;
+    }
+    speed_configure(&reference_stage, DOUBLE_FOLLOW, 44100);
+    uint32_t made = 0;
+    uint32_t pushed = 0;
+    while (made < EQUALIZED_CHECK_FRAMES) {
+        if (pushed < 16 * EQUALIZED_SOURCE_FRAMES) {
+            pushed += speed_push(&reference_stage, input + 2 * pushed, 32);
+        } else {
+            speed_finish(&reference_stage);
+        }
+        uint32_t got = speed_pull(&reference_stage, reference_ring_frames + 2 * made, 32);
+        if (equalize) {
+            equalizer_process(&reference_eq, reference_ring_frames + 2 * made, got);
+        }
+        made += got;
+    }
+}
+
+static uint32_t equalizer_test_ring_differs_from(bool equalize)
+{
+    uint32_t differing = 0;
+    reference_through_stage(equalize);
+    for (uint32_t frame = 0; frame < EQUALIZED_CHECK_FRAMES; frame++) {
+        uint32_t slot = 2 * (frame % RING_FRAMES);
+        differing += ring[slot] != (uint32_t)reference_ring_frames[2 * frame] << 8;
+        differing += ring[slot + 1] != (uint32_t)reference_ring_frames[2 * frame + 1] << 8;
+    }
+    return differing;
+}
+
+static void run_unequalized_scripted_at_double_speed(bool already_equalized)
+{
+    start_scripted_engine_at(0, EQUALIZED_SOURCE_FRAMES, DOUBLE_FOLLOW);
+    scripted.equalized = already_equalized;
+    for (int index = 0; index < 16; index++) {
+        scripted.left[index] = (index + 1) * 100;
+        scripted.right[index] = -(index + 1) * 100;
+    }
+    use_a_cut_at_one_kilohertz();
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    pump_rounds(0, PUMP_ROUNDS);
+}
+
+static void the_equalizer_shapes_the_output_of_the_speed_stage(void)
+{
+    run_unequalized_scripted_at_double_speed(false);
+    CHECK_EQUAL(0u, equalizer_test_ring_differs_from(true));
+    CHECK(equalizer_test_ring_differs_from(false) > 0);
+}
+
+static void frames_core_1_equalized_are_not_equalized_again_after_the_stage(void)
+{
+    run_unequalized_scripted_at_double_speed(true);
+    CHECK_EQUAL(0u, equalizer_test_ring_differs_from(false));
+    CHECK(equalizer_test_ring_differs_from(true) > 0);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -716,6 +1078,25 @@ int main(void)
         TEST_CASE(a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate),
         TEST_CASE(a_missing_file_is_refused),
         TEST_CASE(the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size),
+        TEST_CASE(a_stage_at_unity_speed_leaves_the_ring_bit_identical),
+        TEST_CASE(the_position_is_track_time_at_double_speed),
+        TEST_CASE(the_position_is_track_time_at_three_quarter_speed),
+        TEST_CASE(a_lead_in_does_not_count_as_track_time_at_speed),
+        TEST_CASE(starting_part_way_at_speed_counts_from_the_start_position),
+        TEST_CASE(a_queued_track_at_the_same_speed_follows_without_a_gap),
+        TEST_CASE(a_stretched_track_hands_over_after_its_tail),
+        TEST_CASE(the_end_of_a_stretched_track_plays_its_tail_before_stopping),
+        TEST_CASE(seeking_at_speed_resets_the_stage),
+        TEST_CASE(a_speed_set_while_playing_waits_for_the_next_start),
+        TEST_CASE(a_ramp_at_speed_rises_over_output_frames),
+        TEST_CASE(a_next_track_at_another_rate_waits_for_the_stretched_tail),
+        TEST_CASE(a_22_khz_track_at_speed_is_sped_up_before_it_is_doubled),
+        TEST_CASE(without_a_stage_the_speed_is_ignored),
+        TEST_CASE(double_speed_keeps_the_ring_fed),
+        TEST_CASE(an_error_while_speeding_leaves_the_stage_unused),
+        TEST_CASE(a_stage_never_decodes_past_the_end_of_the_source),
+        TEST_CASE(the_equalizer_shapes_the_output_of_the_speed_stage),
+        TEST_CASE(frames_core_1_equalized_are_not_equalized_again_after_the_stage),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

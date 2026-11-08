@@ -5,6 +5,7 @@
 
 #include "codec/flac.h"
 #include "dsp/equalizer.h"
+#include "dsp/speed.h"
 
 enum {
     AUDIO_ENGINE_PATH_CAPACITY = 256,
@@ -63,6 +64,7 @@ typedef struct AudioEngineConfig {
     AudioSource source;
     uint32_t *ring;
     uint32_t ring_words;
+    SpeedStage *speed_stage;
 } AudioEngineConfig;
 
 typedef enum AudioRefusalProblem {
@@ -81,6 +83,7 @@ typedef struct AudioSegment {
     uint32_t start;
     uint32_t base_ms;
     uint32_t rate;
+    uint8_t quarters;
     AudioTrackInfo track;
     char path[AUDIO_ENGINE_PATH_CAPACITY];
 } AudioSegment;
@@ -130,6 +133,11 @@ typedef struct AudioEngine {
     char next_path[AUDIO_ENGINE_PATH_CAPACITY];
     uint32_t gain;
     Equalizer equalizer;
+    SpeedSetting speed;
+    bool speeding;
+    bool draining;
+    bool stage_equalized;
+    uint8_t track_quarters;
     AudioEngineStats stats;
     AudioRefusal refusal;
 } AudioEngine;
@@ -137,6 +145,7 @@ typedef struct AudioEngine {
 void audio_engine_init(AudioEngine *engine, AudioEngineConfig config);
 void audio_engine_set_volume(AudioEngine *engine, uint8_t level);
 void audio_engine_set_equalizer(AudioEngine *engine, const EqualizerCurve *curve);
+void audio_engine_set_speed(AudioEngine *engine, SpeedSetting speed);
 bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms, uint32_t token);
 const char *audio_engine_current_path(const AudioEngine *engine);
 void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token);
