@@ -229,6 +229,35 @@ static size_t terminated_length(const char *buffer, uint32_t length)
     return utf8_complete_length(buffer, length);
 }
 
+enum {
+    STRING_PIECE = 32
+};
+
+static bool has_end(const char *text, uint32_t length)
+{
+    for (uint32_t index = 0; index < length; index++) {
+        if (text[index] == '\0') {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool read_until_end(const Library *library, uint32_t start, char *buffer, uint32_t *wanted)
+{
+    for (uint32_t done = 0; done < *wanted; done += STRING_PIECE) {
+        uint32_t piece = *wanted - done < STRING_PIECE ? *wanted - done : STRING_PIECE;
+        if (!read_source(library, start + done, buffer + done, piece)) {
+            return false;
+        }
+        if (has_end(buffer + done, piece)) {
+            *wanted = done + piece;
+            return true;
+        }
+    }
+    return true;
+}
+
 bool library_read_string(const Library *library, uint32_t offset, char *buffer, size_t capacity)
 {
     LibrarySectionInfo strings = library->sections[LIBRARY_STRINGS];
@@ -241,7 +270,7 @@ bool library_read_string(const Library *library, uint32_t offset, char *buffer, 
     }
     uint32_t available = strings.count - offset;
     uint32_t wanted = capacity - 1 < available ? (uint32_t)(capacity - 1) : available;
-    if (!read_source(library, strings.offset + offset, buffer, wanted)) {
+    if (!read_until_end(library, strings.offset + offset, buffer, &wanted)) {
         buffer[0] = '\0';
         return false;
     }
