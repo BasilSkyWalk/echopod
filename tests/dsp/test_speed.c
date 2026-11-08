@@ -168,6 +168,23 @@ static void keep_pitch_stretches_up_to_48_khz_and_resamples_above(void)
     CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 192000));
 }
 
+static void keep_pitch_resamples_below_the_lowest_stretch_rate(void)
+{
+    SpeedSetting setting = {6, true};
+    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 0));
+    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 24));
+    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 3999));
+    CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, 4000));
+}
+
+static void a_tiny_source_rate_still_plays_out_and_drains(void)
+{
+    fill_tone(TONE_HZ, 24.0, 200);
+    configure(6, true, 24);
+    CHECK_EQUAL(SPEED_RESAMPLE, speed_method(&stage));
+    CHECK_EQUAL(ceil_quarters(200, 6), play(200));
+}
+
 static void pitch_follows_speed_always_resamples(void)
 {
     CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for((SpeedSetting){6, false}, RATE_22K));
@@ -406,6 +423,8 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(unity_and_out_of_range_speeds_bypass_the_stage),
         TEST_CASE(keep_pitch_stretches_up_to_48_khz_and_resamples_above),
+        TEST_CASE(keep_pitch_resamples_below_the_lowest_stretch_rate),
+        TEST_CASE(a_tiny_source_rate_still_plays_out_and_drains),
         TEST_CASE(pitch_follows_speed_always_resamples),
         TEST_CASE(the_stretch_starts_with_the_first_input_unchanged),
         TEST_CASE(the_stretch_passes_a_constant_unchanged_at_every_speed),

@@ -6,7 +6,9 @@ SpeedMethod speed_method_for(SpeedSetting setting, uint32_t rate)
         setting.quarters == SPEED_UNITY_QUARTERS) {
         return SPEED_BYPASS;
     }
-    return setting.keep_pitch && rate <= SPEED_STRETCH_MAX_RATE ? SPEED_STRETCH : SPEED_RESAMPLE;
+    bool stretches =
+        setting.keep_pitch && rate >= SPEED_STRETCH_MIN_RATE && rate <= SPEED_STRETCH_MAX_RATE;
+    return stretches ? SPEED_STRETCH : SPEED_RESAMPLE;
 }
 
 void speed_configure(SpeedStage *stage, SpeedSetting setting, uint32_t rate)

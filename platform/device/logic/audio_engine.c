@@ -154,6 +154,7 @@ static void push_segment(AudioEngine *engine, const char *path, uint32_t token, 
         engine->segment_count--;
     }
     AudioSegment *segment = &engine->segments[engine->segment_count++];
+    engine->next_replaced = false;
     segment->token = token;
     segment->start = start;
     segment->base_ms = base_ms;
@@ -205,6 +206,7 @@ bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms,
 void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token)
 {
     engine->has_next = path != NULL;
+    engine->next_replaced = engine->segment_count > 1 || engine->rate_pending;
     engine->next_token = token;
     if (path != NULL) {
         copy_path(engine->next_path, path);
@@ -218,9 +220,9 @@ bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms)
     }
     AudioSegment playing = engine->segments[0];
     AudioEngineState state = engine->state;
-    if (engine->segment_count > 1) {
+    if (!engine->next_replaced && engine->segment_count > 1) {
         audio_engine_queue_next(engine, engine->segments[1].path, engine->segments[1].token);
-    } else if (engine->rate_pending) {
+    } else if (!engine->next_replaced && engine->rate_pending) {
         engine->has_next = true;
     }
     bool started = start_track(engine, playing.path, position_ms, playing.token);

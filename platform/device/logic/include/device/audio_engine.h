@@ -129,6 +129,7 @@ typedef struct AudioEngine {
     uint32_t ramp_done;
     uint32_t output_rate;
     bool has_next;
+    bool next_replaced;
     uint32_t next_token;
     char next_path[AUDIO_ENGINE_PATH_CAPACITY];
     uint32_t gain;
