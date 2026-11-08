@@ -660,6 +660,93 @@ static void an_empty_file_grows_from_nothing(void)
     check_empty_grow("exfat_mbr");
 }
 
+enum {
+    STREAM_SIZE = 1024 * 1024,
+    STREAM_START = 1000,
+    STREAM_CHUNK = 8192,
+    SPARE_READS = 8
+};
+
+static uint32_t fat_sectors_for(const Card *card, uint32_t size)
+{
+    uint32_t clusters = (size + cluster_bytes(card) - 1) / cluster_bytes(card);
+    uint32_t per_sector = SECTOR_SIZE / (card->volume.type == FAT_TYPE_16 ? 2u : 4u);
+    return clusters / per_sector + 2;
+}
+
+static uint32_t reads_streaming(Card *card, const char *path, uint32_t seed)
+{
+    FatFile file;
+    CHECK(fat_open(&card->volume, path, &file));
+    static uint8_t chunk[STREAM_CHUNK];
+    uint32_t before = card->sparse.reads;
+    uint32_t mismatches = 0;
+    for (uint32_t offset = STREAM_START; offset < file.size; offset += STREAM_CHUNK) {
+        uint32_t length = file.size - offset < STREAM_CHUNK ? file.size - offset : STREAM_CHUNK;
+        CHECK(fat_read(&card->volume, &file, offset, chunk, length));
+        for (uint32_t index = 0; index < length; index++) {
+            mismatches += chunk[index] != pattern_byte(seed, offset + index);
+        }
+    }
+    CHECK_EQUAL(0, mismatches);
+    return card->sparse.reads - before;
+}
+
+static uint32_t reads_for_one_byte(Card *card, FatFile *file, uint32_t offset)
+{
+    uint8_t byte = 0;
+    uint32_t before = card->sparse.reads;
+    CHECK(fat_read(&card->volume, file, offset, &byte, 1));
+    return card->sparse.reads - before;
+}
+
+static void check_reserved_stream(const char *name)
+{
+    Card *card = mounted(name);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.echo/stream.bin", STREAM_SIZE));
+    write_pattern(card, "/.echo/stream.bin", 11, STREAM_SIZE);
+    remount(card);
+    uint32_t data = STREAM_SIZE / SECTOR_SIZE;
+    CHECK(reads_streaming(card, "/.echo/stream.bin", 11) <=
+          data + fat_sectors_for(card, STREAM_SIZE) + SPARE_READS);
+    FatFile file;
+    CHECK(fat_open(&card->volume, "/.echo/stream.bin", &file));
+    CHECK(reads_for_one_byte(card, &file, STREAM_SIZE - 1) <=
+          fat_sectors_for(card, STREAM_SIZE) + FAT_CACHE_SECTORS);
+    CHECK(reads_for_one_byte(card, &file, 0) <= FAT_CACHE_SECTORS);
+    CHECK(reads_for_one_byte(card, &file, STREAM_SIZE - 1) <= FAT_CACHE_SECTORS);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_reserved_file_streams_without_walking_its_chain_again(void)
+{
+    check_reserved_stream("fat32_mbr");
+    check_reserved_stream("fat16_superfloppy");
+    check_reserved_stream("exfat_mbr");
+}
+
+static void check_scattered_stream(const char *name)
+{
+    Card *card = mounted(name);
+    uint32_t cluster = cluster_bytes(card);
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.echo/split.bin", 3 * cluster));
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_reserve(&card->volume, "/.echo/wedge.bin", cluster));
+    CHECK_EQUAL(FAT_RESERVE_CREATED, fat_grow(&card->volume, "/.echo/split.bin", STREAM_SIZE));
+    write_pattern(card, "/.echo/split.bin", 13, STREAM_SIZE);
+    remount(card);
+    CHECK(!is_contiguous(card, "/.echo/split.bin"));
+    uint32_t data = STREAM_SIZE / SECTOR_SIZE;
+    CHECK(reads_streaming(card, "/.echo/split.bin", 13) <=
+          data + 3 * fat_sectors_for(card, STREAM_SIZE) + SPARE_READS);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_scattered_file_streams_with_one_walk_of_its_chain(void)
+{
+    check_scattered_stream("fat32_mbr");
+    check_scattered_stream("fat16_superfloppy");
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -678,6 +765,8 @@ int main(void)
         TEST_CASE(an_exfat_file_with_free_clusters_after_it_stays_contiguous),
         TEST_CASE(a_file_grows_into_scattered_free_clusters_and_a_full_card_refuses),
         TEST_CASE(an_empty_file_grows_from_nothing),
+        TEST_CASE(a_reserved_file_streams_without_walking_its_chain_again),
+        TEST_CASE(a_scattered_file_streams_with_one_walk_of_its_chain),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

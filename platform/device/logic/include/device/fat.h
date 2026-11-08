@@ -33,6 +33,7 @@ typedef struct FatFile {
     uint32_t size;
     uint32_t cursor_index;
     uint32_t cursor_cluster;
+    uint32_t straight;
     bool directory;
     bool contiguous;
 } FatFile;

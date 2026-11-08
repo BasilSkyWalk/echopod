@@ -269,26 +269,53 @@ static bool next_cluster(FatVolume *volume, uint32_t cluster, uint32_t *next)
     return *next >= FIRST_CLUSTER && *next < volume->cluster_count + FIRST_CLUSTER;
 }
 
+static bool straight_cluster(const FatVolume *volume, const FatFile *file, uint32_t index,
+                             uint32_t *cluster)
+{
+    *cluster = file->first_cluster + index;
+    return file->first_cluster >= FIRST_CLUSTER && *cluster < volume->cluster_count + FIRST_CLUSTER;
+}
+
+static void rewind_cursor(FatFile *file)
+{
+    if (file->straight == 0 && file->first_cluster >= FIRST_CLUSTER) {
+        file->straight = 1;
+    }
+    uint32_t known = file->straight > 0 ? file->straight - 1u : 0u;
+    file->cursor_index = known;
+    file->cursor_cluster = file->first_cluster + known;
+}
+
+static bool step_cursor(FatVolume *volume, FatFile *file)
+{
+    uint32_t current = file->cursor_cluster;
+    if (!next_cluster(volume, current, &file->cursor_cluster)) {
+        file->cursor_cluster = 0;
+        return false;
+    }
+    file->cursor_index++;
+    if (file->cursor_index == file->straight && file->cursor_cluster == current + 1u) {
+        file->straight++;
+    }
+    return true;
+}
+
 static bool cluster_at(FatVolume *volume, FatFile *file, uint32_t index, uint32_t *cluster)
 {
-    if (file->cursor_cluster == 0 || index < file->cursor_index) {
-        file->cursor_index = 0;
-        file->cursor_cluster = file->first_cluster;
-    }
     if (index >= volume->cluster_count) {
         return false;
     }
-    if (file->contiguous) {
-        *cluster = file->first_cluster + index;
-        return file->first_cluster >= FIRST_CLUSTER &&
-               *cluster < volume->cluster_count + FIRST_CLUSTER;
+    if (file->contiguous || index < file->straight) {
+        return straight_cluster(volume, file, index, cluster);
+    }
+    if (file->cursor_cluster == 0 || index < file->cursor_index ||
+        file->cursor_index + 1u < file->straight) {
+        rewind_cursor(file);
     }
     while (file->cursor_index < index) {
-        if (!next_cluster(volume, file->cursor_cluster, &file->cursor_cluster)) {
-            file->cursor_cluster = 0;
+        if (!step_cursor(volume, file)) {
             return false;
         }
-        file->cursor_index++;
     }
     *cluster = file->cursor_cluster;
     return *cluster >= FIRST_CLUSTER;
@@ -326,12 +353,16 @@ uint32_t fat_run_length(FatVolume *volume, FatFile *file, uint32_t sector_index,
     if (!fat_file_sector(volume, file, sector_index, &first)) {
         return 0;
     }
+    uint32_t cursor_index = file->cursor_index;
+    uint32_t cursor_cluster = file->cursor_cluster;
     uint32_t length = 1;
     uint32_t lba = first;
     while (length < limit && fat_file_sector(volume, file, sector_index + length, &lba) &&
            lba == first + length) {
         length++;
     }
+    file->cursor_index = cursor_index;
+    file->cursor_cluster = cursor_cluster;
     return length;
 }
 
