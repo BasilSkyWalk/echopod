@@ -248,6 +248,8 @@ static void adopt(Core1Stream *stream, uint32_t generation)
     stream->slot = 0;
     stream->pending = (Core1Block){0};
     stream->emitted = 0;
+    stream->handing = false;
+    stream->holding = false;
     stream->finished = false;
     stream->starved = false;
     control->slot_offset = stream->slot_offset;
@@ -303,24 +305,52 @@ static void emit_piece(Core1Stream *stream)
     slot->first_sample = stream->pending.first_sample + stream->emitted;
     slot->samples = samples;
     stream->emitted += samples;
+    stream->handing = stream->emitted < stream->pending.samples;
     hand_over(stream, AUDIO_FRAME_READY);
 }
 
-static void fill_slot(Core1Stream *stream, Core1DecodeResult result, const Core1Block *block)
+static void end_stream(Core1Stream *stream, Core1DecodeResult result)
 {
-    if (result == CORE1_DECODED) {
-        stream->pending = *block;
-        stream->emitted = 0;
-        stream->region.control->released = stream->start_offset + block->position;
-        emit_piece(stream);
-        return;
-    }
     volatile StreamSlot *slot = &stream->region.control->slots[stream->slot];
     slot->first_sample = 0;
     slot->samples = 0;
     slot->equalized = 0;
     stream->finished = true;
     hand_over(stream, result == CORE1_FINISHED ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR);
+}
+
+static void take_result(Core1Stream *stream, Core1DecodeResult result, const Core1Block *block)
+{
+    if (result == CORE1_DECODED) {
+        stream->pending = *block;
+        stream->emitted = 0;
+        stream->handing = true;
+        stream->region.control->released = stream->start_offset + block->position;
+        return;
+    }
+    stream->held = result;
+    stream->holding = true;
+}
+
+static bool slot_empty(const Core1Stream *stream)
+{
+    return stream->region.control->slots[stream->slot].state == STREAM_SLOT_EMPTY;
+}
+
+static bool hand_over_when_free(Core1Stream *stream)
+{
+    if (!slot_empty(stream)) {
+        return false;
+    }
+    uint32_t began = tick_now(stream);
+    if (stream->handing) {
+        emit_piece(stream);
+    } else {
+        stream->holding = false;
+        end_stream(stream, stream->held);
+    }
+    stream->busy_ticks += (tick_now(stream) - began) & stream->tick_mask;
+    return true;
 }
 
 bool core1_stream_step(Core1Stream *stream)
@@ -339,19 +369,14 @@ bool core1_stream_step(Core1Stream *stream)
     if (generation == 0 || stream->finished) {
         return false;
     }
-    if (control->slots[stream->slot].state != STREAM_SLOT_EMPTY) {
-        return false;
-    }
-    if (stream->emitted < stream->pending.samples) {
-        uint32_t began = tick_now(stream);
-        emit_piece(stream);
-        stream->busy_ticks += (tick_now(stream) - began) & stream->tick_mask;
-        return true;
+    if (stream->handing || stream->holding) {
+        return hand_over_when_free(stream);
     }
     stream->starved = false;
     Core1Block block = {0};
     if (stream->decoder.decode == NULL) {
-        fill_slot(stream, CORE1_FAILED, &block);
+        take_result(stream, CORE1_FAILED, &block);
+        (void)hand_over_when_free(stream);
         return true;
     }
     uint32_t started = tick_now(stream);
@@ -364,9 +389,8 @@ bool core1_stream_step(Core1Stream *stream)
         stream->starved = false;
         return false;
     }
-    started = tick_now(stream);
-    fill_slot(stream, result, &block);
-    stream->busy_ticks += (tick_now(stream) - started) & stream->tick_mask;
+    take_result(stream, result, &block);
+    (void)hand_over_when_free(stream);
     return true;
 }
 

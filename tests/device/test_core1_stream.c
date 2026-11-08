@@ -785,6 +785,34 @@ static void blocks_up_to_8192_samples_keep_both_channels_in_the_second_bank(void
     CHECK(streams_exactly("big_blocks_16", 2, FULL_RING_BYTES));
 }
 
+static void core_1_decodes_the_next_block_while_its_slots_wait(void)
+{
+    made = flac_writer_make((FlacWriterSpec){192000, 2, 16, 4096, 20000, 6});
+    start(FULL_RING_BYTES);
+    use_the_flac_program_slots();
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "made", 0, &info));
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    for (int round = 0; round < 20; round++) {
+        interface.next(interface.context, &frame);
+        core1_stream_step(&stream);
+    }
+    CHECK_EQUAL(STREAM_SLOT_FULL, control.slots[0].state);
+    CHECK_EQUAL(STREAM_SLOT_FULL, control.slots[1].state);
+    CHECK_EQUAL(4096u, stream.pending.first_sample);
+    CHECK_EQUAL(0u, stream.emitted);
+    interface.close(interface.context);
+    flac_writer_free(&made);
+}
+
+static void hi_res_blocks_larger_than_a_slot_stream_exactly(void)
+{
+    FlacWriterSpec spec = {192000, 2, 24, 4096, 20000, 6};
+    CHECK(made_track_streams_exactly(spec, false));
+    CHECK(made_track_streams_exactly(spec, true));
+}
+
 static void a_block_is_handed_over_in_pieces_no_larger_than_a_slot(void)
 {
     made = flac_writer_make((FlacWriterSpec){192000, 2, 16, 16384, 20000, 6});
@@ -1107,6 +1135,8 @@ int main(void)
         TEST_CASE(blocks_of_16384_samples_stream_through_core_1_in_pieces),
         TEST_CASE(blocks_up_to_8192_samples_keep_both_channels_in_the_second_bank),
         TEST_CASE(a_block_is_handed_over_in_pieces_no_larger_than_a_slot),
+        TEST_CASE(core_1_decodes_the_next_block_while_its_slots_wait),
+        TEST_CASE(hi_res_blocks_larger_than_a_slot_stream_exactly),
         TEST_CASE(a_16384_sample_track_opened_part_way_starts_on_its_frame),
         TEST_CASE(core_1_equalizes_pieces_exactly_like_the_main_core),
         TEST_CASE(alac_streams_exactly_through_the_flac_program_slots),

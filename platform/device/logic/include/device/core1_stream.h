@@ -119,6 +119,9 @@ typedef struct Core1Stream {
     uint32_t slot_samples;
     Core1Block pending;
     uint32_t emitted;
+    Core1DecodeResult held;
+    bool handing;
+    bool holding;
     uint32_t (*ticks)(void);
     uint32_t tick_mask;
     uint32_t load_window;
