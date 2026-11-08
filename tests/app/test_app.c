@@ -2601,6 +2601,25 @@ static void a_clock_dated_before_the_firmware_shows_no_time(void)
     CHECK(!area_has_color(clock, DEFAULT_THEME.colors.header_text));
 }
 
+static void the_landscape_clock_and_battery_show_at_every_minute(void)
+{
+    char text[8] = "00:00";
+    StatusBarState state = {.battery_known = true, .battery_percent = 100, .clock = text};
+    int hidden = 0;
+    for (int minute = 0; minute < 24 * 60; minute++) {
+        int hour = minute / 60;
+        text[0] = (char)('0' + hour / 10);
+        text[1] = (char)('0' + hour % 10);
+        text[3] = (char)('0' + minute % 60 / 10);
+        text[4] = (char)('0' + minute % 10);
+        Rect clock = status_bar_clock_area(&DEFAULT_THEME, state);
+        hidden += rect_is_empty(clock) ? 1 : 0;
+        Rect percent = status_bar_percent_area(&DEFAULT_THEME, "100%", false);
+        hidden += HAL_DISPLAY_WIDTH - DEFAULT_THEME.metrics.header_inset > percent.x ? 1 : 0;
+    }
+    CHECK_EQUAL(0, hidden);
+}
+
 static uint32_t last_play_time(void)
 {
     HistoryRecord records[16];
@@ -2912,6 +2931,7 @@ int main(void)
         TEST_CASE(connecting_writes_the_scrobbler_log_while_the_history_is_on),
         TEST_CASE(the_clock_is_under_display_and_date_time_under_system),
         TEST_CASE(a_clock_dated_before_the_firmware_shows_no_time),
+        TEST_CASE(the_landscape_clock_and_battery_show_at_every_minute),
         TEST_CASE(the_listen_history_has_no_time_while_the_clock_predates_the_firmware),
         TEST_CASE(a_new_firmware_asks_once_for_the_clock_after_the_start_up_screen),
         TEST_CASE(set_now_opens_the_date_and_time_at_the_build_date),

@@ -12,7 +12,8 @@ enum {
     BOLT_WIDTH_TENTHS = 6,
     BLUETOOTH_WIDTH_TENTHS = 7,
     TENTHS = 10,
-    FULL_PERCENT = 100
+    FULL_PERCENT = 100,
+    CLOCK_TEXT_CAPACITY = 16
 };
 
 static const Font *status_font(const Theme *theme)
@@ -100,13 +101,41 @@ static int right_items_left(const Theme *theme, StatusBarState state)
     return state.charging ? status_bar_bolt_area(theme).x : status_bar_battery_area(theme).x;
 }
 
+static char widest_digit(const Font *font)
+{
+    char widest = '0';
+    int widest_width = 0;
+    for (char digit = '0'; digit <= '9'; digit++) {
+        char text[2] = {digit, '\0'};
+        int width = text_width(font, text);
+        if (width > widest_width) {
+            widest_width = width;
+            widest = digit;
+        }
+    }
+    return widest;
+}
+
+static int clock_room(const Font *font, const char *clock)
+{
+    char widest[CLOCK_TEXT_CAPACITY];
+    char digit = widest_digit(font);
+    size_t index = 0;
+    for (; clock[index] != '\0' && index + 1 < sizeof widest; index++) {
+        bool is_digit = clock[index] >= '0' && clock[index] <= '9';
+        widest[index] = is_digit ? digit : clock[index];
+    }
+    widest[index] = '\0';
+    return text_width(font, widest);
+}
+
 Rect status_bar_clock_area(const Theme *theme, StatusBarState state)
 {
     Rect bluetooth = status_bar_bluetooth_area(theme);
     int gap = percent_gap(theme);
     int left = bluetooth.x + bluetooth.width + gap;
     int right = right_items_left(theme, state) - gap;
-    int width = state.clock != NULL ? text_width(status_font(theme), state.clock) : 0;
+    int width = state.clock != NULL ? clock_room(status_font(theme), state.clock) : 0;
     bool centered = theme->metrics.status_height > 0;
     int x = centered ? (theme->metrics.screen_width - width) / 2 : left;
     int limit = centered ? right : theme->metrics.header_inset;
@@ -166,7 +195,8 @@ static void draw_battery(Canvas *canvas, const Theme *theme, StatusBarState stat
 
 void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
 {
-    if (state.clock != NULL && rect_is_empty(status_bar_clock_area(theme, state))) {
+    if (state.clock != NULL && theme->metrics.status_height > 0 &&
+        rect_is_empty(status_bar_clock_area(theme, state))) {
         state.hide_percent = true;
     }
     Rect icon = status_bar_playback_area(theme);
