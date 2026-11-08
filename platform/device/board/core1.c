@@ -7,6 +7,7 @@
 #include "device/core1_stream.h"
 #include "device/image_crc.h"
 #include "emmc.h"
+#include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/system.h"
 #include "registers.h"
@@ -38,6 +39,7 @@ static Core1Program streaming_program;
 static uint32_t streaming_divider;
 static EqualizerCurve equalizer_curve;
 static uint32_t equalizer_version;
+static uint8_t core1_quarters;
 
 static uint32_t bus_read(void *context, uint32_t address)
 {
@@ -162,7 +164,8 @@ static bool hi_res(Core1Program program, uint32_t rate)
 static uint32_t stream_divider(Core1Program program, uint32_t rate, uint32_t pll_mhz)
 {
     bool heavy = program == CORE1_PROGRAM_AAC || program == CORE1_PROGRAM_OPUS ||
-                 equalizing(program, rate) || hi_res(program, rate);
+                 equalizing(program, rate) || hi_res(program, rate) ||
+                 core1_quarters > HAL_AUDIO_SPEED_UNITY_QUARTERS;
     return heavy && pll_mhz <= FULL_SPEED_MHZ ? 1 : core1_divider_for(pll_mhz);
 }
 
@@ -174,6 +177,11 @@ static void share_equalizer(bool enabled)
     share->enabled = enabled ? 1u : 0u;
     __atomic_thread_fence(__ATOMIC_RELEASE);
     share->version = ++equalizer_version;
+}
+
+void board_core1_set_speed(uint8_t quarters)
+{
+    core1_quarters = quarters;
 }
 
 void board_core1_set_equalizer(const EqualizerCurve *curve)
