@@ -50,6 +50,8 @@ enum {
     SETTINGS_SLEEP_INDEX = 4,
     SETTINGS_FIRST_GROUP_INDEX = 5,
     SOUND_GAIN_ROW = 0,
+    SOUND_SPOKEN_SPEED_ROW = 5,
+    SOUND_SPOKEN_PITCH_ROW = 6,
     DISPLAY_THEME_ROW = 0,
     DISPLAY_ACCENT_ROW = 1,
     DISPLAY_HIGHLIGHT_ROW = 2,
@@ -604,6 +606,43 @@ static void saved_settings_are_restored_at_start(void)
     tap(KEY_PLAY);
     restart_app();
     CHECK_EQUAL(settings_defaults().brightness + 2, fake_hal_display_brightness());
+}
+
+static void the_spoken_speed_is_chosen_and_saved(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_SOUND, SOUND_SPOKEN_SPEED_ROW);
+    CHECK(title_is("Book & podcast speed"));
+    move_down(2);
+    tap(KEY_PLAY);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(SPOKEN_SPEED_1_5X, settings.options[OPTION_SPOKEN_SPEED]);
+    CHECK_EQUAL(0, fake_hal_audio_speed_calls());
+}
+
+static void the_spoken_pitch_is_chosen_and_saved(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_SOUND, SOUND_SPOKEN_PITCH_ROW);
+    CHECK(title_is("Book & podcast pitch"));
+    move_down(1);
+    tap(KEY_PLAY);
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(SPOKEN_PITCH_FOLLOWS_SPEED, settings.options[OPTION_SPOKEN_PITCH]);
+}
+
+static void music_plays_at_normal_speed_after_a_spoken_speed_is_saved(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_SOUND, SOUND_SPOKEN_SPEED_ROW);
+    move_down(4);
+    tap(KEY_PLAY);
+    restart_app();
+    play_first_album_track();
+    CHECK_EQUAL(4, fake_hal_audio_play_speed().quarters);
+    CHECK(fake_hal_audio_play_speed().keep_pitch);
 }
 
 static Orientation swapping_portrait(void)
@@ -3500,6 +3539,9 @@ int main(void)
         TEST_CASE(brightness_is_applied_and_saved),
         TEST_CASE(the_equalizer_opens_from_settings_and_is_applied),
         TEST_CASE(gain_is_applied),
+        TEST_CASE(the_spoken_speed_is_chosen_and_saved),
+        TEST_CASE(the_spoken_pitch_is_chosen_and_saved),
+        TEST_CASE(music_plays_at_normal_speed_after_a_spoken_speed_is_saved),
         TEST_CASE(saved_settings_are_restored_at_start),
         TEST_CASE(the_orientation_setting_is_saved),
         TEST_CASE(a_swapping_portrait_turns_the_rocker_around_in_lists),

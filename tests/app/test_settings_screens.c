@@ -17,7 +17,13 @@ static const char *const TOP[SETTINGS_TOP_COUNT] = {
     "Shuffle", "Repeat",  "Bluetooth", "Equalizer", "Sleep timer",
     "Sound",   "Display", "Library",   "Buttons",   "System"};
 
-static const char *const SOUND[] = {"Gain", "Output", "Filter", "Balance", "Bluetooth level"};
+static const char *const SOUND[] = {"Gain",
+                                    "Output",
+                                    "Filter",
+                                    "Balance",
+                                    "Bluetooth level",
+                                    "Book & podcast speed",
+                                    "Book & podcast pitch"};
 static const char *const DISPLAY[] = {
     "Theme",           "Accent color",        "Highlight",   "Now Playing",
     "Brightness",      "Screen timeout",      "Orientation", "Animations",
@@ -100,6 +106,20 @@ static void every_row_but_rescan_opens_a_screen(void)
             CHECK_EQUAL(!rescan, screens.rows[row].opens);
         }
     }
+}
+
+static void the_speed_rows_show_their_values(void)
+{
+    SettingsStore store = {.settings = settings_defaults()};
+    fake_hal_reset();
+    settings_screens_init(&screens, (SettingsContext){.store = &store}, &DEFAULT_THEME);
+    open_group(SETTINGS_SOUND);
+    CHECK_EQUAL(0, strcmp("1x", screens.rows[5].value(screens.rows[5].context)));
+    CHECK_EQUAL(0, strcmp("Keep pitch", screens.rows[6].value(screens.rows[6].context)));
+    store.settings.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_0_75X;
+    store.settings.options[OPTION_SPOKEN_PITCH] = SPOKEN_PITCH_FOLLOWS_SPEED;
+    CHECK_EQUAL(0, strcmp("0.75x", screens.rows[5].value(screens.rows[5].context)));
+    CHECK_EQUAL(0, strcmp("Follows speed", screens.rows[6].value(screens.rows[6].context)));
 }
 
 static void a_group_remembers_its_selected_row(void)
@@ -266,6 +286,7 @@ int main(void)
         TEST_CASE(the_top_level_lists_the_quick_settings_then_the_groups),
         TEST_CASE(each_group_lists_its_rows_in_order),
         TEST_CASE(every_row_but_rescan_opens_a_screen),
+        TEST_CASE(the_speed_rows_show_their_values),
         TEST_CASE(a_group_remembers_its_selected_row),
         TEST_CASE(starting_again_forgets_the_selected_rows),
         TEST_CASE(the_theme_choice_lists_every_theme_in_stored_order),
