@@ -394,6 +394,18 @@ bool hal_input_next_transition(HalKeyTransition *transition)
     return true;
 }
 
+void hal_input_drop_presses(void)
+{
+    int kept = 0;
+    for (int index = fake.next_transition; index < fake.transition_count; index++) {
+        if (!fake.transitions[index].pressed) {
+            fake.transitions[kept++] = fake.transitions[index];
+        }
+    }
+    fake.next_transition = 0;
+    fake.transition_count = kept;
+}
+
 uint32_t hal_clock_milliseconds(void)
 {
     return fake.now_ms;

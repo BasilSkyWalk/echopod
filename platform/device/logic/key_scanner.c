@@ -7,14 +7,25 @@ void key_scanner_init(KeyScanner *scanner)
     *scanner = (KeyScanner){.power_armed = false};
 }
 
-static void push(KeyScanner *scanner, HalKeyTransition transition)
+static bool has_room(const KeyScanner *scanner, bool pressed)
 {
-    if (scanner->count == KEY_SCANNER_QUEUE_CAPACITY) {
-        return;
+    uint32_t free_slots = KEY_SCANNER_QUEUE_CAPACITY - (uint32_t)scanner->count;
+    return pressed ? free_slots > KEY_COUNT : free_slots > 0;
+}
+
+static uint8_t slot_at(const KeyScanner *scanner, uint32_t index)
+{
+    return (uint8_t)((scanner->head + index) % KEY_SCANNER_QUEUE_CAPACITY);
+}
+
+static bool push(KeyScanner *scanner, HalKeyTransition transition)
+{
+    if (!has_room(scanner, transition.pressed)) {
+        return false;
     }
-    uint32_t tail = (uint32_t)(scanner->head + scanner->count) % KEY_SCANNER_QUEUE_CAPACITY;
-    scanner->queue[tail] = transition;
+    scanner->queue[slot_at(scanner, scanner->count)] = transition;
     scanner->count++;
+    return true;
 }
 
 static uint8_t gate_power(KeyScanner *scanner, uint8_t mask)
@@ -32,12 +43,12 @@ static void emit_changes(KeyScanner *scanner, uint8_t mask, uint32_t time_ms)
         bool pressed = pass == 1;
         for (int key = 0; key < KEY_COUNT; key++) {
             uint8_t bit = (uint8_t)(1u << key);
-            if ((changed & bit) != 0 && ((mask & bit) != 0) == pressed) {
-                push(scanner, (HalKeyTransition){(Key)key, pressed, time_ms});
+            if ((changed & bit) != 0 && ((mask & bit) != 0) == pressed &&
+                push(scanner, (HalKeyTransition){(Key)key, pressed, time_ms})) {
+                scanner->stable ^= bit;
             }
         }
     }
-    scanner->stable = mask;
 }
 
 void key_scanner_sample(KeyScanner *scanner, uint8_t pressed_mask, uint32_t time_ms)
@@ -55,7 +66,20 @@ bool key_scanner_next(KeyScanner *scanner, HalKeyTransition *transition)
         return false;
     }
     *transition = scanner->queue[scanner->head];
-    scanner->head = (uint8_t)((scanner->head + 1) % KEY_SCANNER_QUEUE_CAPACITY);
+    scanner->head = slot_at(scanner, 1);
     scanner->count--;
     return true;
+}
+
+void key_scanner_drop_presses(KeyScanner *scanner)
+{
+    uint8_t kept = 0;
+    for (uint8_t index = 0; index < scanner->count; index++) {
+        HalKeyTransition transition = scanner->queue[slot_at(scanner, index)];
+        if (!transition.pressed) {
+            scanner->queue[slot_at(scanner, kept)] = transition;
+            kept++;
+        }
+    }
+    scanner->count = kept;
 }

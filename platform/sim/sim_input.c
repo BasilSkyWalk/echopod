@@ -80,3 +80,16 @@ bool hal_input_next_transition(HalKeyTransition *transition)
     queue.length--;
     return true;
 }
+
+void hal_input_drop_presses(void)
+{
+    int kept = 0;
+    for (int index = 0; index < queue.length; index++) {
+        HalKeyTransition transition = queue.items[(queue.start + index) % TRANSITION_CAPACITY];
+        if (!transition.pressed) {
+            queue.items[(queue.start + kept) % TRANSITION_CAPACITY] = transition;
+            kept++;
+        }
+    }
+    queue.length = kept;
+}

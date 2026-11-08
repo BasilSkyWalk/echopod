@@ -12,3 +12,4 @@ typedef struct HalKeyTransition {
 } HalKeyTransition;
 
 bool hal_input_next_transition(HalKeyTransition *transition);
+void hal_input_drop_presses(void);

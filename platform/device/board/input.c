@@ -112,6 +112,13 @@ bool hal_input_next_transition(HalKeyTransition *transition)
     return found;
 }
 
+void hal_input_drop_presses(void)
+{
+    uint32_t primask = irq_save();
+    key_scanner_drop_presses(&scanner);
+    irq_restore(primask);
+}
+
 void board_wait_for_key(void)
 {
     HalKeyTransition transition;

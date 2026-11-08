@@ -21,3 +21,4 @@ typedef struct KeyScanner {
 void key_scanner_init(KeyScanner *scanner);
 void key_scanner_sample(KeyScanner *scanner, uint8_t pressed_mask, uint32_t time_ms);
 bool key_scanner_next(KeyScanner *scanner, HalKeyTransition *transition);
+void key_scanner_drop_presses(KeyScanner *scanner);

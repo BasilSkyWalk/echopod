@@ -8,6 +8,7 @@
 #include "cover_cache.h"
 #include "folders_store.h"
 #include "hal/clock.h"
+#include "hal/input.h"
 #include "hal/storage.h"
 #include "hal/system.h"
 #include "library_store.h"
@@ -298,6 +299,7 @@ RescanOutcome library_rescan_run(RescanProgress progress)
     run_passes(entry, &job, &outcome);
     hal_file_close(&files.scratch);
     hal_system_return_scratch();
+    hal_input_drop_presses();
     return outcome;
 }
 
