@@ -50,7 +50,7 @@ Version 0.12.0 adds seven colour themes, four retro Now Playing faces, `.m4b` au
 | Browse while covers are built | todo |
 | echo-sync on a Mac and on Linux with a real card | todo |
 | Firmware images in GitHub releases | todo |
-| Playback speed for audiobooks and podcasts | todo |
+| Playback speed for audiobooks and podcasts | sim (0.75x–2x, Keep pitch or Follows speed; not yet checked on a player) |
 | Installing from a Mac through FiiO's updater | todo |
 | Testing on more players | todo |
 
