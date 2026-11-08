@@ -20,7 +20,8 @@ enum {
     ALBUM_COUNT = 5,
     BIG_LIST = 3000,
     BIG_ALBUMS = 2500,
-    MOST_VALUES = 65536
+    MOST_VALUES = 65536,
+    FEW_READS = 64
 };
 
 static uint8_t seen[MOST_VALUES];
@@ -315,6 +316,56 @@ static void a_long_list_starts_at_an_anchor_near_its_end(void)
     big_library_close(&big);
 }
 
+static PlayQueue *built_big_at(uint32_t position, uint32_t hint)
+{
+    PlayQueuePlan plan = {.source = browse_root_query(BROWSE_ALL_SONGS),
+                          .anchor_track = (uint16_t)title_order_track(position),
+                          .anchor_position = hint,
+                          .shuffle = SHUFFLE_OFF,
+                          .seed = 7};
+    big.memory.reads = 0;
+    CHECK(play_queue_build(&queue, &big.library, plan));
+    return &queue;
+}
+
+static void a_hinted_anchor_is_found_without_reading_the_list(void)
+{
+    big_library_open(&big, BIG_LIST, BIG_LIST);
+    PlayQueue *list = built_big_at(BIG_LIST - 2, BIG_LIST - 2);
+    CHECK(big.memory.reads < FEW_READS);
+    CHECK_EQUAL(title_order_track(BIG_LIST - 2), current_track(list));
+    CHECK_EQUAL(BIG_LIST - 1, play_queue_place(list).number);
+    big_library_close(&big);
+}
+
+static void a_wrong_hint_still_finds_the_anchor(void)
+{
+    big_library_open(&big, BIG_LIST, BIG_LIST);
+    PlayQueue *list = built_big_at(BIG_LIST - 2, 5);
+    CHECK_EQUAL(title_order_track(BIG_LIST - 2), current_track(list));
+    CHECK_EQUAL(BIG_LIST - 1, play_queue_place(list).number);
+    list = built_big_at(BIG_LIST - 2, BIG_LIST + 10);
+    CHECK_EQUAL(BIG_LIST - 1, play_queue_place(list).number);
+    big_library_close(&big);
+}
+
+static void a_playlist_with_a_repeated_track_anchors_at_its_first_place_whatever_the_hint(void)
+{
+    BrowseQuery weekend = {.kind = BROWSE_PLAYLIST_TRACKS,
+                           .group = LIBRARY_PLAYLISTS,
+                           .subject = 1,
+                           .artist = LIBRARY_NONE};
+    Library *library = fixture_library_open(&fixture);
+    PlayQueuePlan plan = {.source = weekend,
+                          .anchor_track = SHOOT_TO_THRILL,
+                          .anchor_position = 4,
+                          .shuffle = SHUFFLE_OFF,
+                          .seed = 1};
+    CHECK(play_queue_build(&queue, library, plan));
+    CHECK_EQUAL(2, play_queue_place(&queue).number);
+    CHECK_EQUAL(SHOOT_TO_THRILL, current_track(&queue));
+}
+
 static void shuffling_a_long_list_reaches_every_track_once(void)
 {
     big_library_open(&big, BIG_LIST, BIG_LIST);
@@ -370,6 +421,9 @@ int main(void)
         TEST_CASE(stepping_works_from_any_place_without_moving_the_queue),
         TEST_CASE(a_long_list_plays_through_to_its_last_track),
         TEST_CASE(a_long_list_starts_at_an_anchor_near_its_end),
+        TEST_CASE(a_hinted_anchor_is_found_without_reading_the_list),
+        TEST_CASE(a_wrong_hint_still_finds_the_anchor),
+        TEST_CASE(a_playlist_with_a_repeated_track_anchors_at_its_first_place_whatever_the_hint),
         TEST_CASE(shuffling_a_long_list_reaches_every_track_once),
         TEST_CASE(a_big_folder_queues_all_its_tracks),
         TEST_CASE(shuffling_many_albums_reaches_every_album_once),

@@ -75,10 +75,20 @@ CoverState cover_cache_full(const CoverCache *cache, uint16_t album, Image *imag
 static CoverState read_cover(CoverCache *cache, uint16_t album, CoverSize size, Color *pixels)
 {
     uint32_t record = 0;
+    if (!cache->available) {
+        return COVER_MISSING;
+    }
     uint32_t key = library_album_key(cache->library, album);
-    bool found = cache->available && covers_find(&cache->covers, key, &record) &&
+    bool found = covers_find(&cache->covers, key, &record) &&
                  covers_read(&cache->covers, record, size, pixels);
     return found ? COVER_LOADED : COVER_MISSING;
+}
+
+bool cover_cache_has_cover(CoverCache *cache, uint16_t album)
+{
+    uint32_t record = 0;
+    return cache->available &&
+           covers_find(&cache->covers, library_album_key(cache->library, album), &record);
 }
 
 bool cover_cache_load_half(CoverCache *cache, int position, uint16_t album)

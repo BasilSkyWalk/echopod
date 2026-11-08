@@ -251,7 +251,8 @@ bool player_play_from(Player *player, PlayerListStart start)
                           .shuffle = start.in_order   ? SHUFFLE_OFF
                                      : start.shuffled ? SHUFFLE_SONGS
                                                       : player->shuffle,
-                          .seed = start.seed};
+                          .seed = start.seed,
+                          .anchor_position = start.position};
     if (!play_queue_build(&player->queue, player->library, plan) ||
         !start_playable(player, 0, 1, player->repeat == REPEAT_ALL)) {
         return false;

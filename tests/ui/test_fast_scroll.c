@@ -28,12 +28,21 @@ static int item_section(const void *context, int index)
     return index / ROWS_PER_SECTION;
 }
 
-static const ListModel SECTIONED = {
-    .context = NULL, .count = item_count, .label = item_label, .section = item_section};
-static const ListModel PLAIN = {.context = NULL, .count = item_count, .label = item_label};
-
 static ListView view;
 static uint32_t now_ms;
+static int section_lookups;
+
+static int counted_section(const void *context, int index)
+{
+    section_lookups++;
+    return item_section(context, index);
+}
+
+static const ListModel SECTIONED = {
+    .context = NULL, .count = item_count, .label = item_label, .section = item_section};
+static const ListModel COUNTED = {
+    .context = NULL, .count = item_count, .label = item_label, .section = counted_section};
+static const ListModel PLAIN = {.context = NULL, .count = item_count, .label = item_label};
 
 static void start(const ListModel *model, int selected)
 {
@@ -163,6 +172,28 @@ static void the_section_shows_while_scrolling_fast_and_then_fades(void)
     CHECK(!letter_box_drawn(now_ms + LIST_SECTION_SHOWN_MS));
 }
 
+static void drawing_the_section_looks_up_no_rows(void)
+{
+    start(&COUNTED, 0);
+    press_down();
+    repeat_down_at(LIST_FAST_SCROLL_AFTER_MS);
+    section_lookups = 0;
+    CHECK(letter_box_drawn(now_ms));
+    CHECK(letter_box_drawn(now_ms + 1));
+    CHECK_EQUAL(0, section_lookups);
+}
+
+static void the_section_shows_after_a_move_that_ends_the_fast_scroll(void)
+{
+    start(&COUNTED, 0);
+    press_down();
+    repeat_down_at(LIST_FAST_SCROLL_AFTER_MS);
+    press_down();
+    section_lookups = 0;
+    CHECK(letter_box_drawn(now_ms));
+    CHECK_EQUAL(0, section_lookups);
+}
+
 static void a_list_without_sections_shows_no_letter(void)
 {
     start(&PLAIN, 0);
@@ -199,6 +230,8 @@ int main(void)
         TEST_CASE(fast_scrolling_stops_at_the_end),
         TEST_CASE(a_new_press_starts_slow_again),
         TEST_CASE(the_section_shows_while_scrolling_fast_and_then_fades),
+        TEST_CASE(drawing_the_section_looks_up_no_rows),
+        TEST_CASE(the_section_shows_after_a_move_that_ends_the_fast_scroll),
         TEST_CASE(a_list_without_sections_shows_no_letter),
         TEST_CASE(section_labels_are_letters_or_a_hash),
         TEST_CASE(sections_come_from_the_first_letter_of_a_sort_key),

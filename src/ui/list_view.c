@@ -83,7 +83,31 @@ void list_view_init(ListView *view, const ListModel *model, const Theme *theme, 
         .model = model,
         .theme = theme,
         .selection_changed_ms = now_ms,
+        .section_row = -1,
     };
+}
+
+static int section_at(const ListView *view, int index)
+{
+    return view->model->section(view->model->context, index);
+}
+
+static bool section_showing(const ListView *view, uint32_t now_ms)
+{
+    return view->model->section != NULL && (int32_t)(now_ms - view->section_shown_until_ms) < 0;
+}
+
+static void note_section(ListView *view, uint32_t now_ms)
+{
+    if (!section_showing(view, now_ms)) {
+        view->section_row = -1;
+        return;
+    }
+    if (view->section_row == view->selected) {
+        return;
+    }
+    view->section = section_at(view, view->selected);
+    view->section_row = view->selected;
 }
 
 void list_view_move(ListView *view, int delta, bool wrap, uint32_t now_ms)
@@ -99,17 +123,13 @@ void list_view_move(ListView *view, int delta, bool wrap, uint32_t now_ms)
     view->selected = target;
     view->selection_changed_ms = now_ms;
     keep_selection_visible(view);
+    note_section(view, now_ms);
 }
 
 void list_view_start_scroll(ListView *view, int direction, uint32_t now_ms)
 {
     view->scroll_started_ms = now_ms;
     list_view_move(view, direction, true, now_ms);
-}
-
-static int section_at(const ListView *view, int index)
-{
-    return view->model->section(view->model->context, index);
 }
 
 static int first_of_section_at_least(const ListView *view, int section, int low, int high)
@@ -161,6 +181,7 @@ void list_view_keep_scrolling(ListView *view, int direction, uint32_t now_ms)
     } else {
         list_view_move(view, direction * LIST_FASTEST_SCROLL_ROWS, false, now_ms);
     }
+    note_section(view, now_ms);
 }
 
 int list_section_of_key(const char *key)
@@ -193,6 +214,7 @@ void list_view_select(ListView *view, int index, uint32_t now_ms)
     view->selected = target;
     view->selection_changed_ms = now_ms;
     keep_selection_visible(view);
+    note_section(view, now_ms);
 }
 
 void list_view_restart_marquee(ListView *view, uint32_t now_ms)
@@ -305,8 +327,8 @@ static Row make_row(const ListView *view, Rect rows, int top, int position)
 
 static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32_t now_ms)
 {
-    if (view->model->section == NULL || item_count(view) == 0 ||
-        (int32_t)(now_ms - view->section_shown_until_ms) >= 0) {
+    if (!section_showing(view, now_ms) || item_count(view) == 0 ||
+        view->section_row != view->selected) {
         return;
     }
     const Theme *theme = view->theme;
@@ -319,7 +341,7 @@ static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32
     canvas_fill_rect(canvas, inner, theme->colors.header_background);
     TextStyle style = {.font = theme->fonts.title, .color = theme->colors.header_text};
     int scale = max_of(1, side / (font_line_height(style.font) + 4));
-    const char *label = list_section_label(section_at(view, view->selected));
+    const char *label = list_section_label(view->section);
     text_draw_glyph_scaled(canvas, style, inner, (uint32_t)(unsigned char)label[0], scale);
 }
 

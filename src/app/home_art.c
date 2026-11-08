@@ -34,20 +34,31 @@ static bool playing_album(const HomeArt *art, uint16_t *album)
     return true;
 }
 
-static bool cover_missing(const HomeArt *art, uint16_t album)
+static void start_search(HomeArt *art, uint32_t from, uint32_t count, uint32_t now_ms)
 {
-    Image ignored;
-    cover_cache_load_full(art->covers, album);
-    return cover_cache_full(art->covers, album, &ignored) == COVER_MISSING;
+    art->searching = true;
+    art->probe = (uint16_t)(from % count);
+    art->probes_left = count;
+    art->next_change_ms = now_ms + HOME_ART_CYCLE_MS;
 }
 
-static void show_next_with_a_cover(HomeArt *art, uint32_t count)
+static bool probe_next(HomeArt *art, uint32_t count)
 {
-    for (uint32_t tried = 0; tried < count; tried++) {
-        art->album = (uint16_t)((art->album + 1) % count);
-        if (!cover_missing(art, art->album)) {
-            return;
-        }
+    uint16_t album = (uint16_t)(art->probe % count);
+    art->probe = (uint16_t)((album + 1u) % count);
+    art->probes_left--;
+    if (!cover_cache_has_cover(art->covers, album)) {
+        return false;
+    }
+    art->album = album;
+    art->chosen = true;
+    return true;
+}
+
+static void search(HomeArt *art, uint32_t count)
+{
+    for (int tried = 0; tried < HOME_ART_ALBUMS_PER_UPDATE && art->searching; tried++) {
+        art->searching = art->probes_left > 0 && !probe_next(art, count);
     }
 }
 
@@ -55,33 +66,43 @@ static void cycle(HomeArt *art, uint32_t count, uint32_t now_ms)
 {
     if (!art->cycling) {
         art->cycling = true;
-        art->album = (uint16_t)(count - 1);
-        show_next_with_a_cover(art, count);
-        art->next_change_ms = now_ms + HOME_ART_CYCLE_MS;
-        return;
+        start_search(art, 0, count, now_ms);
+    } else if ((int32_t)(now_ms - art->next_change_ms) >= 0) {
+        start_search(art, (uint32_t)art->album + 1u, count, now_ms);
     }
-    if ((int32_t)(now_ms - art->next_change_ms) >= 0) {
-        show_next_with_a_cover(art, count);
-        art->next_change_ms = now_ms + HOME_ART_CYCLE_MS;
-    }
+    search(art, count);
+}
+
+static void forget_album(HomeArt *art)
+{
+    art->cycling = false;
+    art->searching = false;
+    art->chosen = false;
+}
+
+static void follow_playing(HomeArt *art, uint16_t album)
+{
+    forget_album(art);
+    art->album = album;
+    art->chosen = true;
 }
 
 void home_art_update(void *context, uint32_t now_ms)
 {
     HomeArt *art = context;
     uint32_t count = album_count(art);
-    art->has_album = count > 0;
-    if (!art->has_album) {
-        return;
-    }
     uint16_t album;
-    if (playing_album(art, &album)) {
-        art->cycling = false;
-        art->album = album;
-    } else {
+    if (count == 0) {
+        forget_album(art);
+    } else if (playing_album(art, &album)) {
+        follow_playing(art, album);
+    } else if (art->covers->available) {
         cycle(art, count, now_ms);
     }
-    cover_cache_load_full(art->covers, art->album);
+    art->has_album = art->chosen;
+    if (art->chosen) {
+        cover_cache_load_full(art->covers, art->album);
+    }
 }
 
 void home_art_draw(void *context, Canvas *canvas, Rect area)

@@ -34,6 +34,27 @@ static void without_a_covers_file_every_cover_is_missing(void)
     CHECK_EQUAL(COVER_MISSING, cover_cache_half(&cache, 0, RED_ALBUM, &image));
 }
 
+static void without_a_covers_file_loading_reads_nothing_from_the_library(void)
+{
+    fake_hal_reset();
+    cover_cache_open(&cache, fixture_library_open(&fixture));
+    fixture.memory.reads = 0;
+    cover_cache_load_full(&cache, RED_ALBUM);
+    cover_cache_load_half(&cache, 0, RED_ALBUM);
+    CHECK(!cover_cache_has_cover(&cache, RED_ALBUM));
+    CHECK_EQUAL(0, fixture.memory.reads);
+}
+
+static void an_album_has_a_cover_only_when_the_covers_file_holds_one(void)
+{
+    CoverCache *covers = cache_with_covers();
+    Image image;
+    CHECK(cover_cache_has_cover(covers, RED_ALBUM));
+    CHECK(cover_cache_has_cover(covers, BLUE_ALBUM));
+    CHECK(!cover_cache_has_cover(covers, BARE_ALBUM));
+    CHECK_EQUAL(COVER_EMPTY, cover_cache_full(covers, RED_ALBUM, &image));
+}
+
 static void an_unloaded_cover_is_empty(void)
 {
     CoverCache *covers = cache_with_covers();
@@ -87,6 +108,8 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(without_a_covers_file_every_cover_is_missing),
+        TEST_CASE(without_a_covers_file_loading_reads_nothing_from_the_library),
+        TEST_CASE(an_album_has_a_cover_only_when_the_covers_file_holds_one),
         TEST_CASE(an_unloaded_cover_is_empty),
         TEST_CASE(a_loaded_half_cover_has_its_pixels),
         TEST_CASE(a_loaded_full_cover_has_its_pixels),

@@ -58,6 +58,29 @@ static uint16_t find_anchor(const PlayQueue *queue)
     return queue->base_count;
 }
 
+static bool lists_each_track_once(const PlayQueue *queue)
+{
+    return queue->plan.source.kind != BROWSE_PLAYLIST_TRACKS;
+}
+
+static bool anchor_at_hint(const PlayQueue *queue, uint16_t *base)
+{
+    uint32_t hint = queue->plan.anchor_position;
+    uint16_t track = 0;
+    if (!lists_each_track_once(queue) || hint < queue->first_track ||
+        hint - queue->first_track >= queue->base_count) {
+        return false;
+    }
+    *base = (uint16_t)(hint - queue->first_track);
+    return base_value(queue, *base, &track) && track == queue->anchor_value;
+}
+
+static uint16_t place_anchor(const PlayQueue *queue)
+{
+    uint16_t base = 0;
+    return anchor_at_hint(queue, &base) ? base : find_anchor(queue);
+}
+
 static void finish_layout(PlayQueue *queue)
 {
     bool shuffled = queue->plan.shuffle != SHUFFLE_OFF;
@@ -77,7 +100,7 @@ static bool build_track_queue(PlayQueue *queue)
     uint32_t tracks = available - queue->first_track;
     queue->base_count = (uint16_t)(tracks < MOST_ENTRIES ? tracks : MOST_ENTRIES);
     queue->anchor_value = queue->plan.anchor_track;
-    queue->anchor_base = find_anchor(queue);
+    queue->anchor_base = place_anchor(queue);
     finish_layout(queue);
     return true;
 }

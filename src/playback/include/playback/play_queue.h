@@ -29,6 +29,7 @@ typedef struct PlayQueuePlan {
     uint16_t anchor_track;
     ShuffleMode shuffle;
     uint32_t seed;
+    uint32_t anchor_position;
 } PlayQueuePlan;
 
 typedef struct PlayQueueCursor {

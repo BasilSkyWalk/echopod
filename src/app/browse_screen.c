@@ -69,6 +69,28 @@ static void forget_rows(BrowseScreen *browse)
     }
 }
 
+static BrowseRowStamp row_stamp(const BrowseScreen *browse)
+{
+    const BrowsePoolConfig *config = &browse->pool->config;
+    return (BrowseRowStamp){.favorites_revision =
+                                config->favorites != NULL ? config->favorites->revision : 0,
+                            .portrait = theme_is_portrait(config->theme)};
+}
+
+static bool stamps_match(BrowseRowStamp first, BrowseRowStamp second)
+{
+    return first.favorites_revision == second.favorites_revision &&
+           first.portrait == second.portrait;
+}
+
+static void forget_stale_rows(BrowseScreen *browse)
+{
+    BrowseRows *rows = rows_of_level(browse->pool, browse->level);
+    if (rows != NULL && !stamps_match(rows->stamp, row_stamp(browse))) {
+        rows->level = NO_LEVEL;
+    }
+}
+
 static int rows_wanted(const BrowseScreen *browse)
 {
     int top = list_view_top(&browse->list);
@@ -200,6 +222,7 @@ static RowWindow cached_window(BrowseScreen *browse)
 
 static void refresh_rows(BrowseScreen *browse)
 {
+    forget_stale_rows(browse);
     if (rows_current(browse)) {
         return;
     }
@@ -216,6 +239,7 @@ static void refresh_rows(BrowseScreen *browse)
     rows->level = browse->level;
     rows->first = now.first;
     rows->count = now.count;
+    rows->stamp = row_stamp(browse);
 }
 
 static const char *cached_text(const BrowseScreen *browse, int index, bool detail)
@@ -561,7 +585,9 @@ static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 static void enter(void *context, uint32_t now_ms)
 {
     BrowseScreen *browse = context;
-    forget_rows(browse);
+    if (browse->shelf != SPOKEN_NONE) {
+        forget_rows(browse);
+    }
     browse->now_ms = now_ms;
     if (browse->favorites_only) {
         collect_favorites(browse);
@@ -627,6 +653,7 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     BrowseScreen *browse = &pool->screens[level];
     browse->pool = pool;
     browse->level = level;
+    forget_rows(browse);
     browse->query = query;
     browse->favorites_only = false;
     browse->shelf = SPOKEN_NONE;

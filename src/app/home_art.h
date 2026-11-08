@@ -12,7 +12,8 @@
 enum {
     HOME_ART_WIDTH = 144,
     HOME_ART_MIN_HEIGHT = 128,
-    HOME_ART_CYCLE_MS = 5000
+    HOME_ART_CYCLE_MS = 5000,
+    HOME_ART_ALBUMS_PER_UPDATE = 4
 };
 
 typedef struct HomeArt {
@@ -22,8 +23,12 @@ typedef struct HomeArt {
     const Theme *theme;
     const char *notice;
     bool cycling;
+    bool searching;
+    bool chosen;
     bool has_album;
     uint16_t album;
+    uint16_t probe;
+    uint32_t probes_left;
     uint32_t next_change_ms;
 } HomeArt;
 

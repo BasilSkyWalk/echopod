@@ -72,6 +72,8 @@ typedef struct CoverFlowScreen {
     char title[COVER_FLOW_TEXT_CAPACITY];
     char artist[COVER_FLOW_TEXT_CAPACITY];
     CoverFlowTile tiles[COVER_FLOW_TILES];
+    uint16_t playing_track;
+    CoverFlowTile playing_tile;
 } CoverFlowScreen;
 
 Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config);

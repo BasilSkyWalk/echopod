@@ -3,15 +3,21 @@
 #include "browse_screen.h"
 #include "check.h"
 #include "default_theme.h"
+#include "fake_hal.h"
 #include "fixture_library.h"
 
 static FixtureLibrary fixture;
 static BrowsePool pool;
+static FavoritesStore favorites;
 
 static BrowseScreen *opened(BrowseQuery query)
 {
-    browse_pool_init(&pool, (BrowsePoolConfig){.library = fixture_library_open(&fixture),
-                                               .theme = &DEFAULT_THEME});
+    fake_hal_reset();
+    Library *library = fixture_library_open(&fixture);
+    favorites = (FavoritesStore){.library = library};
+    browse_pool_init(
+        &pool,
+        (BrowsePoolConfig){.library = library, .theme = &DEFAULT_THEME, .favorites = &favorites});
     Screen *screen = browse_pool_open(&pool, 0, query);
     screen->enter(screen->context, 0);
     return screen->context;
@@ -104,13 +110,51 @@ static void scrolling_one_row_loads_only_the_new_row(void)
     BrowseScreen *albums = opened(browse_root_query(BROWSE_ALBUMS));
     albums->list.visible_rows = 3;
     albums->screen.update(albums, 0);
+    favorites.revision++;
     fixture.memory.reads = 0;
-    albums->screen.enter(albums, 0);
+    albums->screen.update(albums, 0);
     int full_reload = fixture.memory.reads;
     list_view_select(&albums->list, 3, 0);
     fixture.memory.reads = 0;
     albums->screen.update(albums, 0);
     CHECK(fixture.memory.reads < full_reload);
+}
+
+static void coming_back_to_a_list_reads_nothing(void)
+{
+    BrowseScreen *albums = opened(browse_root_query(BROWSE_ALBUMS));
+    albums->screen.update(albums, 0);
+    fixture.memory.reads = 0;
+    albums->screen.enter(albums, 0);
+    albums->screen.update(albums, 0);
+    CHECK_EQUAL(0, fixture.memory.reads);
+    check_rows_match_the_library(albums, 3);
+}
+
+static bool row_has_star(const BrowseScreen *browse, int index)
+{
+    const char *detail = browse->model.detail(browse, index);
+    return detail != NULL && strstr(detail, "\xE2\x98\x85") != NULL;
+}
+
+static void a_favorite_added_elsewhere_shows_when_the_list_comes_back(void)
+{
+    BrowseScreen *albums = opened(browse_root_query(BROWSE_ALBUMS));
+    BrowseItem item;
+    CHECK(browse_item(pool.config.library, albums->query, 0, &item));
+    CHECK(!row_has_star(albums, 0));
+    favorites_store_toggle_album(&favorites, item.index);
+    albums->screen.enter(albums, 0);
+    CHECK(row_has_star(albums, 0));
+}
+
+static void opening_another_list_at_the_same_level_shows_its_own_rows(void)
+{
+    BrowseScreen *albums = opened(browse_root_query(BROWSE_ALBUMS));
+    albums->screen.update(albums, 0);
+    Screen *artists = browse_pool_open(&pool, 0, browse_root_query(BROWSE_ARTISTS));
+    artists->enter(artists->context, 0);
+    check_rows_match_the_library(artists->context, 3);
 }
 
 int main(void)
@@ -122,6 +166,9 @@ int main(void)
         TEST_CASE(scrolling_one_row_at_a_time_keeps_every_row_right),
         TEST_CASE(a_jump_longer_than_the_window_reloads_every_row),
         TEST_CASE(scrolling_one_row_loads_only_the_new_row),
+        TEST_CASE(coming_back_to_a_list_reads_nothing),
+        TEST_CASE(a_favorite_added_elsewhere_shows_when_the_list_comes_back),
+        TEST_CASE(opening_another_list_at_the_same_level_shows_its_own_rows),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

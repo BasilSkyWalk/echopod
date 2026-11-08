@@ -3,18 +3,28 @@
 
 #include "big_library.h"
 #include "check.h"
+#include "default_theme.h"
+#include "fake_hal.h"
 #include "fixture_library.h"
 #include "screens/cover_flow_screen.h"
 
 enum {
     BIG_ALBUMS = 2500,
     GROUP_FIRST_LINK = 4,
-    GROUP_LINK_COUNT = 8
+    GROUP_LINK_COUNT = 8,
+    PLAYLIST_TRACKS = 1000,
+    PLAYLIST_TRACKS_PER_ALBUM = 2,
+    PLAYLIST_ALBUMS = PLAYLIST_TRACKS / PLAYLIST_TRACKS_PER_ALBUM,
+    FEW_READS = 64
 };
 
 static FixtureLibrary fixture;
 static BigLibrary big;
 static uint8_t seen[BIG_ALBUMS];
+static Player player;
+static FavoritesStore favorites;
+static CoverCache covers;
+static CoverFlowScreen flow;
 
 static int album_at(const Library *library, CoverFlowOrder order, uint32_t position)
 {
@@ -112,6 +122,72 @@ static void out_of_order_links_fall_back_to_album_order(void)
     }
 }
 
+static Library *playlist_library(void)
+{
+    Library *library =
+        big_library_open_with_playlist(&big, PLAYLIST_TRACKS, PLAYLIST_TRACKS_PER_ALBUM);
+    fake_hal_reset();
+    player_init(&player, library);
+    return library;
+}
+
+static int reads_to_open_the_playlist(const Library *library)
+{
+    cover_flow_screen_init(&flow, (CoverFlowConfig){.library = library,
+                                                    .theme = &DEFAULT_THEME,
+                                                    .covers = &covers,
+                                                    .favorites = &favorites,
+                                                    .player = &player});
+    big.memory.reads = 0;
+    Screen *screen = cover_flow_screen_open_group(&flow, LIBRARY_PLAYLISTS, 0, 1);
+    CHECK(screen != NULL);
+    screen->enter(screen->context, 0);
+    return big.memory.reads;
+}
+
+static void play_playlist_track(uint32_t position)
+{
+    BrowseQuery everything = {.kind = BROWSE_PLAYLIST_TRACKS,
+                              .group = LIBRARY_PLAYLISTS,
+                              .subject = 0,
+                              .artist = LIBRARY_NONE};
+    CHECK(player_play_list(&player, everything, position, 1));
+}
+
+static void a_playlist_flow_finds_the_playing_album_while_counting_its_tiles(void)
+{
+    const Library *library = playlist_library();
+    int idle = reads_to_open_the_playlist(library);
+    CHECK_EQUAL(PLAYLIST_ALBUMS + 1, flow.count);
+    CHECK_EQUAL(1, flow.target);
+    play_playlist_track(PLAYLIST_TRACKS - 1);
+    int playing = reads_to_open_the_playlist(library);
+    CHECK_EQUAL(PLAYLIST_ALBUMS, flow.target);
+    CHECK(playing < idle + FEW_READS);
+    big_library_close(&big);
+}
+
+static void a_playlist_flow_starts_at_the_first_tile_of_the_playing_album(void)
+{
+    const Library *library = playlist_library();
+    play_playlist_track(PLAYLIST_TRACKS / 2 + 1);
+    reads_to_open_the_playlist(library);
+    CHECK_EQUAL(PLAYLIST_ALBUMS / 2 + 1, flow.target);
+    const CoverFlowTile *tile = &flow.tiles[flow.target % COVER_FLOW_TILES];
+    CHECK_EQUAL(flow.target, tile->position);
+    CHECK_EQUAL(flow.order.first_link + PLAYLIST_TRACKS / 2, tile->link);
+    big_library_close(&big);
+}
+
+static void opening_a_long_playlist_flow_keeps_the_audio_fed(void)
+{
+    const Library *library = playlist_library();
+    int before = fake_hal_audio_service_count();
+    reads_to_open_the_playlist(library);
+    CHECK(fake_hal_audio_service_count() > before);
+    big_library_close(&big);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -119,6 +195,9 @@ int main(void)
         TEST_CASE(each_album_is_found_where_it_is_shown),
         TEST_CASE(every_album_of_a_big_library_is_shown_once),
         TEST_CASE(out_of_order_links_fall_back_to_album_order),
+        TEST_CASE(a_playlist_flow_finds_the_playing_album_while_counting_its_tiles),
+        TEST_CASE(a_playlist_flow_starts_at_the_first_tile_of_the_playing_album),
+        TEST_CASE(opening_a_long_playlist_flow_keeps_the_audio_fed),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -23,11 +23,17 @@ enum {
     SONG_ACTION_COUNT = 2
 };
 
+typedef struct BrowseRowStamp {
+    uint32_t favorites_revision;
+    bool portrait;
+} BrowseRowStamp;
+
 typedef struct BrowseRows {
     int level;
     uint32_t used;
     int first;
     int count;
+    BrowseRowStamp stamp;
     char labels[BROWSE_ROWS][BROWSE_LABEL_CAPACITY];
     char details[BROWSE_ROWS][BROWSE_DETAIL_CAPACITY];
     bool opens[BROWSE_ROWS];

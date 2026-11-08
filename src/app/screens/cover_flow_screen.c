@@ -6,6 +6,7 @@
 #include "core/random.h"
 #include "core/string_builder.h"
 #include "draw_profile.h"
+#include "hal/audio.h"
 #include "hal/clock.h"
 #include "settings/settings.h"
 #include "ui/cover_flow.h"
@@ -33,8 +34,17 @@ enum {
     STACK_FLOOR_TOP = 266,
     THREE_FADE_START = COVER_FLOW_ONE,
     THREE_FADE_END = COVER_FLOW_ONE + COVER_FLOW_ONE / 2,
-    FOLDER_DEPTH_LIMIT = 64
+    FOLDER_DEPTH_LIMIT = 64,
+    LINKS_PER_AUDIO_SERVICE = 16
 };
+
+typedef struct PlaylistScan {
+    uint16_t playing_track;
+    uint16_t playing_album;
+    uint16_t previous;
+    uint32_t runs;
+    CoverFlowTile playing;
+} PlaylistScan;
 
 static const CoverStackLayout STACK = {
     .center_x = 85,
@@ -432,6 +442,18 @@ static int playlist_find(CoverFlowScreen *flow, uint16_t album)
     return tile.position;
 }
 
+static int scanned_playlist_find(CoverFlowScreen *flow, uint16_t track, uint16_t album)
+{
+    const CoverFlowTile *tile = &flow->playing_tile;
+    if (track != flow->playing_track) {
+        return playlist_find(flow, album);
+    }
+    if (tile->position != NO_POSITION) {
+        flow->tiles[tile->position % COVER_FLOW_TILES] = *tile;
+    }
+    return tile->position;
+}
+
 static bool child_index(const Library *library, CoverFlowOrder order, uint16_t folder,
                         uint32_t *index)
 {
@@ -473,7 +495,7 @@ static int playing_position(CoverFlowScreen *flow)
     }
     switch (flow->order.kind) {
     case COVER_FLOW_PLAYLIST:
-        return playlist_find(flow, track.album);
+        return scanned_playlist_find(flow, status.track, track.album);
     case COVER_FLOW_FOLDERS:
         return folder_find(flow, track.folder);
     case COVER_FLOW_ALBUMS:
@@ -527,6 +549,8 @@ static void use_order(CoverFlowScreen *flow, CoverFlowOrder order, int32_t key, 
     flow->first = order.kind == COVER_FLOW_FOLDERS ? 0 : 1;
     flow->count = order.count > 0 ? (int)order.count + flow->first : 0;
     flow->text_position = NO_POSITION;
+    flow->playing_track = LIBRARY_NONE;
+    flow->playing_tile.position = NO_POSITION;
     for (int slot = 0; slot < COVER_FLOW_TILES; slot++) {
         flow->tiles[slot].position = NO_POSITION;
     }
@@ -811,16 +835,65 @@ Screen *cover_flow_screen_open_all(CoverFlowScreen *flow)
     return &flow->screen;
 }
 
-static uint32_t playlist_runs(const Library *library, CoverFlowOrder order)
+static void scan_link(PlaylistScan *scan, uint32_t link, uint16_t album)
 {
-    uint32_t runs = 0;
-    uint16_t previous = LIBRARY_NONE;
-    for (uint32_t link = order.first_link; link < order.first_link + order.links; link++) {
-        uint16_t album = link_album(library, link);
-        runs += link == order.first_link || album != previous ? 1u : 0u;
-        previous = album;
+    if (scan->runs > 0 && album == scan->previous) {
+        return;
     }
-    return runs;
+    scan->runs++;
+    scan->previous = album;
+    if (scan->playing_track != LIBRARY_NONE && scan->playing.position == NO_POSITION &&
+        album == scan->playing_album) {
+        scan->playing = (CoverFlowTile){(int)scan->runs - 1, album, album, link};
+    }
+}
+
+static PlaylistScan scan_start(const CoverFlowScreen *flow)
+{
+    PlaylistScan scan = {.playing_track = LIBRARY_NONE,
+                         .playing_album = LIBRARY_NONE,
+                         .previous = LIBRARY_NONE,
+                         .runs = 0,
+                         .playing = {NO_POSITION, LIBRARY_NONE, LIBRARY_NONE, 0}};
+    PlayerStatus status = player_status(flow->config.player);
+    LibraryTrack track;
+    if (status.has_track && library_read_track(flow->config.library, status.track, &track)) {
+        scan.playing_track = status.track;
+        scan.playing_album = track.album;
+    }
+    return scan;
+}
+
+static PlaylistScan playlist_scan(const CoverFlowScreen *flow, CoverFlowOrder order)
+{
+    PlaylistScan scan = scan_start(flow);
+    for (uint32_t step = 0; step < order.links; step++) {
+        uint32_t link = order.first_link + step;
+        scan_link(&scan, link, link_album(flow->config.library, link));
+        if (step % LINKS_PER_AUDIO_SERVICE == LINKS_PER_AUDIO_SERVICE - 1) {
+            hal_audio_service();
+        }
+    }
+    return scan;
+}
+
+static Screen *open_playlist(CoverFlowScreen *flow, CoverFlowOrder order, uint16_t subject,
+                             int album_level)
+{
+    PlaylistScan scan = playlist_scan(flow, order);
+    BrowseQuery parent = {.kind = BROWSE_PLAYLIST_TRACKS,
+                          .group = LIBRARY_PLAYLISTS,
+                          .subject = subject,
+                          .artist = LIBRARY_NONE};
+    order.kind = COVER_FLOW_PLAYLIST;
+    order.count = scan.runs;
+    use_order(flow, order, (int32_t)LIBRARY_PLAYLISTS << 16 | subject, parent, album_level);
+    flow->playing_track = scan.playing_track;
+    flow->playing_tile = scan.playing;
+    if (scan.playing.position != NO_POSITION) {
+        flow->playing_tile.position += flow->first;
+    }
+    return &flow->screen;
 }
 
 static Screen *open_folder(CoverFlowScreen *flow, uint16_t folder, int album_level)
@@ -851,13 +924,11 @@ Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group
                             .kind = COVER_FLOW_ALBUMS,
                             .links = record.link_count,
                             .folder = LIBRARY_NONE};
+    if (group == LIBRARY_PLAYLISTS) {
+        return open_playlist(flow, order, subject, album_level);
+    }
     BrowseQuery parent = {
         .kind = BROWSE_GROUP_ALBUMS, .group = group, .subject = subject, .artist = LIBRARY_NONE};
-    if (group == LIBRARY_PLAYLISTS) {
-        order.kind = COVER_FLOW_PLAYLIST;
-        order.count = playlist_runs(flow->config.library, order);
-        parent.kind = BROWSE_PLAYLIST_TRACKS;
-    }
     use_order(flow, order, (int32_t)group << 16 | subject, parent, album_level);
     return &flow->screen;
 }

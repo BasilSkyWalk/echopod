@@ -13,4 +13,6 @@ typedef struct BigLibrary {
 } BigLibrary;
 
 Library *big_library_open(BigLibrary *big, uint32_t tracks, uint32_t tracks_per_album);
+Library *big_library_open_with_playlist(BigLibrary *big, uint32_t tracks,
+                                        uint32_t tracks_per_album);
 void big_library_close(BigLibrary *big);
