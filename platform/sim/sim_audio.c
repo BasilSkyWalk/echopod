@@ -40,6 +40,7 @@ typedef struct SimAudio {
     HalAudioGain analog_gain;
     HalAudioOutput output;
     Equalizer equalizer;
+    HalAudioSpeed speed;
 } SimAudio;
 
 static SimAudio audio;
@@ -334,6 +335,13 @@ void hal_audio_set_equalizer(const EqualizerCurve *curve)
 {
     lock();
     equalizer_set_curve(&audio.equalizer, curve);
+    unlock();
+}
+
+void hal_audio_set_speed(HalAudioSpeed speed)
+{
+    lock();
+    audio.speed = speed;
     unlock();
 }
 

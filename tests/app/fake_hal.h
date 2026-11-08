@@ -12,6 +12,12 @@
 #include "hal/storage.h"
 #include "hal/time.h"
 
+typedef enum FakeAudioCall {
+    FAKE_AUDIO_CALL_SET_SPEED,
+    FAKE_AUDIO_CALL_PLAY,
+    FAKE_AUDIO_CALL_QUEUE_NEXT
+} FakeAudioCall;
+
 void fake_hal_reset(void);
 void fake_hal_set_version(const char *version);
 void fake_hal_set_build_day(uint32_t day);
@@ -66,6 +72,11 @@ HalDisplayRotation fake_hal_display_rotation(void);
 const char *fake_hal_audio_playing_path(void);
 uint32_t fake_hal_audio_play_start(void);
 int fake_hal_audio_play_count(void);
+HalAudioSpeed fake_hal_audio_speed(void);
+HalAudioSpeed fake_hal_audio_play_speed(void);
+int fake_hal_audio_speed_calls(void);
+int fake_hal_audio_call_count(void);
+FakeAudioCall fake_hal_audio_call_at(int index);
 const char *fake_hal_audio_queued_path(void);
 void fake_hal_audio_finish_track(void);
 void fake_hal_audio_fail_track(void);

@@ -67,6 +67,10 @@ echo_add_unit_test(NAME test_equalizer
     SOURCES dsp/test_equalizer.c
     LIBRARIES echo_dsp $<$<PLATFORM_ID:Linux>:m>
 )
+echo_add_unit_test(NAME test_speed
+    SOURCES dsp/test_speed.c
+    LIBRARIES echo_dsp $<$<PLATFORM_ID:Linux>:m>
+)
 echo_add_unit_test(NAME test_equalizer_file SOURCES sound/test_equalizer_file.c LIBRARIES echo_sound)
 echo_add_unit_test(NAME test_equalizer_text SOURCES sound/test_equalizer_text.c LIBRARIES echo_sound)
 

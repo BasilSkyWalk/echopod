@@ -6,7 +6,10 @@
 #include "dsp/equalizer.h"
 
 enum {
-    HAL_AUDIO_VOLUME_MAX = 50
+    HAL_AUDIO_VOLUME_MAX = 50,
+    HAL_AUDIO_SPEED_MIN_QUARTERS = 3,
+    HAL_AUDIO_SPEED_UNITY_QUARTERS = 4,
+    HAL_AUDIO_SPEED_MAX_QUARTERS = 8
 };
 
 typedef enum HalAudioState {
@@ -67,6 +70,11 @@ typedef struct HalAudioFormat {
     uint8_t channels;
     uint32_t bitrate_kbps;
 } HalAudioFormat;
+
+typedef struct HalAudioSpeed {
+    uint8_t quarters;
+    bool keep_pitch;
+} HalAudioSpeed;
 
 typedef struct HalAudioStatus {
     HalAudioState state;
@@ -136,6 +144,7 @@ void hal_audio_set_balance(uint8_t balance);
 void hal_audio_set_output(HalAudioOutput output);
 void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level);
 void hal_audio_set_equalizer(const EqualizerCurve *curve);
+void hal_audio_set_speed(HalAudioSpeed speed);
 void hal_audio_allow_slow_clock(bool allowed);
 HalAudioStatus hal_audio_status(void);
 HalAudioStats hal_audio_stats(void);

@@ -91,6 +91,8 @@ static bool paused_before_clock_change;
 static uint32_t position_before_clock_change;
 static AudioEngine engine;
 static EqualizerCurve equalizer_curve;
+static uint8_t chosen_quarters;
+static bool chosen_keep_pitch;
 static DmaItem items[RING_BLOCKS];
 static HalFile file;
 static bool engine_ready;
@@ -798,6 +800,12 @@ void hal_audio_set_equalizer(const EqualizerCurve *curve)
     if (deferred || audio_engine_next_pending(&engine)) {
         follow_queue();
     }
+}
+
+void hal_audio_set_speed(HalAudioSpeed speed)
+{
+    chosen_quarters = speed.quarters;
+    chosen_keep_pitch = speed.keep_pitch;
 }
 
 static HalAudioState state_of(AudioEngineState state)
