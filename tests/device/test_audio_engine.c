@@ -616,6 +616,21 @@ static void the_dma_overtaking_the_decoder_counts_an_underrun(void)
     CHECK_EQUAL(1u, audio_engine_stats(&engine).underruns);
 }
 
+static void what_the_dma_played_is_silenced_so_a_late_lap_plays_nothing_old(void)
+{
+    start_scripted_engine(0, 1);
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    audio_engine_pump(&engine, 0);
+    CHECK(frame_is(0, 1, -1, 16));
+    audio_engine_observe(&engine, 8);
+    CHECK(frame_is(0, 0, 0, 16));
+    CHECK(frame_is(7, 0, 0, 16));
+    CHECK(frame_is(8, 9, -9, 16));
+    audio_engine_observe(&engine, 3 * RING_FRAMES);
+    CHECK(frame_is(8, 0, 0, 16));
+    CHECK(frame_is(RING_FRAMES - 1, 0, 0, 16));
+}
+
 static void every_decoded_frame_is_counted(void)
 {
     start_engine();
@@ -671,6 +686,7 @@ int main(void)
         TEST_CASE(a_frame_is_released_once_its_samples_are_in_the_ring),
         TEST_CASE(observing_the_dma_position_never_decodes),
         TEST_CASE(the_dma_overtaking_the_decoder_counts_an_underrun),
+        TEST_CASE(what_the_dma_played_is_silenced_so_a_late_lap_plays_nothing_old),
         TEST_CASE(every_decoded_frame_is_counted),
         TEST_CASE(playing_fills_the_ring_with_the_track),
         TEST_CASE(the_equalizer_shapes_what_the_main_core_decodes),

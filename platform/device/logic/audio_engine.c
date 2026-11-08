@@ -465,8 +465,25 @@ static void drop_finished_segments(AudioEngine *engine)
     }
 }
 
+static void clear_played(AudioEngine *engine, uint32_t consumed)
+{
+    uint32_t frames = ring_frames(engine);
+    uint32_t played = consumed - engine->consumed;
+    uint32_t count = played < frames ? played : frames;
+    uint32_t slot = engine->consumed % frames;
+    for (uint32_t index = 0; index < count; index++) {
+        uint32_t *words = &engine->config.ring[WORDS_PER_FRAME * slot];
+        words[0] = 0;
+        words[1] = 0;
+        slot = slot + 1 == frames ? 0 : slot + 1;
+    }
+}
+
 void audio_engine_observe(AudioEngine *engine, uint32_t consumed)
 {
+    if ((int32_t)(consumed - engine->consumed) > 0) {
+        clear_played(engine, consumed);
+    }
     engine->consumed = consumed;
     if ((int32_t)(engine->produced - engine->consumed) < 0) {
         if (engine->decoding) {
