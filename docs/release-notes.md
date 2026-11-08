@@ -1,5 +1,25 @@
 # EchoPod release notes
 
+## 0.11.1
+
+Smoother and steadier: 192 kHz FLAC plays cleanly again, and menus, Cover Flow and card reads do less work. Tested on one Echo Mini 8 GB.
+
+### Fixed
+
+- **192 kHz FLAC plays cleanly again.** Since 0.11.0, FLAC at 176.4 and 192 kHz could crackle and play at the wrong speed: the second core waited for the main core before decoding the next block, so at those rates the audio ran out. It now decodes the next block straight away, and runs at full speed for FLAC and ALAC above 96 kHz.
+- **The clock and battery percentage in landscape** no longer come and go as the minutes change (issue 57). The header title is a few pixels narrower to make room for the clock.
+- **Long tracks on FAT32 storage** (internal storage, and microSD cards of 32 GB or less) no longer take more work to read the further they play. Covers and the library also load with fewer reads on FAT32.
+- **If the audio buffer ever runs dry,** you hear a moment of silence instead of the last fraction of a second again.
+- **Moving between FLAC or ALAC and MP3, AAC or Opus, or turning the equalizer on or off,** now gives a short clean gap at the next track instead of a possible crackle on hi-res tracks.
+- **A key no longer sticks** when many presses arrive during a long rescan (a volume key could keep stepping), and taps made during a rescan aren't replayed afterwards.
+
+### Smoother
+
+- Slides start once the new screen has loaded, so the first frame doesn't jump.
+- Cover Flow moves the same way at any frame rate, and a slow frame no longer snaps straight to the album.
+- Going back to a list doesn't reload it. Opening a long playlist in Cover Flow, starting playback from a long list, the fast-scroll letter and the Home cover read far less from the card.
+- The resume save every 15 s waits until a slide or fade has finished.
+
 ## 0.11.0
 
 This release answers most of the requests from GitHub and Reddit: listen history, a clock, music on internal storage, grouped settings, and fixes for battery life, Bluetooth, USB and the SD card. Tested on one Echo Mini 8 GB.
