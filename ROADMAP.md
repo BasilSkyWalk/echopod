@@ -47,6 +47,8 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | echo-sync on a Mac and on Linux with a real card | todo |
 | Firmware images in GitHub releases | todo |
 | Playback speed for audiobooks and podcasts | todo |
+| More themes: Fjord, Dusk, Neon, Phosphor, Paper, Olive and High contrast | sim (Settings → Display → Theme; not yet checked on a player) |
+| Now Playing faces: Cassette, VU meters, Turntable and LCD deck | sim (Settings → Display → Now Playing; not yet checked on a player) |
 | Installing from a Mac through FiiO's updater | todo |
 | Testing on more players | todo |
 

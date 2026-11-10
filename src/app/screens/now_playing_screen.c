@@ -8,6 +8,7 @@
 #include "gfx/image.h"
 #include "hal/audio.h"
 #include "hal/storage.h"
+#include "hal/system.h"
 #include "settings/settings.h"
 #include "ui/header.h"
 #include "ui/icons.h"
@@ -47,7 +48,11 @@ enum {
     LYRICS_ROWS = 5,
     LYRICS_ROW_HEIGHT = 19,
     EXTENSION_ROOM = 5,
-    TIMES_GAP = TIMES_TOP - PROGRESS_TOP - PROGRESS_HEIGHT
+    TIMES_GAP = TIMES_TOP - PROGRESS_TOP - PROGRESS_HEIGHT,
+    FACE_STREAM_CAPACITY = 24,
+    FACE_DETAIL_CAPACITY = 40,
+    FACE_MODES_CAPACITY = 64,
+    FACE_TEXTS_CAPACITY = FACE_STREAM_CAPACITY + FACE_DETAIL_CAPACITY + FACE_MODES_CAPACITY
 };
 
 typedef struct Layout {
@@ -870,9 +875,105 @@ static void draw_nothing_playing(const Theme *theme, Canvas *canvas)
     label_draw(canvas, style, (Label){.area = area, .text = message});
 }
 
+static uint8_t face_of(const NowPlayingScreen *now_playing)
+{
+    return now_playing->config.options[OPTION_NOW_PLAYING_FACE];
+}
+
+static const NowPlayingFaces *face_code(const NowPlayingScreen *now_playing)
+{
+    if (now_playing->config.options == NULL || !now_playing->status.has_track ||
+        face_of(now_playing) == NP_FACE_STANDARD || face_of(now_playing) >= NP_FACE_COUNT) {
+        return NULL;
+    }
+    return hal_system_load_faces();
+}
+
+const ThemeColors *now_playing_face_colors(const NowPlayingScreen *now_playing)
+{
+    const NowPlayingFaces *faces = face_code(now_playing);
+    return faces != NULL ? faces->chrome[face_of(now_playing)] : NULL;
+}
+
+static NowPlayingFeedback badge_of(const NowPlayingScreen *now_playing)
+{
+    NowPlayingFeedback feedback = now_playing->feedback;
+    bool shown = feedback != NOW_PLAYING_FEEDBACK_VOLUME && showing(now_playing, feedback);
+    return shown ? feedback : NOW_PLAYING_FEEDBACK_NONE;
+}
+
+static void face_texts(const NowPlayingScreen *now_playing, NowPlayingFrame *frame, char *texts)
+{
+    char *detail = texts + FACE_STREAM_CAPACITY;
+    char *modes = detail + FACE_DETAIL_CAPACITY;
+    now_playing_stream_text(now_playing->status.format, texts, FACE_STREAM_CAPACITY);
+    now_playing_detail_text(&now_playing->status, detail, FACE_DETAIL_CAPACITY);
+    modes_text(&now_playing->status, modes, FACE_MODES_CAPACITY);
+    frame->stream = texts;
+    frame->detail = detail;
+    frame->modes = modes;
+}
+
+static void frame_state(const NowPlayingScreen *now_playing, NowPlayingFrame *frame)
+{
+    frame->now_ms = now_playing->now_ms;
+    frame->text_ms = now_playing->text_changed_ms;
+    frame->lyric_ms = now_playing->lyrics.current_ms;
+    frame->shown_ms = shown_position(now_playing);
+    frame->tick = now_playing->status.position_ms / NP_FACE_TICK_MS;
+    frame->feedback = badge_of(now_playing);
+    frame->face = face_of(now_playing);
+    frame->playing = now_playing->status.state == PLAYER_PLAYING;
+    frame->scrubbing = now_playing->scrubbing;
+    frame->volume_shown = showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME);
+}
+
+static void frame_of(const NowPlayingScreen *now_playing, NowPlayingFrame *frame, char *texts)
+{
+    const Theme *theme = now_playing->config.theme;
+    frame->theme = theme;
+    frame->status = &now_playing->status;
+    frame->song = now_playing->title;
+    frame->artist = now_playing->artist;
+    frame->album = now_playing->album;
+    frame->lyric = now_playing->lyrics.lyrics.synced ? now_playing_lyric(now_playing) : NULL;
+    frame->codec = now_playing_codec_name(now_playing->status.format.codec);
+    frame->area = theme_content_area(theme);
+    frame_state(now_playing, frame);
+    frame->cover = (Image){0};
+    current_cover(now_playing, &frame->cover);
+    face_texts(now_playing, frame, texts);
+}
+
+static void request_tick(const NowPlayingScreen *now_playing)
+{
+    const PlayerStatus *status = &now_playing->status;
+    if (status->state == PLAYER_PLAYING) {
+        marquee_frame_request(NP_FACE_TICK_MS - status->position_ms % NP_FACE_TICK_MS);
+    }
+}
+
+static void draw_face(const NowPlayingScreen *now_playing, const NowPlayingFaces *faces,
+                      Canvas *canvas)
+{
+    char texts[FACE_TEXTS_CAPACITY];
+    Theme dressed = *now_playing->config.theme;
+    dressed.colors = *faces->chrome[face_of(now_playing)];
+    header_draw(canvas, &dressed, now_playing->screen.title);
+    NowPlayingFrame frame;
+    frame_of(now_playing, &frame, texts);
+    request_tick(now_playing);
+    faces->draw(&frame, canvas);
+}
+
 static void draw(void *context, Canvas *canvas)
 {
     const NowPlayingScreen *now_playing = context;
+    const NowPlayingFaces *faces = face_code(now_playing);
+    if (faces != NULL) {
+        draw_face(now_playing, faces, canvas);
+        return;
+    }
     const Theme *theme = now_playing->config.theme;
     canvas_fill_rect(canvas, theme_content_area(theme), theme->colors.background);
     header_draw(canvas, theme, now_playing->screen.title);

@@ -7,6 +7,7 @@
 #include "core/key_tracker.h"
 #include "cover_cache.h"
 #include "library/library.h"
+#include "np_faces/now_playing_face.h"
 #include "playback/lyrics.h"
 #include "player.h"
 #include "ui/screen.h"
@@ -51,15 +52,6 @@ enum {
     NOW_PLAYING_VOLUME_HOLD_MS = 2500,
     NOW_PLAYING_BADGE_MS = 700
 };
-
-typedef enum NowPlayingFeedback {
-    NOW_PLAYING_FEEDBACK_NONE,
-    NOW_PLAYING_FEEDBACK_VOLUME,
-    NOW_PLAYING_FEEDBACK_NEXT,
-    NOW_PLAYING_FEEDBACK_PREVIOUS,
-    NOW_PLAYING_FEEDBACK_PAUSE,
-    NOW_PLAYING_FEEDBACK_PLAY
-} NowPlayingFeedback;
 
 typedef struct NowPlayingConfig {
     Player *player;
@@ -116,4 +108,5 @@ bool now_playing_feedback_visible(NowPlayingFeedback feedback, uint32_t started_
                                   uint32_t now_ms);
 int now_playing_volume_width(uint8_t volume, int width);
 const char *now_playing_lyric(const NowPlayingScreen *now_playing);
+const ThemeColors *now_playing_face_colors(const NowPlayingScreen *now_playing);
 Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig config);

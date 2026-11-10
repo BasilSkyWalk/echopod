@@ -45,6 +45,6 @@ if(CMAKE_CROSSCOMPILING)
     target_compile_definitions(echo_app PRIVATE ECHO_RESIDENT_TABLES ECHO_EQ_FILES_HIDDEN)
 endif()
 target_link_libraries(echo_app
-    PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_settings echo_sound echo_hal
+    PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_np_faces echo_settings echo_sound echo_hal
     PRIVATE echo_options echo_compact echo_lto
 )

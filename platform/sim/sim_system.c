@@ -1,6 +1,9 @@
 #include "core/wall_clock.h"
 #include "hal/system.h"
 #include "library/library_scan.h"
+#include "np_faces/now_playing_face.h"
+
+extern const NowPlayingFaces NOW_PLAYING_FACES;
 
 enum {
     BOOT_CLOCK_MHZ = 24,
@@ -148,4 +151,9 @@ HalStackUsage hal_system_stack_usage(void)
 
 void hal_system_watchdog_test(void)
 {
+}
+
+const void *hal_system_load_faces(void)
+{
+    return &NOW_PLAYING_FACES;
 }

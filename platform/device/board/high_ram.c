@@ -2,6 +2,7 @@
 
 #include "board.h"
 #include "hal/system.h"
+#include "overlay.h"
 
 #define HIGH_RAM_BASE 0x0307A000u
 #define HIGH_RAM_END 0x0309F000u
@@ -52,6 +53,7 @@ static uint32_t call_from_high_ram(void)
 
 HalHighRamTest hal_system_high_ram_test(void)
 {
+    board_np_faces_forget();
     board_audio_shut_down();
     uint32_t bad = check_memory(0);
     bad = bad != 0 ? bad : check_memory(0xFFFFFFFFu);

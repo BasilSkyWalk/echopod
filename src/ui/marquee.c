@@ -41,15 +41,19 @@ uint32_t marquee_wait_ms(MarqueeTiming timing, int text_width, int view_width, u
     return (uint32_t)(next_ms < cycle ? next_ms : cycle) - phase_ms;
 }
 
+void marquee_frame_request(uint32_t wait_ms)
+{
+    if (frame_wait_ms == 0 || wait_ms < frame_wait_ms) {
+        frame_wait_ms = wait_ms;
+    }
+}
+
 int marquee_offset(MarqueeTiming timing, int text_width, int view_width, uint32_t elapsed_ms)
 {
     if (!scrolls(timing, text_width, view_width)) {
         return 0;
     }
-    uint32_t wait_ms = marquee_wait_ms(timing, text_width, view_width, elapsed_ms);
-    if (frame_wait_ms == 0 || wait_ms < frame_wait_ms) {
-        frame_wait_ms = wait_ms;
-    }
+    marquee_frame_request(marquee_wait_ms(timing, text_width, view_width, elapsed_ms));
     return (int)pixels_after(timing, elapsed_ms % cycle_ms(timing, text_width));
 }
 

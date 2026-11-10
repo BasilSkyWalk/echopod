@@ -6,13 +6,19 @@
 #include "fake_hal.h"
 #include "library/library_browse.h"
 #include "player.h"
+#include "screens/now_playing_screen.h"
+#include "settings/settings.h"
 #include "spoken_library.h"
 #include "spoken_store.h"
+#include "ui/marquee.h"
 
 enum {
     SEED = 11,
     MIDWAY_MS = 123000,
-    NEAR_END_MS = SPOKEN_EPISODE_MS - 5000
+    NEAR_END_MS = SPOKEN_EPISODE_MS - 5000,
+    STRIP_WIDTH = 320,
+    STRIP_ROWS = 34,
+    FACE_POSITION_MS = 61230
 };
 
 static SpokenLibrary spoken;
@@ -285,6 +291,58 @@ static void a_played_episode_says_so_in_its_show(void)
     CHECK(strcmp("Played", detail_of(episodes, 0)) == 0);
 }
 
+static Color face_strip[STRIP_WIDTH * STRIP_ROWS];
+static NowPlayingScreen face_screen;
+static uint8_t face_options[SETTINGS_OPTION_COUNT];
+
+static void show_a_face_at(uint32_t position_ms)
+{
+    memset(face_options, 0, sizeof face_options);
+    face_options[OPTION_NOW_PLAYING_FACE] = NP_FACE_CASSETTE;
+    NowPlayingConfig config = {
+        .player = &player, .library = library, .theme = &DEFAULT_THEME, .options = face_options};
+    Screen *screen = now_playing_screen_init(&face_screen, config);
+    fake_hal_audio_set_position(position_ms);
+    screen->enter(screen->context, 0);
+}
+
+static uint32_t frame_wait_after_drawing_the_face(void)
+{
+    Canvas canvas = canvas_make(face_strip, (Rect){0, 0, STRIP_WIDTH, STRIP_ROWS});
+    marquee_frame_start();
+    face_screen.screen.draw(face_screen.screen.context, &canvas);
+    return marquee_frame_wait_ms();
+}
+
+static uint32_t ticks_to_the_next_hundred(void)
+{
+    return 100 - player_status(&player).position_ms % 100;
+}
+
+static void a_playing_face_asks_for_the_next_tick_of_the_position(void)
+{
+    start();
+    play(SPOKEN_CHAPTER_ONE_PATH, true);
+    show_a_face_at(FACE_POSITION_MS);
+    CHECK(ticks_to_the_next_hundred() <= 100);
+    CHECK_EQUAL(ticks_to_the_next_hundred(), frame_wait_after_drawing_the_face());
+    fake_hal_audio_set_position(FACE_POSITION_MS + 40);
+    face_screen.screen.update(face_screen.screen.context, 40);
+    CHECK_EQUAL(ticks_to_the_next_hundred(), frame_wait_after_drawing_the_face());
+}
+
+static void a_paused_face_asks_for_no_frame(void)
+{
+    start();
+    play(SPOKEN_CHAPTER_ONE_PATH, true);
+    show_a_face_at(FACE_POSITION_MS);
+    CHECK(frame_wait_after_drawing_the_face() > 0);
+    player_toggle_pause(&player);
+    face_screen.screen.update(face_screen.screen.context, 1);
+    CHECK_EQUAL(PLAYER_PAUSED, player_status(&player).state);
+    CHECK_EQUAL(0u, frame_wait_after_drawing_the_face());
+}
+
 int main(void)
 {
     library = spoken_library_open(&spoken);
@@ -304,6 +362,8 @@ int main(void)
         TEST_CASE(selecting_a_paused_book_carries_on_playing_it),
         TEST_CASE(holding_play_on_a_book_opens_its_chapters),
         TEST_CASE(a_played_episode_says_so_in_its_show),
+        TEST_CASE(a_playing_face_asks_for_the_next_tick_of_the_position),
+        TEST_CASE(a_paused_face_asks_for_no_frame),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     spoken_library_close(&spoken);

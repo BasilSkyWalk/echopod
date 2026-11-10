@@ -2,6 +2,7 @@
 
 #include "core/i18n.h"
 #include "core/resident.h"
+#include "default_theme.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
@@ -69,11 +70,17 @@ static const StringId COVER_ORDER_OPTIONS[2] = {STR_SETTINGS_BY_ALBUM_ARTIST,
                                                 STR_SETTINGS_BY_ALBUM_TITLE};
 static const StringId ARTIST_VIEW_OPTIONS[2] = {STR_SETTINGS_LIST, STR_MENU_COVER_FLOW};
 static const StringId BLUETOOTH_LEVEL_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LOUDER};
+ECHO_RESIDENT static const StringId NP_FACE_OPTIONS[NP_FACE_COUNT] = {
+    STR_SETTINGS_STANDARD, STR_SETTINGS_CASSETTE, STR_SETTINGS_VU_METERS, STR_SETTINGS_TURNTABLE,
+    STR_SETTINGS_LCD_DECK};
 static const StringId COVER_COUNT_OPTIONS[2] = {STR_SETTINGS_FIVE_COVERS,
                                                 STR_SETTINGS_THREE_COVERS};
 static const StringId ANIMATION_OPTIONS[ANIMATION_SPEED_COUNT] = {
     STR_SETTINGS_NORMAL, STR_SETTINGS_SLOWER, STR_SETTINGS_FASTER};
-static const StringId THEME_OPTIONS[2] = {STR_SETTINGS_DARK, STR_SETTINGS_LIGHT};
+static const StringId THEME_OPTIONS[THEME_COUNT] = {
+    STR_SETTINGS_DARK,  STR_SETTINGS_LIGHT, STR_SETTINGS_FJORD,
+    STR_SETTINGS_DUSK,  STR_SETTINGS_NEON,  STR_SETTINGS_PHOSPHOR,
+    STR_SETTINGS_PAPER, STR_SETTINGS_OLIVE, STR_SETTINGS_HIGH_CONTRAST};
 static const StringId STATUS_BAR_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LARGE};
 static const StringId POWER_ON_OPTIONS[2] = {STR_SETTINGS_PRESS, STR_SETTINGS_HOLD};
 static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
@@ -379,6 +386,7 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_CLOCK, SWITCH_OPTIONS, OPTION_CLOCK),
     OPTION_CHOICE(STR_SETTINGS_STATUS_BAR, STATUS_BAR_OPTIONS, OPTION_STATUS_BAR),
     OPTION_CHOICE(STR_SETTINGS_POWER_ON, POWER_ON_OPTIONS, OPTION_POWER_ON),
+    OPTION_CHOICE(STR_MENU_NOW_PLAYING, NP_FACE_OPTIONS, OPTION_NOW_PLAYING_FACE),
 };
 
 static ScreenAction open_choice(void *context)
@@ -460,6 +468,7 @@ enum {
     CHOICE_CLOCK,
     CHOICE_STATUS_BAR,
     CHOICE_POWER_ON,
+    CHOICE_NOW_PLAYING_FACE,
     ROW_BLUETOOTH = SETTINGS_CHOICE_COUNT,
     ROW_EQUALIZER,
     ROW_DATE_TIME,
@@ -488,31 +497,88 @@ ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
     {STR_SETTINGS_RESCAN, request_rescan, NULL},
 };
 
-ECHO_RESIDENT static const uint8_t ROWS[] = {
-    CHOICE_SHUFFLE,     CHOICE_REPEAT,      ROW_BLUETOOTH,
-    ROW_EQUALIZER,      CHOICE_SLEEP,       ROW_GROUP,
-    ROW_GROUP + 1,      ROW_GROUP + 2,      ROW_GROUP + 3,
-    ROW_GROUP + 4,      CHOICE_GAIN,        CHOICE_OUTPUT,
-    CHOICE_FILTER,      CHOICE_BALANCE,     CHOICE_BLUETOOTH_LEVEL,
-    CHOICE_THEME,       CHOICE_ACCENT,      CHOICE_HIGHLIGHT,
-    CHOICE_BRIGHTNESS,  CHOICE_TIMEOUT,     CHOICE_ORIENTATION,
-    CHOICE_ANIMATIONS,  CHOICE_BATTERY,     CHOICE_STATUS_BAR,
-    CHOICE_CLOCK,       ROW_FOLDERS,        ROW_RESCAN,
-    CHOICE_START,       CHOICE_COVERS,      CHOICE_COVER_ORDER,
-    CHOICE_ARTIST_VIEW, CHOICE_FOLDER_VIEW, CHOICE_LYRICS,
-    CHOICE_HISTORY,     CHOICE_ROCKER,      CHOICE_SWAP,
-    CHOICE_MENU_KEY,    CHOICE_POWER_ON,    CHOICE_LANGUAGE,
-    ROW_DATE_TIME,      CHOICE_AUTO_OFF,    CHOICE_USB_MODE,
-    CHOICE_USB_PROMPT};
+ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
+                                             CHOICE_REPEAT,
+                                             ROW_BLUETOOTH,
+                                             ROW_EQUALIZER,
+                                             CHOICE_SLEEP,
+                                             ROW_GROUP,
+                                             ROW_GROUP + 1,
+                                             ROW_GROUP + 2,
+                                             ROW_GROUP + 3,
+                                             ROW_GROUP + 4,
+                                             CHOICE_GAIN,
+                                             CHOICE_OUTPUT,
+                                             CHOICE_FILTER,
+                                             CHOICE_BALANCE,
+                                             CHOICE_BLUETOOTH_LEVEL,
+                                             CHOICE_THEME,
+                                             CHOICE_ACCENT,
+                                             CHOICE_HIGHLIGHT,
+                                             CHOICE_NOW_PLAYING_FACE,
+                                             CHOICE_BRIGHTNESS,
+                                             CHOICE_TIMEOUT,
+                                             CHOICE_ORIENTATION,
+                                             CHOICE_ANIMATIONS,
+                                             CHOICE_BATTERY,
+                                             CHOICE_STATUS_BAR,
+                                             CHOICE_CLOCK,
+                                             ROW_FOLDERS,
+                                             ROW_RESCAN,
+                                             CHOICE_START,
+                                             CHOICE_COVERS,
+                                             CHOICE_COVER_ORDER,
+                                             CHOICE_ARTIST_VIEW,
+                                             CHOICE_FOLDER_VIEW,
+                                             CHOICE_LYRICS,
+                                             CHOICE_HISTORY,
+                                             CHOICE_ROCKER,
+                                             CHOICE_SWAP,
+                                             CHOICE_MENU_KEY,
+                                             CHOICE_POWER_ON,
+                                             CHOICE_LANGUAGE,
+                                             ROW_DATE_TIME,
+                                             CHOICE_AUTO_OFF,
+                                             CHOICE_USB_MODE,
+                                             CHOICE_USB_PROMPT};
+
+enum {
+    SOUND_ROWS = 5,
+    DISPLAY_FIRST = SETTINGS_TOP_COUNT + SOUND_ROWS,
+    DISPLAY_ROWS = 11,
+    LIBRARY_FIRST = DISPLAY_FIRST + DISPLAY_ROWS,
+    LIBRARY_ROWS = 9,
+    BUTTONS_FIRST = LIBRARY_FIRST + LIBRARY_ROWS,
+    BUTTONS_ROWS = 4,
+    SYSTEM_FIRST = BUTTONS_FIRST + BUTTONS_ROWS,
+    SYSTEM_ROWS = 5
+};
 
 ECHO_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
-    {STR_SETTINGS_SOUND, 10, 5},
-    {STR_SETTINGS_DISPLAY, 15, 10},
-    {STR_SETTINGS_LIBRARY, 25, 9},
-    {STR_SETTINGS_BUTTONS, 34, 4},
-    {STR_SETTINGS_SYSTEM, 38, 5}};
+    {STR_SETTINGS_SOUND, SETTINGS_TOP_COUNT, SOUND_ROWS},
+    {STR_SETTINGS_DISPLAY, DISPLAY_FIRST, DISPLAY_ROWS},
+    {STR_SETTINGS_LIBRARY, LIBRARY_FIRST, LIBRARY_ROWS},
+    {STR_SETTINGS_BUTTONS, BUTTONS_FIRST, BUTTONS_ROWS},
+    {STR_SETTINGS_SYSTEM, SYSTEM_FIRST, SYSTEM_ROWS}};
+
+_Static_assert(sizeof ROWS == SYSTEM_FIRST + SYSTEM_ROWS, "the System group ends the rows");
+_Static_assert((int)DISPLAY_ROWS == (int)SETTINGS_GROUP_ROWS_MAX,
+               "the Display group is the longest and sizes the row buffer");
+_Static_assert((int)SOUND_ROWS < (int)SETTINGS_GROUP_ROWS_MAX &&
+                   (int)LIBRARY_ROWS < (int)SETTINGS_GROUP_ROWS_MAX,
+               "the other groups fit the row buffer");
 
 static ScreenAction open_group(void *context);
+
+static bool choice_shown(const void *context)
+{
+    const SettingsEntry *entry = context;
+    int theme = settings_of(&entry->owner->context)->options[OPTION_THEME];
+    if (entry->choice == &CHOICES[CHOICE_ACCENT]) {
+        return default_theme_takes_accent(theme);
+    }
+    return entry->choice != &CHOICES[CHOICE_HIGHLIGHT] || default_theme_takes_highlight(theme);
+}
 
 static MenuItem row_item(SettingsScreens *screens, int row)
 {
@@ -521,7 +587,9 @@ static MenuItem row_item(SettingsScreens *screens, int row)
                           .select = open_choice,
                           .context = &screens->entries[row],
                           .value = choice_value,
-                          .opens = true};
+                          .opens = true,
+                          .shown = choice_shown,
+                          .shown_context = &screens->entries[row]};
     }
     if (row >= ROW_GROUP) {
         return (MenuItem){.label = i18n_text(GROUPS[row - ROW_GROUP].title),

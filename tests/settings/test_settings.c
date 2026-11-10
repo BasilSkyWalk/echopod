@@ -15,7 +15,7 @@ enum {
     V8_CHECKSUM_FIELD = 28,
     OPTIONS_CHECKSUM_FIELD = 44,
     V8_OPTION_COUNT = 8,
-    SPARE_OPTION_FIELD = 43,
+    NOW_PLAYING_FACE_FIELD = 41,
     NEVER_OPTION = 6
 };
 
@@ -471,7 +471,7 @@ static void a_version_9_file_is_48_bytes_with_the_checksum_at_the_end(void)
     CHECK_EQUAL(9, bytes[VERSION_FIELD]);
     CHECK_EQUAL(ANIMATION_FASTER, bytes[OPTIONS_FIELD + OPTION_ANIMATION_SPEED]);
     CHECK_EQUAL(1, bytes[OPTIONS_FIELD + OPTION_LISTEN_HISTORY]);
-    CHECK_EQUAL(0, bytes[SPARE_OPTION_FIELD]);
+    CHECK_EQUAL(NP_FACE_OPTION_SLOTS - 1, bytes[NOW_PLAYING_FACE_FIELD]);
     uint32_t checksum = hash_update(HASH_START, bytes, OPTIONS_CHECKSUM_FIELD);
     CHECK_EQUAL(checksum, (uint32_t)bytes[44] | (uint32_t)bytes[45] << 8 |
                               (uint32_t)bytes[46] << 16 | (uint32_t)bytes[47] << 24);
@@ -552,16 +552,60 @@ static void a_short_or_corrupted_version_8_file_is_rejected(void)
     CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
 }
 
-static void a_value_in_a_spare_option_slot_is_ignored(void)
+static void the_now_playing_face_is_saved_at_byte_41_in_a_version_9_file(void)
+{
+    CHECK_EQUAL(NOW_PLAYING_FACE_FIELD, OPTIONS_FIELD + OPTION_NOW_PLAYING_FACE);
+    Settings settings = custom_settings();
+    settings.options[OPTION_NOW_PLAYING_FACE] = NP_FACE_TURNTABLE;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(9, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(NP_FACE_TURNTABLE, bytes[NOW_PLAYING_FACE_FIELD]);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(NP_FACE_TURNTABLE, decoded.options[OPTION_NOW_PLAYING_FACE]);
+}
+
+static void a_file_with_nothing_in_byte_41_reads_the_standard_face(void)
 {
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[SPARE_OPTION_FIELD] = 0xEE;
+    bytes[NOW_PLAYING_FACE_FIELD] = 0;
     put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
     Settings decoded;
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
+    CHECK_EQUAL(NP_FACE_STANDARD, decoded.options[OPTION_NOW_PLAYING_FACE]);
+    CHECK_EQUAL(NP_FACE_STANDARD, settings_defaults().options[OPTION_NOW_PLAYING_FACE]);
+}
+
+static void a_face_from_a_newer_firmware_is_accepted_up_to_the_eighth_slot(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    Settings decoded;
+    for (uint8_t face = NP_FACE_COUNT; face < NP_FACE_OPTION_SLOTS; face++) {
+        settings_encode(&settings, bytes);
+        bytes[NOW_PLAYING_FACE_FIELD] = face;
+        put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+        CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+        CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
+    }
+    bytes[NOW_PLAYING_FACE_FIELD] = NP_FACE_OPTION_SLOTS;
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+}
+
+static void the_checksum_covers_the_now_playing_face_byte(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[NOW_PLAYING_FACE_FIELD] = NP_FACE_LCD;
+    Settings decoded;
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
 }
 
 static void a_new_option_out_of_range_is_rejected(void)
@@ -575,6 +619,27 @@ static void a_new_option_out_of_range_is_rejected(void)
     CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
 }
 
+static void a_settings_file_with_the_last_theme_round_trips(void)
+{
+    Settings settings = custom_settings();
+    settings.options[OPTION_THEME] = THEME_HIGH_CONTRAST;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    Settings decoded;
+    settings_encode(&settings, bytes);
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(THEME_HIGH_CONTRAST, decoded.options[OPTION_THEME]);
+}
+
+static void a_theme_past_the_last_one_rejects_the_file(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[OPTIONS_FIELD + OPTION_THEME] = THEME_COUNT;
+    rewrite_checksum(bytes);
+    CHECK(!settings_decode(bytes, sizeof bytes, &settings));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -586,9 +651,14 @@ int main(void)
         TEST_CASE(a_version_8_file_keeps_every_value_and_gets_the_new_defaults),
         TEST_CASE(a_version_8_file_is_saved_again_as_version_9),
         TEST_CASE(a_short_or_corrupted_version_8_file_is_rejected),
-        TEST_CASE(a_value_in_a_spare_option_slot_is_ignored),
+        TEST_CASE(the_now_playing_face_is_saved_at_byte_41_in_a_version_9_file),
+        TEST_CASE(a_file_with_nothing_in_byte_41_reads_the_standard_face),
+        TEST_CASE(a_face_from_a_newer_firmware_is_accepted_up_to_the_eighth_slot),
+        TEST_CASE(the_checksum_covers_the_now_playing_face_byte),
         TEST_CASE(a_new_option_out_of_range_is_rejected),
         TEST_CASE(an_option_out_of_range_is_rejected),
+        TEST_CASE(a_settings_file_with_the_last_theme_round_trips),
+        TEST_CASE(a_theme_past_the_last_one_rejects_the_file),
         TEST_CASE(a_version_7_file_loads_with_the_options_off),
         TEST_CASE(defaults_are_comfortable),
         TEST_CASE(timeout_options_end_with_never),

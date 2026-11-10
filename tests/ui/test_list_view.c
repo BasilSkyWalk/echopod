@@ -198,6 +198,107 @@ static void the_selected_row_has_a_shine_line_and_shades_down(void)
     CHECK(below_shine != 0x07E0 && below_shine != theme.colors.selection_background);
 }
 
+static Theme distinct_selection_theme(ThemeSelection selection)
+{
+    Theme theme = TEST_THEME;
+    theme.colors.selection_background = 0x001F;
+    theme.colors.selection_top = 0x8410;
+    theme.colors.selection_shine = 0x07E0;
+    theme.colors.selection_text = 0xFFE0;
+    theme.colors.chevron = 0xC618;
+    theme.selection = selection;
+    return theme;
+}
+
+static Rect full_row(int row)
+{
+    Rect area = row_rect(row);
+    area.width = TEST_SCREEN_WIDTH;
+    return area;
+}
+
+static Canvas draw_second_row_selected(Theme *theme)
+{
+    ListView view = list_of(3);
+    view.theme = theme;
+    items.opens_at_one = true;
+    move_times(&view, 1, 1);
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(theme), 100);
+    return canvas;
+}
+
+static void a_flat_selection_fills_the_whole_row_in_the_selection_background(void)
+{
+    Theme theme = distinct_selection_theme(THEME_SELECTION_FLAT);
+    theme.colors.selection_text = theme.colors.selection_background;
+    theme.colors.chevron = theme.colors.selection_background;
+    Canvas canvas = draw_second_row_selected(&theme);
+    CHECK(ui_test_area_has_only(&canvas, full_row(1), theme.colors.selection_background));
+}
+
+static void an_outline_selection_draws_a_frame_around_the_background(void)
+{
+    Theme theme = distinct_selection_theme(THEME_SELECTION_OUTLINE);
+    Canvas canvas = draw_second_row_selected(&theme);
+    Rect row = full_row(1);
+    int last = row.y + row.height - 1;
+    CHECK_EQUAL(theme.colors.selection_top, canvas_pixel_at(&canvas, 6, row.y + 1));
+    CHECK_EQUAL(theme.colors.selection_top, canvas_pixel_at(&canvas, 20, last - 1));
+    CHECK_EQUAL(theme.colors.selection_top, canvas_pixel_at(&canvas, 6, row.y + 2));
+    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 7, row.y + 2));
+    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 5, row.y + 2));
+    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 20, row.y));
+    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 20, last));
+    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors.selection_background));
+}
+
+static void an_outline_selection_keeps_clear_of_the_scrollbar(void)
+{
+    Theme theme = distinct_selection_theme(THEME_SELECTION_OUTLINE);
+    ListView view = list_of(10);
+    view.theme = &theme;
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(&theme), 100);
+    Rect row = row_rect(0);
+    Rect beside_scrollbar = {TEST_SCREEN_WIDTH - 6, row.y, 6, row.height};
+    CHECK(!ui_test_area_has_color(&canvas, beside_scrollbar, theme.colors.selection_top));
+}
+
+static unsigned beyond_the_frame_sum(Theme *theme)
+{
+    Canvas canvas = draw_second_row_selected(theme);
+    Rect row = full_row(1);
+    unsigned sum = 0;
+    for (int y = row.y; y < row.y + row.height; y++) {
+        for (int x = TEST_SCREEN_WIDTH - 6; x < TEST_SCREEN_WIDTH; x++) {
+            sum += canvas_pixel_at(&canvas, x, y);
+        }
+    }
+    return sum;
+}
+
+static void an_outline_selection_draws_its_label_and_chevron_in_the_frame_color(void)
+{
+    Theme theme = distinct_selection_theme(THEME_SELECTION_OUTLINE);
+    Canvas canvas = draw_second_row_selected(&theme);
+    Rect row = full_row(1);
+    Rect label = {0, row.y, 6, row.height};
+    CHECK(ui_test_area_has_color(&canvas, label, theme.colors.selection_top));
+    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors.selection_text));
+    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors.chevron));
+    unsigned chevron = beyond_the_frame_sum(&theme);
+    theme.colors.selection_top = 0xF81F;
+    CHECK(beyond_the_frame_sum(&theme) != chevron);
+}
+
+static void a_gradient_selection_draws_its_label_in_the_selection_text(void)
+{
+    Theme theme = distinct_selection_theme(THEME_SELECTION_GRADIENT);
+    Canvas canvas = draw_second_row_selected(&theme);
+    CHECK(ui_test_area_has_color(&canvas, full_row(1), theme.colors.selection_text));
+}
+
 static void the_scrollbar_thumb_sits_inset_without_a_track(void)
 {
     Rect content = theme_content_area(&TEST_THEME);
@@ -279,6 +380,11 @@ int main(void)
         TEST_CASE(the_selected_row_is_highlighted),
         TEST_CASE(the_scrollbar_appears_only_when_items_overflow),
         TEST_CASE(the_selected_row_has_a_shine_line_and_shades_down),
+        TEST_CASE(a_flat_selection_fills_the_whole_row_in_the_selection_background),
+        TEST_CASE(an_outline_selection_draws_a_frame_around_the_background),
+        TEST_CASE(an_outline_selection_keeps_clear_of_the_scrollbar),
+        TEST_CASE(an_outline_selection_draws_its_label_and_chevron_in_the_frame_color),
+        TEST_CASE(a_gradient_selection_draws_its_label_in_the_selection_text),
         TEST_CASE(the_scrollbar_thumb_sits_inset_without_a_track),
         TEST_CASE(a_row_that_opens_something_shows_a_chevron),
         TEST_CASE(a_detail_is_drawn_in_the_secondary_color_at_the_right),

@@ -460,7 +460,9 @@ static void draw_slider(const EqualizerEditor *editor, Canvas *canvas, int band)
                      : selected ? colors->selection_background
                                 : colors->text_tertiary);
     canvas_fill_rect(canvas, (Rect){center - KNOB_WIDTH / 2, knob_y, KNOB_WIDTH, KNOB_HEIGHT},
-                     selected ? colors->text : colors->text_secondary);
+                     grabbed    ? colors->selection_text
+                     : selected ? colors->text
+                                : colors->text_secondary);
     TextStyle label = {.font = editor->config.theme->fonts.small,
                        .color = selected ? colors->text : colors->text_tertiary};
     draw_centered(canvas, label, (Rect){left, LABEL_TOP, COLUMN_WIDTH, LINE_HEIGHT},
@@ -517,9 +519,13 @@ static void draw_stacked_slider(const EqualizerEditor *editor, Canvas *canvas,
     int knob_x = geometry.zero_x + gain * PIXELS_PER_DB - STACK_KNOB_WIDTH / 2;
     canvas_fill_rect(
         canvas, (Rect){knob_x, middle - STACK_KNOB_HEIGHT / 2, STACK_KNOB_WIDTH, STACK_KNOB_HEIGHT},
-        selected ? colors->text : colors->text_secondary);
+        grabbed    ? colors->selection_text
+        : selected ? colors->text
+                   : colors->text_secondary);
     TextStyle label = {.font = editor->config.theme->fonts.small,
-                       .color = selected ? colors->text : colors->text_tertiary};
+                       .color = grabbed    ? colors->selection_text
+                                : selected ? colors->text
+                                           : colors->text_tertiary};
     draw_text(
         canvas, label,
         (Rect){STACK_ROW_INSET + STACK_ROW_INSET / 2, top, STACK_LABEL_WIDTH, STACK_ROW_HEIGHT},

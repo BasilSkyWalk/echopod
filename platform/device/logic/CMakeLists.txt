@@ -102,6 +102,7 @@ set(ECHO_DEVICE_LOGIC_SOURCES
     mp3_decoder.c
     mp3_probe.c
     msc.c
+    np_faces_gate.c
     panel.c
     panic_text.c
     pcf8563.c
@@ -141,6 +142,7 @@ if(CMAKE_CROSSCOMPILING)
         image_date.c
         mp3_probe.c
         msc.c
+        np_faces_gate.c
         panel.c
         panic_text.c
         pcf8563.c
