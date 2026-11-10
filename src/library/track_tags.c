@@ -11,9 +11,9 @@ typedef struct FormatName {
 
 static const FormatName FORMATS[] = {
     {"flac", TAG_FORMAT_FLAC}, {"ogg", TAG_FORMAT_OGG}, {"opus", TAG_FORMAT_OGG},
-    {"mp3", TAG_FORMAT_MP3},   {"m4a", TAG_FORMAT_MP4}, {"wav", TAG_FORMAT_WAV},
-    {"wma", TAG_FORMAT_WMA},   {"ape", TAG_FORMAT_APE}, {"dsf", TAG_FORMAT_DSF},
-    {"dff", TAG_FORMAT_DFF},
+    {"mp3", TAG_FORMAT_MP3},   {"m4a", TAG_FORMAT_MP4}, {"m4b", TAG_FORMAT_MP4},
+    {"wav", TAG_FORMAT_WAV},   {"wma", TAG_FORMAT_WMA}, {"ape", TAG_FORMAT_APE},
+    {"dsf", TAG_FORMAT_DSF},   {"dff", TAG_FORMAT_DFF},
 };
 
 static char lower(char character)
@@ -320,7 +320,7 @@ static bool read_format(TagReader *reader, TagFormat format)
 
 bool track_tags_read(ByteSource source, uint32_t size, TagFormat format, TrackTags *tags)
 {
-    *tags = (TrackTags){.duration_ms = 0, .picture = {.kind = TAG_PICTURE_NONE}};
+    *tags = (TrackTags){.duration_ms = 0, .picture = {.kind = TAG_PICTURE_NONE}, .chapters = 0};
     TagReader reader = {.source = source, .size = size, .tags = tags};
     return read_format(&reader, format);
 }

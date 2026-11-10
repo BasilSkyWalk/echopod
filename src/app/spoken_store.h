@@ -20,6 +20,7 @@ enum {
 typedef struct SpokenFollow {
     bool known;
     bool active;
+    bool embedded;
     uint16_t track;
     uint32_t duration_ms;
     Bookmark bookmark;

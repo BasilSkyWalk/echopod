@@ -56,6 +56,7 @@ typedef struct LibraryTrack {
     uint32_t duration_ms;
     uint8_t disc;
     uint8_t number;
+    uint16_t chapters;
 } LibraryTrack;
 
 typedef struct LibraryAlbum {

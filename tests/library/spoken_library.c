@@ -18,6 +18,8 @@ const char SPOKEN_CHAPTER_ONE_PATH[] = "Audiobooks/Book One/01 - Arrival.mp3";
 const char SPOKEN_CHAPTER_TWO_PATH[] = "Audiobooks/Book One/02 - The Road.mp3";
 const char SPOKEN_CHAPTER_THREE_PATH[] = "Audiobooks/Book One/03 - Home.mp3";
 const char SPOKEN_SINGLE_BOOK_PATH[] = "Audiobooks/Single Book.mp3";
+const char SPOKEN_CHAPTERED_BOOK_PATH[] = "Audiobooks/Chaptered Book/Chaptered Book.m4b";
+const char SPOKEN_LOOSE_BOOK_PATH[] = "Audiobooks/Loose Book.m4b";
 const char SPOKEN_SONG_PATH[] = "Music/Band/Record/01 - Song.flac";
 const char SPOKEN_EPISODE_A_PATH[] = "Podcasts/Show/Episode A.mp3";
 const char SPOKEN_EPISODE_B_PATH[] = "Podcasts/Show/Episode B.mp3";
@@ -57,18 +59,23 @@ static void fail(const char *what)
 
 static const BuilderTrack TRACKS[] = {
     {SPOKEN_CHAPTER_ONE_PATH, "Arrival", "Reader", "Author", "Book One", "Audiobook", 2020, 1, 1,
-     SPOKEN_CHAPTER_MS, false},
+     SPOKEN_CHAPTER_MS, false, 0},
     {SPOKEN_CHAPTER_TWO_PATH, "The Road", "Reader", "Author", "Book One", "Audiobook", 2020, 1, 2,
-     SPOKEN_CHAPTER_MS, false},
+     SPOKEN_CHAPTER_MS, false, 0},
     {SPOKEN_CHAPTER_THREE_PATH, "Home", "Reader", "Author", "Book One", "Audiobook", 2020, 1, 3,
-     SPOKEN_CHAPTER_MS, false},
+     SPOKEN_CHAPTER_MS, false, 0},
     {SPOKEN_SINGLE_BOOK_PATH, "Single Book", "Reader", "Writer", "Single Book", "Audiobook", 2019,
-     1, 0, SPOKEN_CHAPTER_MS, false},
-    {SPOKEN_SONG_PATH, "Song", "Band", "Band", "Record", "Rock", 2001, 1, 1, SPOKEN_SONG_MS, false},
+     1, 0, SPOKEN_CHAPTER_MS, false, 0},
+    {SPOKEN_CHAPTERED_BOOK_PATH, "Chaptered Book", "Novelist", "Novelist", "Chaptered Book",
+     "Audiobook", 1965, 1, 1, SPOKEN_CHAPTERED_BOOK_MS, false, SPOKEN_CHAPTERED_BOOK_CHAPTERS},
+    {SPOKEN_LOOSE_BOOK_PATH, "Loose Book", "Reader", "Writer", "Loose Book", "Audiobook", 2018, 1,
+     0, SPOKEN_CHAPTERED_BOOK_MS, false, SPOKEN_LOOSE_BOOK_CHAPTERS},
+    {SPOKEN_SONG_PATH, "Song", "Band", "Band", "Record", "Rock", 2001, 1, 1, SPOKEN_SONG_MS, false,
+     0},
     {SPOKEN_EPISODE_A_PATH, "Episode A", "Host", "Host", "Show", "Podcast", 2024, 1, 0,
-     SPOKEN_EPISODE_MS, false},
+     SPOKEN_EPISODE_MS, false, 0},
     {SPOKEN_EPISODE_B_PATH, "Episode B", "Host", "Host", "Show", "Podcast", 2024, 1, 0,
-     SPOKEN_EPISODE_MS, false},
+     SPOKEN_EPISODE_MS, false, 0},
 };
 
 static void check_step(BuilderResult result, const char *step)

@@ -4,6 +4,7 @@ add_library(echo_library STATIC
     favorites.c
     library.c
     library_browse.c
+    mp4_chapters.c
     music_fingerprint.c
     music_folders.c
     sort_initial.c

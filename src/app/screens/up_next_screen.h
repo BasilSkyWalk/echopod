@@ -28,6 +28,7 @@ typedef struct UpNextScreen {
     ListView list;
     int count;
     int added;
+    bool chapters;
     int rows_first;
     int rows_count;
     char labels[UP_NEXT_ROWS][UP_NEXT_LABEL_CAPACITY];

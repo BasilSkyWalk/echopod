@@ -339,6 +339,19 @@ class SpokenWordTest(unittest.TestCase):
         self.assertEqual([1, 1, 1, 1, 1, 0, 1, 0, 0, 0], music)
 
 
+class ChapterCountTest(unittest.TestCase):
+    def test_a_books_chapter_count_reaches_its_track_record(self):
+        book = spoken_test_track("Audiobooks/Book.m4b", "Book", "Reader", "Book")
+        book.chapters = 13
+        song = spoken_test_track("Rock/Song.m4a", "Song", "Band", "Record")
+        library = library_index.build_library([book, song])
+        data = library_index.encode_library(library)
+        offset = SECTION_ENTRY.unpack_from(data, 8)[0]
+        records = [TRACK_RECORD.unpack_from(data, offset + number * TRACK_RECORD.size)
+                   for number in range(2)]
+        self.assertEqual([0, 13], [record[9] for record in records])
+
+
 class EncodeLibraryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

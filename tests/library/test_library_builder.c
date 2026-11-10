@@ -217,6 +217,7 @@ static BuilderTrack parse_track(char **cursor)
     parsed.number = (uint8_t)atoi(next_field(cursor));
     parsed.duration_ms = (uint32_t)strtoul(next_field(cursor), NULL, 10);
     parsed.album_artist_guessed = false;
+    parsed.chapters = 0;
     return parsed;
 }
 
@@ -305,7 +306,8 @@ static ReferenceTrack reference_track(const BuilderTrack *track)
                             .disc = track->disc,
                             .number = track->number,
                             .duration_ms = track->duration_ms,
-                            .album_artist_guessed = track->album_artist_guessed};
+                            .album_artist_guessed = track->album_artist_guessed,
+                            .chapters = track->chapters};
 }
 
 static void build_reference(const RandomLibrary *library, Built *built)
@@ -528,6 +530,47 @@ static bool album_is(const Opened *opened, uint32_t index, const char *artist, u
            strcmp(artist, name) == 0 && album.track_count == tracks;
 }
 
+static bool chapters_of(const Opened *opened, const char *path, uint16_t *chapters)
+{
+    char text[128];
+    LibraryTrack track;
+    for (uint32_t index = 0; index < library_count(&opened->library, LIBRARY_TRACKS); index++) {
+        if (library_read_track(&opened->library, index, &track) &&
+            library_read_string(&opened->library, track.path, text, sizeof text) &&
+            strcmp(path, text) == 0) {
+            *chapters = track.chapters;
+            return true;
+        }
+    }
+    return false;
+}
+
+static void a_books_chapter_count_reaches_its_track_record(void)
+{
+    BuilderTrack tracks[] = {
+        track("Audiobooks/Alpha/Alpha.m4b", "Alpha", "Reader", "Reader", "Alpha", "Audiobook", 1965,
+              1),
+        track("Rock/Band/Album/01 - Song.m4a", "Song", "Band", "Band", "Album", "Rock", 2000, 1),
+        track("Audiobooks/Long/Long.m4b", "Long", "Reader", "Reader", "Long", "Audiobook", 2010, 1),
+        track("Audiobooks/Plain/01 - One.mp3", "One", "Reader", "Reader", "Plain", "Audiobook",
+              2011, 1),
+    };
+    tracks[0].chapters = 13;
+    tracks[2].chapters = 255;
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    uint16_t chapters = 99;
+    CHECK(chapters_of(&opened, "Audiobooks/Alpha/Alpha.m4b", &chapters));
+    CHECK_EQUAL(13, chapters);
+    CHECK(chapters_of(&opened, "Rock/Band/Album/01 - Song.m4a", &chapters));
+    CHECK_EQUAL(0, chapters);
+    CHECK(chapters_of(&opened, "Audiobooks/Long/Long.m4b", &chapters));
+    CHECK_EQUAL(255, chapters);
+    CHECK(chapters_of(&opened, "Audiobooks/Plain/01 - One.mp3", &chapters));
+    CHECK_EQUAL(0, chapters);
+    free(opened.built.output.bytes);
+}
+
 static void a_featured_artist_stays_with_the_album(void)
 {
     const BuilderTrack tracks[] = {
@@ -589,6 +632,7 @@ int main(void)
         TEST_CASE(the_65536th_track_is_too_many),
         TEST_CASE(a_library_bigger_than_its_room_writes_nothing),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
+        TEST_CASE(a_books_chapter_count_reaches_its_track_record),
         TEST_CASE(a_featured_artist_stays_with_the_album),
         TEST_CASE(a_tie_goes_to_the_artist_first_in_order),
         TEST_CASE(tagged_album_artists_and_other_folders_keep_their_albums),

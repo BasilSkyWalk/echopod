@@ -8,13 +8,18 @@
 enum {
     SPOKEN_CHAPTER_MS = 600000,
     SPOKEN_EPISODE_MS = 1200000,
-    SPOKEN_SONG_MS = 180000
+    SPOKEN_SONG_MS = 180000,
+    SPOKEN_CHAPTERED_BOOK_MS = 600000,
+    SPOKEN_CHAPTERED_BOOK_CHAPTERS = 3,
+    SPOKEN_LOOSE_BOOK_CHAPTERS = 4
 };
 
 extern const char SPOKEN_CHAPTER_ONE_PATH[];
 extern const char SPOKEN_CHAPTER_TWO_PATH[];
 extern const char SPOKEN_CHAPTER_THREE_PATH[];
 extern const char SPOKEN_SINGLE_BOOK_PATH[];
+extern const char SPOKEN_CHAPTERED_BOOK_PATH[];
+extern const char SPOKEN_LOOSE_BOOK_PATH[];
 extern const char SPOKEN_SONG_PATH[];
 extern const char SPOKEN_EPISODE_A_PATH[];
 extern const char SPOKEN_EPISODE_B_PATH[];

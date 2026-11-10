@@ -35,6 +35,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **Library size:** tested on the player with 6,558 tracks, and with over 1,600 albums; on a computer with 20,000 tracks. Larger libraries may stop with an error when the library file (4 MB) is full.
 - **Album art:** the covers file starts with room for 2,673 albums; a rescan that finds more grows it (see `docs/architecture.md`, Covers on the device), up to 8,192 albums. Past that, or when the card has no room to grow it, the remaining albums show without art.
 - **Cover Flow** orders albums by album artist, then year, not by album title like the Albums list.
+- **Chapters inside one file** (.m4b or .m4a) are read from the `chpl` chapter list only, up to 255 per file (the player places the first 160 chapters of a book, a book with more shows none), to the second, and without their names. A book folder with several files ignores them, the chapters of a file with QuickTime text-track chapters aren't read, and a file with a 64-bit atom size (over 4 GB) shows none. A library built before chapters were read shows none until the next rescan.
 - **Spoken word is decided by the top folder.** Only tracks inside an `Audiobooks`, `Audiobook`, `Podcasts` or `Podcast` folder at the top of the card count as audiobooks or podcasts; the same folder names deeper down are music. An author with music too appears under Artists with the music only.
 
 ## Languages

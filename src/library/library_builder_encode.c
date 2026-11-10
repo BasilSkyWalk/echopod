@@ -351,7 +351,7 @@ static bool write_tracks(Encode *encode)
         put_u32(writer, row.duration_ms);
         put_byte(writer, row.disc);
         put_byte(writer, row.number);
-        put_u16(writer, 0);
+        put_u16(writer, row.chapters);
     }
     return true;
 }

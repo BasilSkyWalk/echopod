@@ -25,7 +25,8 @@ typedef struct TrackRecord {
     uint16_t year;
     uint8_t disc;
     uint8_t number;
-    uint16_t guessed;
+    uint8_t guessed;
+    uint8_t chapters;
     uint32_t duration_ms;
 } TrackRecord;
 
