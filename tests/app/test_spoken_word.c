@@ -5,6 +5,7 @@
 #include "default_theme.h"
 #include "fake_hal.h"
 #include "library/library_browse.h"
+#include "mp4_book.h"
 #include "player.h"
 #include "spoken_library.h"
 #include "spoken_store.h"
@@ -39,12 +40,14 @@ static BrowseQuery folder_of(const char *path, uint32_t *position)
 {
     uint16_t track = spoken_library_track(library, path);
     LibraryTrack record;
+    LibraryFolder folder;
     uint16_t chapter = 0;
     BrowseQuery query = browse_root_query(BROWSE_FOLDER);
     library_read_track(library, track, &record);
+    library_read_folder(library, record.folder, &folder);
     spoken_chapter_of(library, track, &chapter);
     browse_child(query, (BrowseItem){.kind = BROWSE_ITEM_FOLDER, .index = record.folder}, &query);
-    *position = chapter;
+    *position = (uint32_t)folder.subfolder_count + chapter;
     return query;
 }
 
@@ -95,6 +98,57 @@ static void jumping_past_the_end_starts_the_next_chapter(void)
     fake_hal_audio_set_position(SPOKEN_CHAPTER_MS - 10000);
     player_skip(&player, 1);
     CHECK(path_is(fake_hal_audio_playing_path(), SPOKEN_CHAPTER_TWO_PATH));
+}
+
+static uint8_t book_file[512];
+static const Mp4BookChapter BOOK_CHAPTERS[] = {
+    {0, "Part 1"}, {200000, "Part 2"}, {400000, "Part 3"}};
+static const char BOOK_FILE_PATH[] = "/Audiobooks/Chaptered Book/Chaptered Book.m4b";
+
+static void provide_book_file(void)
+{
+    uint32_t size = mp4_book_build(book_file, sizeof book_file, BOOK_CHAPTERS, 3);
+    fake_hal_add_file(BOOK_FILE_PATH, book_file, size);
+}
+
+static void a_book_with_chapters_reports_the_current_one(void)
+{
+    start();
+    provide_book_file();
+    play(SPOKEN_CHAPTERED_BOOK_PATH, true);
+    PlayerStatus status = player_status(&player);
+    CHECK_EQUAL(3, status.chapters);
+    CHECK_EQUAL(0, status.chapter);
+    fake_hal_audio_set_position(250000);
+    CHECK_EQUAL(1, player_status(&player).chapter);
+    fake_hal_audio_set_position(599000);
+    CHECK_EQUAL(2, player_status(&player).chapter);
+}
+
+static void holding_volume_still_jumps_in_time_in_a_book_with_chapters(void)
+{
+    start();
+    provide_book_file();
+    play(SPOKEN_CHAPTERED_BOOK_PATH, true);
+    fake_hal_audio_set_position(100000);
+    player_skip(&player, 1);
+    CHECK_EQUAL(100000 + SPOKEN_JUMP_FORWARD_MS, fake_hal_audio_last_seek());
+    fake_hal_audio_set_position(250000);
+    player_skip(&player, -1);
+    CHECK_EQUAL(250000 - SPOKEN_JUMP_BACK_MS, fake_hal_audio_last_seek());
+    fake_hal_audio_set_position(5000);
+    player_skip(&player, -1);
+    CHECK_EQUAL(0, fake_hal_audio_last_seek());
+}
+
+static void a_book_whose_chapters_cannot_be_read_keeps_the_time_jumps(void)
+{
+    start();
+    play(SPOKEN_CHAPTERED_BOOK_PATH, true);
+    CHECK_EQUAL(0, player_status(&player).chapters);
+    fake_hal_audio_set_position(100000);
+    player_skip(&player, 1);
+    CHECK_EQUAL(100000 + SPOKEN_JUMP_FORWARD_MS, fake_hal_audio_last_seek());
 }
 
 static void music_still_skips_tracks(void)
@@ -198,7 +252,7 @@ static uint32_t music_count(BrowseKind kind)
 static void the_music_lists_leave_out_spoken_word(void)
 {
     start();
-    CHECK_EQUAL(7, library_count(library, LIBRARY_TRACKS));
+    CHECK_EQUAL(9, library_count(library, LIBRARY_TRACKS));
     CHECK_EQUAL(1, library_music_count(library, LIBRARY_TRACKS));
     CHECK_EQUAL(1, music_count(BROWSE_ALBUMS));
     CHECK_EQUAL(1, music_count(BROWSE_ALL_SONGS));
@@ -212,7 +266,7 @@ static void the_audiobook_shelf_lists_books(void)
 {
     start();
     BrowseScreen *books = shelf(SPOKEN_AUDIOBOOK);
-    CHECK_EQUAL(2, books->count);
+    CHECK_EQUAL(4, books->count);
     CHECK(strcmp("Audiobooks", books->title) == 0);
     CHECK(strcmp("3 chapters", detail_of(books, 0)) == 0);
 }
@@ -226,6 +280,64 @@ static void a_started_book_shows_its_chapter(void)
     follow(1000);
     BrowseScreen *books = shelf(SPOKEN_AUDIOBOOK);
     CHECK(strcmp("Chapter 2 of 3", detail_of(books, 0)) == 0);
+}
+
+static void a_single_files_chapters_are_counted_on_the_shelf(void)
+{
+    start();
+    BrowseScreen *books = shelf(SPOKEN_AUDIOBOOK);
+    CHECK(strcmp("3 chapters", detail_of(books, 1)) == 0);
+}
+
+static void a_started_chaptered_book_shows_its_chapter_on_the_shelf(void)
+{
+    start();
+    provide_book_file();
+    play(SPOKEN_CHAPTERED_BOOK_PATH, true);
+    follow(0);
+    fake_hal_audio_set_position(250000);
+    follow(SPOKEN_PUT_INTERVAL_MS + 1000);
+    BrowseScreen *books = shelf(SPOKEN_AUDIOBOOK);
+    CHECK(strcmp("Chapter 2 of 3", detail_of(books, 1)) == 0);
+}
+
+static uint8_t loose_file[512];
+static const Mp4BookChapter LOOSE_CHAPTERS[] = {
+    {0, "One"}, {100000, "Two"}, {300000, "Three"}, {500000, "Four"}};
+static const char LOOSE_FILE_PATH[] = "/Audiobooks/Loose Book.m4b";
+
+static int loose_row(BrowseScreen *books)
+{
+    for (int index = 0; index < (int)books->count; index++) {
+        if (strstr(detail_of(books, index), "4") != NULL) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+static void a_loose_chaptered_file_counts_its_chapters_on_the_shelf(void)
+{
+    start();
+    BrowseScreen *books = shelf(SPOKEN_AUDIOBOOK);
+    int row = loose_row(books);
+    CHECK(row >= 0);
+    CHECK(strcmp("4 chapters", detail_of(books, row)) == 0);
+}
+
+static void a_started_loose_file_shows_its_chapter_on_the_shelf(void)
+{
+    start();
+    uint32_t size = mp4_book_build(loose_file, sizeof loose_file, LOOSE_CHAPTERS, 4);
+    fake_hal_add_file(LOOSE_FILE_PATH, loose_file, size);
+    play(SPOKEN_LOOSE_BOOK_PATH, true);
+    follow(0);
+    fake_hal_audio_set_position(350000);
+    follow(SPOKEN_PUT_INTERVAL_MS + 1000);
+    BrowseScreen *books = shelf(SPOKEN_AUDIOBOOK);
+    int row = loose_row(books);
+    CHECK(row >= 0);
+    CHECK(strcmp("Chapter 3 of 4", detail_of(books, row)) == 0);
 }
 
 static void selecting_a_book_resumes_it(void)
@@ -299,6 +411,13 @@ int main(void)
         TEST_CASE(a_played_episode_starts_from_the_top),
         TEST_CASE(the_music_lists_leave_out_spoken_word),
         TEST_CASE(the_audiobook_shelf_lists_books),
+        TEST_CASE(a_book_with_chapters_reports_the_current_one),
+        TEST_CASE(holding_volume_still_jumps_in_time_in_a_book_with_chapters),
+        TEST_CASE(a_book_whose_chapters_cannot_be_read_keeps_the_time_jumps),
+        TEST_CASE(a_single_files_chapters_are_counted_on_the_shelf),
+        TEST_CASE(a_started_chaptered_book_shows_its_chapter_on_the_shelf),
+        TEST_CASE(a_loose_chaptered_file_counts_its_chapters_on_the_shelf),
+        TEST_CASE(a_started_loose_file_shows_its_chapter_on_the_shelf),
         TEST_CASE(a_started_book_shows_its_chapter),
         TEST_CASE(selecting_a_book_resumes_it),
         TEST_CASE(selecting_a_paused_book_carries_on_playing_it),

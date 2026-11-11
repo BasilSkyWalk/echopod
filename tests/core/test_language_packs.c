@@ -87,10 +87,33 @@ static void indonesian_is_the_last_language_and_translates_the_menus(void)
     i18n_detach();
 }
 
+static void every_translation_has_its_own_chapters_title(void)
+{
+    static uint8_t pack[PACK_LIMIT + 1];
+    const char *cursor = PACK_PATHS;
+    uint32_t checked = 0;
+    while (*cursor != '\0') {
+        char path[PATH_CAPACITY];
+        size_t length = strcspn(cursor, "|");
+        memcpy(path, cursor, length);
+        path[length] = '\0';
+        uint32_t size = read_pack(path, pack);
+        CHECK(i18n_attach(pack, size));
+        if (strstr(path, "/en.bin") == NULL) {
+            CHECK(strcmp(i18n_english(STR_MENU_CHAPTERS), i18n_text(STR_MENU_CHAPTERS)) != 0);
+            checked++;
+        }
+        i18n_detach();
+        cursor += length + (cursor[length] == '|' ? 1u : 0u);
+    }
+    CHECK_EQUAL(LANGUAGE_COUNT - 1, checked);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(every_language_has_a_pack_that_attaches),
+        TEST_CASE(every_translation_has_its_own_chapters_title),
         TEST_CASE(polish_translates_the_menus),
         TEST_CASE(indonesian_is_the_last_language_and_translates_the_menus),
     };

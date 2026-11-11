@@ -19,6 +19,7 @@ EXPECTED = {
     "id3v23_vbr.mp3": dict(FULL, genre="Rock", duration_ms=1032),
     "aac.m4a": dict(FULL, duration_ms=1023),
     "alac.m4a": dict(FULL, duration_ms=1000),
+    "chapters.m4b": dict(FULL, duration_ms=3023, chapters=3),
     "tagged.wav": dict(FULL, duration_ms=1000),
     "tagged.wma": dict(FULL, duration_ms=1000),
     "tagged.ape": dict(FULL, duration_ms=3442),
@@ -35,7 +36,8 @@ EXPECTED = {
 
 class TrackTagsTest(unittest.TestCase):
     def test_every_stock_format_is_listed(self):
-        for suffix in (".flac", ".ogg", ".opus", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf", ".dff"):
+        for suffix in (".flac", ".ogg", ".opus", ".mp3", ".m4a", ".m4b", ".wav", ".wma", ".ape", ".dsf",
+                       ".dff"):
             self.assertIn(suffix, library_index.AUDIO_SUFFIXES)
 
     def test_each_format_reads_its_tags_and_duration(self):
@@ -45,6 +47,7 @@ class TrackTagsTest(unittest.TestCase):
                 self.assertEqual(f"tags/{name}", track.path)
                 for field_name, value in expected.items():
                     self.assertEqual(value, getattr(track, field_name), field_name)
+                self.assertEqual(expected.get("chapters", 0), track.chapters)
 
 
 if __name__ == "__main__":

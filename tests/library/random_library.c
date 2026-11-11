@@ -181,6 +181,7 @@ static void make_track(RandomLibrary *library, Random *random, uint32_t index, u
     track->disc = disc;
     track->number = number;
     track->duration_ms = 60000 + below(random, 400000);
+    track->chapters = index % 11 == 0 ? (uint8_t)(1 + index % 255) : 0;
 }
 
 static void windows_path(const char *path, char *out, size_t capacity)

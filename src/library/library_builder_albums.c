@@ -8,7 +8,7 @@ enum {
     GUESS_HEADER = 18,
     DECISION_SIZE = 6,
     ASSIGNMENT_SIZE = 12,
-    ROW_FLAGS = 43,
+    ROW_FLAGS = 42,
     ROW_ALBUM_ARTIST_TEXT = 4 * BUILDER_ALBUM_ARTIST,
     ROW_ALBUM_ARTIST_LENGTH = 24 + 2 * BUILDER_ALBUM_ARTIST
 };
@@ -202,7 +202,7 @@ static bool emit_guesses(BuilderState *state, Prepared *prepared, Region *guesse
         if (!in_get(&rows, bytes, sizeof bytes)) {
             return false;
         }
-        if (bytes[ROW_FLAGS] == 0) {
+        if ((bytes[ROW_FLAGS] & BUILDER_ROW_GUESSED_BIT) == 0) {
             continue;
         }
         TrackRow row;
@@ -332,7 +332,7 @@ static bool rewrite_rows(BuilderState *state, Region sorted)
                 return false;
             }
         }
-        bytes[ROW_FLAGS] = 0;
+        bytes[ROW_FLAGS] &= (uint8_t)~BUILDER_ROW_GUESSED_BIT;
         if (!out_put(&out, bytes, sizeof bytes)) {
             return false;
         }
