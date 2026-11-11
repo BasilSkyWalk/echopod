@@ -5,7 +5,9 @@
 
 #include "board.h"
 #include "device/image_crc.h"
+#include "device/np_faces_gate.h"
 #include "emmc.h"
+#include "hal/system.h"
 
 #define CODE_BASE 0x03050000u
 
@@ -15,6 +17,11 @@ enum {
 };
 
 extern const uint8_t device_code_end[];
+
+static NpFacesGate np_faces_gate;
+
+static const BoardOverlay NP_FACES_OVERLAY = {NP_FACES_IMAGE_OFFSET, NP_FACES_IMAGE_MAGIC,
+                                              (uint8_t *)NP_FACES_BASE, NP_FACES_BYTES};
 
 static uint32_t le32(const uint8_t *bytes)
 {
@@ -107,6 +114,7 @@ static const void *load_window(uint32_t image_offset, uint32_t magic)
 {
     uint8_t *base = (uint8_t *)(uintptr_t)OVERLAY_WINDOW_BASE;
     BoardOverlay overlay = {image_offset, magic, base, OVERLAY_WINDOW_BYTES};
+    board_np_faces_forget();
     board_audio_shut_down();
     return board_overlay_load(&overlay) ? base + OVERLAY_HEADER_BYTES : NULL;
 }
@@ -114,6 +122,37 @@ static const void *load_window(uint32_t image_offset, uint32_t magic)
 const void *hal_system_load_rescan_code(void)
 {
     return load_window(RESCAN_OVERLAY_IMAGE_OFFSET, RESCAN_OVERLAY_MAGIC);
+}
+
+void board_np_faces_forget(void)
+{
+    np_faces_gate_forget(&np_faces_gate);
+}
+
+static bool np_faces_header_intact(void)
+{
+    const uint8_t *base = (const uint8_t *)(uintptr_t)NP_FACES_BASE;
+    return le32(base) == NP_FACES_IMAGE_MAGIC && le32(base + 12) == running_code_crc();
+}
+
+static bool np_faces_may_load(void)
+{
+    uint32_t status;
+    return !hal_system_restart_pending() && emmc_status(&status);
+}
+
+__attribute__((noinline)) const void *hal_system_load_faces(void)
+{
+    if (np_faces_gate.state == NP_FACES_READY) {
+        np_faces_gate_checked(&np_faces_gate, np_faces_header_intact());
+    }
+    if (np_faces_gate.state == NP_FACES_UNKNOWN &&
+        np_faces_gate_should_load(&np_faces_gate, np_faces_may_load())) {
+        np_faces_gate_loaded(&np_faces_gate, board_overlay_load(&NP_FACES_OVERLAY));
+    }
+    const void *entry = (const void *)(uintptr_t)NP_FACES_ENTRY;
+    __asm__("" : "+r"(entry));
+    return np_faces_gate.state == NP_FACES_READY ? entry : NULL;
 }
 
 const void *board_usb_overlay_load(void)

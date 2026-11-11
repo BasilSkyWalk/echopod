@@ -217,8 +217,8 @@ static HalDisplayRotation rotation_for(Orientation orientation)
 static int theme_key(const Settings *settings)
 {
     return (int)settings->orientation | settings->options[OPTION_ACCENT] << 2 |
-           settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_THEME] << 6 |
-           settings->options[OPTION_STATUS_BAR] << 7;
+           settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_STATUS_BAR] << 7 |
+           settings->options[OPTION_THEME] << 8;
 }
 
 static void apply_orientation(void)
@@ -227,11 +227,11 @@ static void apply_orientation(void)
     Orientation orientation = settings->orientation;
     app.shown_theme = theme_key(settings);
     bool portrait = orientation != ORIENTATION_LANDSCAPE;
-    int accent = settings->options[OPTION_ACCENT];
-    bool flat = settings->options[OPTION_HIGHLIGHT] != 0;
-    app.theme = default_theme_styled(portrait, accent, flat,
-                                     settings->options[OPTION_THEME] == THEME_LIGHT);
-    app.stage_theme = default_theme_styled(portrait, accent, flat, false);
+    ThemeChoice choice = {.theme = settings->options[OPTION_THEME],
+                          .accent = settings->options[OPTION_ACCENT],
+                          .flat = settings->options[OPTION_HIGHLIGHT] != 0};
+    app.theme = default_theme_styled(portrait, choice);
+    app.stage_theme = default_theme_stage(portrait, choice);
     if (settings->options[OPTION_STATUS_BAR] == STATUS_BAR_LARGE) {
         default_theme_enlarge_status(&app.theme);
         default_theme_enlarge_status(&app.stage_theme);
@@ -638,6 +638,24 @@ static void draw_shifted(Screen *screen, Canvas *canvas, int x, Rect area)
     }
 }
 
+__attribute__((noinline)) static Theme dressed_theme(const Screen *screen)
+{
+    Theme theme = *current_theme();
+    const ThemeColors *face = screen == &app.screens.now_playing.screen
+                                  ? now_playing_face_colors(&app.screens.now_playing)
+                                  : NULL;
+    if (face != NULL) {
+        theme.colors = *face;
+    }
+    return theme;
+}
+
+static const Screen *chrome_screen(const Screen *top)
+{
+    bool leaving = slide_running() && !slide_shows_arriving_title(&app.slide, app.now_ms);
+    return leaving ? app.leaving : top;
+}
+
 static void draw_slide(Canvas *canvas, Screen *arriving)
 {
     const Theme *theme = current_theme();
@@ -648,8 +666,9 @@ static void draw_slide(Canvas *canvas, Screen *arriving)
     draw_shifted(leaving, canvas, slide_leaving_x(&app.slide, app.now_ms, width), area);
     draw_shifted(arriving, canvas, slide_arriving_x(&app.slide, app.now_ms, width), area);
     if (!whole) {
-        bool arrived = slide_shows_arriving_title(&app.slide, app.now_ms);
-        header_draw(canvas, theme, arrived ? arriving->title : leaving->title);
+        const Screen *titled = chrome_screen(arriving);
+        Theme dressed = dressed_theme(titled);
+        header_draw(canvas, &dressed, titled->title);
     }
 }
 
@@ -666,7 +685,8 @@ static void draw_frame(void *context, Canvas *canvas)
         screen->draw(screen->context, canvas);
     }
     if (!screen->full_screen) {
-        status_bar_draw(canvas, current_theme(), state->status_bar);
+        Theme dressed = dressed_theme(chrome_screen(screen));
+        status_bar_draw(canvas, &dressed, state->status_bar);
     }
     toast_draw(&state->toast, canvas, current_theme());
     if (state->options.show_frame_time) {

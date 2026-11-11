@@ -84,6 +84,31 @@ static void a_frame_remembers_the_soonest_wait(void)
     CHECK_EQUAL(0u, marquee_frame_wait_ms());
 }
 
+static void a_request_keeps_the_soonest_wait(void)
+{
+    marquee_frame_start();
+    marquee_frame_request(80);
+    CHECK_EQUAL(80u, marquee_frame_wait_ms());
+    marquee_frame_request(100);
+    CHECK_EQUAL(80u, marquee_frame_wait_ms());
+    marquee_frame_request(30);
+    CHECK_EQUAL(30u, marquee_frame_wait_ms());
+    marquee_frame_start();
+    CHECK_EQUAL(0u, marquee_frame_wait_ms());
+}
+
+static void a_request_shares_the_minimum_with_a_scrolling_line(void)
+{
+    marquee_frame_start();
+    marquee_frame_request(500);
+    marquee_offset(TIMING, LONG_TEXT, VIEW, PAUSE_MS + 10);
+    CHECK_EQUAL(24u, marquee_frame_wait_ms());
+    marquee_frame_start();
+    marquee_offset(TIMING, LONG_TEXT, VIEW, PAUSE_MS + 10);
+    marquee_frame_request(10);
+    CHECK_EQUAL(10u, marquee_frame_wait_ms());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -96,6 +121,8 @@ int main(void)
         TEST_CASE(the_offset_moves_one_pixel_at_each_wait),
         TEST_CASE(the_first_wait_covers_the_pause),
         TEST_CASE(a_frame_remembers_the_soonest_wait),
+        TEST_CASE(a_request_keeps_the_soonest_wait),
+        TEST_CASE(a_request_shares_the_minimum_with_a_scrolling_line),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

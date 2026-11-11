@@ -45,11 +45,18 @@ typedef struct ThemeMetrics {
     int status_height;
 } ThemeMetrics;
 
+typedef enum ThemeSelection {
+    THEME_SELECTION_GRADIENT,
+    THEME_SELECTION_FLAT,
+    THEME_SELECTION_OUTLINE
+} ThemeSelection;
+
 typedef struct Theme {
     ThemeColors colors;
     ThemeFonts fonts;
     ThemeMetrics metrics;
     MarqueeTiming marquee;
+    ThemeSelection selection;
 } Theme;
 
 Rect theme_header_area(const Theme *theme);
@@ -57,3 +64,4 @@ Rect theme_content_area(const Theme *theme);
 int theme_visible_rows(const Theme *theme);
 bool theme_is_portrait(const Theme *theme);
 Rect theme_title_area(const Theme *theme);
+Color theme_selected_text(const Theme *theme);

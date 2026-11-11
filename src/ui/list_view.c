@@ -8,6 +8,9 @@
 enum {
     MIN_THUMB_HEIGHT = 6,
     SHINE_HEIGHT = 1,
+    OUTLINE_SIDE_INSET = 6,
+    OUTLINE_EDGE_INSET = 1,
+    OUTLINE_THICKNESS = 1,
     NARROW_DETAIL_SHARE = 30,
     PERCENT = 100,
     SECTION_HEIGHT_SHARE = 2,
@@ -224,7 +227,7 @@ void list_view_restart_marquee(ListView *view, uint32_t now_ms)
 
 static TextStyle row_style(const ListView *view, bool selected, Color normal)
 {
-    Color color = selected ? view->theme->colors.selection_text : normal;
+    Color color = selected ? theme_selected_text(view->theme) : normal;
     return (TextStyle){.font = view->theme->fonts.body, .color = color};
 }
 
@@ -234,7 +237,7 @@ static Row draw_chevron(const ListView *view, Canvas *canvas, Row row)
     if (model->opens == NULL || !model->opens(model->context, row.index)) {
         return row;
     }
-    Color color = row.selected ? view->theme->colors.selection_text : view->theme->colors.chevron;
+    Color color = row.selected ? theme_selected_text(view->theme) : view->theme->colors.chevron;
     TextStyle style = {.font = view->theme->fonts.title, .color = color};
     int width = text_width(style.font, CHEVRON);
     Rect area = {row.text.x + row.text.width - width, row.text.y, width, row.text.height};
@@ -288,15 +291,42 @@ static void draw_label(const ListView *view, Canvas *canvas, Row row, uint32_t n
     label_draw_scrolling(canvas, style, label, (Marquee){.offset = offset, .gap = timing.gap_px});
 }
 
+static Rect inset_rect(Rect area, int across, int down)
+{
+    return (Rect){area.x + across, area.y + down, area.width - 2 * across, area.height - 2 * down};
+}
+
+static void draw_bar_selection(Canvas *canvas, Rect area, const ThemeColors *colors, bool flat)
+{
+    Color top = flat ? colors->selection_background : colors->selection_top;
+    Rect shine = {area.x, area.y, area.width, SHINE_HEIGHT};
+    Rect bar = {area.x, area.y + SHINE_HEIGHT, area.width, area.height - SHINE_HEIGHT};
+    canvas_fill_rect(canvas, shine, flat ? top : colors->selection_shine);
+    canvas_fill_gradient(canvas, bar, top, colors->selection_background);
+}
+
+static void draw_outline_selection(Canvas *canvas, Rect area, const ThemeColors *colors)
+{
+    Rect frame = inset_rect(area, OUTLINE_SIDE_INSET, OUTLINE_EDGE_INSET);
+    canvas_fill_rect(canvas, frame, colors->selection_top);
+    canvas_fill_rect(canvas, inset_rect(frame, OUTLINE_THICKNESS, OUTLINE_THICKNESS),
+                     colors->background);
+}
+
+static void draw_selection(const ListView *view, Canvas *canvas, Rect area)
+{
+    const ThemeColors *colors = &view->theme->colors;
+    if (view->theme->selection == THEME_SELECTION_OUTLINE) {
+        draw_outline_selection(canvas, area, colors);
+        return;
+    }
+    draw_bar_selection(canvas, area, colors, view->theme->selection == THEME_SELECTION_FLAT);
+}
+
 static void draw_row(const ListView *view, Canvas *canvas, Row row, uint32_t now_ms)
 {
     if (row.selected) {
-        const ThemeColors *colors = &view->theme->colors;
-        Rect shine = {row.area.x, row.area.y, row.area.width, SHINE_HEIGHT};
-        Rect bar = {row.area.x, row.area.y + SHINE_HEIGHT, row.area.width,
-                    row.area.height - SHINE_HEIGHT};
-        canvas_fill_rect(canvas, shine, colors->selection_shine);
-        canvas_fill_gradient(canvas, bar, colors->selection_top, colors->selection_background);
+        draw_selection(view, canvas, row.area);
     }
     draw_label(view, canvas, draw_detail(view, canvas, draw_chevron(view, canvas, row)), now_ms);
 }

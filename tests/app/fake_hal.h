@@ -27,6 +27,7 @@ int fake_hal_stall_test_count(void);
 int fake_hal_watchdog_test_count(void);
 int fake_hal_keep_alive_count(void);
 void fake_hal_set_restart_pending(bool pending);
+void fake_hal_set_np_faces(bool present);
 void fake_hal_set_language_pack(const uint8_t *pack, uint32_t size);
 uint32_t fake_hal_language_requested(void);
 void fake_hal_set_reserve_result(HalReserveResult result);

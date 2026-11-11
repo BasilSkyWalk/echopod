@@ -4,7 +4,8 @@ MEMORY
 {
     DATA_RAM (rw) : ORIGIN = 0x03004000, LENGTH = 0x48000
     CODE_RAM (rx) : ORIGIN = 0x03050000, LENGTH = 0x2666C
-    HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x15000
+    HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x11A00
+    NP_FACES_RAM (rx) : ORIGIN = 0x0308BA00, LENGTH = 0x3600
     LANGUAGE_RAM (rw) : ORIGIN = 0x0308F000, LENGTH = 0x3000
     GLYPH_RAM (rw) : ORIGIN = 0x03092000, LENGTH = 0x8800
     RESIDENT_RAM (rw) : ORIGIN = 0x0309A800, LENGTH = 0x4800
@@ -70,6 +71,15 @@ SECTIONS
         device_resident_end = .;
     } > RESIDENT_RAM
 
+    .np_faces :
+    {
+        LONG(0) LONG(0) LONG(0) LONG(0)
+        KEEP(*(.np_faces.entry))
+        *(.np_faces.text .np_faces.text.*)
+        *(.np_faces.rodata .np_faces.rodata.*)
+        . = ALIGN(4);
+    } > NP_FACES_RAM
+
     .comment 0 : { *(.comment) }
     .ARM.attributes 0 : { *(.ARM.attributes) }
 
@@ -85,3 +95,5 @@ ASSERT(ADDR(.data) == 0x03004000, "the entry vector must be at 0x03004000")
 ASSERT(SIZEOF(.data) == 8, "only the entry vector may be in .data: make initialised globals const")
 ASSERT(device_noinit_end <= 0x0304C000, ".data, .bss and .noinit must end below 0x0304C000")
 ASSERT(ADDR(.resident) == 0x0309A800, "the resident tables must start at 0x0309A800")
+ASSERT(ADDR(.np_faces) == 0x0308BA00, "the Now Playing faces must start at 0x0308BA00")
+ASSERT(NOW_PLAYING_FACES == 0x0308BA10, "the Now Playing faces entry must follow the 16-byte header")

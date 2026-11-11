@@ -9,6 +9,7 @@
 #include "library/library_browse.h"
 #include "library/mp4_chapters.h"
 #include "playback/play_queue.h"
+#include "playback/player_status.h"
 #include "playback/up_next.h"
 
 enum {
@@ -17,12 +18,6 @@ enum {
     PLAYER_SAVE_INTERVAL_MS = 15000,
     PLAYER_PATH_CAPACITY = 260
 };
-
-typedef enum PlayerState {
-    PLAYER_IDLE,
-    PLAYER_PLAYING,
-    PLAYER_PAUSED
-} PlayerState;
 
 typedef enum PlayerUpNextResult {
     PLAYER_UP_NEXT_ADDED,
@@ -36,22 +31,6 @@ typedef enum PlayerNextSource {
     PLAYER_NEXT_FROM_UP_NEXT,
     PLAYER_NEXT_SAME_SONG
 } PlayerNextSource;
-
-typedef struct PlayerStatus {
-    PlayerState state;
-    bool has_track;
-    uint16_t track;
-    uint32_t position_ms;
-    uint32_t duration_ms;
-    uint8_t volume;
-    ShuffleMode shuffle;
-    RepeatMode repeat;
-    PlayQueuePlace place;
-    HalAudioFormat format;
-    bool spoken;
-    uint16_t chapters;
-    uint16_t chapter;
-} PlayerStatus;
 
 typedef struct PlayerResume {
     uint32_t (*position_for)(void *context, uint16_t track);

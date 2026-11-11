@@ -254,6 +254,7 @@ list(TRANSFORM ECHO_OVERLAY_IMPORTS PREPEND "-Wl,--require-defined=" OUTPUT_VARI
 target_link_options(echo_device PRIVATE
     -flto -flto-partition=one
     ${ECHO_OVERLAY_IMPORT_OPTIONS}
+    -Wl,--require-defined=NOW_PLAYING_FACES
     -T${ECHO_DEVICE_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_device.map
 )
@@ -315,6 +316,7 @@ add_custom_target(echo_device_image ALL
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
         --version ${ECHO_FIRMWARE_VERSION}
         --elf $<TARGET_FILE:echo_device>
+        --nm ${CMAKE_NM}
         --overlay $<TARGET_FILE:echo_rescan_overlay>
         --usb-overlay $<TARGET_FILE:echo_usb_overlay>
         --core1-mp3 ${ECHO_CORE1_MP3_BINARY}

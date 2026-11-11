@@ -12,8 +12,11 @@
 #include "hal/storage.h"
 #include "hal/time.h"
 #include "library/library_scan.h"
+#include "np_faces/now_playing_face.h"
 #include <stdlib.h>
 #include <string.h>
+
+extern const NowPlayingFaces NOW_PLAYING_FACES;
 
 enum {
     TRANSITION_CAPACITY = 16,
@@ -153,6 +156,7 @@ typedef struct FakeHal {
     int open_files;
     int opens[FILE_CAPACITY];
     int open_file_limit;
+    bool np_faces_missing;
 } FakeHal;
 
 static FakeHal fake;
@@ -1424,4 +1428,14 @@ bool hal_language_pack(uint32_t language, const uint8_t **pack, uint32_t *size)
 const void *hal_system_load_rescan_code(void)
 {
     return &LIBRARY_SCAN_ENTRY;
+}
+
+void fake_hal_set_np_faces(bool present)
+{
+    fake.np_faces_missing = !present;
+}
+
+const void *hal_system_load_faces(void)
+{
+    return fake.np_faces_missing ? NULL : &NOW_PLAYING_FACES;
 }

@@ -4,7 +4,7 @@ import re
 import struct
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 POLYNOMIAL = 0x04C10DB7
@@ -33,6 +33,15 @@ RESIDENT_BASE = 0x0309A800
 RESIDENT_CAPACITY = 0x4800
 RESIDENT_HEADER_SIZE = 16
 RESIDENT_MAGIC = b"ERES"
+NP_FACES_OFFSET = RESIDENT_OFFSET + RESIDENT_CAPACITY
+NP_FACES_BASE = 0x0308BA00
+NP_FACES_CAPACITY = 0x3600
+NP_FACES_END = NP_FACES_BASE + NP_FACES_CAPACITY
+NP_FACES_HEADER_SIZE = 16
+NP_FACES_MAGIC = b"ENPF"
+NP_FACES_SOURCES = "/src/np_faces/"
+NP_FACES_SANCTIONED_SOURCE = "/platform/device/board/overlay.c"
+NP_FACES_SANCTIONED_TABLE = "NP_FACES_OVERLAY"
 CORE1_MODULE_CAPACITY = 0x20000
 CORE1_MODULE_HEADER_SIZE = 512
 CORE1_MODULE_MAGIC = b"EC1M"
@@ -45,7 +54,6 @@ GLYPH_PAYLOAD_LIMIT = 0x30000
 GLYPH_REGIONS = (
     (GLYPH_PAYLOAD_LIMIT, OVERLAY_OFFSET),
     (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, USB_OVERLAY_OFFSET),
-    (RESIDENT_OFFSET + RESIDENT_CAPACITY, CORE1_MP3_OFFSET),
     (CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_FLAC_OFFSET),
 )
 TABLE_CAPACITY = 91
@@ -89,7 +97,7 @@ SHN_UNDEF = 0
 SHN_ABS = 0xFFF1
 SHF_ALLOC = 2
 SHT_NOBITS = 8
-FIRMWARE_SECTIONS = (".code", ".data", ".bss", ".resident")
+FIRMWARE_SECTIONS = (".code", ".data", ".bss", ".resident", ".np_faces")
 
 
 class ImageError(Exception):
@@ -102,6 +110,9 @@ class Firmware:
     data: bytes
     bss_size: int
     resident: bytes = b""
+    np_faces: bytes = b""
+    sanctioned: tuple = ()
+    regions: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -118,6 +129,7 @@ class ImageParts:
     core1_opus: bytes = b""
     resident: bytes = b""
     usb_overlay: bytes = b""
+    np_faces: bytes = b""
 
 
 def crc_table():
@@ -210,6 +222,7 @@ def assemble(parts):
     place_overlay(image, parts, parts.usb_overlay, USB_OVERLAY_OFFSET, USB_OVERLAY_CAPACITY,
                   USB_OVERLAY_MAGIC)
     place_resident(image, parts)
+    place_np_faces(image, parts)
     place_core1_module(image, parts.core1_mp3, CORE1_MP3_OFFSET)
     place_core1_module(image, parts.core1_flac, CORE1_FLAC_OFFSET)
     place_core1_module(image, parts.core1_aac, CORE1_AAC_OFFSET, CORE1_AAC_CAPACITY)
@@ -237,16 +250,25 @@ def code_crc(parts):
     return crc32(parts.payload[start:start + parts.rows[0][2]])
 
 
-def place_resident(image, parts):
-    resident = parts.resident
-    if not resident:
+def place_headed(image, parts, section):
+    content, offset, capacity, magic, label = section
+    if not content:
         return
-    if len(resident) > RESIDENT_CAPACITY or len(resident) < RESIDENT_HEADER_SIZE:
-        raise ImageError(f"the resident tables must be {RESIDENT_HEADER_SIZE} to "
-                         f"{RESIDENT_CAPACITY:#x} bytes")
-    header = RESIDENT_MAGIC + struct.pack("<III", len(resident),
-                                          crc32(resident[RESIDENT_HEADER_SIZE:]), code_crc(parts))
-    image[RESIDENT_OFFSET:RESIDENT_OFFSET + len(resident)] = header + resident[RESIDENT_HEADER_SIZE:]
+    if len(content) > capacity or len(content) < RESIDENT_HEADER_SIZE:
+        raise ImageError(f"the {label} must be {RESIDENT_HEADER_SIZE} to {capacity:#x} bytes")
+    header = magic + struct.pack("<III", len(content), crc32(content[RESIDENT_HEADER_SIZE:]),
+                                 code_crc(parts))
+    image[offset:offset + len(content)] = header + content[RESIDENT_HEADER_SIZE:]
+
+
+def place_resident(image, parts):
+    place_headed(image, parts, (parts.resident, RESIDENT_OFFSET, RESIDENT_CAPACITY,
+                                RESIDENT_MAGIC, "resident tables"))
+
+
+def place_np_faces(image, parts):
+    place_headed(image, parts, (parts.np_faces, NP_FACES_OFFSET, NP_FACES_CAPACITY,
+                                NP_FACES_MAGIC, "Now Playing faces"))
 
 
 def place_core1_module(image, program, offset, capacity=CORE1_MODULE_CAPACITY):
@@ -312,6 +334,80 @@ def split_image(image):
                       marker=image[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE])
 
 
+def thumb_branch_target(address, first, second):
+    """Where a 32-bit Thumb B.W, BL or B<cond>.W at `address` goes, or None for anything else."""
+    if first & 0xF800 != 0xF000:
+        return None
+    sign, low = first >> 10 & 1, (second & 0x7FF) << 1
+    if second & 0xD000 in (0x9000, 0xD000):
+        first_bit, second_bit = 1 ^ (second >> 13 & 1 ^ sign), 1 ^ (second >> 11 & 1 ^ sign)
+        offset = sign << 24 | first_bit << 23 | second_bit << 22 | (first & 0x3FF) << 12 | low
+        width = 25
+    elif second & 0xD000 == 0x8000 and first >> 6 & 0xF < 0xE:
+        offset = (sign << 20 | (second >> 11 & 1) << 19 | (second >> 13 & 1) << 18
+                  | (first & 0x3F) << 12 | low)
+        width = 21
+    else:
+        return None
+    return address + 4 + offset - (1 << width if offset >> (width - 1) else 0)
+
+
+def in_np_faces(address):
+    return NP_FACES_BASE <= address < NP_FACES_END
+
+
+def code_runs(code, regions):
+    """(start, stop, kind) for each stretch of `code` between mapping symbols; "t" is Thumb code."""
+    end = CODE_BASE + len(code)
+    marks = sorted(regions)
+    if not marks or marks[0][0] > CODE_BASE:
+        marks.insert(0, (CODE_BASE, "t"))
+    stops = [mark[0] for mark in marks[1:]] + [end]
+    return [(start, min(stop, end), kind) for (start, kind), stop in zip(marks, stops)
+            if start < end]
+
+
+def window_branches(code, regions=()):
+    """Addresses of the instructions in `code` that branch into the Now Playing faces region.
+
+    Decoding starts at each Thumb run and steps by whole instructions, so the second half of a
+    32-bit instruction is never read as one of its own.
+    """
+    found = []
+    for start, stop, kind in code_runs(code, regions):
+        address = start
+        while kind == "t" and address + 4 <= stop:
+            first, second = struct.unpack_from("<HH", code, address - CODE_BASE)
+            target = thumb_branch_target(address, first, second)
+            if target is not None and in_np_faces(target):
+                found.append(address)
+            address += 4 if first >> 11 in (0x1D, 0x1E, 0x1F) else 2
+    return found
+
+
+def window_literals(code, sanctioned, regions=()):
+    """Addresses of the aligned data words in `code` that point into the faces region."""
+    found = []
+    for start, stop, kind in code_runs(code, regions):
+        first = (start + 3) & ~3
+        for address in range(first, stop - 3, 4) if kind == "d" else ():
+            value = struct.unpack_from("<I", code, address - CODE_BASE)[0]
+            if in_np_faces(value) and not any(low <= address < high for low, high in sanctioned):
+                found.append(address)
+    return found
+
+
+def check_window_references(code, sanctioned=(), regions=()):
+    """The code window must never call or point into the lazily loaded Now Playing faces."""
+    branches = window_branches(code, regions)
+    literals = window_literals(code, sanctioned, regions)
+    if branches or literals:
+        raise ImageError("the code window refers into the Now Playing faces region "
+                         f"{NP_FACES_BASE:#010x}-{NP_FACES_END:#010x}: "
+                         + ", ".join(f"{address:#010x}" for address in sorted(branches + literals)))
+
+
+
 def check_firmware(firmware):
     code, data = firmware.code, firmware.data
     if len(code) % 4 or len(data) % 4:
@@ -323,6 +419,10 @@ def check_firmware(firmware):
     if firmware.resident and (len(firmware.resident) % 4 or
                               len(firmware.resident) < RESIDENT_HEADER_SIZE):
         raise ImageError("the resident tables must start with a 16-byte header, in whole words")
+    if firmware.np_faces and (len(firmware.np_faces) % 4 or
+                              len(firmware.np_faces) < NP_FACES_HEADER_SIZE):
+        raise ImageError("the Now Playing faces must start with a 16-byte header, in whole words")
+    check_window_references(code, firmware.sanctioned, firmware.regions)
     stack, reset = struct.unpack_from("<II", data)
     if stack != DATA_BASE:
         raise ImageError(f"the entry stack must be {DATA_BASE:#010x}")
@@ -399,7 +499,7 @@ def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", co
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     return assemble(ImageParts(bytes(header), tuple(rows), payload, bytes(MARKER_SIZE), overlay,
                                core1_mp3, core1_flac, tuple(glyph_faces), core1_aac, core1_opus,
-                               firmware.resident, usb_overlay))
+                               firmware.resident, usb_overlay, firmware.np_faces))
 
 
 def validate_image(image):
@@ -461,6 +561,9 @@ def check_sections(sections):
     resident = sections.get(".resident")
     if resident is not None and resident.size and resident.address != RESIDENT_BASE:
         raise ImageError(f".resident must be at {RESIDENT_BASE:#010x}")
+    faces = sections.get(".np_faces")
+    if faces is not None and faces.size and faces.address != NP_FACES_BASE:
+        raise ImageError(f".np_faces must be at {NP_FACES_BASE:#010x}")
 
 
 def firmware_from_elf(elf):
@@ -470,9 +573,11 @@ def firmware_from_elf(elf):
     bss = sections.get(".bss")
     if bss is not None and bss.size and bss.address != DATA_BASE + len(data):
         raise ImageError(".bss must directly follow .data")
-    resident = sections.get(".resident")
+    resident, faces = sections.get(".resident"), sections.get(".np_faces")
     return Firmware(code=code, data=data, bss_size=bss.size if bss is not None else 0,
-                    resident=resident.content if resident is not None else b"")
+                    resident=resident.content if resident is not None else b"",
+                    np_faces=faces.content if faces is not None else b"",
+                    regions=mapping_regions(elf))
 
 
 def overlay_from_elf(elf, zeroed=False):
@@ -509,6 +614,22 @@ def elf_symbols(elf):
     return symbols
 
 
+def mapping_regions(elf):
+    """(address, kind) of the ARM mapping symbols: "t" starts Thumb code, "d" starts data."""
+    sections = elf_sections(elf)
+    symtab, strtab, code = sections.get(".symtab"), sections.get(".strtab"), sections.get(".code")
+    if symtab is None or strtab is None or code is None:
+        return ()
+    found = []
+    for offset in range(0, len(symtab.content) - ELF_SYMBOL.size + 1, ELF_SYMBOL.size):
+        name, value, *_ = ELF_SYMBOL.unpack_from(symtab.content, offset)
+        label = strtab.content[name:strtab.content.index(b"\x00", name)]
+        inside = code.address <= value < code.address + code.size
+        if inside and label[:2] in (b"$t", b"$d", b"$a") and label[2:3] in (b"", b"."):
+            found.append((value & ~1, chr(label[1])))
+    return tuple(sorted(set(found)))
+
+
 def overlay_copies(main_elf, overlay_elf):
     """Functions and tables the overlay holds its own copy of although the main program has them.
 
@@ -527,6 +648,52 @@ def check_overlay_copies(main_elf, overlay_elf, label):
     if copies:
         raise ImageError(f"the {label} has its own copy of what the main program has: "
                          + ", ".join(copies) + " (add them to ECHO_OVERLAY_IMPORTS)")
+
+
+NM_LINE = re.compile(r"^([0-9a-f]+) (?:([0-9a-f]+) )?(\S) (\S+)(?:\t(.+):\d+)?$")
+
+
+def run_nm(elf_path, nm):
+    """`nm -S -l` for the ELF as (address, size, name, source file) rows."""
+    try:
+        result = subprocess.run([nm, "-S", "-l", str(elf_path)], capture_output=True, text=True,
+                                check=False)
+    except OSError as error:
+        raise ImageError(f"cannot run {nm}: {error}") from None
+    if result.returncode != 0:
+        raise ImageError(f"{nm} failed: {result.stderr.strip()}")
+    rows = []
+    for line in result.stdout.splitlines():
+        match = NM_LINE.match(line)
+        if match:
+            address, size = int(match.group(1), 16) & ~1, int(match.group(2) or "0", 16)
+            rows.append((address, size, match.group(4), (match.group(5) or "").replace("\\", "/")))
+    return rows
+
+
+def check_np_faces_symbols(rows):
+    """Located symbols in the faces region come from src/np_faces, and src/np_faces stays in it.
+
+    nm -l only locates code; a table has no line, so it can't be attributed and isn't judged.
+    """
+    inside = [name for address, _, name, source in rows
+              if in_np_faces(address) and source and NP_FACES_SOURCES not in source]
+    outside = [name for address, _, name, source in rows
+               if not in_np_faces(address) and NP_FACES_SOURCES in source and source.endswith(".c")]
+    if inside:
+        raise ImageError("symbols in the Now Playing faces region that are not from src/np_faces: "
+                         + ", ".join(sorted(set(inside))))
+    if outside:
+        raise ImageError("src/np_faces code outside the faces region "
+                         "(a function without ECHO_NP_FACES_CODE): "
+                         + ", ".join(sorted(set(outside))))
+
+
+def sanctioned_ranges(rows):
+    """Where the loader in overlay.c may hold the faces region's address as a constant."""
+    return tuple((address, address + size) for address, size, name, source in rows
+                 if source.endswith(NP_FACES_SANCTIONED_SOURCE)
+                 or name.split(".")[0] == NP_FACES_SANCTIONED_TABLE)
 
 
 def git_output(directory, *arguments):
@@ -570,6 +737,8 @@ def parse_arguments(argv):
                         help="major.minor.patch written to the header")
     parser.add_argument("--elf", type=Path, required=True,
                         help="device ELF with .code at 0x03050000 and .data at 0x03004000")
+    parser.add_argument("--nm", default="arm-none-eabi-nm",
+                        help="the nm that attributes the faces region's symbols to sources")
     parser.add_argument("--brand", default="EchoPod")
     parser.add_argument("--build-tag", help="defaults to the short git commit, + when dirty")
     parser.add_argument("--date", type=parse_date, help="YYYY-MM-DD; defaults to today")
@@ -586,13 +755,21 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 
+def with_symbol_checks(firmware, elf_path, nm):
+    if not firmware.np_faces:
+        return firmware
+    rows = run_nm(elf_path, nm)
+    check_np_faces_symbols(rows)
+    return replace(firmware, sanctioned=sanctioned_ranges(rows))
+
+
 def main(argv=None):
     arguments = parse_arguments(argv)
     build_tag = arguments.build_tag or default_build_tag(Path(__file__).resolve().parents[1])
     date = arguments.date or default_date()
     try:
         main_elf = arguments.elf.read_bytes()
-        firmware = firmware_from_elf(main_elf)
+        firmware = with_symbol_checks(firmware_from_elf(main_elf), arguments.elf, arguments.nm)
         overlay = usb_overlay = b""
         if arguments.overlay:
             overlay_elf = arguments.overlay.read_bytes()
@@ -623,6 +800,7 @@ def main(argv=None):
     print(f"wrote {arguments.output} ({build_tag}): "
           f"code {len(firmware.code):,} bytes, "
           f"overlay {len(overlay):,} bytes, resident {len(firmware.resident):,} bytes, "
+          f"np_faces {len(firmware.np_faces):,} bytes, "
           f"USB overlay {len(usb_overlay):,} bytes, "
           f"core 1 MP3 {len(core1_mp3):,} bytes, "
           f"core 1 FLAC {len(core1_flac):,} bytes, core 1 AAC {len(core1_aac):,} bytes, core 1 Opus {len(core1_opus):,} bytes, "

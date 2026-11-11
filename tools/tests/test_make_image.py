@@ -5,6 +5,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
@@ -31,11 +32,16 @@ def vector_table(stack=0x03004000, reset=RESET, size=256):
 
 
 def firmware(code_tail=b"\xAA" * 64, data_tail=b"", bss_size=0x100, stack=0x03004000,
-             reset=RESET, code_reset=RESET, resident=b""):
+             reset=RESET, code_reset=RESET, resident=b"", np_faces=b""):
     return make_image.Firmware(
         code=vector_table(reset=code_reset) + code_tail,
         data=struct.pack("<II", stack, reset) + data_tail,
-        bss_size=bss_size, resident=resident)
+        bss_size=bss_size, resident=resident, np_faces=np_faces)
+
+
+def mock_nm(output):
+    result = subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+    return mock.patch.object(make_image.subprocess, "run", return_value=result)
 
 
 def build(firmware_parts=None, **options):
@@ -571,10 +577,13 @@ class ResidentTablesTest(unittest.TestCase):
         opus_end = (make_image.CORE1_OPUS_OFFSET + make_image.CORE1_MODULE_HEADER_SIZE
                     + make_image.CORE1_MODULE_CAPACITY)
         self.assertEqual(opus_end, make_image.RESIDENT_OFFSET)
-        self.assertLessEqual(make_image.RESIDENT_OFFSET + make_image.RESIDENT_CAPACITY,
-                             make_image.CORE1_MP3_OFFSET)
-        self.assertIn((make_image.RESIDENT_OFFSET + make_image.RESIDENT_CAPACITY,
-                       make_image.CORE1_MP3_OFFSET), make_image.GLYPH_REGIONS)
+        self.assertEqual(make_image.NP_FACES_OFFSET,
+                         make_image.RESIDENT_OFFSET + make_image.RESIDENT_CAPACITY)
+        self.assertEqual(make_image.CORE1_MP3_OFFSET,
+                         make_image.NP_FACES_OFFSET + make_image.NP_FACES_CAPACITY)
+        self.assertEqual(0x0308F000, make_image.NP_FACES_END)
+        self.assertNotIn(0x23FA00, [low for low, _ in make_image.GLYPH_REGIONS])
+        self.assertEqual(3, len(make_image.GLYPH_REGIONS))
 
     def test_the_tables_are_not_loaded_at_start(self):
         with_tables = build(firmware(resident=self.resident()))
@@ -606,6 +615,217 @@ class ResidentTablesTest(unittest.TestCase):
                    len(parts.resident))
         with self.assertRaises(make_image.ImageError):
             make_image.firmware_from_elf(firmware_elf(parts, [section]))
+
+
+def encode_branch(address, target, link=True):
+    offset = target - (address + 4)
+    sign = offset >> 24 & 1
+    first = 0xF000 | sign << 10 | offset >> 12 & 0x3FF
+    second = ((0xD000 if link else 0x9000) | (1 ^ (offset >> 23 & 1) ^ sign) << 13
+              | (1 ^ (offset >> 22 & 1) ^ sign) << 11 | offset >> 1 & 0x7FF)
+    return struct.pack("<HH", first, second)
+
+
+def decoded(patch, address):
+    return make_image.thumb_branch_target(address, *struct.unpack("<HH", patch))
+
+
+class NpFacesTest(unittest.TestCase):
+    def faces(self, body=b"\x5A" * 100):
+        return bytes(16) + body
+
+    def test_the_faces_land_at_their_offset_with_size_and_both_crcs(self):
+        faces = self.faces()
+        parts = firmware(code_tail=b"!C" * 40, np_faces=faces)
+        image = build(parts)
+        offset = make_image.NP_FACES_OFFSET
+        self.assertEqual(0x23CA00, offset)
+        self.assertEqual(b"ENPF", image[offset:offset + 4])
+        self.assertEqual(len(faces), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(faces[16:]), word(image, offset + 8))
+        self.assertEqual(make_image.crc32(parts.code), word(image, offset + 12))
+        self.assertEqual(faces[16:], image[offset + 16:offset + len(faces)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_the_faces_are_not_loaded_at_start(self):
+        with_faces = build(firmware(np_faces=self.faces()))
+        without = build()
+        self.assertEqual(row(without, 0), row(with_faces, 0))
+        self.assertEqual(row(without, 1), row(with_faces, 1))
+        self.assertEqual(word(without, make_image.FW1_END_OFFSET),
+                         word(with_faces, make_image.FW1_END_OFFSET))
+
+    def test_the_faces_leave_the_resident_tables_alone(self):
+        tables = bytes(16) + b"\x3C" * 100
+        image = build(firmware(resident=tables, np_faces=self.faces()))
+        offset = make_image.RESIDENT_OFFSET
+        self.assertEqual(tables[16:], image[offset + 16:offset + len(tables)])
+
+    def test_faces_bigger_than_their_ram_are_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(np_faces=self.faces(bytes(make_image.NP_FACES_CAPACITY))))
+
+    def test_faces_without_a_header_or_in_odd_bytes_are_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(np_faces=b"\x01" * 8))
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(np_faces=self.faces(b"\x01" * 7)))
+
+    def test_the_faces_come_from_the_elf_section_at_their_address(self):
+        parts = firmware(np_faces=self.faces(b"\x01\x02\x03\x04"))
+        section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, parts.np_faces,
+                   len(parts.np_faces))
+        self.assertEqual(parts, make_image.firmware_from_elf(firmware_elf(parts, [section])))
+
+    def test_a_faces_section_elsewhere_is_refused(self):
+        parts = firmware(np_faces=self.faces())
+        section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308D000, parts.np_faces,
+                   len(parts.np_faces))
+        with self.assertRaises(make_image.ImageError):
+            make_image.firmware_from_elf(firmware_elf(parts, [section]))
+
+    def test_the_new_field_is_last_in_the_image_parts(self):
+        self.assertEqual("np_faces", list(make_image.ImageParts.__dataclass_fields__)[-1])
+
+
+class WindowReferenceTest(unittest.TestCase):
+    INSIDE = 0x0308BA10
+    HERE = make_image.CODE_BASE + 256
+
+    def code_with(self, patch):
+        code = bytearray(vector_table() + b"\xAA" * 64)
+        code[256:256 + len(patch)] = patch
+        return bytes(code)
+
+    def build_code(self, code, sanctioned=(), regions=()):
+        data = firmware().data
+        return build(make_image.Firmware(code=code, data=data, bss_size=0x100,
+                                         sanctioned=sanctioned, regions=regions))
+
+    def test_the_encoder_and_decoder_agree(self):
+        for target in (0x03050000, 0x03051000, 0x0308BA10, 0x0308EFFC):
+            self.assertEqual(target, decoded(encode_branch(0x03050100, target), 0x03050100))
+            self.assertEqual(target, decoded(encode_branch(0x03050100, target, False), 0x03050100))
+
+    def test_a_bl_into_the_faces_region_stops_the_build(self):
+        with self.assertRaises(make_image.ImageError) as raised:
+            self.build_code(self.code_with(encode_branch(self.HERE, self.INSIDE)))
+        self.assertIn("0x03050100", str(raised.exception))
+
+    def test_a_b_w_into_the_faces_region_stops_the_build(self):
+        with self.assertRaises(make_image.ImageError):
+            self.build_code(self.code_with(encode_branch(self.HERE, self.INSIDE + 0x100, False)))
+
+    def test_a_conditional_branch_into_the_faces_region_is_decoded(self):
+        offset = 0x0308BA20 - (self.HERE + 4)
+        first = 0xF000 | (offset >> 20 & 1) << 10 | 1 << 6 | offset >> 12 & 0x3F
+        second = 0x8000 | (offset >> 18 & 1) << 13 | (offset >> 19 & 1) << 11 | offset >> 1 & 0x7FF
+        self.assertEqual(0x0308BA20, make_image.thumb_branch_target(self.HERE, first, second))
+        code = self.code_with(struct.pack("<HH", first, second))
+        with self.assertRaises(make_image.ImageError):
+            self.build_code(code)
+
+    def test_the_edges_of_the_region_are_inside_and_outside(self):
+        for target in (0x0308BA00, 0x0308EFFC):
+            with self.assertRaises(make_image.ImageError):
+                self.build_code(self.code_with(encode_branch(self.HERE, target)))
+        for target in (0x0308F000, 0x0308B9FC):
+            self.build_code(self.code_with(encode_branch(self.HERE, target)))
+
+    def test_a_bl_to_the_main_program_is_fine(self):
+        self.build_code(self.code_with(encode_branch(self.HERE, make_image.CODE_BASE + 0x2000)))
+
+    def pool(self, *values):
+        code = self.code_with(b"".join(struct.pack("<I", value) for value in values))
+        return code, ((make_image.CODE_BASE, "t"), (self.HERE, "d"))
+
+    def test_a_pool_word_in_the_region_stops_the_build(self):
+        code, regions = self.pool(self.INSIDE)
+        with self.assertRaises(make_image.ImageError) as raised:
+            self.build_code(code, regions=regions)
+        self.assertIn("0x03050100", str(raised.exception))
+
+    def test_a_pool_word_just_outside_the_region_is_fine(self):
+        for value in (make_image.NP_FACES_END, make_image.NP_FACES_BASE - 4):
+            code, regions = self.pool(value)
+            self.build_code(code, regions=regions)
+
+    def test_a_sanctioned_pool_word_passes_and_the_one_next_to_it_does_not(self):
+        code, regions = self.pool(self.INSIDE, self.INSIDE)
+        self.build_code(code, ((self.HERE, self.HERE + 8),), regions)
+        with self.assertRaises(make_image.ImageError):
+            self.build_code(code, ((self.HERE, self.HERE + 4),), regions)
+
+    def test_a_word_in_a_code_run_is_not_a_pool_word(self):
+        self.build_code(self.code_with(struct.pack("<I", self.INSIDE)))
+
+    def test_the_second_half_of_a_wide_instruction_is_not_an_instruction(self):
+        wide = bytes.fromhex("d5f80448") + bytes.fromhex("0130") * 8 + bytes.fromhex("a3eb0803")
+        self.assertEqual(0x0308EBA3, struct.unpack_from("<I", wide, len(wide) - 4)[0])
+        self.build_code(self.code_with(wide))
+
+    def test_a_branch_after_a_wide_instruction_is_still_seen(self):
+        wide = bytes.fromhex("d5f80448")
+        branch = encode_branch(self.HERE + len(wide), self.INSIDE)
+        with self.assertRaises(make_image.ImageError):
+            self.build_code(self.code_with(wide + branch))
+
+    def test_the_mapping_symbols_of_an_elf_become_regions(self):
+        names = b"\x00$t\x00$d.3\x00$x\x00foo\x00"
+        table = bytes(16) + b"".join(
+            struct.pack("<IIIBBH", name, value, 0, 0, 0, 1)
+            for name, value in ((1, 0x03050000), (4, 0x03050101 & ~1 | 0x40), (8, 5), (12, 9), (1, 0x03004000)))
+        elf = elf_file([(".code", SHT_PROGBITS, SHF_ALLOC, 0x03050000, bytes(0x200), 0x200),
+                        (".symtab", 2, 0, 0, table, len(table)),
+                        (".strtab", SHT_STRTAB, 0, 0, names, len(names))])
+        self.assertEqual(((0x03050000, "t"), (0x03050140, "d")), make_image.mapping_regions(elf))
+
+    def test_symbols_in_the_region_must_come_from_np_faces(self):
+        good = (0x0308BA10, 4, "NOW_PLAYING_FACES", "/w/src/np_faces/np_faces.c")
+        make_image.check_np_faces_symbols([good])
+        with self.assertRaises(make_image.ImageError):
+            make_image.check_np_faces_symbols(
+                [good, (0x0308BB00, 8, "helper.isra.0", "/w/src/gfx/canvas.c")])
+
+    def test_a_table_nm_cannot_locate_is_not_judged(self):
+        make_image.check_np_faces_symbols([(0x0308BB00, 8, "CASSETTE_CHROME", "")])
+
+    def test_np_faces_code_in_the_window_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            make_image.check_np_faces_symbols(
+                [(0x03055000, 8, "face_helper", "/w/src/np_faces/face_text.c")])
+        make_image.check_np_faces_symbols(
+            [(0x03055000, 8, "canvas_fill_rect", "/w/src/gfx/canvas.c")])
+
+    def test_the_sanctioned_ranges_are_the_loader_symbols(self):
+        rows = [(0x03055000, 0x40, "hal_system_load_faces", "/w/platform/device/board/overlay.c"),
+                (0x03056000, 0x40, "other", "/w/src/app/app.c"),
+                (0x03057000, 0x10, "NP_FACES_OVERLAY", ""),
+                (0x03058000, 0x10, "NP_FACES_OVERLAY_COPY", "")]
+        self.assertEqual(((0x03055000, 0x03055040), (0x03057000, 0x03057010)),
+                         make_image.sanctioned_ranges(rows))
+
+    def test_the_nm_rows_are_parsed_with_their_sources(self):
+        output = ("0308ba11 00000004 T draw\t/w/src/np_faces/np_faces.c:12\n"
+                  "0308ba10 R no_size\n")
+        with mock_nm(output):
+            rows = make_image.run_nm("x.elf", "nm")
+        self.assertEqual([(0x0308BA10, 4, "draw", "/w/src/np_faces/np_faces.c"),
+                          (0x0308BA10, 0, "no_size", "")], rows)
+
+    def test_main_checks_symbols_when_the_elf_has_faces(self):
+        parts = firmware(np_faces=bytes(16) + b"\x5A" * 8)
+        section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, parts.np_faces,
+                   len(parts.np_faces))
+        with tempfile.TemporaryDirectory() as directory:
+            elf = Path(directory) / "echo.elf"
+            elf.write_bytes(firmware_elf(parts, [section]))
+            arguments = ["--elf", str(elf), "--output", str(Path(directory) / "out.img"),
+                         "--build-tag", "t", "--date", "2026-10-22"]
+            with mock_nm("0308ba10 00000004 D bad\t/w/src/gfx/canvas.c:1\n"):
+                self.assertEqual(1, make_image.main(arguments))
+            with mock_nm("0308ba10 00000004 D ok\t/w/src/np_faces/np_faces.c:1\n"):
+                self.assertEqual(0, make_image.main(arguments))
 
 
 class Core1ModuleTest(unittest.TestCase):
@@ -715,6 +935,10 @@ class GlyphFaceTest(unittest.TestCase):
                  (make_image.CORE1_OPUS_OFFSET, make_image.CORE1_OPUS_OFFSET + 512 +
                   make_image.CORE1_MODULE_CAPACITY),
                  (make_image.GLYPH_TABLE_OFFSET, make_image.GLYPH_TABLE_OFFSET + 512),
+                 (make_image.RESIDENT_OFFSET,
+                  make_image.RESIDENT_OFFSET + make_image.RESIDENT_CAPACITY),
+                 (make_image.NP_FACES_OFFSET,
+                  make_image.NP_FACES_OFFSET + make_image.NP_FACES_CAPACITY),
                  (make_image.USB_OVERLAY_OFFSET, make_image.FW_SIZE),
                  (make_image.FW_SIZE, make_image.IMAGE_SIZE),
                  (0, make_image.GLYPH_PAYLOAD_LIMIT)]

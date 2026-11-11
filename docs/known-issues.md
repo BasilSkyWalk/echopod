@@ -38,6 +38,23 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **Chapters inside one file** (.m4b or .m4a) are read from the `chpl` chapter list only, up to 255 per file (the player places the first 160 chapters of a book, a book with more shows none), to the second, and without their names. A book folder with several files ignores them, the chapters of a file with QuickTime text-track chapters aren't read, and a file with a 64-bit atom size (over 4 GB) shows none. A library built before chapters were read shows none until the next rescan.
 - **Spoken word is decided by the top folder.** Only tracks inside an `Audiobooks`, `Audiobook`, `Podcasts` or `Podcast` folder at the top of the card count as audiobooks or podcasts; the same folder names deeper down are music. An author with music too appears under Artists with the music only.
 
+## Themes
+
+- **The new themes are checked in the simulator only.** Fjord, Dusk, Neon, Phosphor, Paper, Olive and High contrast have not been seen on the player's panel. Their contrast was measured on the colour values, not on the glass, and the darkest tints (Phosphor's green-black, Neon's glow) may look crushed there.
+- **The cover panel on Home stays dark on the light themes** (Light, Paper and Olive), so it shows as a dark panel on a light screen. Cover Flow does the same.
+- **Dark and Light keep a few low-contrast details** that the new themes avoid, because they are kept exactly as they were: white text on the top of the selection bar (3.1:1 with the Blue accent), the disconnected-Bluetooth icon on Dark's header (2.3:1), the Now Playing scrub fill against its track on Dark (2.3:1), and on Light the charging bolt at the top of the header (2.9:1), the equalizer's band readout while editing (2.9:1) and the scrollbar thumb (2.7:1). High contrast has none of these.
+- **Going back to an older EchoPod after choosing a new theme resets all settings.** Older firmware rejects a theme value it doesn't know and starts from the defaults, so the whole settings file is ignored, not only the theme. Choose Dark or Light before you go back.
+
+## Now Playing faces
+
+- **The faces are checked in the simulator only.** Cassette, VU meters, Turntable and LCD deck have not been seen on the player's panel. Not yet verified on the device: the boot with the faces in the image, the load from internal storage on the first face frame, the reload after a rescan or a USB session, the frame time and the battery cost of the animation.
+- **The VU needles and the LCD spectrum are decorative.** The player has no audio-level data, so they move in a fixed pattern that doesn't follow the music.
+- **VU meters in landscape leave out the album, the format and the modes row.** Portrait shows them.
+- **Standard shows if the face code can't be loaded.** The faces are read from internal storage when first needed. If that fails (internal storage doesn't answer, or the copy is damaged twice), Now Playing draws Standard and keeps doing so until you restart the player.
+- **Going back to an older EchoPod resets the face to Standard.** Older firmware ignores the setting and writes 0 in its place the next time it saves. No other setting is lost.
+- **The faces' region is nearly full:** it has 876 of 13,824 bytes free, so a fifth face needs a smaller one or a bigger region. `.high_ram` keeps 31,140 bytes free (44,964 before the faces).
+- **"Standard" isn't translated** in any language; the Portrait status bar setting shares the word. The LCD deck's legends stay English on purpose.
+
 ## Languages
 
 - **The translations are unreviewed.** No native speaker has checked them yet (the Chinese starts from a contributor's text). Terms such as the name of the Play key, Up Next, and the equalizer presets are guesses in several languages.

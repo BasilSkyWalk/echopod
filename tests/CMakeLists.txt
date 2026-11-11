@@ -123,7 +123,7 @@ add_library(echo_ui_fixtures STATIC gfx/tiny_font.c ui/ui_test_theme.c ui/ui_tes
 target_include_directories(echo_ui_fixtures PUBLIC gfx ui)
 target_link_libraries(echo_ui_fixtures PUBLIC echo_ui PRIVATE echo_options)
 
-foreach(ui_test theme_layout list_view list_navigation fast_scroll header menu_screen message_screen
+foreach(ui_test theme theme_layout list_view list_navigation fast_scroll header menu_screen message_screen
         choice_screen toast status_bar)
     echo_add_unit_test(NAME test_${ui_test}
         SOURCES ui/test_${ui_test}.c
@@ -131,9 +131,32 @@ foreach(ui_test theme_layout list_view list_navigation fast_scroll header menu_s
     )
 endforeach()
 
+add_library(echo_np_faces_fixtures STATIC np_faces/np_faces_test.c)
+target_include_directories(echo_np_faces_fixtures PUBLIC np_faces)
+target_link_libraries(echo_np_faces_fixtures PUBLIC echo_np_faces echo_ui_fixtures PRIVATE echo_options)
+
+foreach(np_faces_test np_faces face_cassette face_vu face_turntable face_lcd)
+    echo_add_unit_test(NAME test_${np_faces_test}
+        SOURCES np_faces/test_${np_faces_test}.c
+        LIBRARIES echo_np_faces_fixtures
+    )
+endforeach()
+echo_add_unit_test(NAME test_face_contrast
+    SOURCES np_faces/test_face_contrast.c
+    LIBRARIES echo_np_faces_fixtures echo_fonts m
+)
+echo_add_unit_test(NAME test_face_shapes
+    SOURCES np_faces/test_face_shapes.c
+    LIBRARIES echo_np_faces_fixtures
+)
+echo_add_unit_test(NAME test_face_text
+    SOURCES np_faces/test_face_text.c
+    LIBRARIES echo_np_faces_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/np_faces
+)
 echo_add_unit_test(NAME test_app
     SOURCES app/test_app.c app/fake_hal.c
-    LIBRARIES echo_app echo_library_fixtures
+    LIBRARIES echo_app echo_library_fixtures m
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_release_diagnostics
@@ -264,7 +287,7 @@ echo_add_unit_test(NAME test_test_pattern_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 
-foreach(device_test audio_math backlight image_date battery_gauge watchdog panic_text stall_watch bt_module card_write core1_control start_record stack_mark dac_sequence dma_loop flac_accel jack_sense key_ladder key_scanner msc panel pcf8563 pll sd_card sleep_meter stream_drift tick_clock updater usb_audio usb_audio_sink usb_device usb_fallback wav_source vbus_debounce)
+foreach(device_test audio_math backlight image_date battery_gauge watchdog panic_text stall_watch bt_module card_write core1_control start_record stack_mark dac_sequence dma_loop flac_accel jack_sense key_ladder key_scanner msc np_faces_gate panel pcf8563 pll sd_card sleep_meter stream_drift tick_clock updater usb_audio usb_audio_sink usb_device usb_fallback wav_source vbus_debounce)
     echo_add_unit_test(NAME test_${device_test}
         SOURCES device/test_${device_test}.c
         LIBRARIES echo_device_logic
@@ -430,6 +453,9 @@ endif()
 
 add_test(NAME no_comments
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_no_comments.py ${PROJECT_SOURCE_DIR}
+)
+add_test(NAME np_faces_sections
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_np_faces_sections.py ${PROJECT_SOURCE_DIR}
 )
 
 find_program(CLANG_FORMAT clang-format)

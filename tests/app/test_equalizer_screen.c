@@ -5,7 +5,9 @@
 #include "default_theme.h"
 #include "equalizer_store.h"
 #include "fake_hal.h"
+#include "hal/display.h"
 #include "screens/equalizer_screen.h"
+#include "settings/settings.h"
 
 enum {
     START_MS = 1000
@@ -423,6 +425,53 @@ static void a_file_with_unsupported_filters_plays_the_rest_and_says_so(void)
     CHECK(strcmp("2 filters skipped", equalizer.notice) == 0);
 }
 
+static Color grabbed_pixels[HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT];
+static Color picked_pixels[HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT];
+
+static void draw_editor(const Theme *theme, bool grabbed, Color *pixels)
+{
+    Screen *editor = open_editor();
+    equalizer.editor.config.theme = theme;
+    if (grabbed) {
+        tap(editor, KEY_PLAY);
+    }
+    Canvas canvas = canvas_make(
+        pixels, (Rect){0, 0, theme->metrics.screen_width, theme->metrics.screen_height});
+    canvas_clear(&canvas, theme->colors.background);
+    editor->draw(editor->context, &canvas);
+}
+
+enum {
+    LANDSCAPE_KNOB_PIXELS = 18 * 4,
+    PORTRAIT_KNOB_PIXELS = 4 * 16
+};
+
+static int pixels_changed_to(const Theme *theme, Color from, Color to)
+{
+    int count = 0;
+    for (int index = 0; index < theme->metrics.screen_width * theme->metrics.screen_height;
+         index++) {
+        count += picked_pixels[index] == from && grabbed_pixels[index] == to ? 1 : 0;
+    }
+    return count;
+}
+
+static void the_grabbed_band_and_its_knob_stay_visible_in_every_theme(void)
+{
+    for (int theme_id = 0; theme_id < THEME_COUNT; theme_id++) {
+        for (int portrait = 0; portrait < 2; portrait++) {
+            Theme theme = default_theme_styled(portrait != 0, (ThemeChoice){.theme = theme_id});
+            draw_editor(&theme, true, grabbed_pixels);
+            draw_editor(&theme, false, picked_pixels);
+            Color knob = theme.colors.selection_text;
+            CHECK(knob != theme.colors.text);
+            int changed = pixels_changed_to(&theme, theme.colors.text, knob);
+            CHECK(portrait != 0 ? changed > PORTRAIT_KNOB_PIXELS
+                                : changed >= LANDSCAPE_KNOB_PIXELS);
+        }
+    }
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -433,6 +482,7 @@ int main(void)
         TEST_CASE(the_editor_opens_picking_the_first_band),
         TEST_CASE(volume_moves_between_bands_both_ways_and_stops_at_the_ends),
         TEST_CASE(play_grabs_a_band_and_volume_changes_its_level),
+        TEST_CASE(the_grabbed_band_and_its_knob_stay_visible_in_every_theme),
         TEST_CASE(a_missed_band_is_one_press_back),
         TEST_CASE(the_level_stops_at_twelve_decibels),
         TEST_CASE(holding_play_flattens_the_band_in_either_mode),

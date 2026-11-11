@@ -28,3 +28,9 @@ Rect theme_title_area(const Theme *theme)
     return (Rect){0, metrics->status_height, metrics->screen_width,
                   metrics->header_height - metrics->status_height};
 }
+
+Color theme_selected_text(const Theme *theme)
+{
+    return theme->selection == THEME_SELECTION_OUTLINE ? theme->colors.selection_top
+                                                       : theme->colors.selection_text;
+}
