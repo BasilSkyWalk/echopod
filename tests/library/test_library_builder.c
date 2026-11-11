@@ -704,6 +704,30 @@ static void single_album_folders_keep_their_discs_together(void)
     free(opened.built.output.bytes);
 }
 
+static void single_album_folders_follow_track_numbers_before_file_names(void)
+{
+    const BuilderTrack tracks[] = {
+        disc_track("Album/Artist - Alpha.flac", "Alpha", "Album", 1, 3),
+        disc_track("Album/Artist - Beta.flac", "Beta", "Album", 1, 1),
+        disc_track("Album/Artist - Gamma.flac", "Gamma", "Album", 1, 2),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseItem folder = folder_named(&opened.library, root, "Album");
+    BrowseQuery album_folder;
+    CHECK(browse_child(root, folder, &album_folder));
+    CHECK_EQUAL(3, browse_count(&opened.library, album_folder));
+    char label[64];
+    CHECK(browse_label(&opened.library, album_folder, 0, label, sizeof label) &&
+          strcmp(label, "Artist - Beta") == 0);
+    CHECK(browse_label(&opened.library, album_folder, 1, label, sizeof label) &&
+          strcmp(label, "Artist - Gamma") == 0);
+    CHECK(browse_label(&opened.library, album_folder, 2, label, sizeof label) &&
+          strcmp(label, "Artist - Alpha") == 0);
+    free(opened.built.output.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -725,6 +749,7 @@ int main(void)
         TEST_CASE(tagged_album_artists_and_other_folders_keep_their_albums),
         TEST_CASE(mixed_album_folders_sort_by_numbered_file_name),
         TEST_CASE(single_album_folders_keep_their_discs_together),
+        TEST_CASE(single_album_folders_follow_track_numbers_before_file_names),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     free(scratch_of_size(1)->bytes);

@@ -434,6 +434,10 @@ static int by_folder_track(const void *context, uint16_t left, uint16_t right)
         if (disc != 0) {
             return disc;
         }
+        int number = compare_numbers(a->number, b->number);
+        if (number != 0) {
+            return number;
+        }
     }
     return natural_key_compare(reference_text(sort->builder, a->file_name),
                                reference_text(sort->builder, b->file_name));

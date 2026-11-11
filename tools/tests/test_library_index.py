@@ -294,6 +294,15 @@ class BuildLibraryTest(unittest.TestCase):
         self.assertEqual(["First", "Also First", "Second", "Later"],
                          [library.tracks[index].title for index in double.tracks])
 
+    def test_single_album_folders_follow_track_numbers_before_file_names(self):
+        tracks = [numbered_track("Album/Artist - Alpha.flac", "Alpha", "Album", 1, 3),
+                  numbered_track("Album/Artist - Beta.flac", "Beta", "Album", 1, 1),
+                  numbered_track("Album/Artist - Gamma.flac", "Gamma", "Album", 1, 2)]
+        library = library_index.build_library(tracks)
+        album = next(folder for folder in library.folders if folder.name == "Album")
+        self.assertEqual(["Beta", "Gamma", "Alpha"],
+                         [library.tracks[index].title for index in album.tracks])
+
 
 def numbered_track(path, title, album, disc, number):
     return library_index.TrackInfo(path=path, title=title, artist="Artist", album_artist="Artist",

@@ -506,6 +506,7 @@ def add_folder(folders, node, name, parent, tracks):
     folder.tracks = sorted(
         node["tracks"],
         key=lambda index: (tracks[index].disc if same_album else 0,
+                           tracks[index].number if same_album else 0,
                            natural_sort_key(PurePosixPath(tracks[index].path).name)))
     return position
 
