@@ -1,10 +1,27 @@
 # EchoPod release notes
 
-## Unreleased
+## 0.12.0
+
+New looks and new formats, from five community pull requests: seven colour themes, four retro Now Playing faces, `.m4b` audiobooks with chapters, QOA playback, folder order by file name and a complete Polish translation. Tested on one Echo Mini 8 GB.
 
 ### New
 
-- **QOA plays.** `.qoa` files now show up in the library (with their length) and play, mono or stereo, with seeking that lands on the exact sample. They use the same queue and gapless hand-over as the other formats. The decoder is the reference implementation by Dominic Szablewski (`third_party/qoa`, MIT), which also runs in the simulator. Playback has been tested on the player. Rescan the library (Settings → Library → Rescan library) or run echo-sync again to see QOA files you already have.
+- **Seven more colour themes** (by hva314, pull request 73). Settings → Display → Theme adds Fjord, Dusk, Neon, Phosphor, Paper, Olive and High contrast next to Dark and Light. Accent color shows only on Dark and Light, and Highlight only on the themes with a gradient bar (Dark, Light, Fjord, Dusk and Paper). Switching themes keeps your accent and highlight for when you come back. Cover Flow and the Home cover panel stay dark on every theme.
+- **Now Playing faces** (by hva314, pull request 73). Settings → Display → Now Playing adds Cassette, VU meters, Turntable and LCD deck next to Standard, which stays the default. Every face has a portrait layout, its own colours, and shows the seek target, volume, skip and play badges and the current lyric line. Faces move only while a track plays, about ten frames a second. The Turntable prints the album cover across the record like a picture disc, and shows black vinyl with a red label when there's no cover. The VU needles and the LCD spectrum are for show: the player has no audio-level data.
+- **`.m4b` audiobooks with chapters** (by micdudk, pull request 74). `.m4b` files are found and play like `.m4a`. A book with embedded chapters (the Nero chapter list that m4b-tool, mp4v2 and ffmpeg write) shows "Chapter N of M" on Now Playing, ≡ opens the chapter list with each chapter's start time, picking one jumps to it, and a one-file book's bookmark and shelf row keep the chapter. Vol+ and Vol- still jump 30 s and 15 s. Chapter titles aren't shown yet, and a book with more than 160 chapters plays without them.
+- **QOA plays** (by boromil, pull request 49). `.qoa` files show up in the library (with their length) and play, mono or stereo, with seeking that lands on the exact sample. They use the same queue and gapless hand-over as the other formats. The decoder is the reference implementation by Dominic Szablewski (`third_party/qoa`, MIT), which also runs in the simulator. QOA files carry no tags, so their names come from the folders and file name.
+- **Polish is complete** (by boromil, pull request 48): the language names, settings and diagnostics are translated, and the playback, seeking and rescan wording fits each screen.
+
+### Changed
+
+- **Folder View lists a folder's tracks by file name** (by mahyarrezghi, pull request 31), comparing numbers in names as numbers, so `1`, `2`, `10` stay in order and a folder of songs from different albums no longer follows their unrelated track numbers. A folder that holds a single album still plays by disc and track number. Audiobook and podcast folders follow the same order.
+
+### When you update
+
+- Your settings stay. If you pick one of the new themes and later go back to 0.11.1 or earlier, that firmware resets all settings to their defaults.
+- Rescan the library (Settings → Library → Rescan library), or run the new echo-sync, to see `.m4b` and `.qoa` files you already have, count book chapters and apply the new folder order. An older echo-sync leaves `.m4b` and `.qoa` files out.
+- After an update installs, restart the player before connecting it to a computer again.
+- Delete the update file from the player once it has installed, or it installs again.
 
 ## 0.11.1
 

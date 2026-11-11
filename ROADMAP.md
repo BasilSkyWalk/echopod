@@ -4,7 +4,7 @@ Status: `device` (works on the player) · `sim` (works in the simulator only) ·
 
 ## Where it stands
 
-Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in place and makes menus, Cover Flow and FAT32 reads smoother; 0.11.0 adds listen history for Last.fm, a clock, music on internal storage, grouped settings, lyrics and a light theme, with battery, Bluetooth, USB and SD card fixes; 0.10.0 adds Play all / Shuffle all, button and colour settings, Russian and Ukrainian, and fixes for the way back to FiiO; 0.9.1 adds Filter and Balance settings, quieter low volume steps and a Bluetooth volume curve; 0.9.0 adds 14 languages (Settings → Language) and draws Cyrillic, Greek and extended Latin letters in track names; 0.8.1 fixes 176.4 kHz playing 0.28 % slow and makes menus quicker; 0.8.0 added portrait mode (Settings → Orientation); 0.7.1 fixed a first start that stayed black with FAT32 cards; 0.7.0 added an equalizer (FiiO's presets and a 7-band Custom EQ) and ALAC, AAC and Opus playback; 0.6.0 made Bluetooth connect within seconds and added Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
+Version 0.12.0 adds seven colour themes, four retro Now Playing faces, `.m4b` audiobooks with chapters, QOA playback, folder order by file name and a complete Polish translation, all from community pull requests; 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in place and makes menus, Cover Flow and FAT32 reads smoother; 0.11.0 adds listen history for Last.fm, a clock, music on internal storage, grouped settings, lyrics and a light theme, with battery, Bluetooth, USB and SD card fixes; 0.10.0 adds Play all / Shuffle all, button and colour settings, Russian and Ukrainian, and fixes for the way back to FiiO; 0.9.1 adds Filter and Balance settings, quieter low volume steps and a Bluetooth volume curve; 0.9.0 adds 14 languages (Settings → Language) and draws Cyrillic, Greek and extended Latin letters in track names; 0.8.1 fixes 176.4 kHz playing 0.28 % slow and makes menus quicker; 0.8.0 added portrait mode (Settings → Orientation); 0.7.1 fixed a first start that stayed black with FAT32 cards; 0.7.0 added an equalizer (FiiO's presets and a 7-band Custom EQ) and ALAC, AAC and Opus playback; 0.6.0 made Bluetooth connect within seconds and added Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
 
 ## Features
 
@@ -32,6 +32,10 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | USB mass storage | device | Internal storage and the SD card, read/write, at high speed; SD card reads at about 3.9 MB/s |
 | USB DAC mode | device | Settings → USB mode → DAC: a USB Audio Class 1.0 sound card, 16 or 24-bit at 44.1 or 48 kHz, with its own remembered volume; played on the player from Windows 11 (all four formats) and an Android phone |
 | Updates and the way back to FiiO | device | EchoPod installs its own updates and FiiO's 8 GB firmware from a file copy |
+| Themes | device | Settings → Display → Theme: Dark, Light, Fjord, Dusk, Neon, Phosphor, Paper, Olive and High contrast |
+| Now Playing faces | device | Settings → Display → Now Playing: Standard, Cassette, VU meters, Turntable (a picture disc of the cover) and LCD deck, in landscape and portrait |
+| `.m4b` audiobooks with chapters | device | "Chapter N of M" on Now Playing, a chapter list on ≡, the chapter kept in a one-file book's bookmark; no chapter titles yet |
+| QOA playback | device | Mono and stereo, exact seeking, gapless; names from the path, since QOA has no tags |
 | Configurable start screen | sim | Works in the simulator; not yet checked on the player |
 
 ## Next
@@ -47,8 +51,6 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | echo-sync on a Mac and on Linux with a real card | todo |
 | Firmware images in GitHub releases | todo |
 | Playback speed for audiobooks and podcasts | todo |
-| More themes: Fjord, Dusk, Neon, Phosphor, Paper, Olive and High contrast | sim (Settings → Display → Theme; not yet checked on a player) |
-| Now Playing faces: Cassette, VU meters, Turntable and LCD deck | sim (Settings → Display → Now Playing; not yet checked on a player) |
 | Installing from a Mac through FiiO's updater | todo |
 | Testing on more players | todo |
 
