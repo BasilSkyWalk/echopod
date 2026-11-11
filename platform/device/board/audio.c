@@ -219,7 +219,8 @@ static TrackProbe probe_header(const uint8_t *magic, bool read)
                                              (uint32_t)rate[2] >> 4};
     }
     if (tag_is(magic, "qoaf")) {
-        return SOURCE_QOA;
+        return (TrackProbe){SOURCE_QOA, (uint32_t)magic[9] << 16 | (uint32_t)magic[10] << 8 |
+                                            (uint32_t)magic[11]};
     }
     if (tag_is(magic, "RIFF") && tag_is(magic + 8, "WAVE")) {
         bool format_first = tag_is(magic + WAV_FORMAT_OFFSET, "fmt ");
