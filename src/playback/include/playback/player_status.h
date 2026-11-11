@@ -24,4 +24,6 @@ typedef struct PlayerStatus {
     PlayQueuePlace place;
     HalAudioFormat format;
     bool spoken;
+    uint16_t chapters;
+    uint16_t chapter;
 } PlayerStatus;

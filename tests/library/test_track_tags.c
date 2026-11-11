@@ -18,21 +18,23 @@ typedef struct Expected {
     const char *genre;
     uint32_t duration_ms;
     TagPictureKind picture;
+    uint16_t chapters;
 } Expected;
 
 static const Expected TAGGED[] = {
-    {"tagged.flac", TAG_FORMAT_FLAC, "Post-Rock", 1000, TAG_PICTURE_RAW},
-    {"tagged.ogg", TAG_FORMAT_OGG, "Post-Rock", 1001, TAG_PICTURE_BASE64_FLAC_BLOCK},
-    {"../opus/tagged.opus", TAG_FORMAT_OGG, "Post-Rock", 1000, TAG_PICTURE_BASE64_FLAC_BLOCK},
-    {"id3v24.mp3", TAG_FORMAT_MP3, "Post-Rock", 1045, TAG_PICTURE_RAW},
-    {"id3v23_vbr.mp3", TAG_FORMAT_MP3, "Rock", 1032, TAG_PICTURE_RAW},
-    {"aac.m4a", TAG_FORMAT_MP4, "Post-Rock", 1023, TAG_PICTURE_RAW},
-    {"alac.m4a", TAG_FORMAT_MP4, "Post-Rock", 1000, TAG_PICTURE_RAW},
-    {"tagged.wav", TAG_FORMAT_WAV, "Post-Rock", 1000, TAG_PICTURE_RAW},
-    {"tagged.wma", TAG_FORMAT_WMA, "Post-Rock", 1000, TAG_PICTURE_RAW},
-    {"tagged.ape", TAG_FORMAT_APE, "Post-Rock", 3442, TAG_PICTURE_RAW},
-    {"tagged.dsf", TAG_FORMAT_DSF, "Post-Rock", 100, TAG_PICTURE_RAW},
-    {"tagged.dff", TAG_FORMAT_DFF, "Post-Rock", 100, TAG_PICTURE_RAW},
+    {"tagged.flac", TAG_FORMAT_FLAC, "Post-Rock", 1000, TAG_PICTURE_RAW, 0},
+    {"tagged.ogg", TAG_FORMAT_OGG, "Post-Rock", 1001, TAG_PICTURE_BASE64_FLAC_BLOCK, 0},
+    {"../opus/tagged.opus", TAG_FORMAT_OGG, "Post-Rock", 1000, TAG_PICTURE_BASE64_FLAC_BLOCK, 0},
+    {"id3v24.mp3", TAG_FORMAT_MP3, "Post-Rock", 1045, TAG_PICTURE_RAW, 0},
+    {"id3v23_vbr.mp3", TAG_FORMAT_MP3, "Rock", 1032, TAG_PICTURE_RAW, 0},
+    {"aac.m4a", TAG_FORMAT_MP4, "Post-Rock", 1023, TAG_PICTURE_RAW, 0},
+    {"alac.m4a", TAG_FORMAT_MP4, "Post-Rock", 1000, TAG_PICTURE_RAW, 0},
+    {"chapters.m4b", TAG_FORMAT_MP4, "Post-Rock", 3023, TAG_PICTURE_RAW, 3},
+    {"tagged.wav", TAG_FORMAT_WAV, "Post-Rock", 1000, TAG_PICTURE_RAW, 0},
+    {"tagged.wma", TAG_FORMAT_WMA, "Post-Rock", 1000, TAG_PICTURE_RAW, 0},
+    {"tagged.ape", TAG_FORMAT_APE, "Post-Rock", 3442, TAG_PICTURE_RAW, 0},
+    {"tagged.dsf", TAG_FORMAT_DSF, "Post-Rock", 100, TAG_PICTURE_RAW, 0},
+    {"tagged.dff", TAG_FORMAT_DFF, "Post-Rock", 100, TAG_PICTURE_RAW, 0},
 };
 
 typedef struct Fixture {
@@ -105,6 +107,7 @@ static void every_tagged_format_reads_its_fields_duration_and_cover(void)
         CHECK_EQUAL(1, leading_number(tags.text[TAG_DISC]));
         CHECK_EQUAL(4, leading_number(tags.text[TAG_TRACK]));
         CHECK_EQUAL(expected->duration_ms, tags.duration_ms);
+        CHECK_EQUAL(expected->chapters, tags.chapters);
         check_picture(expected->name, &tags, expected->picture);
     }
 }
@@ -247,6 +250,17 @@ static void an_mp3_with_only_id3v1_and_no_xing_header_still_reads(void)
     CHECK_EQUAL(TAG_PICTURE_NONE, tags.picture.kind);
 }
 
+static void an_untagged_qoa_has_empty_fields_and_its_duration(void)
+{
+    static TrackTags tags;
+    CHECK(read_fixture("qoa.qoa", &tags));
+    for (int field = 0; field < TAG_FIELD_COUNT; field++) {
+        CHECK_EQUAL(0, strcmp("", tags.text[field]));
+    }
+    CHECK_EQUAL(35u, tags.duration_ms);
+    CHECK_EQUAL(TAG_PICTURE_NONE, tags.picture.kind);
+}
+
 static void an_untagged_flac_has_empty_fields_and_its_duration(void)
 {
     static TrackTags tags;
@@ -279,6 +293,8 @@ static void formats_come_from_the_extension_in_any_case(void)
 {
     CHECK_EQUAL(TAG_FORMAT_FLAC, track_tags_format_for_name("a.FLAC"));
     CHECK_EQUAL(TAG_FORMAT_MP4, track_tags_format_for_name("song.M4a"));
+    CHECK_EQUAL(TAG_FORMAT_MP4, track_tags_format_for_name("book.M4B"));
+    CHECK_EQUAL(TAG_FORMAT_QOA, track_tags_format_for_name("a.QOA"));
     CHECK_EQUAL(TAG_FORMAT_UNKNOWN, track_tags_format_for_name("cover.jpg"));
     CHECK_EQUAL(TAG_FORMAT_UNKNOWN, track_tags_format_for_name("flac"));
 }
@@ -296,9 +312,10 @@ static void a_truncated_file_fails_cleanly(void)
 static const char *const ALL_FIXTURES[] = {
     "tagged.flac", "tagged.ogg",     "../opus/tagged.opus",
     "id3v24.mp3",  "id3v23_vbr.mp3", "id3v1_no_xing.mp3",
-    "aac.m4a",     "alac.m4a",       "tagged.wav",
-    "tagged.wma",  "tagged.ape",     "tagged.dsf",
-    "tagged.dff",  "untagged.flac",
+    "aac.m4a",     "alac.m4a",       "chapters.m4b",
+    "tagged.wav",  "tagged.wma",     "tagged.ape",
+    "tagged.dsf",  "tagged.dff",     "untagged.flac",
+    "qoa.qoa",
 };
 
 static void damaged_files_never_read_outside_the_file(void)
@@ -362,6 +379,7 @@ int main(void)
         TEST_CASE(ogg_pictures_decode_to_the_same_image_as_flac),
         TEST_CASE(ogg_comments_and_pictures_read_across_small_pages),
         TEST_CASE(an_mp3_with_only_id3v1_and_no_xing_header_still_reads),
+        TEST_CASE(an_untagged_qoa_has_empty_fields_and_its_duration),
         TEST_CASE(an_untagged_flac_has_empty_fields_and_its_duration),
         TEST_CASE(odd_spaces_become_plain_spaces_and_ends_are_trimmed),
         TEST_CASE(formats_come_from_the_extension_in_any_case),

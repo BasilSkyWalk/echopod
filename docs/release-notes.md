@@ -1,5 +1,11 @@
 # EchoPod release notes
 
+## Unreleased
+
+### New
+
+- **QOA plays.** `.qoa` files now show up in the library (with their length) and play, mono or stereo, with seeking that lands on the exact sample. They use the same queue and gapless hand-over as the other formats. The decoder is the reference implementation by Dominic Szablewski (`third_party/qoa`, MIT), which also runs in the simulator. Playback has been tested on the player. Rescan the library (Settings → Library → Rescan library) or run echo-sync again to see QOA files you already have.
+
 ## 0.11.1
 
 Smoother and steadier: 192 kHz FLAC plays cleanly again, and menus, Cover Flow and card reads do less work. Tested on one Echo Mini 8 GB.

@@ -34,6 +34,9 @@ target_include_directories(echo_faad2 SYSTEM
 target_compile_definitions(echo_faad2 PRIVATE
     FIXED_POINT LC_ONLY_DECODER DISABLE_SBR NDEBUG PACKAGE_VERSION="2.11.4"
 )
+if(NOT CMAKE_CROSSCOMPILING)
+    target_compile_definitions(echo_faad2 PRIVATE HAVE_INTTYPES_H=1)
+endif()
 target_compile_options(echo_faad2 PRIVATE -w)
 set_target_properties(echo_faad2 PROPERTIES C_EXTENSIONS ON)
 if(CMAKE_CROSSCOMPILING)
@@ -81,6 +84,7 @@ set(ECHO_DEVICE_LOGIC_SOURCES
     core1_control.c
     core1_mp3.c
     core1_opus.c
+    core1_qoa.c
     core1_stream.c
     dac_sequence.c
     flac_source.c

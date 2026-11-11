@@ -18,6 +18,8 @@ enum {
     BUILDER_GENRE = 4,
     BUILDER_FILE = 5,
     BUILDER_ROW_SIZE = 48,
+    BUILDER_ROW_SPOKEN_BIT = 1,
+    BUILDER_ROW_GUESSED_BIT = 2,
     BUILDER_FOLDER_SIZE = 8,
     BUILDER_MAX_DEPTH = 64,
     BUILDER_TEXT_CAPACITY = 1024,
@@ -84,6 +86,7 @@ typedef struct TrackRow {
     uint8_t number;
     uint8_t spoken;
     uint8_t guessed;
+    uint8_t chapters;
     uint32_t duration_ms;
 } TrackRow;
 

@@ -70,6 +70,21 @@ static void comparison_follows_the_keys(void)
     CHECK(sort_key_compare("Zebra", "apple") > 0);
 }
 
+static void natural_keys_compare_digit_runs_as_numbers(void)
+{
+    CHECK(natural_key_compare("1 - Intro.flac", "2 - Intro.flac") < 0);
+    CHECK(natural_key_compare("2 - Intro.flac", "10 - Intro.flac") < 0);
+    CHECK(natural_key_compare("10 - Intro.flac", "11 - Intro.flac") < 0);
+    CHECK(natural_key_compare("Track 9.flac", "Track 10.flac") < 0);
+    CHECK(natural_key_compare("01 - Intro.flac", "1 - Intro.flac") == 0);
+}
+
+static void natural_keys_fold_case_and_accents(void)
+{
+    CHECK(natural_key_compare("J\xc3\xb3ga 2.flac", "joga 10.flac") < 0);
+    CHECK(natural_key_compare("J\xc3\xb3ga.flac", "joga.flac") == 0);
+}
+
 static void a_long_text_is_cut_at_the_capacity(void)
 {
     char text[3000];
@@ -170,6 +185,8 @@ int main(void)
         TEST_CASE(the_initial_matches_the_first_byte_of_the_key),
         TEST_CASE(keys_match_the_pc_indexer),
         TEST_CASE(comparison_follows_the_keys),
+        TEST_CASE(natural_keys_compare_digit_runs_as_numbers),
+        TEST_CASE(natural_keys_fold_case_and_accents),
         TEST_CASE(a_long_text_is_cut_at_the_capacity),
         TEST_CASE(case_folding_keeps_accents_and_lowers_everything),
         TEST_CASE(every_kind_of_fold_run_applies),

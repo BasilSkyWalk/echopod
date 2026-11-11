@@ -167,6 +167,7 @@ static void the_codec_has_a_short_name(void)
     CHECK(strcmp("ALAC", now_playing_codec_name(HAL_AUDIO_CODEC_ALAC)) == 0);
     CHECK(strcmp("AAC", now_playing_codec_name(HAL_AUDIO_CODEC_AAC)) == 0);
     CHECK(strcmp("Opus", now_playing_codec_name(HAL_AUDIO_CODEC_OPUS)) == 0);
+    CHECK(strcmp("QOA", now_playing_codec_name(HAL_AUDIO_CODEC_QOA)) == 0);
     CHECK(strcmp("", now_playing_codec_name(HAL_AUDIO_CODEC_UNKNOWN)) == 0);
 }
 
@@ -196,6 +197,16 @@ static void the_detail_line_leaves_out_what_is_unknown(void)
     CHECK(detail_text_is((PlayerStatus){.place = {3, 10}}, "3 of 10"));
     CHECK(detail_text_is((PlayerStatus){.format = MP3}, "320 kbps"));
     CHECK(detail_text_is((PlayerStatus){0}, ""));
+}
+
+static void the_detail_line_shows_the_chapter_of_a_book_with_chapters(void)
+{
+    PlayerStatus status = {.format = MP3, .place = {1, 1}, .chapters = 13, .chapter = 2};
+    CHECK(detail_text_is(status, "320 kbps \xC2\xB7 Chapter 3 of 13"));
+    status.format = (HalAudioFormat){0};
+    CHECK(detail_text_is(status, "Chapter 3 of 13"));
+    status.chapters = 0;
+    CHECK(detail_text_is(status, "1 of 1"));
 }
 
 static NowPlayingCommand controlled(Key key, KeyGesture gesture, NowPlayingControls controls)
@@ -254,6 +265,7 @@ static void controls_follow_the_saved_options(void)
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(the_detail_line_shows_the_chapter_of_a_book_with_chapters),
         TEST_CASE(tap_skip_hold_volume_swaps_the_rocker_gestures),
         TEST_CASE(hold_to_seek_moves_within_the_track),
         TEST_CASE(holding_while_the_volume_shows_keeps_changing_it),

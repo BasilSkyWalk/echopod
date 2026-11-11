@@ -71,5 +71,6 @@ bool tags_read_mp4(TagReader *reader);
 bool tags_read_wav(TagReader *reader);
 bool tags_read_dsf(TagReader *reader);
 bool tags_read_dff(TagReader *reader);
+bool tags_read_qoa(TagReader *reader);
 bool tags_read_ape(TagReader *reader);
 bool tags_read_wma(TagReader *reader);

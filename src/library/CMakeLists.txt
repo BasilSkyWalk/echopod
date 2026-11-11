@@ -4,6 +4,7 @@ add_library(echo_library STATIC
     favorites.c
     library.c
     library_browse.c
+    mp4_chapters.c
     music_fingerprint.c
     music_folders.c
     sort_initial.c
@@ -39,6 +40,7 @@ add_library(echo_library_scan STATIC
     tags_id3.c
     tags_mp4.c
     tags_mpeg.c
+    tags_qoa.c
     tags_riff.c
     tags_vorbis.c
     track_fields.c

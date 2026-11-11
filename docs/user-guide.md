@@ -37,7 +37,7 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 ## Your music
 
 - Put music on a microSD card formatted FAT32 or exFAT, in any folder layout.
-- EchoPod plays FLAC, ALAC (Apple Lossless `.m4a`), AAC (`.m4a`), Opus (`.opus`), MP3 and WAV, up to 192 kHz. HE-AAC isn't supported yet. It lists the other formats FiiO lists, and says when it can't play one.
+- EchoPod plays FLAC, ALAC (Apple Lossless `.m4a`), AAC (`.m4a`), Opus (`.opus`), QOA (`.qoa`), MP3 and WAV, up to 192 kHz. HE-AAC isn't supported yet. It lists the other formats FiiO lists, and says when it can't play one.
 - Album covers come from art inside one of each album's first four tracks (Ogg and Opus pictures included), or from a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks.
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
 - Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
@@ -280,18 +280,20 @@ Audiobooks/
     01 - Departure.mp3    chapters play in file-name order
     02 - The River.mp3
   Short Story.mp3         a book in one file works too
+  Novel.m4b               so does an .m4b with chapters
 Podcasts/
   Tech Talk/              one folder per show
     2026-10-01 - Episode 41.mp3
 ```
 
-- **Audiobooks** lists your books, each with "3 chapters", "Chapter 2 of 12" or "Finished". ▶ on a book carries on where you stopped (or starts a finished book again). Hold ▶ on a book to see its chapters.
+- **Audiobooks** lists your books, each with "3 chapters", "Chapter 2 of 12" or "Finished" (for an .m4b, its own chapters). ▶ on a book carries on where you stopped (or starts a finished book again). Hold ▶ on a book to see its chapters.
 - **Podcasts** lists your shows; open one to see its episodes, each with "23:10 left" or "Played".
 - Every book and every episode remembers its own place, even when you play music in between or turn the player off. The places are saved in `/.echo/bookmarks.bin` (the last 128 books and episodes).
 - Books and shows always play in order: shuffle doesn't apply to them, and your shuffle setting for music stays as it was.
 - On Now Playing, holding Vol+ jumps 30 s forward and holding Vol− jumps 15 s back. Jumping past the end of a chapter goes to the next one. To pick another chapter, use the book's chapter list.
 - An episode or book counts as finished once it played to its last tenth (at most its last 30 s).
 - These folders still appear under Music (Albums, Artists, Folders and so on), as all tracks on the card do. Give them a genre such as "Audiobook" if you want to find them there.
+- An .m4b (or .m4a) with chapters shows "Chapter 3 of 13" on Now Playing, and the Menu button opens the chapter list with each chapter's start time: pick one to jump to it. Holding Vol+ and Vol− still jump 30 s and 15 s. The chapters are read from the file's chapter list (`chpl`); chapter names aren't shown.
 - Playback speed can't be changed yet.
 - To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `python tools/echo_bookmarks.py E:\ --finished` with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
 

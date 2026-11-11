@@ -35,7 +35,7 @@ Each section directory entry is `u32 offset`, `u32 count`, `u16 record size`, `u
 
 | Record | Layout |
 |---|---|
-| **Track** | `u32 title`, `u32 path`, `u16 album`, `u16 artist`, `u16 genre`, `u16 folder`, `u32 duration_ms`, `u8 disc`, `u8 number`, `u16 reserved` |
+| **Track** | `u32 title`, `u32 path`, `u16 album`, `u16 artist`, `u16 genre`, `u16 folder`, `u32 duration_ms`, `u8 disc`, `u8 number`, `u16 chapters` |
 | **Album** | `u32 title`, `u16 album_artist`, `u16 genre`, `u16 year`, `u16 first_track`, `u16 track_count`, `u16 cover` |
 | **Group** (artist, album artist, genre, playlist) | `u32 name`, `u32 first_link`, `u16 link_count`, `u16 reserved` |
 | **Folder** | `u32 name`, `u16 parent`, `u16 subfolder_count`, `u32 first_link`, `u16 track_count`, `u16 reserved` |
@@ -43,10 +43,11 @@ Each section directory entry is `u32 offset`, `u32 count`, `u16 record size`, `u
 Field notes:
 - `u32` string fields hold an offset into the strings section.
 - Track `path` is relative to the music root and uses `/`. A track on the player's internal storage has a path under `:internal/`, a top-level folder no FAT or exFAT card can hold (`:` isn't allowed in names): `:internal/Artist/Album/01.flac` is `Artist/Album/01.flac` on internal storage. The folder is sorted among the root's names by its bytes like any other, and its folder record is named `:internal` (the player shows it as "Internal storage"). A library built without internal storage (echo-sync with no internal drive found, or a player whose internal volume didn't mount) has no such paths. Every string is Unicode NFC (composed). FAT cards store names in NFC, but macOS lists them decomposed (NFD), so the indexer recomposes paths, playlist names, playlist entries and tags. The device then matches paths against the card's names without any Unicode tables. Track `artist` indexes the artists section, and `genre` indexes genres.
+- Track `chapters` is the number of chapters in the file's `moov.udta.chpl` atom (Nero chapters, written by m4b-tool, mp4v2 and ffmpeg): 0 when there is none, when it is unreadable or out of order, or when the atom uses a 64-bit size. It holds at most 255. A library built before this field existed has 0 there, and the format version stays 3.
 - An album's tracks are `tracks[first_track .. first_track + track_count)`. Album `cover` is reserved and always `0xFFFF`. Covers live in their own file, keyed by album key (see Covers file).
 - A group's albums are `links[first_link .. first_link + link_count)`. Artists list every album containing at least one of their tracks. Artist and album-artist albums are ordered by year, then title; genre albums are ordered by title. Within each section the groups' links are consecutive and in group order (group `n + 1` starts where group `n` ends). Cover Flow relies on this for album artists to read its order straight from `links`; a file that breaks it gets Cover Flow in album order instead.
 - A playlist's links are track indices in playlist order. Its name is the file name without `.m3u` or `.m3u8`.
-- A folder's items are `links[first_link ..]`: first `subfolder_count` folder indices (sorted by name), then `track_count` track indices (sorted by disc, number, file name).
+- A folder's items are `links[first_link ..]`: first `subfolder_count` folder indices (sorted by name), then `track_count` track indices (by file name, comparing runs of digits as numbers; an album that spans one folder also orders its discs first).
 
 ## Spoken word
 
@@ -60,7 +61,7 @@ Sort keys are case-insensitive and accent-insensitive (Unicode NFKD with combini
 
 ## Files and tags
 
-The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` (AAC or ALAC), `.wav`, `.wma`, `.ape`, `.dsf` and `.dff`, and also `.opus`, skipping hidden files and folders (a name starting with `.`). Each field takes the first non-empty value, trimmed:
+The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` and `.m4b` (AAC or ALAC), `.wav`, `.wma`, `.ape`, `.dsf` and `.dff`, and also `.opus` and `.qoa`, skipping hidden files and folders (a name starting with `.`). QOA carries no tags, so its fields come from its path and its length from its header. Each field takes the first non-empty value, trimmed:
 
 | Field | Vorbis comment (FLAC, Ogg, Opus) | ID3 (MP3, WAV, DSF, DFF) | MP4 atom | APEv2 (any case) | ASF (WMA) |
 |---|---|---|---|---|---|
@@ -86,7 +87,7 @@ On the device, `track_tags_read` reads through a `ByteSource` with small bounded
 - During the scan each track becomes a 48-byte row on the card (text offsets and lengths, folder, year, disc, number, duration) and its texts go to a heap on the card (a text equal to the previous track's same field is stored once). Folders become 8-byte rows; a hash of (parent, name) in RAM finds a folder seen before.
 - Before ranking, tracks marked as having no album-artist tag (a spare row byte) get their shared album artist: one record per such track (folder, track, artist text, album and artist sort keys) is sorted by folder, album key, artist key and track; one pass picks each group's winner, a second writes (track, artist text) pairs, which are sorted by track and merged back into the rows in one sequential rewrite. Nothing runs when no track is marked.
 - Each field is then ranked: one record per run of equal text (its sort key, its bytes and its first track) goes through a stable external merge sort on the card (sorted chunks in RAM, then up to 32-way merges), giving a dense key rank per track, a spelling rank for genres, and each group's first spelling. Folder names are ranked by key, then bytes.
-- Every view is built from integer tuples with the same sort, in the PC's order: albums (grouped by album artist and album; first sight, earliest non-zero year, most common genre spelling with ties to the first seen; members by disc, number and title), album order (title, then album artist, then first sight), the final track order, artist and album-artist links by year and title, genre links by title, preorder folders (sorted rank paths) with their links, and All Songs by title then artist. Playlists resolve through RAM tables of 16-bit positions keyed by path hashes, confirmed against the paths rebuilt from the card.
+- Every view is built from integer tuples with the same sort, in the PC's order: albums (grouped by album artist and album; first sight, earliest non-zero year, most common genre spelling with ties to the first seen; members by disc, number and title), album order (title, then album artist, then first sight), the final track order, artist and album-artist links by year and title, genre links by title, preorder folders (sorted rank paths) with their links, folder tracks by file name with digit runs compared as numbers (and by disc first when the folder holds a single album), and All Songs by title then artist. Playlists resolve through RAM tables of 16-bit positions keyed by path hashes, confirmed against the paths rebuilt from the card.
 - `library_builder_finish` writes the file in two passes over the card data: records with string offsets counted in emission order, then the strings, through a 512-byte buffer; the `EMDB` magic goes in last so an interrupted build reads as no library. Titles and paths are written per track and names per group, without the PC's global de-duplication, so the bytes differ from the PC's file while every record, link and string means the same. It reports running out of memory or scratch room rather than truncating.
 - Tests decode both files and compare them field by field (`tests/library/library_compare.c`): the fixtures `small_library_tracks.db` and `builder_random/`, and seeded random libraries of 1 to 20,000 tracks (`tests/library/random_library.c`) against the previous in-RAM builder kept as a test-only reference (`tests/library/reference/`).
 

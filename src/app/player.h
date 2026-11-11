@@ -7,6 +7,7 @@
 #include "hal/audio.h"
 #include "library/library.h"
 #include "library/library_browse.h"
+#include "library/mp4_chapters.h"
 #include "playback/play_queue.h"
 #include "playback/player_status.h"
 #include "playback/up_next.h"
@@ -71,6 +72,7 @@ typedef struct Player {
     HalAudioRefusal refusal;
     bool spoken;
     PlayerResume resume;
+    Mp4Chapters chapters;
 } Player;
 
 extern const char PLAYER_RESUME_PATH[];

@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "core/format.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "ui/header.h"
@@ -9,7 +10,8 @@
 #include "ui/list_navigation.h"
 
 enum {
-    DETAIL_MAX_WIDTH = 110
+    DETAIL_MAX_WIDTH = 110,
+    CHAPTER_NUMBER_CAPACITY = 8
 };
 
 typedef enum RowKind {
@@ -77,8 +79,13 @@ static int count_queue_rows(const Player *player)
 static void count_rows(UpNextScreen *up_next)
 {
     const Player *player = up_next->config.player;
+    up_next->chapters = player->has_track && player->chapters.count > 0;
     up_next->added = player->up_next.count;
-    up_next->count = player->has_track ? 1 + up_next->added + count_queue_rows(player) : 0;
+    if (up_next->chapters) {
+        up_next->count = player->chapters.count;
+    } else {
+        up_next->count = player->has_track ? 1 + up_next->added + count_queue_rows(player) : 0;
+    }
     up_next->rows_first = -1;
 }
 
@@ -104,8 +111,28 @@ static const char *state_text(const Player *player)
     return i18n_text(player->state == PLAYER_PLAYING ? STR_BT_PLAYING : STR_MENU_PAUSED);
 }
 
+static void load_chapter_row(UpNextScreen *up_next, int row, int index)
+{
+    const Player *player = up_next->config.player;
+    char number[CHAPTER_NUMBER_CAPACITY];
+    char total[CHAPTER_NUMBER_CAPACITY];
+    StringBuilder number_digits = string_builder_make(number, sizeof number);
+    StringBuilder total_digits = string_builder_make(total, sizeof total);
+    string_builder_append_unsigned(&number_digits, (uint32_t)index + 1u);
+    string_builder_append_unsigned(&total_digits, player->chapters.count);
+    const char *arguments[] = {number, total};
+    StringBuilder builder = string_builder_make(up_next->labels[row], UP_NEXT_LABEL_CAPACITY);
+    i18n_format(&builder, STR_MENU_CHAPTER_PROGRESS, arguments, 2);
+    format_duration(mp4_chapter_start_ms(&player->chapters, (uint16_t)index), up_next->details[row],
+                    UP_NEXT_DETAIL_CAPACITY);
+}
+
 static void load_row(UpNextScreen *up_next, int row, int index, QueueWalk *walk)
 {
+    if (up_next->chapters) {
+        load_chapter_row(up_next, row, index);
+        return;
+    }
     const Library *library = up_next->config.library;
     char *label = up_next->labels[row];
     char *detail = up_next->details[row];
@@ -175,6 +202,10 @@ static ScreenAction select_row(void *context, int index)
     UpNextScreen *up_next = context;
     Player *player = up_next->config.player;
     QueueWalk walk = start_walk(player);
+    if (up_next->chapters) {
+        player_seek(player, mp4_chapter_start_ms(&player->chapters, (uint16_t)index));
+        return screen_action_pop();
+    }
     switch (kind_of(up_next, index)) {
     case ROW_PLAYING:
         break;
@@ -206,6 +237,9 @@ static void enter(void *context, uint32_t now_ms)
     up_next->now_ms = now_ms;
     count_rows(up_next);
     list_view_init(&up_next->list, &up_next->model, up_next->config.theme, now_ms);
+    if (up_next->chapters) {
+        list_view_select(&up_next->list, player_status(up_next->config.player).chapter, now_ms);
+    }
     refresh_rows(up_next);
 }
 
@@ -221,7 +255,7 @@ static void draw(void *context, Canvas *canvas)
     const UpNextScreen *up_next = context;
     const Theme *theme = up_next->config.theme;
     Rect content = theme_content_area(theme);
-    header_draw(canvas, theme, i18n_text(STR_MENU_UP_NEXT));
+    header_draw(canvas, theme, i18n_text(up_next->chapters ? STR_MENU_CHAPTERS : STR_MENU_UP_NEXT));
     if (up_next->count == 0) {
         TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
         canvas_fill_rect(canvas, content, theme->colors.background);
@@ -238,6 +272,7 @@ Screen *up_next_screen_init(UpNextScreen *up_next, UpNextConfig config)
     up_next->config = config;
     up_next->count = 0;
     up_next->added = 0;
+    up_next->chapters = false;
     up_next->rows_first = -1;
     up_next->rows_count = 0;
     up_next->now_ms = 0;

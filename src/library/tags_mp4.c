@@ -1,5 +1,6 @@
 #include <stddef.h>
 
+#include "library/mp4_chapters.h"
 #include "tags_internal.h"
 
 enum {
@@ -284,5 +285,9 @@ bool tags_read_mp4(TagReader *reader)
         read_duration(reader, &trak);
     }
     read_tags(reader, &moov);
+    Mp4Chapters chapters;
+    if (mp4_chapters_read(&chapters, reader->source, reader->size)) {
+        reader->tags->chapters = chapters.count;
+    }
     return true;
 }

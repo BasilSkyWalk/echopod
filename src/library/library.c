@@ -155,6 +155,7 @@ bool library_read_track(const Library *library, uint32_t index, LibraryTrack *tr
         .duration_ms = u32_at(record, 16),
         .disc = record[20],
         .number = record[21],
+        .chapters = u16_at(record, 22),
     };
     return true;
 }

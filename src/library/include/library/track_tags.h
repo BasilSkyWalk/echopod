@@ -19,7 +19,8 @@ typedef enum TagFormat {
     TAG_FORMAT_WMA,
     TAG_FORMAT_APE,
     TAG_FORMAT_DSF,
-    TAG_FORMAT_DFF
+    TAG_FORMAT_DFF,
+    TAG_FORMAT_QOA
 } TagFormat;
 
 typedef enum TagField {
@@ -52,6 +53,7 @@ typedef struct TrackTags {
     char text[TAG_FIELD_COUNT][TRACK_TAG_TEXT_CAPACITY];
     uint32_t duration_ms;
     TagPicture picture;
+    uint16_t chapters;
 } TrackTags;
 
 TagFormat track_tags_format_for_name(const char *name);

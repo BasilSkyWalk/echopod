@@ -95,6 +95,7 @@ static void compare_tracks(Pair *pair)
         same_number(pair, "track", index, "duration", left.duration_ms, right.duration_ms);
         same_number(pair, "track", index, "disc", left.disc, right.disc);
         same_number(pair, "track", index, "number", left.number, right.number);
+        same_number(pair, "track", index, "chapters", left.chapters, right.chapters);
     }
 }
 
