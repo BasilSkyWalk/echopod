@@ -194,7 +194,7 @@ Choose Settings on Home, or hold ≡ anywhere except on Now Playing. The top of 
     - **Standard:** the default, in the theme's colours.
     - **Cassette:** a tape deck with turning reels; the tape across the head opening is the progress bar (portrait adds a J-card).
     - **VU meters:** needle dials, two across in landscape and one stereo dial in portrait. The needles are for show; they don't follow the music.
-    - **Turntable:** a record that turns, with the album cover as its label, and a tonearm that moves with the track.
+    - **Turntable:** a record that turns, with the album cover printed across it like a picture disc (black vinyl with a red label when there's no cover), and a tonearm that moves with the track.
     - **LCD deck:** big 7-segment digits with a spectrum (also for show). Its legends (SHUFFLE, ALBUM, REPEAT, 1, ALL, TRACK) stay English in every language, like printed LCD glass.
 
     The faces use their own colours, so Theme, Accent color and Highlight don't apply to them, and the header and status bar follow the face while it shows. They move only while a track plays, and stand still while it's paused. With Lyrics on and timed lyrics, the current line shows as one line in the face's feedback line instead of the five-line list; lyrics without times don't show on a face. The seek hint, the volume and the skip, play and pause badge appear on every face. With nothing playing you see Standard's message.

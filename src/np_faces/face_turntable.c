@@ -26,7 +26,7 @@ enum {
     RIM_OUTER = 67,
     RIM_INNER = 64,
     LABEL_RADIUS = 28,
-    LABEL_MASK = 40,
+    SPINDLE_HOLE = 5,
     PLAIN_RING = 23,
     PLAIN_RING_INNER = 22,
     GROOVE_FIRST = 45,
@@ -112,24 +112,37 @@ ECHO_NP_FACES_CODE static void plate(const Deck *deck)
     ring(deck, RIM_INNER * Q4, 0, VINYL);
 }
 
+ECHO_NP_FACES_CODE static void picture_disc(const Deck *deck, Image cover)
+{
+    int side = 2 * RIM_INNER;
+    int left = deck->centre.x - RIM_INNER;
+    int top = deck->centre.y - RIM_INNER;
+    Quad quad = {left, side, top, side, top, side};
+    for (int column = 0; column < side; column++) {
+        int across = 2 * column + 1 - side;
+        int half = (int)shape_isqrt((uint32_t)(side * side - across * across)) / 2;
+        Canvas strip =
+            canvas_clipped(deck->canvas, (Rect){left + column, deck->centre.y - half, 1, 2 * half});
+        image_draw_quad(&strip, cover, quad);
+    }
+    ring(deck, RIM_OUTER * Q4, RIM_INNER * Q4, ALU);
+    ring(deck, SPINDLE_HOLE * Q4, 0, VINYL);
+}
+
 ECHO_NP_FACES_CODE static void label_art(const Deck *deck)
 {
     Image cover = deck->frame->cover;
-    int corner = deck->centre.y - LABEL_RADIUS;
-    if (cover.pixels == NULL) {
-        ring(deck, LABEL_RADIUS * Q4, 0, LABEL_RED);
-        ring(deck, PLAIN_RING * Q4, PLAIN_RING_INNER * Q4, CREAM);
+    if (cover.pixels != NULL) {
+        picture_disc(deck, cover);
         return;
     }
-    int side = 2 * LABEL_RADIUS;
-    image_draw_quad(deck->canvas, cover,
-                    (Quad){deck->centre.x - LABEL_RADIUS, side, corner, side, corner, side});
-    ring(deck, LABEL_MASK * Q4, LABEL_RADIUS * Q4, VINYL);
+    ring(deck, LABEL_RADIUS * Q4, 0, LABEL_RED);
+    ring(deck, PLAIN_RING * Q4, PLAIN_RING_INNER * Q4, CREAM);
 }
 
 ECHO_NP_FACES_CODE static void grooves(const Deck *deck)
 {
-    for (int index = 0; index < GROOVE_COUNT; index++) {
+    for (int index = 0; index < GROOVE_COUNT && deck->frame->cover.pixels == NULL; index++) {
         int radius = GROOVE_FIRST + GROOVE_STEP * index;
         ring(deck, (radius + 1) * Q4, radius * Q4, ALU_DARK);
     }

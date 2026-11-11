@@ -47,7 +47,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 
 ## Now Playing faces
 
-- **The faces are checked in the simulator only.** Cassette, VU meters, Turntable and LCD deck have not been seen on the player's panel. Not yet verified on the device: the boot with the faces in the image, the load from internal storage on the first face frame, the reload after a rescan or a USB session, the frame time and the battery cost of the animation.
+- **The battery cost of the faces' animation hasn't been measured.** A face redraws while a track plays, about ten frames a second; Standard redraws far less.
 - **The VU needles and the LCD spectrum are decorative.** The player has no audio-level data, so they move in a fixed pattern that doesn't follow the music.
 - **VU meters in landscape leave out the album, the format and the modes row.** Portrait shows them.
 - **Standard shows if the face code can't be loaded.** The faces are read from internal storage when first needed. If that fails (internal storage doesn't answer, or the copy is damaged twice), Now Playing draws Standard and keeps doing so until you restart the player.
