@@ -153,7 +153,7 @@ static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent, bo
     char text[STATUS_BAR_PERCENT_CAPACITY];
     status_bar_percent_text(percent, text, sizeof text);
     Rect area = status_bar_percent_area(theme, text, charging);
-    TextStyle style = {.font = status_font(theme), .color = theme->colors.header_text};
+    TextStyle style = {.font = status_font(theme), .color = theme->colors->header_text};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, area, text), .text = text});
 }
@@ -161,10 +161,10 @@ static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent, bo
 static Color fill_color(const Theme *theme, StatusBarState state)
 {
     if (state.charging) {
-        return theme->colors.success;
+        return theme->colors->success;
     }
-    return state.battery_percent <= STATUS_BAR_LOW_BATTERY_PERCENT ? theme->colors.danger
-                                                                   : theme->colors.header_text;
+    return state.battery_percent <= STATUS_BAR_LOW_BATTERY_PERCENT ? theme->colors->danger
+                                                                   : theme->colors->header_text;
 }
 
 static void draw_outline(Canvas *canvas, Rect body, Color color)
@@ -186,7 +186,7 @@ static void draw_battery(Canvas *canvas, const Theme *theme, StatusBarState stat
     Rect tip = {body.x + body.width, area.y + size / 3, nub, size - 2 * (size / 3)};
     Rect inner = {body.x + FILL_INSET, body.y + FILL_INSET, body.width - 2 * FILL_INSET,
                   body.height - 2 * FILL_INSET};
-    Color color = theme->colors.header_text;
+    Color color = theme->colors->header_text;
     draw_outline(canvas, body, color);
     canvas_fill_rect(canvas, tip, color);
     inner.width = status_bar_battery_fill_width(state.battery_percent, inner.width);
@@ -200,7 +200,7 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
         state.hide_percent = true;
     }
     Rect icon = status_bar_playback_area(theme);
-    Color color = theme->colors.header_text;
+    Color color = theme->colors->header_text;
     if (state.playback == STATUS_PLAYBACK_PLAYING) {
         icon_draw_play(canvas, icon, color);
     } else if (state.playback == STATUS_PLAYBACK_PAUSED) {
@@ -208,7 +208,7 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
     }
     if (state.bluetooth != STATUS_BLUETOOTH_OFF) {
         Color tint =
-            state.bluetooth == STATUS_BLUETOOTH_CONNECTED ? color : theme->colors.text_tertiary;
+            state.bluetooth == STATUS_BLUETOOTH_CONNECTED ? color : theme->colors->text_tertiary;
         icon_draw_bluetooth(canvas, status_bar_bluetooth_area(theme), tint);
     }
     Rect clock = status_bar_clock_area(theme, state);
@@ -221,7 +221,7 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
     if (state.battery_known) {
         draw_battery(canvas, theme, state);
         if (state.charging) {
-            icon_draw_bolt(canvas, status_bar_bolt_area(theme), theme->colors.success);
+            icon_draw_bolt(canvas, status_bar_bolt_area(theme), theme->colors->success);
         }
         if (!state.hide_percent) {
             draw_percent(canvas, theme, state.battery_percent, state.charging);

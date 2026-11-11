@@ -1,4 +1,5 @@
 add_library(echo_ui STATIC
+    box.c
     choice_screen.c
     cover_flow.c
     fade.c
@@ -16,6 +17,7 @@ add_library(echo_ui STATIC
     screen_stack.c
     status_bar.c
     theme.c
+    theme_package.c
     toast.c
 )
 target_include_directories(echo_ui PUBLIC include)

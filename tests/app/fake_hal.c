@@ -2,6 +2,7 @@
 
 #include "hal/system.h"
 
+#include "app/startup.h"
 #include "hal/audio.h"
 #include "hal/bluetooth.h"
 #include "hal/clock.h"
@@ -20,6 +21,7 @@ extern const NowPlayingFaces NOW_PLAYING_FACES;
 
 enum {
     TRANSITION_CAPACITY = 16,
+    FAKE_THEME_MEMORY_WORDS = 256,
     FILE_CAPACITY = 16,
     DIR_CAPACITY = 48,
     WRITTEN_CAPACITY = 1100,
@@ -157,13 +159,18 @@ typedef struct FakeHal {
     int opens[FILE_CAPACITY];
     int open_file_limit;
     bool np_faces_missing;
+    bool startup_missing;
+    int startup_loads;
+    int startup_releases;
 } FakeHal;
 
 static FakeHal fake;
+static uint32_t theme_memory[FAKE_THEME_MEMORY_WORDS];
 
 void fake_hal_reset(void)
 {
     fake = (FakeHal){0};
+    memset(theme_memory, 0, sizeof theme_memory);
     fake.audio.jack = HAL_AUDIO_JACK_SINGLE_ENDED;
     fake.audio.status.idle = true;
     hal_system_set_power_savings(HAL_SAVINGS_DEFAULT);
@@ -1212,6 +1219,12 @@ void hal_system_return_scratch(void)
     }
 }
 
+void *hal_system_theme_memory(uint32_t *size)
+{
+    *size = sizeof theme_memory;
+    return theme_memory;
+}
+
 void *hal_system_borrow_listing(uint32_t *size)
 {
     static uint8_t listing[96 * 1024];
@@ -1438,4 +1451,30 @@ void fake_hal_set_np_faces(bool present)
 const void *hal_system_load_faces(void)
 {
     return fake.np_faces_missing ? NULL : &NOW_PLAYING_FACES;
+}
+
+void fake_hal_set_startup(bool present)
+{
+    fake.startup_missing = !present;
+}
+
+int fake_hal_startup_loads(void)
+{
+    return fake.startup_loads;
+}
+
+int fake_hal_startup_releases(void)
+{
+    return fake.startup_releases;
+}
+
+const void *hal_system_load_startup(void)
+{
+    fake.startup_loads++;
+    return fake.startup_missing ? NULL : &APP_STARTUP;
+}
+
+void hal_system_release_startup(void)
+{
+    fake.startup_releases++;
 }

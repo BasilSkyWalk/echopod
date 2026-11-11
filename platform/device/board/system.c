@@ -9,10 +9,12 @@
 enum {
     SECTOR_WORDS = 128,
     TAG_OFFSET = 0x30,
-    TAG_LENGTH = 8
+    TAG_LENGTH = 8,
+    THEME_MEMORY_WORDS = 256
 };
 
 static char tag[TAG_LENGTH + 1];
+static uint32_t theme_memory[THEME_MEMORY_WORDS];
 static uint32_t build_day;
 static bool tried;
 
@@ -53,4 +55,10 @@ uint32_t hal_system_build_day(void)
 {
     read_header();
     return build_day;
+}
+
+void *hal_system_theme_memory(uint32_t *size)
+{
+    *size = sizeof theme_memory;
+    return theme_memory;
 }

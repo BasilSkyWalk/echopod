@@ -19,6 +19,8 @@ LOADED_LIMIT = 437600
 OVERLAY_CAPACITY = 0x15000
 RESIDENT_CAPACITY = 0x4800
 NP_FACES_CAPACITY = 0x3600
+STARTUP_CAPACITY = 0x3000
+USB_OVERLAY_WINDOW = 0x11A00
 HIGH_RAM_CAPACITY = 0x11A00
 USB_OVERLAY_IMAGE_CAPACITY = 0x10000
 CODE_SECTIONS = (".code",)
@@ -189,6 +191,8 @@ def summary(device_map, overlay_map=None, usb_overlay_map=None):
         lines.append(limit_line("resident tables", sizes[".resident"], RESIDENT_CAPACITY))
     if ".np_faces" in sizes:
         lines.append(limit_line("np_faces", sizes[".np_faces"], NP_FACES_CAPACITY))
+    if ".startup" in sizes:
+        lines.append(limit_line("start-up code", sizes[".startup"], STARTUP_CAPACITY))
     if ".high_ram" in sizes:
         lines.append(limit_line(".high_ram", sizes[".high_ram"], HIGH_RAM_CAPACITY))
     if overlay_map is not None:
@@ -199,7 +203,7 @@ def summary(device_map, overlay_map=None, usb_overlay_map=None):
         code = usb.get(".overlay", 0)
         lines.append(limit_line("USB overlay code", code, USB_OVERLAY_IMAGE_CAPACITY))
         lines.append(limit_line("USB overlay code + .bss", code + usb.get(".bss", 0),
-                                OVERLAY_CAPACITY))
+                                USB_OVERLAY_WINDOW))
     return lines
 
 

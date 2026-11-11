@@ -159,7 +159,7 @@ static bool letter_box_drawn(uint32_t at_ms)
 {
     Canvas canvas = ui_test_canvas();
     list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), at_ms);
-    return ui_test_area_has_color(&canvas, centre(), TEST_THEME.colors.header_background);
+    return ui_test_area_has_color(&canvas, centre(), TEST_THEME.colors->header_background);
 }
 
 static void the_section_shows_while_scrolling_fast_and_then_fades(void)

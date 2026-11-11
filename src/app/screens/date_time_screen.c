@@ -204,11 +204,11 @@ static void draw(void *context, Canvas *canvas)
         Rect row = {content.x, content.y + field * row_height, content.width, row_height};
         bool selected = field == screen->field;
         Color text_color =
-            selected && screen->editing ? theme->colors.selection_text : theme->colors.text;
+            selected && screen->editing ? theme->colors->selection_text : theme->colors->text;
         if (selected) {
             canvas_fill_rect(canvas, row,
-                             screen->editing ? theme->colors.selection_background
-                                             : theme->colors.header_top);
+                             screen->editing ? theme->colors->selection_background
+                                             : theme->colors->header_top);
         }
         value_text(screen, field, value, sizeof value);
         TextStyle label = {.font = theme->fonts.body, .color = text_color};
@@ -219,7 +219,7 @@ static void draw(void *context, Canvas *canvas)
         Rect value_area = {row.x + row.width - padding - width, row.y, width, row.height};
         label_draw(canvas, label, (Label){.area = value_area, .text = value});
     }
-    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors->text_tertiary};
     const char *text =
         i18n_text(screen->editing ? STR_SETTINGS_TIME_EDIT_HINT : STR_SETTINGS_TIME_PICK_HINT);
     Rect hint_area = {content.x, content.y + content.height - HINT_HEIGHT, content.width,

@@ -1,0 +1,64 @@
+name = "Ember"
+author = "EchoPod"
+description = "Warm charcoal with an amber marker on the selected row"
+selection = "selection"
+
+[spacing]
+row_height = 28
+padding = 12
+
+[colors]
+background = "#181210"
+text = "#f8ece0"
+text_secondary = "#c0a890"
+text_tertiary = "#907860"
+selection_background = "#382418"
+selection_top = "#f8a030"
+selection_shine = "#f8c878"
+selection_text = "#f8ece0"
+header_background = "#201810"
+header_top = "#402818"
+header_text = "#f8ece0"
+divider = "#503828"
+scrollbar_thumb = "#a07040"
+danger = "#f86848"
+success = "#a0d068"
+chevron = "#a08060"
+
+[boxes.selection]
+fill = "selection_background"
+border = "selection_top"
+border_width = 3
+border_edges = ["left"]
+ink = "selection_text"
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "selection_top"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_top"
+border = "selection_top"
+border_width = 1
+ink = "header_text"
+radius = 8
+
+[boxes.section]
+fill = "header_top"
+border = "selection_top"
+border_width = 1
+ink = "header_text"
+radius = 10
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+radius = 1
+
+[boxes.progress_fill]
+fill = "selection_top"
+
+[boxes.progress_active]
+fill = "selection_shine"

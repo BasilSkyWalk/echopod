@@ -57,8 +57,8 @@ static void draw(void *context, Canvas *canvas)
     const Theme *theme = stopwatch->theme;
     Rect content = theme_content_area(theme);
     header_draw(canvas, theme, stopwatch->screen.title);
-    TextStyle time = {.font = theme->fonts.title, .color = theme->colors.text};
-    TextStyle clock = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
+    TextStyle time = {.font = theme->fonts.title, .color = theme->colors->text};
+    TextStyle clock = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
     draw_centered(canvas, time, (Rect){content.x, TIME_TOP, content.width, LINE_HEIGHT},
                   stopwatch->text);
     draw_centered(canvas, clock, (Rect){content.x, CLOCK_TOP, content.width, LINE_HEIGHT},

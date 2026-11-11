@@ -1,4 +1,5 @@
 #include "app_screens.h"
+#include "core/resident.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -243,7 +244,7 @@ static void build_home(AppScreens *screens, AppScreensContext context)
     menu_screen_init(&screens->home, home);
 }
 
-Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
+ECHO_STARTUP_CODE Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
     bool card = hal_storage_card_ready();

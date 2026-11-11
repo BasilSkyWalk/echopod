@@ -10,6 +10,7 @@
 #include "hal/storage.h"
 #include "hal/system.h"
 #include "settings/settings.h"
+#include "ui/box.h"
 #include "ui/header.h"
 #include "ui/icons.h"
 #include "ui/label.h"
@@ -675,13 +676,13 @@ static void draw_lyrics(const NowPlayingScreen *now_playing, Canvas *canvas)
         Label label = {{area.x, area.y + row * LYRICS_ROW_HEIGHT, area.width, LYRICS_ROW_HEIGHT},
                        lyrics_line(&lyrics->lyrics, index)};
         if (synced && index == lyrics->current) {
-            TextStyle style = {.font = theme->fonts.title, .color = theme->colors.text};
+            TextStyle style = {.font = theme->fonts.title, .color = theme->colors->text};
             draw_moving_line(now_playing, canvas, label, style, lyrics->current_ms);
             continue;
         }
         TextStyle style = {.font = theme->fonts.body,
-                           .color =
-                               synced ? theme->colors.text_tertiary : theme->colors.text_secondary};
+                           .color = synced ? theme->colors->text_tertiary
+                                           : theme->colors->text_secondary};
         label_draw(canvas, style, centered_if(layout_of(now_playing).centered, style.font, label));
     }
 }
@@ -689,9 +690,9 @@ static void draw_lyrics(const NowPlayingScreen *now_playing, Canvas *canvas)
 static void draw_track_text(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
-    TextStyle title = {.font = theme->fonts.title, .color = theme->colors.text};
-    TextStyle artist = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
-    TextStyle album = {.font = theme->fonts.body, .color = theme->colors.text_tertiary};
+    TextStyle title = {.font = theme->fonts.title, .color = theme->colors->text};
+    TextStyle artist = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
+    TextStyle album = {.font = theme->fonts.body, .color = theme->colors->text_tertiary};
     int top = layout_of(now_playing).title_top;
     draw_text_line(now_playing, canvas,
                    (Label){column_area(now_playing, top, TEXT_LINE_HEIGHT), now_playing->title},
@@ -723,10 +724,10 @@ static void draw_progress(const NowPlayingScreen *now_playing, Canvas *canvas)
     int filled = volume ? now_playing_volume_width(now_playing->status.volume, bar.width)
                         : now_playing_progress_width(shown_position(now_playing),
                                                      now_playing->status.duration_ms, bar.width);
-    Color fill =
-        now_playing->scrubbing || volume ? theme->colors.selection_background : theme->colors.text;
-    canvas_fill_rect(canvas, bar, theme->colors.divider);
-    canvas_fill_rect(canvas, (Rect){bar.x, bar.y, filled, bar.height}, fill);
+    const BoxStyle *fill = now_playing->scrubbing || volume ? &theme->boxes->progress_active
+                                                            : &theme->boxes->progress_fill;
+    box_draw(canvas, theme->colors, &theme->boxes->progress_track, bar);
+    box_draw(canvas, theme->colors, fill, (Rect){bar.x, bar.y, filled, bar.height});
 }
 
 static void draw_right_aligned(Canvas *canvas, TextStyle style, Rect area, const char *text)
@@ -753,7 +754,7 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
         string_builder_append_unsigned(&level, now_playing->status.volume);
     }
     Rect area = line_area(theme, layout_of(now_playing).times_top, SMALL_LINE_HEIGHT);
-    TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
+    TextStyle style = {.font = theme->fonts.small, .color = theme->colors->text_secondary};
     label_draw(canvas, style, (Label){.area = area, .text = elapsed});
     draw_right_aligned(canvas, style, area, remaining);
 }
@@ -790,7 +791,7 @@ static void draw_format(const NowPlayingScreen *now_playing, Canvas *canvas)
     if (codec[0] == '\0') {
         return;
     }
-    TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
+    TextStyle style = {.font = theme->fonts.small, .color = theme->colors->text_secondary};
     Rect row = column_area(now_playing, layout_of(now_playing).format_top, SMALL_LINE_HEIGHT);
     int codec_width = text_width(style.font, codec) + 2 * CODEC_PADDING;
     char stream[STATUS_CAPACITY];
@@ -801,7 +802,7 @@ static void draw_format(const NowPlayingScreen *now_playing, Canvas *canvas)
         row.width = total;
     }
     Rect badge = {row.x, row.y, codec_width, row.height};
-    draw_outline(canvas, badge, theme->colors.text_secondary);
+    draw_outline(canvas, badge, theme->colors->text_secondary);
     Rect codec_text = label_centered_area(style.font, badge, codec);
     label_draw(canvas, style, (Label){.area = codec_text, .text = codec});
     int stream_left = badge.x + badge.width + CODEC_GAP;
@@ -812,7 +813,7 @@ static void draw_format(const NowPlayingScreen *now_playing, Canvas *canvas)
 static void draw_details(const NowPlayingScreen *now_playing, Canvas *canvas)
 {
     const Theme *theme = now_playing->config.theme;
-    TextStyle style = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    TextStyle style = {.font = theme->fonts.small, .color = theme->colors->text_tertiary};
     Layout layout = layout_of(now_playing);
     char detail[STATUS_CAPACITY];
     now_playing_detail_text(&now_playing->status, detail, sizeof detail);
@@ -868,13 +869,13 @@ static void draw_badge(const NowPlayingScreen *now_playing, Canvas *canvas)
     Rect badge = {center_x - BADGE_SIZE / 2, center_y - BADGE_SIZE / 2, BADGE_SIZE, BADGE_SIZE};
     Rect icon = {center_x - BADGE_ICON_SIZE / 2, center_y - BADGE_ICON_SIZE / 2, BADGE_ICON_SIZE,
                  BADGE_ICON_SIZE};
-    canvas_fill_rect(canvas, badge, theme->colors.background);
-    draw_badge_icon(canvas, feedback, icon, theme->colors.text);
+    canvas_fill_rect(canvas, badge, theme->colors->background);
+    draw_badge_icon(canvas, feedback, icon, theme->colors->text);
 }
 
 static void draw_nothing_playing(const Theme *theme, Canvas *canvas)
 {
-    TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
+    TextStyle style = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
     Rect content = theme_content_area(theme);
     const char *message = i18n_text(STR_MENU_NOTHING_PLAYING);
     Rect area = label_centered_area(style.font, content, message);
@@ -964,7 +965,7 @@ static void draw_face(const NowPlayingScreen *now_playing, const NowPlayingFaces
 {
     char texts[FACE_TEXTS_CAPACITY];
     Theme dressed = *now_playing->config.theme;
-    dressed.colors = *faces->chrome[face_of(now_playing)];
+    dressed.colors = faces->chrome[face_of(now_playing)];
     header_draw(canvas, &dressed, now_playing->screen.title);
     NowPlayingFrame frame;
     frame_of(now_playing, &frame, texts);
@@ -981,7 +982,7 @@ static void draw(void *context, Canvas *canvas)
         return;
     }
     const Theme *theme = now_playing->config.theme;
-    canvas_fill_rect(canvas, theme_content_area(theme), theme->colors.background);
+    canvas_fill_rect(canvas, theme_content_area(theme), theme->colors->background);
     header_draw(canvas, theme, now_playing->screen.title);
     if (!now_playing->status.has_track) {
         draw_nothing_playing(theme, canvas);

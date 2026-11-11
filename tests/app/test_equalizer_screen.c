@@ -437,7 +437,7 @@ static void draw_editor(const Theme *theme, bool grabbed, Color *pixels)
     }
     Canvas canvas = canvas_make(
         pixels, (Rect){0, 0, theme->metrics.screen_width, theme->metrics.screen_height});
-    canvas_clear(&canvas, theme->colors.background);
+    canvas_clear(&canvas, theme->colors->background);
     editor->draw(editor->context, &canvas);
 }
 
@@ -460,12 +460,14 @@ static void the_grabbed_band_and_its_knob_stay_visible_in_every_theme(void)
 {
     for (int theme_id = 0; theme_id < THEME_COUNT; theme_id++) {
         for (int portrait = 0; portrait < 2; portrait++) {
-            Theme theme = default_theme_styled(portrait != 0, (ThemeChoice){.theme = theme_id});
+            ThemeColors tinted;
+            Theme theme =
+                default_theme_styled(portrait != 0, (ThemeChoice){.theme = theme_id}, &tinted);
             draw_editor(&theme, true, grabbed_pixels);
             draw_editor(&theme, false, picked_pixels);
-            Color knob = theme.colors.selection_text;
-            CHECK(knob != theme.colors.text);
-            int changed = pixels_changed_to(&theme, theme.colors.text, knob);
+            Color knob = theme.colors->selection_text;
+            CHECK(knob != theme.colors->text);
+            int changed = pixels_changed_to(&theme, theme.colors->text, knob);
             CHECK(portrait != 0 ? changed > PORTRAIT_KNOB_PIXELS
                                 : changed >= LANDSCAPE_KNOB_PIXELS);
         }

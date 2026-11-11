@@ -275,8 +275,8 @@ static void draw(void *context, Canvas *canvas)
     Rect content = theme_content_area(theme);
     header_draw(canvas, theme, i18n_text(up_next->chapters ? STR_MENU_CHAPTERS : STR_MENU_UP_NEXT));
     if (up_next->count == 0) {
-        TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
-        canvas_fill_rect(canvas, content, theme->colors.background);
+        TextStyle style = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
+        canvas_fill_rect(canvas, content, theme->colors->background);
         const char *message = i18n_text(STR_MENU_NOTHING_IS_PLAYING);
         Rect area = label_centered_area(style.font, content, message);
         label_draw(canvas, style, (Label){.area = area, .text = message});

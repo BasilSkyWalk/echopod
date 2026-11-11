@@ -123,7 +123,14 @@ add_library(echo_ui_fixtures STATIC gfx/tiny_font.c ui/ui_test_theme.c ui/ui_tes
 target_include_directories(echo_ui_fixtures PUBLIC gfx ui)
 target_link_libraries(echo_ui_fixtures PUBLIC echo_ui PRIVATE echo_options)
 
-foreach(ui_test theme theme_layout list_view list_navigation fast_scroll header menu_screen message_screen
+echo_add_unit_test(NAME test_theme_package
+    SOURCES ui/test_theme_package.c
+    LIBRARIES echo_ui_fixtures
+)
+target_compile_definitions(test_theme_package PRIVATE
+    ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+
+foreach(ui_test theme theme_layout box list_view list_navigation fast_scroll header menu_screen message_screen
         choice_screen toast status_bar)
     echo_add_unit_test(NAME test_${ui_test}
         SOURCES ui/test_${ui_test}.c
@@ -155,10 +162,11 @@ echo_add_unit_test(NAME test_face_text
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/np_faces
 )
 echo_add_unit_test(NAME test_app
-    SOURCES app/test_app.c app/fake_hal.c
+    SOURCES app/test_app.c app/fake_hal.c app/theme_fixture.c
     LIBRARIES echo_app echo_library_fixtures m
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+target_compile_definitions(test_app PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_release_diagnostics
     SOURCES app/test_release_diagnostics.c ${PROJECT_SOURCE_DIR}/src/app/diagnostics_menu_release.c
         app/fake_hal.c
@@ -272,10 +280,12 @@ echo_add_unit_test(NAME test_date_time_screen
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 echo_add_unit_test(NAME test_settings_screens
-    SOURCES app/test_settings_screens.c app/fake_hal.c
+    SOURCES app/test_settings_screens.c app/fake_hal.c app/theme_fixture.c
     LIBRARIES echo_app echo_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+target_compile_definitions(test_settings_screens PRIVATE
+    ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 echo_add_unit_test(NAME test_folders_screen
     SOURCES app/test_folders_screen.c app/fake_hal.c
     LIBRARIES echo_app echo_library_scan
@@ -524,6 +534,13 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             --catalogue ${PROJECT_SOURCE_DIR}/src/core/include/core
             --languages ${PROJECT_SOURCE_DIR}/assets/lang
             --output ${PROJECT_SOURCE_DIR}/src/lang/packs
+            --check
+    )
+    add_test(NAME theme_fixtures_up_to_date
+        COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/theme_pack.py
+            --themes ${PROJECT_SOURCE_DIR}/assets/themes
+            --definitions ${PROJECT_SOURCE_DIR}/src/ui/include/ui
+            --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/themes
             --check
     )
     add_test(NAME cover_fixture_up_to_date

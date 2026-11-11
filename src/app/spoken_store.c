@@ -1,4 +1,5 @@
 #include "spoken_store.h"
+#include "core/resident.h"
 
 #include "core/format.h"
 #include "core/i18n.h"
@@ -29,7 +30,7 @@ static bool read_bookmarks(uint8_t *bytes, uint32_t *length)
     return read;
 }
 
-void spoken_store_load(SpokenStore *store, const Library *library)
+ECHO_STARTUP_CODE void spoken_store_load(SpokenStore *store, const Library *library)
 {
     uint8_t bytes[BOOKMARKS_FILE_CAPACITY];
     uint32_t length = 0;

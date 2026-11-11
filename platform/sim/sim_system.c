@@ -1,3 +1,4 @@
+#include "app/startup.h"
 #include "core/wall_clock.h"
 #include "hal/system.h"
 #include "library/library_scan.h"
@@ -7,6 +8,7 @@ extern const NowPlayingFaces NOW_PLAYING_FACES;
 
 enum {
     BOOT_CLOCK_MHZ = 24,
+    SIM_THEME_MEMORY_WORDS = 256,
     BUILD_YEAR_DIVISOR = 10000,
     BUILD_MONTH_DIVISOR = 100
 };
@@ -105,6 +107,13 @@ void *hal_system_borrow_scratch(uint32_t *size)
     return scratch;
 }
 
+void *hal_system_theme_memory(uint32_t *size)
+{
+    static uint32_t memory[SIM_THEME_MEMORY_WORDS];
+    *size = sizeof memory;
+    return memory;
+}
+
 void *hal_system_borrow_listing(uint32_t *size)
 {
     static uint8_t listing[96 * 1024];
@@ -156,4 +165,13 @@ void hal_system_watchdog_test(void)
 const void *hal_system_load_faces(void)
 {
     return &NOW_PLAYING_FACES;
+}
+
+const void *hal_system_load_startup(void)
+{
+    return &APP_STARTUP;
+}
+
+void hal_system_release_startup(void)
+{
 }

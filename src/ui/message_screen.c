@@ -92,8 +92,8 @@ static void draw(void *context, Canvas *canvas)
     MessageScreen *message = context;
     const Theme *theme = message->config.theme;
     Rect content = theme_content_area(theme);
-    TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
-    canvas_fill_rect(canvas, content, theme->colors.background);
+    TextStyle style = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
+    canvas_fill_rect(canvas, content, theme->colors->background);
     header_draw(canvas, theme, message->config.title);
     int padding = theme->metrics.padding;
     int width = content.width - 2 * padding;

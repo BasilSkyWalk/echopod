@@ -175,16 +175,16 @@ static void the_selected_row_is_highlighted(void)
     move_times(&view, 1, 1);
     Canvas canvas = ui_test_canvas();
     list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
-    CHECK(ui_test_area_has_only(&canvas, row_rect(1), TEST_THEME.colors.selection_background));
-    CHECK(ui_test_area_has_only(&canvas, row_rect(0), TEST_THEME.colors.background));
-    CHECK(ui_test_area_has_only(&canvas, row_rect(2), TEST_THEME.colors.background));
+    CHECK(ui_test_area_has_only(&canvas, row_rect(1), TEST_THEME.colors->selection_background));
+    CHECK(ui_test_area_has_only(&canvas, row_rect(0), TEST_THEME.colors->background));
+    CHECK(ui_test_area_has_only(&canvas, row_rect(2), TEST_THEME.colors->background));
 }
 
 static void the_selected_row_has_a_shine_line_and_shades_down(void)
 {
     Theme theme = TEST_THEME;
-    theme.colors.selection_top = 0xFFFF;
-    theme.colors.selection_shine = 0x07E0;
+    ui_test_colors(&theme)->selection_top = 0xFFFF;
+    ui_test_colors(&theme)->selection_shine = 0x07E0;
     ListView view = list_of(10);
     view.theme = &theme;
     move_times(&view, 1, 1);
@@ -192,20 +192,20 @@ static void the_selected_row_has_a_shine_line_and_shades_down(void)
     list_view_draw(&view, &canvas, theme_content_area(&theme), 100);
     Rect row = row_rect(1);
     CHECK_EQUAL(0x07E0, canvas_pixel_at(&canvas, 0, row.y));
-    CHECK_EQUAL(theme.colors.selection_background,
+    CHECK_EQUAL(theme.colors->selection_background,
                 canvas_pixel_at(&canvas, 0, row.y + row.height - 1));
     Color below_shine = canvas_pixel_at(&canvas, 0, row.y + 1);
-    CHECK(below_shine != 0x07E0 && below_shine != theme.colors.selection_background);
+    CHECK(below_shine != 0x07E0 && below_shine != theme.colors->selection_background);
 }
 
 static Theme distinct_selection_theme(ThemeSelection selection)
 {
     Theme theme = TEST_THEME;
-    theme.colors.selection_background = 0x001F;
-    theme.colors.selection_top = 0x8410;
-    theme.colors.selection_shine = 0x07E0;
-    theme.colors.selection_text = 0xFFE0;
-    theme.colors.chevron = 0xC618;
+    ui_test_colors(&theme)->selection_background = 0x001F;
+    ui_test_colors(&theme)->selection_top = 0x8410;
+    ui_test_colors(&theme)->selection_shine = 0x07E0;
+    ui_test_colors(&theme)->selection_text = 0xFFE0;
+    ui_test_colors(&theme)->chevron = 0xC618;
     theme.selection = selection;
     return theme;
 }
@@ -231,10 +231,10 @@ static Canvas draw_second_row_selected(Theme *theme)
 static void a_flat_selection_fills_the_whole_row_in_the_selection_background(void)
 {
     Theme theme = distinct_selection_theme(THEME_SELECTION_FLAT);
-    theme.colors.selection_text = theme.colors.selection_background;
-    theme.colors.chevron = theme.colors.selection_background;
+    ui_test_colors(&theme)->selection_text = theme.colors->selection_background;
+    ui_test_colors(&theme)->chevron = theme.colors->selection_background;
     Canvas canvas = draw_second_row_selected(&theme);
-    CHECK(ui_test_area_has_only(&canvas, full_row(1), theme.colors.selection_background));
+    CHECK(ui_test_area_has_only(&canvas, full_row(1), theme.colors->selection_background));
 }
 
 static void an_outline_selection_draws_a_frame_around_the_background(void)
@@ -243,14 +243,14 @@ static void an_outline_selection_draws_a_frame_around_the_background(void)
     Canvas canvas = draw_second_row_selected(&theme);
     Rect row = full_row(1);
     int last = row.y + row.height - 1;
-    CHECK_EQUAL(theme.colors.selection_top, canvas_pixel_at(&canvas, 6, row.y + 1));
-    CHECK_EQUAL(theme.colors.selection_top, canvas_pixel_at(&canvas, 20, last - 1));
-    CHECK_EQUAL(theme.colors.selection_top, canvas_pixel_at(&canvas, 6, row.y + 2));
-    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 7, row.y + 2));
-    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 5, row.y + 2));
-    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 20, row.y));
-    CHECK_EQUAL(theme.colors.background, canvas_pixel_at(&canvas, 20, last));
-    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors.selection_background));
+    CHECK_EQUAL(theme.colors->selection_top, canvas_pixel_at(&canvas, 6, row.y + 1));
+    CHECK_EQUAL(theme.colors->selection_top, canvas_pixel_at(&canvas, 20, last - 1));
+    CHECK_EQUAL(theme.colors->selection_top, canvas_pixel_at(&canvas, 6, row.y + 2));
+    CHECK_EQUAL(theme.colors->background, canvas_pixel_at(&canvas, 7, row.y + 2));
+    CHECK_EQUAL(theme.colors->background, canvas_pixel_at(&canvas, 5, row.y + 2));
+    CHECK_EQUAL(theme.colors->background, canvas_pixel_at(&canvas, 20, row.y));
+    CHECK_EQUAL(theme.colors->background, canvas_pixel_at(&canvas, 20, last));
+    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors->selection_background));
 }
 
 static void an_outline_selection_keeps_clear_of_the_scrollbar(void)
@@ -262,7 +262,7 @@ static void an_outline_selection_keeps_clear_of_the_scrollbar(void)
     list_view_draw(&view, &canvas, theme_content_area(&theme), 100);
     Rect row = row_rect(0);
     Rect beside_scrollbar = {TEST_SCREEN_WIDTH - 6, row.y, 6, row.height};
-    CHECK(!ui_test_area_has_color(&canvas, beside_scrollbar, theme.colors.selection_top));
+    CHECK(!ui_test_area_has_color(&canvas, beside_scrollbar, theme.colors->selection_top));
 }
 
 static unsigned beyond_the_frame_sum(Theme *theme)
@@ -284,11 +284,11 @@ static void an_outline_selection_draws_its_label_and_chevron_in_the_frame_color(
     Canvas canvas = draw_second_row_selected(&theme);
     Rect row = full_row(1);
     Rect label = {0, row.y, 6, row.height};
-    CHECK(ui_test_area_has_color(&canvas, label, theme.colors.selection_top));
-    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors.selection_text));
-    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors.chevron));
+    CHECK(ui_test_area_has_color(&canvas, label, theme.colors->selection_top));
+    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors->selection_text));
+    CHECK(!ui_test_area_has_color(&canvas, row, theme.colors->chevron));
     unsigned chevron = beyond_the_frame_sum(&theme);
-    theme.colors.selection_top = 0xF81F;
+    ui_test_colors(&theme)->selection_top = 0xF81F;
     CHECK(beyond_the_frame_sum(&theme) != chevron);
 }
 
@@ -296,7 +296,7 @@ static void a_gradient_selection_draws_its_label_in_the_selection_text(void)
 {
     Theme theme = distinct_selection_theme(THEME_SELECTION_GRADIENT);
     Canvas canvas = draw_second_row_selected(&theme);
-    CHECK(ui_test_area_has_color(&canvas, full_row(1), theme.colors.selection_text));
+    CHECK(ui_test_area_has_color(&canvas, full_row(1), theme.colors->selection_text));
 }
 
 static void the_scrollbar_thumb_sits_inset_without_a_track(void)
@@ -307,7 +307,7 @@ static void the_scrollbar_thumb_sits_inset_without_a_track(void)
     list_view_draw(&long_list, &canvas, content, 100);
     Rect edge = {TEST_SCREEN_WIDTH - TEST_THEME.metrics.scrollbar_inset, content.y,
                  TEST_THEME.metrics.scrollbar_inset, content.height};
-    CHECK(ui_test_area_has_only(&canvas, edge, TEST_THEME.colors.background));
+    CHECK(ui_test_area_has_only(&canvas, edge, TEST_THEME.colors->background));
 }
 
 static void a_row_that_opens_something_shows_a_chevron(void)
@@ -318,8 +318,8 @@ static void a_row_that_opens_something_shows_a_chevron(void)
     list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
     Rect right_of_row_one = {TEST_SCREEN_WIDTH - 8, row_rect(1).y, 8, TEST_ROW_HEIGHT};
     Rect right_of_row_two = {TEST_SCREEN_WIDTH - 8, row_rect(2).y, 8, TEST_ROW_HEIGHT};
-    CHECK(!ui_test_area_has_only(&canvas, right_of_row_one, TEST_THEME.colors.background));
-    CHECK(ui_test_area_has_only(&canvas, right_of_row_two, TEST_THEME.colors.background));
+    CHECK(!ui_test_area_has_only(&canvas, right_of_row_one, TEST_THEME.colors->background));
+    CHECK(ui_test_area_has_only(&canvas, right_of_row_two, TEST_THEME.colors->background));
 }
 
 static void the_scrollbar_appears_only_when_items_overflow(void)
@@ -330,11 +330,11 @@ static void the_scrollbar_appears_only_when_items_overflow(void)
     ListView long_list = list_of(10);
     Canvas canvas = ui_test_canvas();
     list_view_draw(&long_list, &canvas, content, 100);
-    CHECK(ui_test_area_has_color(&canvas, right_edge, TEST_THEME.colors.scrollbar_thumb));
+    CHECK(ui_test_area_has_color(&canvas, right_edge, TEST_THEME.colors->scrollbar_thumb));
     ListView short_list = list_of(2);
     canvas = ui_test_canvas();
     list_view_draw(&short_list, &canvas, content, 100);
-    CHECK(!ui_test_area_has_color(&canvas, right_edge, TEST_THEME.colors.scrollbar_thumb));
+    CHECK(!ui_test_area_has_color(&canvas, right_edge, TEST_THEME.colors->scrollbar_thumb));
 }
 
 static void a_detail_is_drawn_in_the_secondary_color_at_the_right(void)
@@ -345,7 +345,7 @@ static void a_detail_is_drawn_in_the_secondary_color_at_the_right(void)
     list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
     Rect right_of_row_one = {TEST_SCREEN_WIDTH / 2, row_rect(1).y, TEST_SCREEN_WIDTH / 2,
                              TEST_ROW_HEIGHT};
-    CHECK(ui_test_area_has_color(&canvas, right_of_row_one, TEST_THEME.colors.text_secondary));
+    CHECK(ui_test_area_has_color(&canvas, right_of_row_one, TEST_THEME.colors->text_secondary));
 }
 
 static void a_long_detail_stops_at_its_maximum_width(void)
@@ -356,10 +356,11 @@ static void a_long_detail_stops_at_its_maximum_width(void)
     Canvas canvas = ui_test_canvas();
     list_view_draw(&view, &canvas, theme_content_area(&TEST_THEME), 100);
     Rect left_half_of_row_one = {0, row_rect(1).y, TEST_SCREEN_WIDTH / 2, TEST_ROW_HEIGHT};
-    CHECK(!ui_test_area_has_color(&canvas, left_half_of_row_one, TEST_THEME.colors.text_secondary));
+    CHECK(
+        !ui_test_area_has_color(&canvas, left_half_of_row_one, TEST_THEME.colors->text_secondary));
     Rect right_of_row_one = {TEST_SCREEN_WIDTH / 2, row_rect(1).y, TEST_SCREEN_WIDTH / 2,
                              TEST_ROW_HEIGHT};
-    CHECK(ui_test_area_has_color(&canvas, right_of_row_one, TEST_THEME.colors.text_secondary));
+    CHECK(ui_test_area_has_color(&canvas, right_of_row_one, TEST_THEME.colors->text_secondary));
 }
 
 int main(void)

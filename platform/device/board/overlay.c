@@ -19,9 +19,13 @@ enum {
 extern const uint8_t device_code_end[];
 
 static NpFacesGate np_faces_gate;
+static bool startup_running;
 
 static const BoardOverlay NP_FACES_OVERLAY = {NP_FACES_IMAGE_OFFSET, NP_FACES_IMAGE_MAGIC,
                                               (uint8_t *)NP_FACES_BASE, NP_FACES_BYTES};
+
+static const BoardOverlay STARTUP_OVERLAY = {STARTUP_IMAGE_OFFSET, STARTUP_IMAGE_MAGIC,
+                                             (uint8_t *)NP_FACES_BASE, NP_FACES_BYTES};
 
 static uint32_t le32(const uint8_t *bytes)
 {
@@ -110,10 +114,13 @@ bool board_overlay_load(const BoardOverlay *overlay)
     return true;
 }
 
-static const void *load_window(uint32_t image_offset, uint32_t magic)
+static const void *load_window(uint32_t image_offset, uint32_t magic, uint32_t capacity)
 {
     uint8_t *base = (uint8_t *)(uintptr_t)OVERLAY_WINDOW_BASE;
-    BoardOverlay overlay = {image_offset, magic, base, OVERLAY_WINDOW_BYTES};
+    BoardOverlay overlay = {image_offset, magic, base, capacity};
+    if (startup_running) {
+        return NULL;
+    }
     board_np_faces_forget();
     board_audio_shut_down();
     return board_overlay_load(&overlay) ? base + OVERLAY_HEADER_BYTES : NULL;
@@ -121,7 +128,7 @@ static const void *load_window(uint32_t image_offset, uint32_t magic)
 
 const void *hal_system_load_rescan_code(void)
 {
-    return load_window(RESCAN_OVERLAY_IMAGE_OFFSET, RESCAN_OVERLAY_MAGIC);
+    return load_window(RESCAN_OVERLAY_IMAGE_OFFSET, RESCAN_OVERLAY_MAGIC, OVERLAY_WINDOW_BYTES);
 }
 
 void board_np_faces_forget(void)
@@ -141,8 +148,30 @@ static bool np_faces_may_load(void)
     return !hal_system_restart_pending() && emmc_status(&status);
 }
 
+bool board_startup_keep(void)
+{
+    board_np_faces_forget();
+    return board_overlay_load(&STARTUP_OVERLAY);
+}
+
+__attribute__((noinline)) const void *hal_system_load_startup(void)
+{
+    startup_running = board_startup_keep();
+    const void *entry = (const void *)(uintptr_t)NP_FACES_ENTRY;
+    __asm__("" : "+r"(entry));
+    return startup_running ? entry : NULL;
+}
+
+void hal_system_release_startup(void)
+{
+    startup_running = false;
+}
+
 __attribute__((noinline)) const void *hal_system_load_faces(void)
 {
+    if (startup_running) {
+        return NULL;
+    }
     if (np_faces_gate.state == NP_FACES_READY) {
         np_faces_gate_checked(&np_faces_gate, np_faces_header_intact());
     }
@@ -157,5 +186,5 @@ __attribute__((noinline)) const void *hal_system_load_faces(void)
 
 const void *board_usb_overlay_load(void)
 {
-    return load_window(USB_OVERLAY_IMAGE_OFFSET, USB_OVERLAY_MAGIC);
+    return load_window(USB_OVERLAY_IMAGE_OFFSET, USB_OVERLAY_MAGIC, USB_OVERLAY_WINDOW_BYTES);
 }

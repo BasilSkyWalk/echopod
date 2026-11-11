@@ -1,4 +1,5 @@
 #include "app/app.h"
+#include "app/startup.h"
 
 #include <stddef.h>
 
@@ -12,6 +13,7 @@
 #include "core/key_tracker.h"
 #include "core/low_battery.h"
 #include "core/power_policy.h"
+#include "core/resident.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
 #include "default_theme.h"
@@ -38,6 +40,7 @@
 #include "scrobbler_log.h"
 #include "settings/rocker.h"
 #include "settings_store.h"
+#include "theme_store.h"
 #include "ui/choice_screen.h"
 #include "ui/fade.h"
 #include "ui/header.h"
@@ -59,7 +62,8 @@ enum {
     IDLE_RENDER_MS = 100,
     NUMBER_CAPACITY = 12,
     PROGRESS_TEXT_CAPACITY = 64,
-    MESSAGE_TEXT_CAPACITY = 64
+    MESSAGE_TEXT_CAPACITY = 64,
+    START_REFUSAL_MS = 5000
 };
 
 static const KeyConfig KEY_CONFIG = {
@@ -115,6 +119,7 @@ typedef struct AppState {
     KeyTracker keys;
     bool rocker_swapped[KEY_COUNT];
     uint32_t dac_volume_until_ms;
+    ThemeColors colors;
     Theme theme;
     Theme stage_theme;
     int shown_theme;
@@ -169,6 +174,7 @@ typedef struct AppState {
     AppOptions options;
     bool display_on;
     bool powered_off;
+    bool start_refused;
     bool charging;
     uint32_t charge_lit_until_ms;
     HalBattery charge_battery;
@@ -182,6 +188,7 @@ static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
 static const char SPLASH_TEXT[] = "EchoPod";
 static const char GOODBYE_TEXT[] = "Goodbye";
+static const char START_CODE_MISSING[] = "Start-up code missing: reinstall the update";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_LONG_SIDE];
 
@@ -218,7 +225,27 @@ static int theme_key(const Settings *settings)
 {
     return (int)settings->orientation | settings->options[OPTION_ACCENT] << 2 |
            settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_STATUS_BAR] << 7 |
-           settings->options[OPTION_THEME] << 8;
+           settings->options[OPTION_THEME] << 8 | theme_store_revision() << 12;
+}
+
+static void wear_spacing(ThemeMetrics *metrics, const uint8_t *spacing)
+{
+    for (int id = 0; id < THEME_SPACING_COUNT; id++) {
+        if (spacing[id] != THEME_PACKAGE_SPACING_UNSET) {
+            theme_space(metrics, (ThemeSpacingId)id, spacing[id] - 1);
+        }
+    }
+}
+
+static void wear_theme_file(Theme *theme)
+{
+    const ThemePackage *package = theme_store_package();
+    if (package != NULL) {
+        theme->colors = &package->colors;
+        theme->boxes = &package->boxes;
+        theme->selection = (ThemeSelection)package->selection;
+        wear_spacing(&theme->metrics, package->spacing);
+    }
 }
 
 static void apply_orientation(void)
@@ -230,8 +257,9 @@ static void apply_orientation(void)
     ThemeChoice choice = {.theme = settings->options[OPTION_THEME],
                           .accent = settings->options[OPTION_ACCENT],
                           .flat = settings->options[OPTION_HIGHLIGHT] != 0};
-    app.theme = default_theme_styled(portrait, choice);
-    app.stage_theme = default_theme_stage(portrait, choice);
+    app.theme = default_theme_styled(portrait, choice, &app.colors);
+    app.stage_theme = default_theme_stage(portrait, choice, &app.colors);
+    wear_theme_file(&app.theme);
     if (settings->options[OPTION_STATUS_BAR] == STATUS_BAR_LARGE) {
         default_theme_enlarge_status(&app.theme);
         default_theme_enlarge_status(&app.stage_theme);
@@ -611,7 +639,7 @@ static void draw_fade(Canvas *canvas, const Fade *fade, const char *text)
     const Theme *theme = current_theme();
     Rect screen = whole_screen();
     Color color =
-        color_blend(theme->colors.background, theme->colors.text, fade_alpha(fade, app.now_ms));
+        color_blend(theme->colors->background, theme->colors->text, fade_alpha(fade, app.now_ms));
     TextStyle style = {.font = theme->fonts.title, .color = color};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, screen, text), .text = text});
@@ -645,7 +673,7 @@ __attribute__((noinline)) static Theme dressed_theme(const Screen *screen)
                                   ? now_playing_face_colors(&app.screens.now_playing)
                                   : NULL;
     if (face != NULL) {
-        theme.colors = *face;
+        theme.colors = face;
     }
     return theme;
 }
@@ -780,7 +808,7 @@ static void render(FrameDrawer drawer, bool drawer_paints_everything, int strip_
         .screen_width = current_theme()->metrics.screen_width,
         .screen_height = current_theme()->metrics.screen_height,
         .strip_height = strip_height,
-        .background = current_theme()->colors.background,
+        .background = current_theme()->colors->background,
         .drawer_paints_everything = drawer_paints_everything,
     };
     FrameSink sink = {.write = write_to_display, .context = NULL};
@@ -906,7 +934,7 @@ static void show_card_setup(void)
     app_show_notice("EchoPod", i18n_text(STR_BOOT_CARD_SETUP));
 }
 
-static void apply_language(Language language)
+ECHO_STARTUP_CODE static void apply_language(Language language)
 {
     const uint8_t *pack;
     uint32_t size;
@@ -915,7 +943,7 @@ static void apply_language(Language language)
     }
 }
 
-void app_start(void)
+ECHO_STARTUP_CODE static void start_up(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
     apply_language(LANGUAGE_ENGLISH);
@@ -939,6 +967,7 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
+    theme_store_start();
     hal_power_confirm_start(app.settings.settings.options[OPTION_POWER_ON] == POWER_ON_HOLD);
     clock_store_start(&app.clock, &app.settings.settings, now_ms);
     app.history.clock = &app.clock.clock;
@@ -952,6 +981,39 @@ void app_start(void)
     report_card_files(files, now_ms);
     if (hal_power_take_usb_start()) {
         start_charging(now_ms);
+    }
+}
+
+ECHO_STARTUP_ENTRY const AppStartup APP_STARTUP = {.magic = APP_STARTUP_MAGIC, .start = start_up};
+
+static void refuse_to_start(void)
+{
+    bool updated = hal_system_restart_pending();
+    app_show_notice("EchoPod", updated ? i18n_text(STR_RESCAN_RESTART_NEEDED) : START_CODE_MISSING);
+    app.now_ms = hal_clock_milliseconds();
+}
+
+static void switch_off_after_refusal(void)
+{
+    if (hal_clock_milliseconds() - app.now_ms < START_REFUSAL_MS) {
+        return;
+    }
+    app.start_refused = false;
+    app.powered_off = true;
+    hal_power_off();
+}
+
+void app_start(void)
+{
+    const AppStartup *startup = hal_system_load_startup();
+    bool usable = startup != NULL && startup->magic == APP_STARTUP_MAGIC;
+    if (usable) {
+        startup->start();
+    }
+    hal_system_release_startup();
+    app.start_refused = !usable;
+    if (!usable) {
+        refuse_to_start();
     }
 }
 
@@ -1298,6 +1360,10 @@ static void charge_step(uint32_t now_ms)
 void app_step(void)
 {
     if (app.powered_off) {
+        return;
+    }
+    if (app.start_refused) {
+        switch_off_after_refusal();
         return;
     }
     app.idle = false;

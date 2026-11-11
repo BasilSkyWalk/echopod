@@ -6,6 +6,14 @@
 #define ECHO_RESIDENT
 #endif
 
+#ifdef ECHO_STARTUP_SECTIONS
+#define ECHO_STARTUP_CODE __attribute__((section(".startup.text"), noinline))
+#define ECHO_STARTUP_ENTRY __attribute__((section(".startup.entry"), used))
+#else
+#define ECHO_STARTUP_CODE
+#define ECHO_STARTUP_ENTRY
+#endif
+
 #ifdef ECHO_NP_FACES_SECTIONS
 #define ECHO_NP_FACES_CODE __attribute__((section(".np_faces.text")))
 #define ECHO_NP_FACES_DATA __attribute__((section(".np_faces.rodata")))

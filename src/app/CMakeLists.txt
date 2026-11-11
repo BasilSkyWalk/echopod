@@ -26,6 +26,7 @@ add_library(echo_app STATIC
     scrobbler_log.c
     settings_screens.c
     settings_store.c
+    theme_store.c
     spoken_store.c
     update_record.c
     screens/bluetooth_screen.c
@@ -42,7 +43,8 @@ add_library(echo_app STATIC
 )
 target_include_directories(echo_app PUBLIC include PRIVATE .)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_app PRIVATE ECHO_RESIDENT_TABLES ECHO_EQ_FILES_HIDDEN)
+    target_compile_definitions(echo_app PRIVATE ECHO_RESIDENT_TABLES ECHO_STARTUP_SECTIONS
+        ECHO_EQ_FILES_HIDDEN)
 endif()
 target_link_libraries(echo_app
     PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_np_faces echo_settings echo_sound echo_hal

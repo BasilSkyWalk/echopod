@@ -6,6 +6,7 @@
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
+#include "theme_store.h"
 
 enum {
     BRIGHTNESS_LEVEL_COUNT = SETTINGS_BRIGHTNESS_MAX - SETTINGS_BRIGHTNESS_MIN + 1,
@@ -389,11 +390,50 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_MENU_NOW_PLAYING, NP_FACE_OPTIONS, OPTION_NOW_PLAYING_FACE),
 };
 
+static int current_theme(const void *context)
+{
+    int file = theme_store_current();
+    return file != THEME_STORE_NONE ? THEME_COUNT + file : current_slot(context);
+}
+
+static void choose_theme(void *context, int index)
+{
+    if (index < THEME_COUNT) {
+        choose_slot(context, index);
+    }
+    (void)theme_store_choose(index < THEME_COUNT ? THEME_STORE_NONE : index - THEME_COUNT);
+}
+
+static ScreenAction open_theme_choice(SettingsEntry *entry)
+{
+    SettingsScreens *screens = entry->owner;
+    const char **options = theme_store_options();
+    int files = options != NULL ? theme_store_scan() : 0;
+    for (int theme = 0; options != NULL && theme < THEME_COUNT + files; theme++) {
+        options[theme] = theme < THEME_COUNT ? i18n_text(THEME_OPTIONS[theme])
+                                             : theme_store_name(theme - THEME_COUNT);
+    }
+    ChoiceConfig config = {
+        .title = i18n_text(entry->choice->title),
+        .options = options,
+        .option_ids = options != NULL ? NULL : entry->choice->options,
+        .option_count = THEME_COUNT + files,
+        .current = current_theme,
+        .choose = choose_theme,
+        .context = entry,
+        .theme = screens->theme,
+    };
+    return screen_action_push(choice_screen_init(&screens->choice, config));
+}
+
 static ScreenAction open_choice(void *context)
 {
     SettingsEntry *entry = context;
     SettingsScreens *screens = entry->owner;
     const SettingChoice *choice = entry->choice;
+    if (choice->slot - 1 == OPTION_THEME) {
+        return open_theme_choice(entry);
+    }
     bool slot = choice->slot != 0;
     ChoiceConfig config = {
         .title = i18n_text(choice->title),
@@ -413,6 +453,9 @@ static const char *choice_value(const void *context)
     const SettingsEntry *entry = context;
     int current = entry->choice->slot != 0 ? current_slot(entry)
                                            : entry->choice->current(&entry->owner->context);
+    if (entry->choice->slot - 1 == OPTION_THEME && theme_store_package() != NULL) {
+        return theme_store_package()->name;
+    }
     if (current < 0 || current >= entry->choice->option_count) {
         return "";
     }
@@ -574,10 +617,12 @@ static bool choice_shown(const void *context)
 {
     const SettingsEntry *entry = context;
     int theme = settings_of(&entry->owner->context)->options[OPTION_THEME];
+    bool built_in = theme_store_package() == NULL;
     if (entry->choice == &CHOICES[CHOICE_ACCENT]) {
-        return default_theme_takes_accent(theme);
+        return built_in && default_theme_takes_accent(theme);
     }
-    return entry->choice != &CHOICES[CHOICE_HIGHLIGHT] || default_theme_takes_highlight(theme);
+    return entry->choice != &CHOICES[CHOICE_HIGHLIGHT] ||
+           (built_in && default_theme_takes_highlight(theme));
 }
 
 static MenuItem row_item(SettingsScreens *screens, int row)

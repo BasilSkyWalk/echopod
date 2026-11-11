@@ -120,8 +120,8 @@ static void the_header_and_the_list_are_drawn(void)
     screen->draw(screen->context, &canvas);
     Rect header = {0, 0, 1, TEST_HEADER_HEIGHT - 1};
     Rect first_row = {0, TEST_HEADER_HEIGHT, 1, TEST_ROW_HEIGHT};
-    CHECK(ui_test_area_has_only(&canvas, header, TEST_THEME.colors.header_background));
-    CHECK(ui_test_area_has_only(&canvas, first_row, TEST_THEME.colors.selection_background));
+    CHECK(ui_test_area_has_only(&canvas, header, TEST_THEME.colors->header_background));
+    CHECK(ui_test_area_has_only(&canvas, first_row, TEST_THEME.colors->selection_background));
 }
 
 static void items_that_open_a_screen_show_a_chevron(void)
@@ -133,8 +133,8 @@ static void items_that_open_a_screen_show_a_chevron(void)
     Rect first_right = {TEST_SCREEN_WIDTH - 8, TEST_HEADER_HEIGHT, 5, TEST_ROW_HEIGHT};
     Rect second_right = {TEST_SCREEN_WIDTH - 8, TEST_HEADER_HEIGHT + TEST_ROW_HEIGHT, 5,
                          TEST_ROW_HEIGHT};
-    CHECK(!ui_test_area_has_only(&canvas, first_right, TEST_THEME.colors.selection_background));
-    CHECK(ui_test_area_has_only(&canvas, second_right, TEST_THEME.colors.background));
+    CHECK(!ui_test_area_has_only(&canvas, first_right, TEST_THEME.colors->selection_background));
+    CHECK(ui_test_area_has_only(&canvas, second_right, TEST_THEME.colors->background));
 }
 
 static bool second_shown;
@@ -192,7 +192,7 @@ static void paint_panel(void *context, Canvas *canvas, Rect area)
 {
     (void)context;
     panel_area_seen = area;
-    canvas_fill_rect(canvas, area, TEST_THEME.colors.danger);
+    canvas_fill_rect(canvas, area, TEST_THEME.colors->danger);
 }
 
 static void a_side_panel_takes_the_right_of_the_content(void)
@@ -221,7 +221,7 @@ static void a_side_panel_takes_the_right_of_the_content(void)
     CHECK_EQUAL(PANEL_WIDTH, panel_area_seen.width);
     CHECK_EQUAL(content.height, panel_area_seen.height);
     Rect first_row_left = {0, TEST_HEADER_HEIGHT, TEST_SCREEN_WIDTH - PANEL_WIDTH, 1};
-    CHECK(!ui_test_area_has_color(&canvas, first_row_left, TEST_THEME.colors.danger));
+    CHECK(!ui_test_area_has_color(&canvas, first_row_left, TEST_THEME.colors->danger));
 }
 
 int main(void)

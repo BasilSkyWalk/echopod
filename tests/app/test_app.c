@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "app/app.h"
@@ -27,12 +28,15 @@
 #include "settings/settings.h"
 #include "settings_screens.h"
 #include "settings_store.h"
+#include "theme_fixture.h"
+#include "theme_store.h"
 #include "ui/slide.h"
 #include "ui/status_bar.h"
 #include "ui/toast.h"
 
 enum {
     START_MS = 1000,
+    START_REFUSAL_SHOWN_MS = 5000,
     KEY_HOLD_MS = 30,
     FULL_FRAME_PIXELS = HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT,
     HOME_DIAGNOSTICS_INDEX = 2,
@@ -92,6 +96,23 @@ enum {
     SPLASH_MS = 500,
     HALF_BATTERY = 50
 };
+
+enum {
+    TINTED_THEMES = 8
+};
+
+static ThemeColors tinted_colors[TINTED_THEMES];
+static unsigned tinted_next;
+
+static Theme styled_theme(bool portrait, ThemeChoice choice)
+{
+    return default_theme_styled(portrait, choice, &tinted_colors[tinted_next++ % TINTED_THEMES]);
+}
+
+static Theme staged_theme(bool portrait, ThemeChoice choice)
+{
+    return default_theme_stage(portrait, choice, &tinted_colors[tinted_next++ % TINTED_THEMES]);
+}
 
 static const char HELLS_BELLS_PATH[] = "/AC DC/Back In Black/1-01 - Hells Bells.flac";
 static const char SHOOT_TO_THRILL_PATH[] = "/AC DC/Back In Black/1-02 - Shoot to Thrill.flac";
@@ -336,7 +357,7 @@ static bool columns_have_ink(int row, int first, int last)
     int top = DEFAULT_THEME.metrics.header_height + row * DEFAULT_THEME.metrics.row_height;
     for (int y = top; y < top + DEFAULT_THEME.metrics.row_height; y++) {
         for (int x = first; x < last; x++) {
-            if (fake_hal_pixel(x, y) != DEFAULT_THEME.colors.background) {
+            if (fake_hal_pixel(x, y) != DEFAULT_THEME.colors->background) {
                 return true;
             }
         }
@@ -836,7 +857,7 @@ static void the_last_setting_asks_whether_to_prompt_on_usb(void)
 static bool drew_the_bottom_of_a_portrait_screen(void)
 {
     return fake_hal_pixel(HAL_DISPLAY_SHORT_SIDE / 2, HAL_DISPLAY_LONG_SIDE - 4) ==
-           DEFAULT_THEME.colors.background;
+           DEFAULT_THEME.colors->background;
 }
 
 static void choosing_portrait_turns_the_screen(void)
@@ -925,11 +946,11 @@ static void a_new_screen_slides_in_from_the_right(void)
     step();
     tap(KEY_PLAY);
     CHECK(title_is("Music"));
-    CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
+    CHECK(scrollbar_probe() != DEFAULT_THEME.colors->scrollbar_thumb);
     wait_ms(SLIDE_DURATION_MS / 2);
-    CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
+    CHECK(scrollbar_probe() != DEFAULT_THEME.colors->scrollbar_thumb);
     wait_ms(SLIDE_DURATION_MS / 2);
-    CHECK_EQUAL(DEFAULT_THEME.colors.scrollbar_thumb, scrollbar_probe());
+    CHECK_EQUAL(DEFAULT_THEME.colors->scrollbar_thumb, scrollbar_probe());
 }
 
 static void going_back_slides_the_screen_out_to_the_right(void)
@@ -940,9 +961,9 @@ static void going_back_slides_the_screen_out_to_the_right(void)
     wait_ms(SLIDE_DURATION_MS);
     tap(KEY_BACK);
     CHECK(title_is("EchoPod"));
-    CHECK_EQUAL(DEFAULT_THEME.colors.scrollbar_thumb, scrollbar_probe());
+    CHECK_EQUAL(DEFAULT_THEME.colors->scrollbar_thumb, scrollbar_probe());
     wait_ms(SLIDE_DURATION_MS);
-    CHECK(scrollbar_probe() != DEFAULT_THEME.colors.scrollbar_thumb);
+    CHECK(scrollbar_probe() != DEFAULT_THEME.colors->scrollbar_thumb);
 }
 
 static void waking_draws_a_frame_before_the_backlight_comes_on(void)
@@ -1163,7 +1184,7 @@ static void the_splash_draws_over_the_home_screen(void)
     app_show_splash();
     wait_ms(SPLASH_FADE_MS);
     Rect content = theme_content_area(&DEFAULT_THEME);
-    CHECK_EQUAL(DEFAULT_THEME.colors.background, fake_hal_pixel(content.x + 2, content.y + 4));
+    CHECK_EQUAL(DEFAULT_THEME.colors->background, fake_hal_pixel(content.x + 2, content.y + 4));
 }
 
 static bool toast_is(const char *expected)
@@ -1337,7 +1358,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(15, fake_hal_reserve_count());
+    CHECK_EQUAL(16, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -2013,7 +2034,7 @@ static void the_header_shows_the_play_state_and_battery(void)
 {
     start_app_with_library();
     fake_hal_set_battery((HalBattery){.known = true, .percent = HALF_BATTERY, .charging = false});
-    Color icon = DEFAULT_THEME.colors.header_text;
+    Color icon = DEFAULT_THEME.colors->header_text;
     step();
     CHECK(!area_has_color(status_bar_playback_area(&DEFAULT_THEME), icon));
     CHECK(area_has_color(status_bar_battery_area(&DEFAULT_THEME), icon));
@@ -2110,7 +2131,7 @@ static void now_playing_without_a_cover_keeps_the_text_layout(void)
     wait_ms(SLIDE_DURATION_MS);
     step();
     CHECK(title_is("Now Playing"));
-    CHECK_EQUAL(DEFAULT_THEME.colors.background, cover_probe());
+    CHECK_EQUAL(DEFAULT_THEME.colors->background, cover_probe());
 }
 
 static void an_unchanged_frame_sends_no_pixels(void)
@@ -2480,13 +2501,13 @@ static void the_light_theme_lightens_the_screens_and_keeps_the_accent(void)
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(THEME_LIGHT, settings.options[OPTION_THEME]);
-    Theme light = default_theme_styled(false, (ThemeChoice){.theme = THEME_LIGHT});
-    CHECK(light.colors.background != DEFAULT_THEME.colors.background);
-    CHECK_EQUAL(light.colors.background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
-    Theme red_light = default_theme_styled(false, (ThemeChoice){.theme = THEME_LIGHT, .accent = 1});
-    Theme red_dark = default_theme_styled(false, (ThemeChoice){.theme = THEME_DARK, .accent = 1});
-    CHECK_EQUAL(red_dark.colors.selection_background, red_light.colors.selection_background);
-    CHECK_EQUAL(red_dark.colors.selection_shine, red_light.colors.selection_shine);
+    Theme light = styled_theme(false, (ThemeChoice){.theme = THEME_LIGHT});
+    CHECK(light.colors->background != DEFAULT_THEME.colors->background);
+    CHECK_EQUAL(light.colors->background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+    Theme red_light = styled_theme(false, (ThemeChoice){.theme = THEME_LIGHT, .accent = 1});
+    Theme red_dark = styled_theme(false, (ThemeChoice){.theme = THEME_DARK, .accent = 1});
+    CHECK_EQUAL(red_dark.colors->selection_background, red_light.colors->selection_background);
+    CHECK_EQUAL(red_dark.colors->selection_shine, red_light.colors->selection_shine);
 }
 
 typedef struct ThemeSetup {
@@ -2547,15 +2568,15 @@ static bool same_colors(ThemeColors first, ThemeColors second)
 
 static void the_dark_and_light_themes_keep_every_colour(void)
 {
-    Theme dark = default_theme_styled(false, (ThemeChoice){.theme = THEME_DARK});
-    CHECK(same_colors(DEFAULT_THEME.colors, dark.colors));
+    Theme dark = styled_theme(false, (ThemeChoice){.theme = THEME_DARK});
+    CHECK(same_colors(*DEFAULT_THEME.colors, *dark.colors));
     CHECK_EQUAL(THEME_SELECTION_GRADIENT, dark.selection);
-    Theme light = default_theme_styled(false, (ThemeChoice){.theme = THEME_LIGHT});
-    CHECK(same_colors(LIGHT_BEFORE_THEMES, light.colors));
+    Theme light = styled_theme(false, (ThemeChoice){.theme = THEME_LIGHT});
+    CHECK(same_colors(LIGHT_BEFORE_THEMES, *light.colors));
     CHECK_EQUAL(THEME_SELECTION_GRADIENT, light.selection);
-    Theme flat = default_theme_styled(false, (ThemeChoice){.theme = THEME_LIGHT, .flat = true});
-    CHECK_EQUAL(LIGHT_BEFORE_THEMES.selection_background, flat.colors.selection_top);
-    CHECK_EQUAL(LIGHT_BEFORE_THEMES.selection_shine, flat.colors.selection_shine);
+    Theme flat = styled_theme(false, (ThemeChoice){.theme = THEME_LIGHT, .flat = true});
+    CHECK_EQUAL(LIGHT_BEFORE_THEMES.selection_background, flat.colors->selection_top);
+    CHECK_EQUAL(LIGHT_BEFORE_THEMES.selection_shine, flat.colors->selection_shine);
 }
 
 static void every_theme_redraws_the_screen_in_its_own_background(void)
@@ -2567,8 +2588,8 @@ static void every_theme_redraws_the_screen_in_its_own_background(void)
             for (int frame = 0; frame < 3; frame++) {
                 step();
             }
-            Theme expected = default_theme_styled(false, setup.choice);
-            CHECK_EQUAL(expected.colors.background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+            Theme expected = styled_theme(false, setup.choice);
+            CHECK_EQUAL(expected.colors->background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
         }
     }
 }
@@ -2580,8 +2601,8 @@ static void choosing_a_theme_redraws_the_screen_in_the_new_background(void)
     move_down(THEME_FJORD);
     tap(KEY_PLAY);
     CHECK(title_is("Display"));
-    Theme fjord = default_theme_styled(false, (ThemeChoice){.theme = THEME_FJORD});
-    CHECK_EQUAL(fjord.colors.background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+    Theme fjord = styled_theme(false, (ThemeChoice){.theme = THEME_FJORD});
+    CHECK_EQUAL(fjord.colors->background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
 }
 
 static void every_theme_change_redraws_with_a_large_status_bar(void)
@@ -2594,8 +2615,8 @@ static void every_theme_change_redraws_with_a_large_status_bar(void)
         move_down(2);
         tap(KEY_PLAY);
         CHECK(title_is("Display"));
-        Theme chosen = default_theme_styled(false, (ThemeChoice){.theme = theme + 2});
-        CHECK_EQUAL(chosen.colors.background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+        Theme chosen = styled_theme(false, (ThemeChoice){.theme = theme + 2});
+        CHECK_EQUAL(chosen.colors->background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
     }
 }
 
@@ -2666,7 +2687,7 @@ static bool is_stage_theme(int theme)
 
 static void check_selection_and_stage_contrast(int theme, const Theme *styled)
 {
-    const ThemeColors *colors = &styled->colors;
+    const ThemeColors *colors = styled->colors;
     if (styled->selection == THEME_SELECTION_GRADIENT) {
         CHECK(contrast(colors->selection_text, colors->selection_top) >= 4.5);
     }
@@ -2683,11 +2704,11 @@ static void check_selection_and_stage_contrast(int theme, const Theme *styled)
 static void every_new_palette_meets_the_contrast_floor_of_each_role(void)
 {
     for (int theme = THEME_FJORD; theme < THEME_COUNT; theme++) {
-        Theme styled = default_theme_styled(false, (ThemeChoice){.theme = theme});
+        Theme styled = styled_theme(false, (ThemeChoice){.theme = theme});
         for (size_t check = 0; check < sizeof ROLE_FLOORS / sizeof ROLE_FLOORS[0]; check++) {
             ContrastCheck floor = ROLE_FLOORS[check];
-            double ratio = contrast(role_color(&styled.colors, floor.foreground),
-                                    role_color(&styled.colors, floor.background));
+            double ratio = contrast(role_color(styled.colors, floor.foreground),
+                                    role_color(styled.colors, floor.background));
             if (ratio < floor.floor) {
                 CHECK_EQUAL(1000 * theme + (int)check, (int)(ratio * 100.0));
             }
@@ -2720,37 +2741,37 @@ static void check_gradient_steps(Color top, Color bottom)
 static void every_new_palette_gradient_steps_its_channels_together(void)
 {
     for (int theme = THEME_FJORD; theme < THEME_COUNT; theme++) {
-        Theme styled = default_theme_styled(false, (ThemeChoice){.theme = theme});
-        check_gradient_steps(styled.colors.selection_top, styled.colors.selection_background);
-        check_gradient_steps(styled.colors.header_top, styled.colors.header_background);
+        Theme styled = styled_theme(false, (ThemeChoice){.theme = theme});
+        check_gradient_steps(styled.colors->selection_top, styled.colors->selection_background);
+        check_gradient_steps(styled.colors->header_top, styled.colors->header_background);
     }
 }
 
 static void an_accent_tints_dark_and_light_and_leaves_signature_themes_alone(void)
 {
     for (int theme = 0; theme < THEME_COUNT; theme++) {
-        Theme blue = default_theme_styled(false, (ThemeChoice){.theme = theme, .accent = 0});
-        Theme red = default_theme_styled(false, (ThemeChoice){.theme = theme, .accent = 1});
+        Theme blue = styled_theme(false, (ThemeChoice){.theme = theme, .accent = 0});
+        Theme red = styled_theme(false, (ThemeChoice){.theme = theme, .accent = 1});
         bool tinted = theme == THEME_DARK || theme == THEME_LIGHT;
         CHECK_EQUAL(tinted, default_theme_takes_accent(theme));
-        CHECK_EQUAL(tinted, blue.colors.selection_background != red.colors.selection_background);
+        CHECK_EQUAL(tinted, blue.colors->selection_background != red.colors->selection_background);
     }
-    Theme fjord = default_theme_styled(false, (ThemeChoice){.theme = THEME_FJORD, .accent = 5});
-    CHECK_EQUAL(COLOR_RGB(128, 168, 200), fjord.colors.selection_background);
+    Theme fjord = styled_theme(false, (ThemeChoice){.theme = THEME_FJORD, .accent = 5});
+    CHECK_EQUAL(COLOR_RGB(128, 168, 200), fjord.colors->selection_background);
 }
 
 static void the_flat_highlight_changes_only_gradient_themes(void)
 {
     for (int theme = 0; theme < THEME_COUNT; theme++) {
-        Theme gradient = default_theme_styled(false, (ThemeChoice){.theme = theme});
-        Theme flat = default_theme_styled(false, (ThemeChoice){.theme = theme, .flat = true});
+        Theme gradient = styled_theme(false, (ThemeChoice){.theme = theme});
+        Theme flat = styled_theme(false, (ThemeChoice){.theme = theme, .flat = true});
         bool gradient_theme = gradient.selection == THEME_SELECTION_GRADIENT;
         CHECK_EQUAL(gradient_theme, default_theme_takes_highlight(theme));
         CHECK_EQUAL(gradient_theme ? THEME_SELECTION_FLAT : gradient.selection, flat.selection);
-        Color top = default_theme_takes_accent(theme) ? gradient.colors.selection_background
-                                                      : gradient.colors.selection_top;
-        CHECK_EQUAL(top, flat.colors.selection_top);
-        CHECK_EQUAL(gradient.colors.selection_shine, flat.colors.selection_shine);
+        Color top = default_theme_takes_accent(theme) ? gradient.colors->selection_background
+                                                      : gradient.colors->selection_top;
+        CHECK_EQUAL(top, flat.colors->selection_top);
+        CHECK_EQUAL(gradient.colors->selection_shine, flat.colors->selection_shine);
     }
     CHECK(default_theme_takes_highlight(THEME_FJORD));
     CHECK(default_theme_takes_highlight(THEME_DUSK));
@@ -2785,24 +2806,24 @@ static void choosing_a_theme_leaves_the_stored_accent_and_highlight_untouched(vo
 
 static void cover_flow_keeps_a_dark_themes_text_and_falls_back_to_dark_for_light_themes(void)
 {
-    Theme dark = default_theme_styled(false, (ThemeChoice){.theme = THEME_DARK, .accent = 2});
+    Theme dark = styled_theme(false, (ThemeChoice){.theme = THEME_DARK, .accent = 2});
     for (int theme = 0; theme < THEME_COUNT; theme++) {
         ThemeChoice choice = {.theme = theme, .accent = 2};
-        Theme styled = default_theme_styled(false, choice);
-        Theme stage = default_theme_stage(false, choice);
+        Theme styled = styled_theme(false, choice);
+        Theme stage = staged_theme(false, choice);
         const Theme *expected = is_stage_theme(theme) ? &styled : &dark;
-        CHECK_EQUAL(expected->colors.text, stage.colors.text);
-        CHECK_EQUAL(expected->colors.text_secondary, stage.colors.text_secondary);
-        CHECK_EQUAL(expected->colors.divider, stage.colors.divider);
+        CHECK_EQUAL(expected->colors->text, stage.colors->text);
+        CHECK_EQUAL(expected->colors->text_secondary, stage.colors->text_secondary);
+        CHECK_EQUAL(expected->colors->divider, stage.colors->divider);
     }
 }
 
 static void an_unknown_theme_falls_back_to_dark(void)
 {
-    Theme unknown = default_theme_styled(false, (ThemeChoice){.theme = THEME_COUNT + 3});
-    Theme dark = default_theme_styled(false, (ThemeChoice){.theme = THEME_DARK});
-    CHECK_EQUAL(dark.colors.background, unknown.colors.background);
-    CHECK_EQUAL(dark.colors.selection_top, unknown.colors.selection_top);
+    Theme unknown = styled_theme(false, (ThemeChoice){.theme = THEME_COUNT + 3});
+    Theme dark = styled_theme(false, (ThemeChoice){.theme = THEME_DARK});
+    CHECK_EQUAL(dark.colors->background, unknown.colors->background);
+    CHECK_EQUAL(dark.colors->selection_top, unknown.colors->selection_top);
 }
 
 static void a_large_status_bar_grows_the_portrait_status_band(void)
@@ -3121,12 +3142,12 @@ static void the_header_and_status_bar_take_the_face_colours_until_home(void)
     const ThemeColors *face = face_code_in_use()->chrome[NP_FACE_CASSETTE];
     CHECK_EQUAL(face->header_top, fake_hal_pixel(2, 0));
     CHECK(header_shows(face->success));
-    CHECK(!header_shows(DEFAULT_THEME.colors.success));
+    CHECK(!header_shows(DEFAULT_THEME.colors->success));
     hold_back();
     wait_ms(SLIDE_DURATION_MS);
     CHECK(title_is("EchoPod"));
-    CHECK_EQUAL(DEFAULT_THEME.colors.header_top, fake_hal_pixel(2, 0));
-    CHECK(header_shows(DEFAULT_THEME.colors.success));
+    CHECK_EQUAL(DEFAULT_THEME.colors->header_top, fake_hal_pixel(2, 0));
+    CHECK(header_shows(DEFAULT_THEME.colors->success));
     CHECK(!header_shows(face->success));
 }
 
@@ -3146,7 +3167,7 @@ static void leaving_a_face_flips_the_header_and_status_bar_at_the_midpoint(void)
     CHECK(title_is("EchoPod"));
     CHECK(shows_chrome_of(face));
     wait_ms(SLIDE_DURATION_MS * 3 / 4);
-    CHECK(shows_chrome_of(&DEFAULT_THEME.colors));
+    CHECK(shows_chrome_of(DEFAULT_THEME.colors));
     CHECK(!header_shows(face->success));
 }
 
@@ -3160,7 +3181,7 @@ static void entering_a_face_flips_the_header_and_status_bar_at_the_midpoint(void
     const ThemeColors *face = face_code_in_use()->chrome[NP_FACE_CASSETTE];
     tap(KEY_MENU);
     CHECK(title_is("Now Playing"));
-    CHECK(shows_chrome_of(&DEFAULT_THEME.colors));
+    CHECK(shows_chrome_of(DEFAULT_THEME.colors));
     CHECK(!header_shows(face->success));
     wait_ms(SLIDE_DURATION_MS * 3 / 4);
     CHECK(shows_chrome_of(face));
@@ -3189,7 +3210,7 @@ static void a_face_chosen_in_settings_applies_without_a_restart(void)
     start_app_with_library();
     play_first_album_track();
     wait_ms(SLIDE_DURATION_MS);
-    CHECK_EQUAL(DEFAULT_THEME.colors.header_top, fake_hal_pixel(2, 0));
+    CHECK_EQUAL(DEFAULT_THEME.colors->header_top, fake_hal_pixel(2, 0));
     hold_back();
     choose_now_playing_face(NP_FACE_LCD);
     Settings settings;
@@ -3280,13 +3301,13 @@ static void a_clock_dated_before_the_firmware_shows_no_time(void)
     StatusBarState state = {.clock = "12:34"};
     Rect clock = status_bar_clock_area(&DEFAULT_THEME, state);
     start_app_with_clock(true);
-    CHECK(area_has_color(clock, DEFAULT_THEME.colors.header_text));
+    CHECK(area_has_color(clock, DEFAULT_THEME.colors->header_text));
     fake_hal_set_time(chip_on(2026, 1, 14));
     fake_hal_set_build_day(day_of(2026, 11, 1));
     app_forget_clock();
     restart_app();
     step();
-    CHECK(!area_has_color(clock, DEFAULT_THEME.colors.header_text));
+    CHECK(!area_has_color(clock, DEFAULT_THEME.colors->header_text));
 }
 
 static void the_landscape_clock_and_battery_show_at_every_minute(void)
@@ -3417,9 +3438,9 @@ static void the_header_shows_the_time_only_while_the_clock_setting_is_on(void)
     Rect clock = status_bar_clock_area(&DEFAULT_THEME, state);
     CHECK(clock.width > 0);
     start_app_with_clock(true);
-    CHECK(area_has_color(clock, DEFAULT_THEME.colors.header_text));
+    CHECK(area_has_color(clock, DEFAULT_THEME.colors->header_text));
     start_app_with_clock(false);
-    CHECK(!area_has_color(clock, DEFAULT_THEME.colors.header_text));
+    CHECK(!area_has_color(clock, DEFAULT_THEME.colors->header_text));
 }
 
 static void a_clock_record_written_over_usb_sets_the_clock(void)
@@ -3462,9 +3483,123 @@ static void a_listen_history_turned_off_records_nothing(void)
     CHECK_EQUAL(before, history_records(records, 16));
 }
 
+static void remember_theme_file(const char *name)
+{
+    static uint8_t record[28];
+    memset(record, 0, sizeof record);
+    memcpy(record, "ETHS", 4);
+    memcpy(record + 4, name, strlen(name));
+    fake_hal_add_file(THEME_STORE_PATH, record, sizeof record);
+}
+
+static void start_app_wearing(const char *fixture, const char *name)
+{
+    uint32_t size = 0;
+    fake_hal_reset();
+    char file[64];
+    snprintf(file, sizeof file, "%s.echotheme", name);
+    if (fixture != NULL) {
+        theme_fixture_on_card(fixture, file, &size);
+    }
+    remember_theme_file(name);
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+    step();
+}
+
+static void a_remembered_theme_file_colours_the_screen_from_the_first_frame(void)
+{
+    start_app_wearing("ember.echotheme", "Ember");
+    Color background = COLOR_RGB(0x18, 0x12, 0x10);
+    CHECK(background != DEFAULT_THEME.colors->background);
+    CHECK_EQUAL(background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+}
+
+static void a_theme_file_draws_its_own_selection_box(void)
+{
+    start_app_wearing("ember.echotheme", "Ember");
+    int row_top = DEFAULT_THEME.metrics.header_height;
+    CHECK_EQUAL(COLOR_RGB(0xf8, 0xa0, 0x30), fake_hal_pixel(1, row_top + 4));
+    CHECK_EQUAL(COLOR_RGB(0x38, 0x24, 0x18), fake_hal_pixel(4, row_top + 1));
+}
+
+static void a_theme_file_spaces_the_rows_it_draws(void)
+{
+    start_app_wearing("ember.echotheme", "Ember");
+    int row_top = DEFAULT_THEME.metrics.header_height;
+    Color fill = COLOR_RGB(0x38, 0x24, 0x18);
+    CHECK(DEFAULT_THEME.metrics.row_height < 28);
+    CHECK_EQUAL(fill, fake_hal_pixel(4, row_top + 27));
+    CHECK(fill != fake_hal_pixel(4, row_top + 28));
+}
+
+static void a_remembered_theme_file_that_is_gone_leaves_the_built_in_theme(void)
+{
+    start_app_wearing(NULL, "Ember");
+    CHECK_EQUAL(DEFAULT_THEME.colors->background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT - 1));
+}
+
+static void the_theme_file_record_is_one_of_the_player_files(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    CHECK_EQUAL(4096, fake_hal_reserved_size(THEME_STORE_PATH));
+}
+
+static void the_app_starts_through_its_loaded_start_up_code(void)
+{
+    start_app_with_library();
+    CHECK_EQUAL(1, fake_hal_startup_loads());
+    CHECK_EQUAL(1, fake_hal_startup_releases());
+    CHECK(title_is("EchoPod"));
+    restart_app();
+    CHECK_EQUAL(2, fake_hal_startup_loads());
+    CHECK_EQUAL(2, fake_hal_startup_releases());
+}
+
+static void start_without_start_up_code(void)
+{
+    fake_hal_reset();
+    fake_hal_set_startup(false);
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+}
+
+static void without_its_start_up_code_the_app_says_so_and_turns_off(void)
+{
+    start_without_start_up_code();
+    CHECK(fake_hal_display_on());
+    CHECK_EQUAL(1, fake_hal_startup_releases());
+    wait_ms(START_REFUSAL_SHOWN_MS - 1);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    wait_ms(1);
+    CHECK_EQUAL(1, fake_hal_power_off_count());
+    wait_ms(1000);
+    CHECK_EQUAL(1, fake_hal_power_off_count());
+}
+
+static void a_start_that_finds_its_code_again_runs_normally(void)
+{
+    start_without_start_up_code();
+    fake_hal_set_startup(true);
+    restart_app();
+    wait_ms(START_REFUSAL_SHOWN_MS + 1000);
+    CHECK_EQUAL(0, fake_hal_power_off_count());
+    CHECK(title_is("EchoPod"));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(a_remembered_theme_file_colours_the_screen_from_the_first_frame),
+        TEST_CASE(a_theme_file_draws_its_own_selection_box),
+        TEST_CASE(a_theme_file_spaces_the_rows_it_draws),
+        TEST_CASE(a_remembered_theme_file_that_is_gone_leaves_the_built_in_theme),
+        TEST_CASE(the_theme_file_record_is_one_of_the_player_files),
+        TEST_CASE(the_app_starts_through_its_loaded_start_up_code),
+        TEST_CASE(without_its_start_up_code_the_app_says_so_and_turns_off),
+        TEST_CASE(a_start_that_finds_its_code_again_runs_normally),
         TEST_CASE(a_notice_is_drawn_at_once_over_the_current_screen),
         TEST_CASE(a_notice_turns_the_display_on),
         TEST_CASE(waking_keeps_the_screen_on_for_a_full_timeout),

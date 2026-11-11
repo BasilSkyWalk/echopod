@@ -612,8 +612,8 @@ static void update(void *context, uint32_t now_ms)
 
 static void draw_empty(Canvas *canvas, const Theme *theme, Rect content, const char *message)
 {
-    TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
-    canvas_fill_rect(canvas, content, theme->colors.background);
+    TextStyle style = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
+    canvas_fill_rect(canvas, content, theme->colors->background);
     Rect area = label_centered_area(style.font, content, message);
     label_draw(canvas, style, (Label){.area = area, .text = message});
 }

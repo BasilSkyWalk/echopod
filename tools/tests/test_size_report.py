@@ -164,10 +164,16 @@ class ReportTest(unittest.TestCase):
         self.assertIn("np_faces: 13,840 of 13,824 bytes, -16 free  OVER BY 16", lines)
         self.assertIn(".high_ram: 72,208 of 72,192 bytes, -16 free  OVER BY 16", lines)
 
+    def test_summary_measures_the_start_up_code_against_its_room_in_the_image(self):
+        with_startup = MAP + "\n.startup        0x0308ba00     0x1918\n"
+        self.assertIn("start-up code: 6,424 of 12,288 bytes, 5,864 free",
+                      size_report.summary(with_startup))
+        self.assertNotIn("start-up code", "".join(size_report.summary(MAP)))
+
     def test_summary_measures_the_usb_overlay_in_the_image_and_with_its_zeroed_memory(self):
         lines = size_report.summary(MAP, OVERLAY_MAP, USB_OVERLAY_MAP)
         self.assertEqual(lines[6], "USB overlay code: 12,288 of 65,536 bytes, 53,248 free")
-        self.assertEqual(lines[7], "USB overlay code + .bss: 49,152 of 86,016 bytes, 36,864 free")
+        self.assertEqual(lines[7], "USB overlay code + .bss: 49,152 of 72,192 bytes, 23,040 free")
 
     def test_summary_flags_a_limit_that_is_over(self):
         over = MAP.replace(".code           0x03050000     0x1000",
