@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EchoPod theme editor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>EchoPod theme editor</h1>
+      <p id="status" role="status">Loading the player…</p>
+    </header>
+    <main>
+      <section id="stage" aria-label="Preview">
+        <div id="device">
+          <canvas id="screen" width="320" height="170" tabindex="0" aria-label="Player screen"></canvas>
+        </div>
+        <div class="row" id="keys">
+          <button type="button" data-key="1" title="Arrow up">▲</button>
+          <button type="button" data-key="0" title="Arrow down">▼</button>
+          <button type="button" data-key="2" title="Enter">Play</button>
+          <button type="button" data-key="4" title="Backspace">Back</button>
+          <button type="button" data-key="3" title="M">Menu</button>
+        </div>
+        <div class="row" id="screens">
+          <button type="button" data-screen="home">Home</button>
+          <button type="button" data-screen="list">List</button>
+          <button type="button" data-screen="playing">Now Playing</button>
+          <button type="button" data-screen="toast">Toast</button>
+          <button type="button" data-screen="letters">Fast scroll</button>
+          <button type="button" data-screen="settings">Settings</button>
+        </div>
+        <div class="row">
+          <label>Orientation
+            <select id="orientation">
+              <option value="0">Landscape</option>
+              <option value="1">Portrait</option>
+            </select>
+          </label>
+          <label>Zoom
+            <select id="zoom">
+              <option value="2">2×</option>
+              <option value="3">3×</option>
+              <option value="1">1×</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">Click the screen, then use the arrow keys, Enter and Backspace. Hold Enter for a long press.</p>
+      </section>
+      <section id="panel" aria-label="Theme">
+        <div class="row" id="file">
+          <label class="grow">Name <input id="name" maxlength="23" autocomplete="off" /></label>
+          <button type="button" id="save">Download theme</button>
+          <button type="button" id="save-source">Download source</button>
+          <button type="button" id="open">Open theme…</button>
+          <select id="samples" aria-label="Start from"></select>
+          <input type="file" id="picker" accept=".echotheme" hidden />
+        </div>
+        <h2>Colours</h2>
+        <div id="colors" class="grid"></div>
+        <h2>Spacing</h2>
+        <div id="spacing"></div>
+        <h2>Shapes</h2>
+        <label>Selected row is drawn by <select id="selection"></select></label>
+        <div id="boxes"></div>
+      </section>
+    </main>
+    <script type="module" src="editor.js"></script>
+  </body>
+</html>

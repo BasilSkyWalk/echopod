@@ -31,6 +31,18 @@
       "cacheVariables": {
         "ECHO_RELEASE": "ON"
       }
+    },
+    {
+      "name": "web",
+      "displayName": "Theme editor preview (WebAssembly, Release)",
+      "binaryDir": "${sourceDir}/build/web",
+      "toolchainFile": "${sourceDir}/cmake/wasm32.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ECHO_BUILD_SIM": "OFF",
+        "ECHO_BUILD_TESTS": "OFF",
+        "ECHO_BUILD_WEB": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -45,6 +57,13 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "web",
+      "configurePreset": "web",
+      "targets": [
+        "echo_preview"
+      ]
     }
   ],
   "testPresets": [
