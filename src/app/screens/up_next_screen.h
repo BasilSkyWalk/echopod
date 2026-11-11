@@ -29,6 +29,7 @@ typedef struct UpNextScreen {
     int count;
     int added;
     bool chapters;
+    uint16_t chapter_track;
     int rows_first;
     int rows_count;
     char labels[UP_NEXT_ROWS][UP_NEXT_LABEL_CAPACITY];

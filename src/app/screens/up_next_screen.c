@@ -80,6 +80,7 @@ static void count_rows(UpNextScreen *up_next)
 {
     const Player *player = up_next->config.player;
     up_next->chapters = player->has_track && player->chapters.count > 0;
+    up_next->chapter_track = player->track;
     up_next->added = player->up_next.count;
     if (up_next->chapters) {
         up_next->count = player->chapters.count;
@@ -87,6 +88,17 @@ static void count_rows(UpNextScreen *up_next)
         up_next->count = player->has_track ? 1 + up_next->added + count_queue_rows(player) : 0;
     }
     up_next->rows_first = -1;
+}
+
+static bool chapters_changed(const UpNextScreen *up_next)
+{
+    const Player *player = up_next->config.player;
+    bool chapters = player->has_track && player->chapters.count > 0;
+    if (chapters != up_next->chapters) {
+        return true;
+    }
+    return chapters &&
+           (player->track != up_next->chapter_track || player->chapters.count != up_next->count);
 }
 
 static bool track_at(const UpNextScreen *up_next, int index, QueueWalk *walk, uint16_t *track)
@@ -203,7 +215,9 @@ static ScreenAction select_row(void *context, int index)
     Player *player = up_next->config.player;
     QueueWalk walk = start_walk(player);
     if (up_next->chapters) {
-        player_seek(player, mp4_chapter_start_ms(&player->chapters, (uint16_t)index));
+        if (!chapters_changed(up_next) && index < player->chapters.count) {
+            player_seek(player, mp4_chapter_start_ms(&player->chapters, (uint16_t)index));
+        }
         return screen_action_pop();
     }
     switch (kind_of(up_next, index)) {
@@ -246,6 +260,10 @@ static void enter(void *context, uint32_t now_ms)
 static void update(void *context, uint32_t now_ms)
 {
     UpNextScreen *up_next = context;
+    if (chapters_changed(up_next)) {
+        enter(up_next, now_ms);
+        return;
+    }
     up_next->now_ms = now_ms;
     refresh_rows(up_next);
 }

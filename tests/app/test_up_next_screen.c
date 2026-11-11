@@ -133,6 +133,28 @@ static void choosing_a_chapter_seeks_to_it_and_leaves(void)
     CHECK_EQUAL(400000, fake_hal_audio_last_seek());
 }
 
+static void the_chapter_list_follows_a_track_change_while_it_is_open(void)
+{
+    play_chaptered_book();
+    open_chapters();
+    player.chapters.count = 0;
+    screen->update(screen->context, 150);
+    CHECK(!up_next.chapters);
+    const char *detail = up_next.model.detail(up_next.model.context, 0);
+    CHECK(detail != NULL && strcmp("Playing", detail) == 0);
+}
+
+static void a_stale_chapter_row_never_seeks(void)
+{
+    play_chaptered_book();
+    open_chapters();
+    uint32_t before = fake_hal_audio_last_seek();
+    player.chapters.count = 1;
+    ScreenAction action = choose_row(2);
+    CHECK_EQUAL(SCREEN_ACTION_POP, action.type);
+    CHECK_EQUAL(before, fake_hal_audio_last_seek());
+}
+
 static void the_playing_song_comes_first_then_the_list(void)
 {
     play_album_from(0);
@@ -222,6 +244,8 @@ int main(void)
         TEST_CASE(a_book_with_chapters_lists_them_with_their_start_times),
         TEST_CASE(the_chapter_list_starts_on_the_chapter_being_played),
         TEST_CASE(choosing_a_chapter_seeks_to_it_and_leaves),
+        TEST_CASE(the_chapter_list_follows_a_track_change_while_it_is_open),
+        TEST_CASE(a_stale_chapter_row_never_seeks),
         TEST_CASE(the_playing_song_comes_first_then_the_list),
         TEST_CASE(a_paused_song_says_so),
         TEST_CASE(added_songs_come_before_the_list),
