@@ -43,6 +43,7 @@ echo_add_unit_test(NAME test_fonts SOURCES fonts/test_fonts.c LIBRARIES echo_fon
 
 add_library(echo_library_fixtures STATIC
     library/memory_source.c
+    library/mp4_book.c
     library/fixture_library.c
     library/big_library.c
     library/spoken_library.c
@@ -69,7 +70,7 @@ echo_add_unit_test(NAME test_equalizer
 echo_add_unit_test(NAME test_equalizer_file SOURCES sound/test_equalizer_file.c LIBRARIES echo_sound)
 echo_add_unit_test(NAME test_equalizer_text SOURCES sound/test_equalizer_text.c LIBRARIES echo_sound)
 
-foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader music_fingerprint music_folders)
+foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader music_fingerprint music_folders mp4_chapters)
     echo_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES echo_library_fixtures

@@ -233,6 +233,78 @@ int sort_key_compare(const char *left, const char *right)
     return (int)*a - (int)*b;
 }
 
+enum {
+    NATURAL_TEXT = 0x01,
+    NATURAL_DIGITS = 0x02
+};
+
+static bool is_ascii_digit(char character)
+{
+    return character >= '0' && character <= '9';
+}
+
+static void copy_bytes(char *key, size_t *length, const char *bytes, size_t count)
+{
+    for (size_t index = 0; index < count; index++) {
+        key[(*length)++] = bytes[index];
+    }
+}
+
+size_t natural_key_make(const char *text, char *key, size_t capacity)
+{
+    char folded[SORT_KEY_CAPACITY];
+    size_t folded_length = sort_key_make(text, folded, sizeof folded);
+    size_t length = 0;
+    size_t index = 0;
+    while (index < folded_length) {
+        size_t start = index;
+        bool digits = is_ascii_digit(folded[index]);
+        while (index < folded_length && is_ascii_digit(folded[index]) == digits) {
+            index++;
+        }
+        size_t count = index - start;
+        if (digits) {
+            size_t significant = start;
+            while (significant + 1 < index && folded[significant] == '0') {
+                significant++;
+            }
+            size_t significant_length = index - significant;
+            if (length + 3 + significant_length > capacity) {
+                break;
+            }
+            key[length++] = (char)NATURAL_DIGITS;
+            key[length++] = (char)(significant_length >> 8);
+            key[length++] = (char)(significant_length & 0xFF);
+            copy_bytes(key, &length, folded + significant, significant_length);
+        } else {
+            if (length + 2 + count > capacity) {
+                break;
+            }
+            key[length++] = (char)NATURAL_TEXT;
+            copy_bytes(key, &length, folded + start, count);
+            key[length++] = '\0';
+        }
+    }
+    return length;
+}
+
+int natural_key_compare(const char *left, const char *right)
+{
+    char left_key[SORT_KEY_CAPACITY];
+    char right_key[SORT_KEY_CAPACITY];
+    size_t left_length = natural_key_make(left, left_key, sizeof left_key);
+    size_t right_length = natural_key_make(right, right_key, sizeof right_key);
+    size_t shorter = left_length < right_length ? left_length : right_length;
+    for (size_t index = 0; index < shorter; index++) {
+        unsigned char a = (unsigned char)left_key[index];
+        unsigned char b = (unsigned char)right_key[index];
+        if (a != b) {
+            return (int)a - (int)b;
+        }
+    }
+    return left_length < right_length ? -1 : left_length > right_length ? 1 : 0;
+}
+
 static void append_case_folded(KeyBuilder *builder, uint32_t code_point)
 {
     if (code_point >= 'A' && code_point <= 'Z') {

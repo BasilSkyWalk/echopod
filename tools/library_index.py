@@ -16,10 +16,11 @@ NONE = 0xFFFF
 MAX_U8 = 0xFF
 MAX_U16 = 0xFFFF
 MAX_U32 = 0xFFFFFFFF
+MAX_CHAPTERS = 255
 UNKNOWN_ARTIST = "Unknown Artist"
 UNKNOWN_ALBUM = "Unknown Album"
 UNKNOWN_GENRE = "Unknown Genre"
-AUDIO_SUFFIXES = {".flac", ".ogg", ".opus", ".mp3", ".m4a", ".wav", ".wma", ".ape", ".dsf",
+AUDIO_SUFFIXES = {".flac", ".ogg", ".opus", ".mp3", ".m4a", ".m4b", ".wav", ".wma", ".ape", ".dsf",
                   ".dff", ".qoa"}
 PLAYLIST_SUFFIXES = {".m3u", ".m3u8"}
 URL_MARKER = "://"
@@ -65,6 +66,7 @@ class TrackInfo:
     number: int
     duration_ms: int
     album_artist_guessed: bool = False
+    chapters: int = 0
 
 
 @dataclass
@@ -133,6 +135,22 @@ def sort_key(text):
     return LEADING_ARTICLE.sub("", stripped.casefold().strip())
 
 
+NATURAL_RUNS = re.compile(r"[0-9]+|[^0-9]+")
+
+
+def natural_sort_key(text):
+    folded = sort_key(text)
+    tokens = []
+    for match in NATURAL_RUNS.finditer(folded):
+        run = match.group()
+        if "0" <= run[0] <= "9":
+            significant = run.lstrip("0") or "0"
+            tokens.append((1, len(significant), significant))
+        else:
+            tokens.append((0, run))
+    return tuple(tokens)
+
+
 def parse_number(text):
     match = LEADING_NUMBER.match(text)
     return int(match.group(1)) if match else 0
@@ -170,7 +188,17 @@ def folder_album(path):
     return "" if str(path.parent) == INTERNAL_FOLDER else path.parent.name
 
 
-def track_from_tags(relative_path, tags, duration_seconds):
+def chapter_count(audio):
+    chapters = getattr(audio, "chapters", None)
+    if not chapters:
+        return 0
+    starts = [chapter.start for chapter in chapters]
+    if any(later < earlier for earlier, later in zip(starts, starts[1:])):
+        return 0
+    return min(len(chapters), MAX_CHAPTERS)
+
+
+def track_from_tags(relative_path, tags, duration_seconds, chapters=0):
     path = PurePosixPath(relative_path)
     file_disc, file_number = numbers_from_filename(path.stem)
     artist = first_tag(tags, "artist")
@@ -190,6 +218,7 @@ def track_from_tags(relative_path, tags, duration_seconds):
         number=min(parse_number(first_tag(tags, "tracknumber")) or file_number, MAX_U8),
         duration_ms=min(round(duration_seconds * 1000), MAX_U32),
         album_artist_guessed=not album_artist,
+        chapters=chapters,
     )
 
 
@@ -324,7 +353,7 @@ def read_track(root, path, prefix=""):
         audio = File(handle)
     duration = audio.info.length if audio is not None else 0.0
     relative = music_path(prefix, path.relative_to(root))
-    return track_from_tags(nfc(relative), normalized_tags(audio), duration)
+    return track_from_tags(nfc(relative), normalized_tags(audio), duration, chapter_count(audio))
 
 
 def parse_m3u(text):
@@ -473,8 +502,11 @@ def add_folder(folders, node, name, parent, tracks):
     for child_name in sorted(node["children"], key=lambda child: (sort_key(child), child)):
         folder.subfolders.append(add_folder(folders, node["children"][child_name], child_name,
                                             position, tracks))
-    folder.tracks = sorted(node["tracks"], key=lambda index: (
-        tracks[index].disc, tracks[index].number, sort_key(PurePosixPath(tracks[index].path).name)))
+    same_album = len({album_key(tracks[index]) for index in node["tracks"]}) <= 1
+    folder.tracks = sorted(
+        node["tracks"],
+        key=lambda index: (tracks[index].disc if same_album else 0,
+                           natural_sort_key(PurePosixPath(tracks[index].path).name)))
     return position
 
 
@@ -582,7 +614,7 @@ def encode_tracks(model, strings):
         data += TRACK_RECORD.pack(strings.add(track.title), strings.add(track.path),
                                   model.track_albums[position], model.track_artists[position],
                                   model.track_genres[position], model.track_folders[position],
-                                  track.duration_ms, track.disc, track.number, 0)
+                                  track.duration_ms, track.disc, track.number, track.chapters)
     return data
 
 

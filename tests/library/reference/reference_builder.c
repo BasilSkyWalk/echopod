@@ -223,6 +223,7 @@ ReferenceResult reference_builder_add_track(ReferenceBuilder *builder, const Ref
                           .disc = track->disc,
                           .number = track->number,
                           .guessed = track->album_artist_guessed ? 1 : 0,
+                          .chapters = track->chapters,
                           .duration_ms = track->duration_ms};
     ReferenceResult result = place_path(builder, track->path, &record);
     if (result == REFERENCE_OK) {

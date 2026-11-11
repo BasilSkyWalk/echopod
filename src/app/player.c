@@ -97,11 +97,39 @@ static void queue_upcoming(Player *player)
     hal_audio_queue_next(path, player->next_token);
 }
 
+static bool read_book_file(void *context, uint32_t offset, void *buffer, uint32_t length)
+{
+    return hal_file_read(*(const HalFile *)context, offset, buffer, length);
+}
+
+static bool open_book(const Player *player, uint16_t track, HalFile *file)
+{
+    char path[PLAYER_PATH_CAPACITY];
+    return track_path(player, track, path, sizeof path) && hal_file_open(file, path);
+}
+
+static void load_chapters(Player *player, uint16_t track)
+{
+    LibraryTrack record;
+    HalFile file;
+    player->chapters.count = 0;
+    if (!player->spoken || !library_read_track(player->library, track, &record) ||
+        record.chapters == 0 || !open_book(player, track, &file)) {
+        return;
+    }
+    (void)mp4_chapters_read(&player->chapters, (ByteSource){read_book_file, &file}, file.size);
+    if (player->chapters.count > MP4_CHAPTERS_KEPT) {
+        player->chapters.count = 0;
+    }
+    hal_file_close(&file);
+}
+
 static void note_spoken(Player *player, uint16_t track)
 {
     char path[PLAYER_PATH_CAPACITY];
     player->spoken =
         track_path(player, track, path, sizeof path) && spoken_kind_of(path) != SPOKEN_NONE;
+    load_chapters(player, track);
 }
 
 static uint32_t resume_point(const Player *player, uint16_t track, uint32_t start_ms)
@@ -121,6 +149,7 @@ static bool start_current(Player *player, uint32_t start_ms)
         return false;
     }
     player->spoken = spoken_kind_of(path) != SPOKEN_NONE;
+    load_chapters(player, track);
     start_ms = resume_point(player, track, start_ms);
     player->track = track;
     player->has_track = true;
@@ -634,6 +663,10 @@ PlayerStatus player_status(const Player *player)
         .place = player->has_track ? play_queue_place(&player->queue) : (PlayQueuePlace){0, 0},
         .format = current_format(player),
         .spoken = player->has_track && player->spoken,
+        .chapters = player->has_track ? player->chapters.count : 0,
+        .chapter = player->has_track && player->chapters.count > 0
+                       ? mp4_chapter_at(&player->chapters, current_position(player))
+                       : 0,
     };
 }
 

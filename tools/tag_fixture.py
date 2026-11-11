@@ -166,6 +166,26 @@ def make_alac(path):
     make_m4a(path, "alac")
 
 
+CHAPTERS = (("Part 1", 0, 1000), ("Part 2", 1000, 2000), ("Part 3", 2000, 3000))
+
+
+def make_chapters(path):
+    from mutagen.mp4 import MP4
+    metadata = path.with_suffix(".ffmetadata")
+    lines = [";FFMETADATA1"]
+    for title, start, stop in CHAPTERS:
+        lines += ["[CHAPTER]", "TIMEBASE=1/1000", f"START={start}", f"END={stop}", f"title={title}"]
+    metadata.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    run("ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
+        "sine=frequency=440:sample_rate=44100:duration=3", "-i", str(metadata), "-ac", "2",
+        "-map", "0:a", "-map_metadata:g", "-1", "-map_chapters", "1", "-fflags", "+bitexact",
+        "-flags:a", "+bitexact", "-c:a", "aac", "-f", "ipod", str(path))
+    audio = MP4(path)
+    audio.clear()
+    mp4_tags(audio)
+    audio.save()
+
+
 def make_wav(path):
     from mutagen.wave import WAVE
     encode(path, ["-c:a", "pcm_s16le"], rate=8000)
@@ -269,6 +289,7 @@ FIXTURES = {
     "id3v1_no_xing.mp3": make_mp3_v1,
     "aac.m4a": make_aac,
     "alac.m4a": make_alac,
+    "chapters.m4b": make_chapters,
     "tagged.wav": make_wav,
     "tagged.wma": make_wma,
     "tagged.ape": make_ape,

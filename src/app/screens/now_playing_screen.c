@@ -118,7 +118,9 @@ void now_playing_detail_text(const PlayerStatus *status, char *buffer, size_t ca
         format_bitrate(status->format.bitrate_kbps, bitrate, sizeof bitrate);
         string_builder_append(&builder, bitrate);
     }
-    if (status->place.total == 0) {
+    bool chapters = status->chapters > 0;
+    uint32_t place_total = chapters ? status->chapters : status->place.total;
+    if (place_total == 0) {
         return;
     }
     if (has_bitrate) {
@@ -128,10 +130,12 @@ void now_playing_detail_text(const PlayerStatus *status, char *buffer, size_t ca
     char total[RATE_CAPACITY];
     StringBuilder number_digits = string_builder_make(number, sizeof number);
     StringBuilder total_digits = string_builder_make(total, sizeof total);
-    string_builder_append_unsigned(&number_digits, status->place.number);
-    string_builder_append_unsigned(&total_digits, status->place.total);
+    string_builder_append_unsigned(&number_digits,
+                                   chapters ? status->chapter + 1u : status->place.number);
+    string_builder_append_unsigned(&total_digits, place_total);
     const char *arguments[] = {number, total};
-    i18n_format(&builder, STR_MENU_POSITION_OF, arguments, 2);
+    i18n_format(&builder, chapters ? STR_MENU_CHAPTER_PROGRESS : STR_MENU_POSITION_OF, arguments,
+                2);
 }
 
 static NowPlayingCommand by_gesture(KeyGesture gesture, NowPlayingCommand press,

@@ -301,7 +301,7 @@ static void write_tracks(Writer *writer, const ReferenceBuilder *builder, const 
         put_u32(writer, track->duration_ms);
         put_byte(writer, track->disc);
         put_byte(writer, track->number);
-        put_u16(writer, 0);
+        put_u16(writer, track->chapters);
     }
 }
 

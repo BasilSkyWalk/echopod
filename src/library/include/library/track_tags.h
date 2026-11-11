@@ -53,6 +53,7 @@ typedef struct TrackTags {
     char text[TAG_FIELD_COUNT][TRACK_TAG_TEXT_CAPACITY];
     uint32_t duration_ms;
     TagPicture picture;
+    uint16_t chapters;
 } TrackTags;
 
 TagFormat track_tags_format_for_name(const char *name);

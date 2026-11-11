@@ -175,10 +175,10 @@ static void scanning_the_tag_fixtures_matches_the_pc_indexer(void)
     Progress progress = {.calls = 0};
     ScanStats stats;
     CHECK_EQUAL(SCAN_OK, scan_folder(ECHO_FIXTURE_DIR "/tags", &output, &progress, &stats));
-    CHECK_EQUAL(14u, stats.tracks);
-    CHECK_EQUAL(14u, progress.last_tracks);
+    CHECK_EQUAL(15u, stats.tracks);
+    CHECK_EQUAL(15u, progress.last_tracks);
     CHECK_EQUAL(0u, progress.last_files);
-    CHECK(progress.calls >= 14);
+    CHECK(progress.calls >= 15);
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("tags_library.db", &expected_size);
     CHECK_EQUAL(stats.length, output.length);
@@ -217,7 +217,7 @@ static void internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer(v
     ScanStats stats;
     ScanResult result = library_scan(&job, &stats);
     CHECK_EQUAL(SCAN_OK, result);
-    CHECK_EQUAL(22u, stats.tracks);
+    CHECK_EQUAL(23u, stats.tracks);
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("two_drives.db", &expected_size);
     CHECK(library_compare(expected, expected_size, output.bytes, stats.length));

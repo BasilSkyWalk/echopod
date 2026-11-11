@@ -308,6 +308,7 @@ BuilderResult library_builder_add_track(LibraryBuilder *builder, const BuilderTr
                     .number = track->number,
                     .spoken = spoken_kind_of(track->path) != SPOKEN_NONE,
                     .guessed = track->album_artist_guessed ? 1 : 0,
+                    .chapters = track->chapters,
                     .duration_ms = track->duration_ms};
     const char *texts[BUILDER_FIELDS - 1] = {track->title, track->artist, track->album_artist,
                                              track->album, track->genre};

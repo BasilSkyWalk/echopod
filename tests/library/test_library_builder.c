@@ -4,6 +4,7 @@
 
 #include "check.h"
 #include "library/library.h"
+#include "library/library_browse.h"
 #include "library/library_builder.h"
 #include "library_compare.h"
 #include "memory_source.h"
@@ -217,6 +218,7 @@ static BuilderTrack parse_track(char **cursor)
     parsed.number = (uint8_t)atoi(next_field(cursor));
     parsed.duration_ms = (uint32_t)strtoul(next_field(cursor), NULL, 10);
     parsed.album_artist_guessed = false;
+    parsed.chapters = 0;
     return parsed;
 }
 
@@ -305,7 +307,8 @@ static ReferenceTrack reference_track(const BuilderTrack *track)
                             .disc = track->disc,
                             .number = track->number,
                             .duration_ms = track->duration_ms,
-                            .album_artist_guessed = track->album_artist_guessed};
+                            .album_artist_guessed = track->album_artist_guessed,
+                            .chapters = track->chapters};
 }
 
 static void build_reference(const RandomLibrary *library, Built *built)
@@ -528,6 +531,47 @@ static bool album_is(const Opened *opened, uint32_t index, const char *artist, u
            strcmp(artist, name) == 0 && album.track_count == tracks;
 }
 
+static bool chapters_of(const Opened *opened, const char *path, uint16_t *chapters)
+{
+    char text[128];
+    LibraryTrack track;
+    for (uint32_t index = 0; index < library_count(&opened->library, LIBRARY_TRACKS); index++) {
+        if (library_read_track(&opened->library, index, &track) &&
+            library_read_string(&opened->library, track.path, text, sizeof text) &&
+            strcmp(path, text) == 0) {
+            *chapters = track.chapters;
+            return true;
+        }
+    }
+    return false;
+}
+
+static void a_books_chapter_count_reaches_its_track_record(void)
+{
+    BuilderTrack tracks[] = {
+        track("Audiobooks/Alpha/Alpha.m4b", "Alpha", "Reader", "Reader", "Alpha", "Audiobook", 1965,
+              1),
+        track("Rock/Band/Album/01 - Song.m4a", "Song", "Band", "Band", "Album", "Rock", 2000, 1),
+        track("Audiobooks/Long/Long.m4b", "Long", "Reader", "Reader", "Long", "Audiobook", 2010, 1),
+        track("Audiobooks/Plain/01 - One.mp3", "One", "Reader", "Reader", "Plain", "Audiobook",
+              2011, 1),
+    };
+    tracks[0].chapters = 13;
+    tracks[2].chapters = 255;
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    uint16_t chapters = 99;
+    CHECK(chapters_of(&opened, "Audiobooks/Alpha/Alpha.m4b", &chapters));
+    CHECK_EQUAL(13, chapters);
+    CHECK(chapters_of(&opened, "Rock/Band/Album/01 - Song.m4a", &chapters));
+    CHECK_EQUAL(0, chapters);
+    CHECK(chapters_of(&opened, "Audiobooks/Long/Long.m4b", &chapters));
+    CHECK_EQUAL(255, chapters);
+    CHECK(chapters_of(&opened, "Audiobooks/Plain/01 - One.mp3", &chapters));
+    CHECK_EQUAL(0, chapters);
+    free(opened.built.output.bytes);
+}
+
 static void a_featured_artist_stays_with_the_album(void)
 {
     const BuilderTrack tracks[] = {
@@ -574,6 +618,92 @@ static void tagged_album_artists_and_other_folders_keep_their_albums(void)
     free(opened.built.output.bytes);
 }
 
+static BrowseItem folder_named(Library *library, BrowseQuery query, const char *name)
+{
+    char label[64];
+    char detail[8];
+    for (uint32_t position = 0; position < browse_count(library, query); position++) {
+        BrowseItem item;
+        BrowseText text = {label, sizeof label, detail, sizeof detail};
+        if (browse_item(library, query, position, &item) && item.kind == BROWSE_ITEM_FOLDER &&
+            browse_item_text(library, query, item, text) && strcmp(label, name) == 0) {
+            return item;
+        }
+    }
+    BrowseItem missing = {
+        .kind = BROWSE_ITEM_FOLDER, .group = LIBRARY_ARTISTS, .index = LIBRARY_NONE};
+    return missing;
+}
+
+static bool browse_label(Library *library, BrowseQuery query, uint32_t position, char *label,
+                         size_t capacity)
+{
+    BrowseItem item;
+    char detail[8];
+    BrowseText text = {label, capacity, detail, sizeof detail};
+    return browse_item(library, query, position, &item) &&
+           browse_item_text(library, query, item, text);
+}
+
+static BuilderTrack disc_track(const char *path, const char *title, const char *album, uint8_t disc,
+                               uint8_t number)
+{
+    BuilderTrack added = track(path, title, "Artist", "Artist", album, "Pop", 2025, number);
+    added.disc = disc;
+    return added;
+}
+
+static void mixed_album_folders_sort_by_numbered_file_name(void)
+{
+    const BuilderTrack tracks[] = {
+        disc_track("Mix/10 - Ten.flac", "Ten", "Ten Album", 2, 10),
+        disc_track("Mix/2 - Two.flac", "Two", "Two Album", 1, 2),
+        disc_track("Mix/1 - One.flac", "One", "One Album", 2, 1),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseItem folder = folder_named(&opened.library, root, "Mix");
+    BrowseQuery mix_folder;
+    CHECK(browse_child(root, folder, &mix_folder));
+    CHECK_EQUAL(3, browse_count(&opened.library, mix_folder));
+    char label[64];
+    CHECK(browse_label(&opened.library, mix_folder, 0, label, sizeof label) &&
+          strcmp(label, "1 - One") == 0);
+    CHECK(browse_label(&opened.library, mix_folder, 1, label, sizeof label) &&
+          strcmp(label, "2 - Two") == 0);
+    CHECK(browse_label(&opened.library, mix_folder, 2, label, sizeof label) &&
+          strcmp(label, "10 - Ten") == 0);
+    free(opened.built.output.bytes);
+}
+
+static void single_album_folders_keep_their_discs_together(void)
+{
+    const BuilderTrack tracks[] = {
+        disc_track("Double/01 - Second.flac", "Second", "Double", 2, 1),
+        disc_track("Double/11 - Later.flac", "Later", "Double", 2, 11),
+        disc_track("Double/03 - First.flac", "First", "Double", 1, 3),
+        disc_track("Double/10 - Also First.flac", "Also First", "Double", 1, 10),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseItem folder = folder_named(&opened.library, root, "Double");
+    BrowseQuery double_folder;
+    CHECK(browse_child(root, folder, &double_folder));
+    CHECK_EQUAL(4, browse_count(&opened.library, double_folder));
+    char label[64];
+    CHECK(browse_label(&opened.library, double_folder, 0, label, sizeof label) &&
+          strcmp(label, "03 - First") == 0);
+    CHECK(browse_label(&opened.library, double_folder, 1, label, sizeof label) &&
+          strcmp(label, "10 - Also First") == 0);
+    CHECK(browse_label(&opened.library, double_folder, 2, label, sizeof label) &&
+          strcmp(label, "01 - Second") == 0);
+    CHECK(browse_label(&opened.library, double_folder, 3, label, sizeof label) &&
+          strcmp(label, "11 - Later") == 0);
+    free(opened.built.output.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -589,9 +719,12 @@ int main(void)
         TEST_CASE(the_65536th_track_is_too_many),
         TEST_CASE(a_library_bigger_than_its_room_writes_nothing),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
+        TEST_CASE(a_books_chapter_count_reaches_its_track_record),
         TEST_CASE(a_featured_artist_stays_with_the_album),
         TEST_CASE(a_tie_goes_to_the_artist_first_in_order),
         TEST_CASE(tagged_album_artists_and_other_folders_keep_their_albums),
+        TEST_CASE(mixed_album_folders_sort_by_numbered_file_name),
+        TEST_CASE(single_album_folders_keep_their_discs_together),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     free(scratch_of_size(1)->bytes);

@@ -286,8 +286,9 @@ void builder_row_encode(const TrackRow *row, uint8_t *bytes)
     builder_put16(bytes + 38, row->year);
     bytes[40] = row->disc;
     bytes[41] = row->number;
-    bytes[42] = row->spoken;
-    bytes[43] = row->guessed;
+    bytes[42] =
+        (uint8_t)(row->spoken * BUILDER_ROW_SPOKEN_BIT | row->guessed * BUILDER_ROW_GUESSED_BIT);
+    bytes[43] = row->chapters;
     builder_put32(bytes + 44, row->duration_ms);
 }
 
@@ -301,8 +302,9 @@ void builder_row_decode(const uint8_t *bytes, TrackRow *row)
     row->year = builder_get16(bytes + 38);
     row->disc = bytes[40];
     row->number = bytes[41];
-    row->spoken = bytes[42];
-    row->guessed = bytes[43];
+    row->spoken = (bytes[42] & BUILDER_ROW_SPOKEN_BIT) != 0;
+    row->guessed = (bytes[42] & BUILDER_ROW_GUESSED_BIT) != 0;
+    row->chapters = bytes[43];
     row->duration_ms = builder_get32(bytes + 44);
 }
 

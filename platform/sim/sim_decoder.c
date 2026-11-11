@@ -34,7 +34,7 @@ static SimCodec codec_for(const char *path)
     if (has_extension(path, ".wav")) {
         return SIM_CODEC_WAV;
     }
-    if (has_extension(path, ".m4a")) {
+    if (has_extension(path, ".m4a") || has_extension(path, ".m4b")) {
         return SIM_CODEC_MP4;
     }
     if (has_extension(path, ".opus")) {

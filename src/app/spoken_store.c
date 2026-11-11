@@ -71,6 +71,15 @@ static void leave(SpokenStore *store, uint32_t now_ms)
     store->follow.active = false;
 }
 
+static bool single_file_book(const SpokenStore *store, const LibraryTrack *record, const char *path)
+{
+    LibraryFolder folder;
+    if (spoken_bookmark_key(path) == spoken_track_key(path)) {
+        return true;
+    }
+    return library_read_folder(store->library, record->folder, &folder) && folder.track_count == 1;
+}
+
 static void begin(SpokenStore *store, uint16_t track)
 {
     LibraryTrack record;
@@ -81,6 +90,7 @@ static void begin(SpokenStore *store, uint16_t track)
         return;
     }
     spoken_chapter_of(store->library, track, &chapter);
+    store->follow.embedded = record.chapters > 0 && single_file_book(store, &record, path);
     store->follow.active = true;
     store->follow.duration_ms = record.duration_ms;
     store->follow.bookmark = (Bookmark){
@@ -91,6 +101,9 @@ static void record(SpokenStore *store, PlayerStatus status, uint32_t now_ms)
 {
     store->follow.bookmark.position_ms = status.position_ms;
     store->follow.bookmark.flags = 0;
+    if (store->follow.embedded) {
+        store->follow.bookmark.chapter = status.chapter;
+    }
     bool state_changed = status.state != store->last_state;
     if (state_changed || now_ms - store->last_put_ms >= SPOKEN_PUT_INTERVAL_MS) {
         put(store, store->follow.bookmark, now_ms);
@@ -209,6 +222,39 @@ static void append_count(StringBuilder *builder, uint32_t count, StringId one, S
     i18n_format(builder, count == 1 ? one : many, arguments, 1);
 }
 
+static void append_progress(StringBuilder *builder, uint32_t chapter, uint32_t total)
+{
+    char chapter_text[TIME_CAPACITY];
+    char total_text[TIME_CAPACITY];
+    StringBuilder chapter_digits = string_builder_make(chapter_text, sizeof chapter_text);
+    StringBuilder total_digits = string_builder_make(total_text, sizeof total_text);
+    string_builder_append_unsigned(&chapter_digits, chapter + 1u);
+    string_builder_append_unsigned(&total_digits, total);
+    const char *arguments[] = {chapter_text, total_text};
+    i18n_format(builder, STR_MENU_CHAPTER_PROGRESS, arguments, 2);
+}
+
+static void describe_book(StringBuilder *builder, uint32_t count, const Bookmark *bookmark)
+{
+    if (bookmark == NULL) {
+        append_count(builder, count, STR_MENU_CHAPTER_ONE, STR_MENU_CHAPTER_MANY);
+    } else if (bookmark_finished(*bookmark)) {
+        string_builder_append(builder, i18n_text(STR_MENU_FINISHED));
+    } else {
+        append_progress(builder, bookmark->chapter, count);
+    }
+}
+
+static uint16_t embedded_chapters(const SpokenStore *store, uint16_t folder)
+{
+    uint16_t track = 0;
+    LibraryTrack record;
+    return spoken_chapter_track(store->library, folder, 0, &track) &&
+                   library_read_track(store->library, track, &record)
+               ? record.chapters
+               : 0;
+}
+
 static bool describe_folder(const SpokenStore *store, SpokenRow row, StringBuilder *builder)
 {
     LibraryFolder folder;
@@ -216,23 +262,15 @@ static bool describe_folder(const SpokenStore *store, SpokenRow row, StringBuild
     if (!library_read_folder(store->library, row.item.index, &folder) || folder.track_count == 0) {
         return false;
     }
-    bool podcast = row.shelf == SPOKEN_PODCAST;
-    if (row.shelf != SPOKEN_AUDIOBOOK || !spoken_store_book(store, row.item.index, &bookmark)) {
-        append_count(builder, folder.track_count,
-                     podcast ? STR_MENU_EPISODE_ONE : STR_MENU_CHAPTER_ONE,
-                     podcast ? STR_MENU_EPISODE_MANY : STR_MENU_CHAPTER_MANY);
-    } else if (bookmark_finished(bookmark)) {
-        string_builder_append(builder, i18n_text(STR_MENU_FINISHED));
-    } else {
-        char chapter[TIME_CAPACITY];
-        char total[TIME_CAPACITY];
-        StringBuilder chapter_digits = string_builder_make(chapter, sizeof chapter);
-        StringBuilder total_digits = string_builder_make(total, sizeof total);
-        string_builder_append_unsigned(&chapter_digits, (uint32_t)bookmark.chapter + 1u);
-        string_builder_append_unsigned(&total_digits, folder.track_count);
-        const char *arguments[] = {chapter, total};
-        i18n_format(builder, STR_MENU_CHAPTER_PROGRESS, arguments, 2);
+    if (row.shelf == SPOKEN_PODCAST) {
+        append_count(builder, folder.track_count, STR_MENU_EPISODE_ONE, STR_MENU_EPISODE_MANY);
+        return true;
     }
+    uint16_t embedded = folder.track_count == 1 ? embedded_chapters(store, row.item.index) : 0;
+    bool started =
+        row.shelf == SPOKEN_AUDIOBOOK && spoken_store_book(store, row.item.index, &bookmark);
+    describe_book(builder, embedded > 0 ? embedded : folder.track_count,
+                  started ? &bookmark : NULL);
     return true;
 }
 
@@ -240,8 +278,17 @@ static bool describe_track(const SpokenStore *store, SpokenRow row, StringBuilde
 {
     Bookmark bookmark;
     LibraryTrack record;
-    if (!spoken_store_track(store, row.item.index, &bookmark) ||
-        !library_read_track(store->library, row.item.index, &record)) {
+    char path[PLAYER_PATH_CAPACITY];
+    if (!track_path(store->library, row.item.index, &record, path)) {
+        return false;
+    }
+    bool started = spoken_store_track(store, row.item.index, &bookmark);
+    if (row.shelf == SPOKEN_AUDIOBOOK && record.chapters > 0 &&
+        spoken_bookmark_key(path) == spoken_track_key(path)) {
+        describe_book(builder, record.chapters, started ? &bookmark : NULL);
+        return true;
+    }
+    if (!started) {
         return false;
     }
     if (bookmark_finished(bookmark)) {
