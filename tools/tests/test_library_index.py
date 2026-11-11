@@ -43,6 +43,21 @@ class SortKeyTest(unittest.TestCase):
         self.assertEqual("bjork", library_index.sort_key("Björk"))
 
 
+class NaturalSortKeyTest(unittest.TestCase):
+    def test_digit_runs_compare_as_numbers(self):
+        names = ["10 - Ten.flac", "2 - Two.flac", "1 - One.flac"]
+        self.assertEqual(["1 - One.flac", "2 - Two.flac", "10 - Ten.flac"],
+                         sorted(names, key=library_index.natural_sort_key))
+
+    def test_leading_zeros_do_not_change_the_number(self):
+        self.assertEqual(library_index.natural_sort_key("01 - One.flac"),
+                         library_index.natural_sort_key("1 - One.flac"))
+
+    def test_case_and_accents_fold_first(self):
+        self.assertLess(library_index.natural_sort_key("Jóga 2.flac"),
+                        library_index.natural_sort_key("joga 10.flac"))
+
+
 class TagParsingTest(unittest.TestCase):
     def test_an_album_version_follows_the_album_title(self):
         track = library_index.track_from_tags("A/B/01 - x.flac", {"album": ["Abbey Road"],
@@ -259,6 +274,31 @@ class BuildLibraryTest(unittest.TestCase):
         homogenic = next(folder for folder in self.library.folders if folder.name == "Homogenic")
         self.assertEqual(["Hunter", "Jóga"],
                          [self.library.tracks[index].title for index in homogenic.tracks])
+
+    def test_mixed_album_folders_sort_by_numbered_file_name(self):
+        tracks = [numbered_track("Mix/10 - Ten.flac", "Ten", "Ten Album", 2, 10),
+                  numbered_track("Mix/2 - Two.flac", "Two", "Two Album", 1, 2),
+                  numbered_track("Mix/1 - One.flac", "One", "One Album", 2, 1)]
+        library = library_index.build_library(tracks)
+        mix = next(folder for folder in library.folders if folder.name == "Mix")
+        self.assertEqual(["One", "Two", "Ten"],
+                         [library.tracks[index].title for index in mix.tracks])
+
+    def test_single_album_folders_keep_their_discs_together(self):
+        tracks = [numbered_track("Double/01 - Second.flac", "Second", "Double", 2, 1),
+                  numbered_track("Double/11 - Later.flac", "Later", "Double", 2, 11),
+                  numbered_track("Double/03 - First.flac", "First", "Double", 1, 3),
+                  numbered_track("Double/10 - Also First.flac", "Also First", "Double", 1, 10)]
+        library = library_index.build_library(tracks)
+        double = next(folder for folder in library.folders if folder.name == "Double")
+        self.assertEqual(["First", "Also First", "Second", "Later"],
+                         [library.tracks[index].title for index in double.tracks])
+
+
+def numbered_track(path, title, album, disc, number):
+    return library_index.TrackInfo(path=path, title=title, artist="Artist", album_artist="Artist",
+                                   album=album, genre="Pop", year=2025, disc=disc, number=number,
+                                   duration_ms=1000)
 
 
 def guessed_track(path, artist, album):

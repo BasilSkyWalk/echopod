@@ -4,6 +4,7 @@
 
 #include "check.h"
 #include "library/library.h"
+#include "library/library_browse.h"
 #include "library/library_builder.h"
 #include "library_compare.h"
 #include "memory_source.h"
@@ -617,6 +618,92 @@ static void tagged_album_artists_and_other_folders_keep_their_albums(void)
     free(opened.built.output.bytes);
 }
 
+static BrowseItem folder_named(Library *library, BrowseQuery query, const char *name)
+{
+    char label[64];
+    char detail[8];
+    for (uint32_t position = 0; position < browse_count(library, query); position++) {
+        BrowseItem item;
+        BrowseText text = {label, sizeof label, detail, sizeof detail};
+        if (browse_item(library, query, position, &item) && item.kind == BROWSE_ITEM_FOLDER &&
+            browse_item_text(library, query, item, text) && strcmp(label, name) == 0) {
+            return item;
+        }
+    }
+    BrowseItem missing = {
+        .kind = BROWSE_ITEM_FOLDER, .group = LIBRARY_ARTISTS, .index = LIBRARY_NONE};
+    return missing;
+}
+
+static bool browse_label(Library *library, BrowseQuery query, uint32_t position, char *label,
+                         size_t capacity)
+{
+    BrowseItem item;
+    char detail[8];
+    BrowseText text = {label, capacity, detail, sizeof detail};
+    return browse_item(library, query, position, &item) &&
+           browse_item_text(library, query, item, text);
+}
+
+static BuilderTrack disc_track(const char *path, const char *title, const char *album, uint8_t disc,
+                               uint8_t number)
+{
+    BuilderTrack added = track(path, title, "Artist", "Artist", album, "Pop", 2025, number);
+    added.disc = disc;
+    return added;
+}
+
+static void mixed_album_folders_sort_by_numbered_file_name(void)
+{
+    const BuilderTrack tracks[] = {
+        disc_track("Mix/10 - Ten.flac", "Ten", "Ten Album", 2, 10),
+        disc_track("Mix/2 - Two.flac", "Two", "Two Album", 1, 2),
+        disc_track("Mix/1 - One.flac", "One", "One Album", 2, 1),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseItem folder = folder_named(&opened.library, root, "Mix");
+    BrowseQuery mix_folder;
+    CHECK(browse_child(root, folder, &mix_folder));
+    CHECK_EQUAL(3, browse_count(&opened.library, mix_folder));
+    char label[64];
+    CHECK(browse_label(&opened.library, mix_folder, 0, label, sizeof label) &&
+          strcmp(label, "1 - One") == 0);
+    CHECK(browse_label(&opened.library, mix_folder, 1, label, sizeof label) &&
+          strcmp(label, "2 - Two") == 0);
+    CHECK(browse_label(&opened.library, mix_folder, 2, label, sizeof label) &&
+          strcmp(label, "10 - Ten") == 0);
+    free(opened.built.output.bytes);
+}
+
+static void single_album_folders_keep_their_discs_together(void)
+{
+    const BuilderTrack tracks[] = {
+        disc_track("Double/01 - Second.flac", "Second", "Double", 2, 1),
+        disc_track("Double/11 - Later.flac", "Later", "Double", 2, 11),
+        disc_track("Double/03 - First.flac", "First", "Double", 1, 3),
+        disc_track("Double/10 - Also First.flac", "Also First", "Double", 1, 10),
+    };
+    Opened opened;
+    build_tracks(tracks, sizeof tracks / sizeof tracks[0], &opened);
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseItem folder = folder_named(&opened.library, root, "Double");
+    BrowseQuery double_folder;
+    CHECK(browse_child(root, folder, &double_folder));
+    CHECK_EQUAL(4, browse_count(&opened.library, double_folder));
+    char label[64];
+    CHECK(browse_label(&opened.library, double_folder, 0, label, sizeof label) &&
+          strcmp(label, "03 - First") == 0);
+    CHECK(browse_label(&opened.library, double_folder, 1, label, sizeof label) &&
+          strcmp(label, "10 - Also First") == 0);
+    CHECK(browse_label(&opened.library, double_folder, 2, label, sizeof label) &&
+          strcmp(label, "01 - Second") == 0);
+    CHECK(browse_label(&opened.library, double_folder, 3, label, sizeof label) &&
+          strcmp(label, "11 - Later") == 0);
+    free(opened.built.output.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -636,6 +723,8 @@ int main(void)
         TEST_CASE(a_featured_artist_stays_with_the_album),
         TEST_CASE(a_tie_goes_to_the_artist_first_in_order),
         TEST_CASE(tagged_album_artists_and_other_folders_keep_their_albums),
+        TEST_CASE(mixed_album_folders_sort_by_numbered_file_name),
+        TEST_CASE(single_album_folders_keep_their_discs_together),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     free(scratch_of_size(1)->bytes);

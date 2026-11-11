@@ -135,6 +135,22 @@ def sort_key(text):
     return LEADING_ARTICLE.sub("", stripped.casefold().strip())
 
 
+NATURAL_RUNS = re.compile(r"[0-9]+|[^0-9]+")
+
+
+def natural_sort_key(text):
+    folded = sort_key(text)
+    tokens = []
+    for match in NATURAL_RUNS.finditer(folded):
+        run = match.group()
+        if "0" <= run[0] <= "9":
+            significant = run.lstrip("0") or "0"
+            tokens.append((1, len(significant), significant))
+        else:
+            tokens.append((0, run))
+    return tuple(tokens)
+
+
 def parse_number(text):
     match = LEADING_NUMBER.match(text)
     return int(match.group(1)) if match else 0
@@ -471,8 +487,11 @@ def add_folder(folders, node, name, parent, tracks):
     for child_name in sorted(node["children"], key=lambda child: (sort_key(child), child)):
         folder.subfolders.append(add_folder(folders, node["children"][child_name], child_name,
                                             position, tracks))
-    folder.tracks = sorted(node["tracks"], key=lambda index: (
-        tracks[index].disc, tracks[index].number, sort_key(PurePosixPath(tracks[index].path).name)))
+    same_album = len({album_key(tracks[index]) for index in node["tracks"]}) <= 1
+    folder.tracks = sorted(
+        node["tracks"],
+        key=lambda index: (tracks[index].disc if same_album else 0,
+                           natural_sort_key(PurePosixPath(tracks[index].path).name)))
     return position
 
 
