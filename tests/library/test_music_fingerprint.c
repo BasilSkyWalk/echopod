@@ -209,9 +209,9 @@ static void album_art_files_count(void)
 
 static void the_counted_formats_are_the_ones_the_scanner_reads(void)
 {
-    static const char *const NAMES[] = {"x.flac", "x.ogg",  "x.mp3", "x.m4a",     "x.m4b", "x.wav",
-                                        "x.wma",  "x.ape",  "x.dsf", "x.dff",     "x.aac", "x.txt",
-                                        "x.opus", "x.aiff", "x.mp4", "x.flac.txt"};
+    static const char *const NAMES[] = {
+        "x.flac", "x.ogg", "x.mp3", "x.m4a",  "x.m4b",  "x.wav", "x.wma",      "x.ape", "x.dsf",
+        "x.dff",  "x.aac", "x.txt", "x.opus", "x.aiff", "x.mp4", "x.flac.txt", "x.qoa", "X.QOA"};
     for (size_t index = 0; index < sizeof NAMES / sizeof NAMES[0]; index++) {
         bool scanned = track_tags_format_for_name(NAMES[index]) != TAG_FORMAT_UNKNOWN;
         CHECK_EQUAL(scanned, music_fingerprint_counts(NAMES[index], false));

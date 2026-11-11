@@ -250,6 +250,17 @@ static void an_mp3_with_only_id3v1_and_no_xing_header_still_reads(void)
     CHECK_EQUAL(TAG_PICTURE_NONE, tags.picture.kind);
 }
 
+static void an_untagged_qoa_has_empty_fields_and_its_duration(void)
+{
+    static TrackTags tags;
+    CHECK(read_fixture("qoa.qoa", &tags));
+    for (int field = 0; field < TAG_FIELD_COUNT; field++) {
+        CHECK_EQUAL(0, strcmp("", tags.text[field]));
+    }
+    CHECK_EQUAL(35u, tags.duration_ms);
+    CHECK_EQUAL(TAG_PICTURE_NONE, tags.picture.kind);
+}
+
 static void an_untagged_flac_has_empty_fields_and_its_duration(void)
 {
     static TrackTags tags;
@@ -283,6 +294,7 @@ static void formats_come_from_the_extension_in_any_case(void)
     CHECK_EQUAL(TAG_FORMAT_FLAC, track_tags_format_for_name("a.FLAC"));
     CHECK_EQUAL(TAG_FORMAT_MP4, track_tags_format_for_name("song.M4a"));
     CHECK_EQUAL(TAG_FORMAT_MP4, track_tags_format_for_name("book.M4B"));
+    CHECK_EQUAL(TAG_FORMAT_QOA, track_tags_format_for_name("a.QOA"));
     CHECK_EQUAL(TAG_FORMAT_UNKNOWN, track_tags_format_for_name("cover.jpg"));
     CHECK_EQUAL(TAG_FORMAT_UNKNOWN, track_tags_format_for_name("flac"));
 }
@@ -303,6 +315,7 @@ static const char *const ALL_FIXTURES[] = {
     "aac.m4a",     "alac.m4a",       "chapters.m4b",
     "tagged.wav",  "tagged.wma",     "tagged.ape",
     "tagged.dsf",  "tagged.dff",     "untagged.flac",
+    "qoa.qoa",
 };
 
 static void damaged_files_never_read_outside_the_file(void)
@@ -366,6 +379,7 @@ int main(void)
         TEST_CASE(ogg_pictures_decode_to_the_same_image_as_flac),
         TEST_CASE(ogg_comments_and_pictures_read_across_small_pages),
         TEST_CASE(an_mp3_with_only_id3v1_and_no_xing_header_still_reads),
+        TEST_CASE(an_untagged_qoa_has_empty_fields_and_its_duration),
         TEST_CASE(an_untagged_flac_has_empty_fields_and_its_duration),
         TEST_CASE(odd_spaces_become_plain_spaces_and_ends_are_trimmed),
         TEST_CASE(formats_come_from_the_extension_in_any_case),

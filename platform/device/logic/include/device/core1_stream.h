@@ -21,7 +21,8 @@ enum {
     STREAM_CODEC_ALAC = 1,
     STREAM_CODEC_AAC = 2,
     STREAM_CODEC_OPUS = 3,
-    STREAM_CODECS = 4
+    STREAM_CODEC_QOA = 4,
+    STREAM_CODECS = 5
 };
 
 typedef struct StreamSlot {
@@ -178,3 +179,4 @@ AudioSource core1_source_interface(Core1Source *source);
 AudioSource core1_source_mp3_interface(Core1Source *source);
 AudioSource core1_source_mp4_interface(Core1Source *source);
 AudioSource core1_source_ogg_interface(Core1Source *source);
+AudioSource core1_source_qoa_interface(Core1Source *source);

@@ -61,6 +61,7 @@ typedef enum SourceKind {
     SOURCE_ALAC,
     SOURCE_AAC,
     SOURCE_OPUS,
+    SOURCE_QOA,
     SOURCE_UNKNOWN
 } SourceKind;
 
@@ -217,6 +218,10 @@ static TrackProbe probe_header(const uint8_t *magic, bool read)
         return (TrackProbe){SOURCE_FLAC, (uint32_t)rate[0] << 12 | (uint32_t)rate[1] << 4 |
                                              (uint32_t)rate[2] >> 4};
     }
+    if (tag_is(magic, "qoaf")) {
+        return (TrackProbe){SOURCE_QOA, (uint32_t)magic[9] << 16 | (uint32_t)magic[10] << 8 |
+                                            (uint32_t)magic[11]};
+    }
     if (tag_is(magic, "RIFF") && tag_is(magic + 8, "WAVE")) {
         bool format_first = tag_is(magic + WAV_FORMAT_OFFSET, "fmt ");
         return (TrackProbe){SOURCE_WAV, format_first ? le32_at(magic + WAV_RATE_OFFSET) : 0};
@@ -278,6 +283,9 @@ static AudioSource chosen_source(void)
     }
     if (source_kind == SOURCE_OPUS) {
         return core1_source_ogg_interface(&core1_source);
+    }
+    if (source_kind == SOURCE_QOA) {
+        return core1_source_qoa_interface(&core1_source);
     }
     return using_core1 ? core1_source_interface(&core1_source)
                        : flac_source_interface(&software_source);
@@ -818,6 +826,8 @@ static HalAudioCodec codec_of(AudioCodec codec)
         return HAL_AUDIO_CODEC_AAC;
     case AUDIO_CODEC_OPUS:
         return HAL_AUDIO_CODEC_OPUS;
+    case AUDIO_CODEC_QOA:
+        return HAL_AUDIO_CODEC_QOA;
     case AUDIO_CODEC_FLAC:
         break;
     }
