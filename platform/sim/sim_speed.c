@@ -10,15 +10,12 @@ HalAudioSpeed sim_speed_normal(HalAudioSpeed speed)
     bool valid = speed.quarters >= HAL_AUDIO_SPEED_MIN_QUARTERS &&
                  speed.quarters <= HAL_AUDIO_SPEED_MAX_QUARTERS &&
                  speed.quarters != HAL_AUDIO_SPEED_UNITY_QUARTERS;
-    return valid ? speed
-                 : (HalAudioSpeed){.quarters = HAL_AUDIO_SPEED_UNITY_QUARTERS, .keep_pitch = true};
+    return valid ? speed : (HalAudioSpeed){.quarters = HAL_AUDIO_SPEED_UNITY_QUARTERS};
 }
 
 bool sim_speed_same(HalAudioSpeed a, HalAudioSpeed b)
 {
-    a = sim_speed_normal(a);
-    b = sim_speed_normal(b);
-    return a.quarters == b.quarters && a.keep_pitch == b.keep_pitch;
+    return sim_speed_normal(a).quarters == sim_speed_normal(b).quarters;
 }
 
 uint64_t sim_speed_frames(HalAudioSpeed speed, uint32_t milliseconds, uint32_t rate)

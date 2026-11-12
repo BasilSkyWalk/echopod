@@ -75,8 +75,6 @@ ECHO_RESIDENT static const StringId NP_FACE_OPTIONS[NP_FACE_COUNT] = {
     STR_SETTINGS_LCD_DECK};
 static const char *const SPOKEN_SPEED_OPTIONS[SPOKEN_SPEED_COUNT] = {"0.75x", "1x",    "1.25x",
                                                                      "1.5x",  "1.75x", "2x"};
-static const StringId SPOKEN_PITCH_OPTIONS[SPOKEN_PITCH_COUNT] = {STR_SETTINGS_KEEP_PITCH,
-                                                                  STR_SETTINGS_FOLLOWS_SPEED};
 static const StringId COVER_COUNT_OPTIONS[2] = {STR_SETTINGS_FIVE_COVERS,
                                                 STR_SETTINGS_THREE_COVERS};
 static const StringId ANIMATION_OPTIONS[ANIMATION_SPEED_COUNT] = {
@@ -255,17 +253,6 @@ static void choose_spoken_speed(void *context, int index)
     apply_spoken_speed(context);
 }
 
-static int current_spoken_pitch(const void *context)
-{
-    return settings_of(context)->options[OPTION_SPOKEN_PITCH];
-}
-
-static void choose_spoken_pitch(void *context, int index)
-{
-    editable_settings(context)->options[OPTION_SPOKEN_PITCH] = (uint8_t)index;
-    apply_spoken_speed(context);
-}
-
 static int current_filter(const void *context)
 {
     return settings_of(context)->filter;
@@ -423,8 +410,6 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_MENU_NOW_PLAYING, NP_FACE_OPTIONS, OPTION_NOW_PLAYING_FACE),
     {STR_SETTINGS_SPOKEN_SPEED, NULL, SPOKEN_SPEED_OPTIONS, SPOKEN_SPEED_COUNT,
      current_spoken_speed, choose_spoken_speed, NULL, 0},
-    {STR_SETTINGS_SPOKEN_PITCH, SPOKEN_PITCH_OPTIONS, NULL, SPOKEN_PITCH_COUNT,
-     current_spoken_pitch, choose_spoken_pitch, NULL, 0},
 };
 
 static ScreenAction open_choice(void *context)
@@ -508,7 +493,6 @@ enum {
     CHOICE_POWER_ON,
     CHOICE_NOW_PLAYING_FACE,
     CHOICE_SPOKEN_SPEED,
-    CHOICE_SPOKEN_PITCH,
     ROW_BLUETOOTH = SETTINGS_CHOICE_COUNT,
     ROW_EQUALIZER,
     ROW_DATE_TIME,
@@ -553,7 +537,6 @@ ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
                                              CHOICE_BALANCE,
                                              CHOICE_BLUETOOTH_LEVEL,
                                              CHOICE_SPOKEN_SPEED,
-                                             CHOICE_SPOKEN_PITCH,
                                              CHOICE_THEME,
                                              CHOICE_ACCENT,
                                              CHOICE_HIGHLIGHT,
@@ -585,7 +568,7 @@ ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
                                              CHOICE_USB_PROMPT};
 
 enum {
-    SOUND_ROWS = 7,
+    SOUND_ROWS = 6,
     DISPLAY_FIRST = SETTINGS_TOP_COUNT + SOUND_ROWS,
     DISPLAY_ROWS = 11,
     LIBRARY_FIRST = DISPLAY_FIRST + DISPLAY_ROWS,

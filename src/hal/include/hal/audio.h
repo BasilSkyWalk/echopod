@@ -73,7 +73,6 @@ typedef struct HalAudioFormat {
 
 typedef struct HalAudioSpeed {
     uint8_t quarters;
-    bool keep_pitch;
 } HalAudioSpeed;
 
 typedef struct HalAudioStatus {

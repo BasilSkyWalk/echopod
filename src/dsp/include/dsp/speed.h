@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "dsp/resample.h"
 #include "dsp/speed_fifo.h"
 #include "dsp/stretch.h"
 
@@ -17,20 +16,17 @@ enum {
 
 typedef struct SpeedSetting {
     uint8_t quarters;
-    bool keep_pitch;
 } SpeedSetting;
 
 typedef enum SpeedMethod {
     SPEED_BYPASS,
-    SPEED_STRETCH,
-    SPEED_RESAMPLE
+    SPEED_STRETCH
 } SpeedMethod;
 
 typedef struct SpeedStage {
     SpeedMethod method;
     SpeedFifo fifo;
     Stretch stretch;
-    Resample resample;
 } SpeedStage;
 
 SpeedMethod speed_method_for(SpeedSetting setting, uint32_t rate);

@@ -103,7 +103,6 @@ static void starting_a_track_sends_the_speed_before_playing(void)
     playing(0);
     CHECK_EQUAL(1, fake_hal_audio_speed_calls());
     CHECK_EQUAL(4, fake_hal_audio_play_speed().quarters);
-    CHECK(fake_hal_audio_play_speed().keep_pitch);
     CHECK_EQUAL(FAKE_AUDIO_CALL_SET_SPEED, fake_hal_audio_call_at(0));
     CHECK_EQUAL(FAKE_AUDIO_CALL_PLAY, fake_hal_audio_call_at(1));
 }
@@ -122,7 +121,7 @@ static void every_start_sends_the_speed_before_playing(void)
 static void setting_the_spoken_speed_with_nothing_playing_touches_no_hardware(void)
 {
     Player *idle = fresh_player();
-    player_set_spoken_speed(idle, (HalAudioSpeed){.quarters = 8, .keep_pitch = true});
+    player_set_spoken_speed(idle, (HalAudioSpeed){.quarters = 8});
     CHECK_EQUAL(0, fake_hal_audio_speed_calls());
     CHECK_EQUAL(0, fake_hal_audio_call_count());
 }
@@ -130,7 +129,7 @@ static void setting_the_spoken_speed_with_nothing_playing_touches_no_hardware(vo
 static void music_keeps_its_gapless_hand_over_at_any_spoken_speed(void)
 {
     Player *started = fresh_player();
-    player_set_spoken_speed(started, (HalAudioSpeed){.quarters = 8, .keep_pitch = true});
+    player_set_spoken_speed(started, (HalAudioSpeed){.quarters = 8});
     CHECK(player_play_list(started, back_in_black(), 0, SEED));
     CHECK(path_is(fake_hal_audio_queued_path(), SHOOT_TO_THRILL_PATH));
     fake_hal_audio_finish_track();

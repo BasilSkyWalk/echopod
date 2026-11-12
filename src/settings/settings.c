@@ -76,8 +76,7 @@ static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_STATUS_BAR] = 2,
     [OPTION_POWER_ON] = 2,
     [OPTION_NOW_PLAYING_FACE] = NP_FACE_OPTION_SLOTS,
-    [OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_COUNT,
-    [OPTION_SPOKEN_PITCH] = SPOKEN_PITCH_COUNT};
+    [OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_COUNT};
 
 _Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
                "the options must fit the file");
@@ -140,11 +139,6 @@ uint8_t settings_spoken_quarters(const uint8_t *options)
 {
     uint8_t speed = options != NULL ? options[OPTION_SPOKEN_SPEED] : SPOKEN_SPEED_1X;
     return speed < SPOKEN_SPEED_COUNT ? SPOKEN_QUARTERS[speed] : SPOKEN_SPEED_NORMAL_QUARTERS;
-}
-
-bool settings_spoken_keep_pitch(const uint8_t *options)
-{
-    return options == NULL || options[OPTION_SPOKEN_PITCH] != SPOKEN_PITCH_FOLLOWS_SPEED;
 }
 
 uint8_t settings_spoken_speed_option(uint8_t quarters)

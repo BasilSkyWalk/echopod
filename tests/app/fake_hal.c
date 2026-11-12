@@ -175,7 +175,7 @@ void fake_hal_reset(void)
     fake = (FakeHal){0};
     fake.audio.jack = HAL_AUDIO_JACK_SINGLE_ENDED;
     fake.audio.status.idle = true;
-    fake.audio.speed = (HalAudioSpeed){HAL_AUDIO_SPEED_UNITY_QUARTERS, true};
+    fake.audio.speed = (HalAudioSpeed){HAL_AUDIO_SPEED_UNITY_QUARTERS};
     fake.audio.play_speed = fake.audio.speed;
     hal_system_set_power_savings(HAL_SAVINGS_DEFAULT);
 }

@@ -78,8 +78,7 @@ void settings_store_capture(SettingsStore *store, PlayerStatus playback)
 
 HalAudioSpeed settings_store_spoken_speed(const Settings *settings)
 {
-    return (HalAudioSpeed){.quarters = settings_spoken_quarters(settings->options),
-                           .keep_pitch = settings_spoken_keep_pitch(settings->options)};
+    return (HalAudioSpeed){.quarters = settings_spoken_quarters(settings->options)};
 }
 
 void settings_store_restore_playback(const SettingsStore *store, Player *player, uint32_t seed)

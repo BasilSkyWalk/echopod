@@ -93,7 +93,6 @@ static uint32_t position_before_clock_change;
 static AudioEngine engine;
 static EqualizerCurve equalizer_curve;
 static uint8_t chosen_quarters;
-static bool chosen_keep_pitch;
 static bool speed_restart_pending;
 static DmaItem items[RING_BLOCKS];
 static HalFile file;
@@ -373,7 +372,7 @@ static uint8_t quarters_set(void)
 
 static SpeedSetting speed_setting(void)
 {
-    return (SpeedSetting){quarters_set(), chosen_keep_pitch};
+    return (SpeedSetting){quarters_set()};
 }
 
 static void ensure_engine(void)
@@ -646,10 +645,8 @@ void hal_audio_set_speed(HalAudioSpeed speed)
     bool valid = speed.quarters >= HAL_AUDIO_SPEED_MIN_QUARTERS &&
                  speed.quarters <= HAL_AUDIO_SPEED_MAX_QUARTERS;
     uint8_t quarters = valid ? speed.quarters : HAL_AUDIO_SPEED_UNITY_QUARTERS;
-    bool changed = quarters != quarters_set() || (quarters != HAL_AUDIO_SPEED_UNITY_QUARTERS &&
-                                                  speed.keep_pitch != chosen_keep_pitch);
+    bool changed = quarters != quarters_set();
     chosen_quarters = quarters;
-    chosen_keep_pitch = speed.keep_pitch;
     board_core1_set_speed(quarters);
     if (!engine_ready) {
         return;

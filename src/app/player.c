@@ -84,12 +84,12 @@ static bool upcoming_track(Player *player, PlayQueueCursor *cursor, uint16_t *tr
 
 static bool same_speed(HalAudioSpeed a, HalAudioSpeed b)
 {
-    return a.quarters == b.quarters && a.keep_pitch == b.keep_pitch;
+    return a.quarters == b.quarters;
 }
 
 static HalAudioSpeed normal_speed(void)
 {
-    return (HalAudioSpeed){.quarters = HAL_AUDIO_SPEED_UNITY_QUARTERS, .keep_pitch = true};
+    return (HalAudioSpeed){.quarters = HAL_AUDIO_SPEED_UNITY_QUARTERS};
 }
 
 static bool spoken_path(const char *path)

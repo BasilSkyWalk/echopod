@@ -16,7 +16,6 @@ enum {
     LEAD_OUT_44K = 1320,
     WINDOW_44K = 2416,
     LEAD_OUT_22K = 660,
-    FULL_SCALE = 8388607,
     DC_LEVEL = 1000000
 };
 
@@ -29,9 +28,9 @@ static SpeedStage stage;
 static int32_t source[SPEED_CHANNELS * SOURCE_MAX];
 static int32_t result[SPEED_CHANNELS * RESULT_MAX];
 
-static void configure(uint8_t quarters, bool keep_pitch, uint32_t rate)
+static void configure(uint8_t quarters, uint32_t rate)
 {
-    speed_configure(&stage, (SpeedSetting){quarters, keep_pitch}, rate);
+    speed_configure(&stage, (SpeedSetting){quarters}, rate);
 }
 
 static void fill_tone(double hz, double rate, uint32_t frames)
@@ -114,15 +113,6 @@ static double tone_hz(uint32_t from, uint32_t to, double rate)
     return count > 1 ? (count - 1) * rate / (last - first) : 0.0;
 }
 
-static double rms(const int32_t *frames, uint32_t from, uint32_t to)
-{
-    double sum = 0.0;
-    for (uint32_t frame = from; frame < to; frame++) {
-        sum += (double)frames[SPEED_CHANNELS * frame] * (double)frames[SPEED_CHANNELS * frame];
-    }
-    return sqrt(sum / (to - from));
-}
-
 static bool near(double expected, double actual, double tolerance)
 {
     return fabs(expected - actual) <= tolerance;
@@ -147,48 +137,43 @@ static void unity_and_out_of_range_speeds_bypass_the_stage(void)
 {
     const uint8_t bypassed[] = {0, 2, 4, 9};
     for (unsigned index = 0; index < sizeof bypassed; index++) {
-        CHECK_EQUAL(SPEED_BYPASS,
-                    speed_method_for((SpeedSetting){bypassed[index], true}, RATE_44K));
-        CHECK_EQUAL(SPEED_BYPASS,
-                    speed_method_for((SpeedSetting){bypassed[index], false}, RATE_44K));
+        CHECK_EQUAL(SPEED_BYPASS, speed_method_for((SpeedSetting){bypassed[index]}, RATE_44K));
     }
-    configure(4, true, RATE_44K);
+    configure(4, RATE_44K);
     CHECK_EQUAL(SPEED_BYPASS, speed_method(&stage));
     CHECK_EQUAL(SPEED_UNITY_QUARTERS, speed_quarters(&stage));
     CHECK_EQUAL(0, speed_space(&stage));
 }
 
-static void keep_pitch_stretches_up_to_48_khz_and_resamples_above(void)
+static void the_stage_stretches_up_to_48_khz_and_bypasses_above(void)
 {
-    SpeedSetting setting = {6, true};
+    SpeedSetting setting = {6};
     CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, 48000));
     CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, RATE_22K));
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 48001));
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 88200));
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 192000));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 48001));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 88200));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 192000));
 }
 
-static void keep_pitch_resamples_below_the_lowest_stretch_rate(void)
+static void the_stage_bypasses_below_the_lowest_stretch_rate(void)
 {
-    SpeedSetting setting = {6, true};
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 0));
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 24));
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for(setting, 3999));
+    SpeedSetting setting = {6};
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 0));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 24));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 3999));
     CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, 4000));
 }
 
-static void a_tiny_source_rate_still_plays_out_and_drains(void)
+static void a_rate_outside_the_stretch_range_plays_at_normal_speed(void)
 {
-    fill_tone(TONE_HZ, 24.0, 200);
-    configure(6, true, 24);
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method(&stage));
-    CHECK_EQUAL(ceil_quarters(200, 6), play(200));
-}
-
-static void pitch_follows_speed_always_resamples(void)
-{
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for((SpeedSetting){6, false}, RATE_22K));
-    CHECK_EQUAL(SPEED_RESAMPLE, speed_method_for((SpeedSetting){3, false}, 8000));
+    const uint32_t rates[] = {24, 96000};
+    for (unsigned index = 0; index < 2; index++) {
+        configure(6, rates[index]);
+        CHECK_EQUAL(SPEED_BYPASS, speed_method(&stage));
+        CHECK_EQUAL(SPEED_UNITY_QUARTERS, speed_quarters(&stage));
+        CHECK_EQUAL(0, speed_space(&stage));
+        CHECK(speed_drained(&stage));
+    }
 }
 
 static void the_stretch_starts_with_the_first_input_unchanged(void)
@@ -198,7 +183,7 @@ static void the_stretch_starts_with_the_first_input_unchanged(void)
         source[SPEED_CHANNELS * frame + 1] = source[SPEED_CHANNELS * frame] / 3 + (int32_t)frame;
     }
     for (unsigned index = 0; index < sizeof SPEEDS; index++) {
-        configure(SPEEDS[index], true, RATE_44K);
+        configure(SPEEDS[index], RATE_44K);
         CHECK(play(10000) > LEAD_OUT_44K);
         for (uint32_t frame = 0; frame < LEAD_OUT_44K; frame++) {
             CHECK_EQUAL(source[SPEED_CHANNELS * frame], result[SPEED_CHANNELS * frame]);
@@ -211,7 +196,7 @@ static void the_stretch_passes_a_constant_unchanged_at_every_speed(void)
 {
     fill_constant(DC_LEVEL, SOURCE_MAX);
     for (unsigned index = 0; index < sizeof SPEEDS; index++) {
-        configure(SPEEDS[index], true, RATE_44K);
+        configure(SPEEDS[index], RATE_44K);
         uint32_t made = play(SOURCE_MAX);
         uint32_t exact = 4 * (SOURCE_MAX - 2 * WINDOW_44K) / SPEEDS[index];
         CHECK(made > exact);
@@ -229,7 +214,7 @@ static void the_stretch_output_length_follows_the_speed(void)
     for (unsigned rate = 0; rate < 2; rate++) {
         fill_tone(TONE_HZ, rates[rate], rates[rate]);
         for (unsigned index = 0; index < sizeof SPEEDS; index++) {
-            configure(SPEEDS[index], true, rates[rate]);
+            configure(SPEEDS[index], rates[rate]);
             uint32_t made = play(rates[rate]);
             CHECK(made >= 4 * rates[rate] / SPEEDS[index]);
             CHECK(made <= ceil_quarters(rates[rate], SPEEDS[index]) + lead_outs[rate]);
@@ -242,7 +227,7 @@ static void the_stretch_keeps_a_sines_pitch_at_every_speed(void)
     const uint8_t speeds[] = {3, 6, 8};
     fill_tone(TONE_HZ, RATE_44K, SOURCE_MAX);
     for (unsigned index = 0; index < sizeof speeds; index++) {
-        configure(speeds[index], true, RATE_44K);
+        configure(speeds[index], RATE_44K);
         uint32_t made = play(SOURCE_MAX);
         double hz = tone_hz(SEQUENCE_44K, made - SEQUENCE_44K, RATE_44K);
         CHECK(near(TONE_HZ, hz, TONE_HZ * 0.01));
@@ -256,7 +241,7 @@ static void the_stretch_splices_without_jumps(void)
     int32_t allowed = largest_jump(source, SOURCE_MAX);
     allowed = allowed + allowed / 20 + 2;
     for (unsigned index = 0; index < sizeof speeds; index++) {
-        configure(speeds[index], true, RATE_44K);
+        configure(speeds[index], RATE_44K);
         uint32_t made = play(SOURCE_MAX);
         CHECK(largest_jump(result, made - SEQUENCE_44K) <= allowed);
     }
@@ -270,7 +255,7 @@ static void the_stretch_moves_both_channels_together(void)
         source[SPEED_CHANNELS * frame + 1] = -source[SPEED_CHANNELS * frame];
     }
     for (unsigned index = 0; index < sizeof speeds; index++) {
-        configure(speeds[index], true, RATE_44K);
+        configure(speeds[index], RATE_44K);
         uint32_t made = play(SOURCE_MAX);
         CHECK(made > SEQUENCE_44K);
         for (uint32_t frame = 0; frame < made; frame++) {
@@ -282,7 +267,7 @@ static void the_stretch_moves_both_channels_together(void)
 static void a_finished_stretch_plays_out_its_tail_then_reports_drained(void)
 {
     fill_tone(TONE_HZ, RATE_44K, 1000);
-    configure(6, true, RATE_44K);
+    configure(6, RATE_44K);
     uint32_t made = play(1000);
     CHECK(made >= 4 * 1000 / 6);
     CHECK(made <= ceil_quarters(1000, 6) + LEAD_OUT_44K);
@@ -293,10 +278,10 @@ static void a_finished_stretch_plays_out_its_tail_then_reports_drained(void)
 static void configuring_again_forgets_the_previous_input(void)
 {
     fill_tone(300.0, RATE_44K, 5000);
-    configure(6, true, RATE_44K);
+    configure(6, RATE_44K);
     CHECK_EQUAL(speed_space(&stage), speed_push(&stage, source, 5000));
     speed_pull(&stage, result, PULL_FRAMES);
-    configure(6, true, RATE_44K);
+    configure(6, RATE_44K);
     CHECK(!speed_drained(&stage));
     fill_tone(777.0, RATE_44K, 6000);
     uint32_t made = play(6000);
@@ -306,9 +291,9 @@ static void configuring_again_forgets_the_previous_input(void)
     }
 }
 
-static void check_progress(uint8_t quarters, bool keep_pitch)
+static void check_progress(uint8_t quarters)
 {
-    configure(quarters, keep_pitch, RATE_44K);
+    configure(quarters, RATE_44K);
     uint32_t pushed = 0;
     for (int round = 0; round < 4000 && pushed < SOURCE_MAX; round++) {
         uint32_t space = speed_space(&stage);
@@ -323,109 +308,28 @@ static void check_progress(uint8_t quarters, bool keep_pitch)
 static void the_stage_always_takes_input_or_gives_output(void)
 {
     fill_tone(TONE_HZ, RATE_44K, SOURCE_MAX);
-    check_progress(3, true);
-    check_progress(8, true);
-    check_progress(3, false);
-    check_progress(8, false);
+    check_progress(3);
+    check_progress(8);
 }
 
 static void push_never_takes_more_than_the_space(void)
 {
     fill_tone(TONE_HZ, RATE_44K, SOURCE_MAX);
-    for (int keep = 0; keep < 2; keep++) {
-        configure(8, keep == 1, RATE_44K);
-        uint32_t space = speed_space(&stage);
-        CHECK(space > 0 && space < SOURCE_MAX);
-        CHECK_EQUAL(space, speed_push(&stage, source, SOURCE_MAX));
-        CHECK_EQUAL(0, speed_space(&stage));
-        CHECK_EQUAL(0, speed_push(&stage, source, PUSH_FRAMES));
-    }
-}
-
-static void the_resampler_output_length_is_exact(void)
-{
-    const uint32_t lengths[] = {1, 17, 1000, 44100};
-    fill_tone(TONE_HZ, RATE_44K, SOURCE_MAX);
-    for (unsigned index = 0; index < sizeof SPEEDS; index++) {
-        for (unsigned length = 0; length < 4; length++) {
-            configure(SPEEDS[index], false, RATE_44K);
-            CHECK_EQUAL(ceil_quarters(lengths[length], SPEEDS[index]), play(lengths[length]));
-        }
-    }
-}
-
-static void the_resampler_at_double_speed_halves_the_length_and_doubles_the_pitch(void)
-{
-    fill_tone(TONE_HZ, RATE_44K, SOURCE_MAX);
-    configure(8, false, RATE_44K);
-    uint32_t made = play(SOURCE_MAX);
-    CHECK_EQUAL(22050, made);
-    CHECK(near(2 * TONE_HZ, tone_hz(100, made - 100, RATE_44K), 2 * TONE_HZ * 0.01));
-}
-
-static void the_resampler_at_three_quarters_lowers_the_pitch(void)
-{
-    fill_tone(TONE_HZ, RATE_44K, SOURCE_MAX);
-    configure(3, false, RATE_44K);
-    uint32_t made = play(SOURCE_MAX);
-    CHECK(near(TONE_HZ * 0.75, tone_hz(100, made - 100, RATE_44K), TONE_HZ * 0.75 * 0.01));
-}
-
-static void the_resampler_passes_a_constant_unchanged(void)
-{
-    fill_constant(DC_LEVEL, 4000);
-    for (unsigned index = 0; index < sizeof SPEEDS; index++) {
-        configure(SPEEDS[index], false, RATE_44K);
-        uint32_t made = play(4000);
-        CHECK(made > 200);
-        for (uint32_t frame = 20; frame + 20 < made; frame++) {
-            CHECK(near(DC_LEVEL, result[SPEED_CHANNELS * frame], 1.0));
-            CHECK(near(DC_LEVEL, result[SPEED_CHANNELS * frame + 1], 1.0));
-        }
-    }
-}
-
-static void the_resampler_keeps_what_would_fold_back_out(void)
-{
-    fill_tone(17640.0, RATE_44K, SOURCE_MAX);
-    double loud = rms(source, 100, SOURCE_MAX - 100);
-    configure(8, false, RATE_44K);
-    uint32_t made = play(SOURCE_MAX);
-    CHECK(rms(result, 100, made - 100) < loud / 100.0);
-    fill_tone(4410.0, RATE_44K, SOURCE_MAX);
-    loud = rms(source, 100, SOURCE_MAX - 100);
-    configure(8, false, RATE_44K);
-    made = play(SOURCE_MAX);
-    CHECK(rms(result, 100, made - 100) > loud * 0.891);
-}
-
-static void the_resampler_never_leaves_24_bits(void)
-{
-    for (uint32_t frame = 0; frame < 4000; frame++) {
-        int32_t level = (frame / 3) % 2 == 0 ? FULL_SCALE : -FULL_SCALE - 1;
-        source[SPEED_CHANNELS * frame] = level;
-        source[SPEED_CHANNELS * frame + 1] = -level - 1;
-    }
-    for (unsigned index = 0; index < sizeof SPEEDS; index++) {
-        configure(SPEEDS[index], false, RATE_44K);
-        uint32_t made = play(4000);
-        int32_t peak = 0;
-        for (uint32_t sample = 0; sample < SPEED_CHANNELS * made; sample++) {
-            CHECK(result[sample] <= FULL_SCALE && result[sample] >= -FULL_SCALE - 1);
-            peak = result[sample] > peak ? result[sample] : peak;
-        }
-        CHECK_EQUAL(FULL_SCALE, peak);
-    }
+    configure(8, RATE_44K);
+    uint32_t space = speed_space(&stage);
+    CHECK(space > 0 && space < SOURCE_MAX);
+    CHECK_EQUAL(space, speed_push(&stage, source, SOURCE_MAX));
+    CHECK_EQUAL(0, speed_space(&stage));
+    CHECK_EQUAL(0, speed_push(&stage, source, PUSH_FRAMES));
 }
 
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(unity_and_out_of_range_speeds_bypass_the_stage),
-        TEST_CASE(keep_pitch_stretches_up_to_48_khz_and_resamples_above),
-        TEST_CASE(keep_pitch_resamples_below_the_lowest_stretch_rate),
-        TEST_CASE(a_tiny_source_rate_still_plays_out_and_drains),
-        TEST_CASE(pitch_follows_speed_always_resamples),
+        TEST_CASE(the_stage_stretches_up_to_48_khz_and_bypasses_above),
+        TEST_CASE(the_stage_bypasses_below_the_lowest_stretch_rate),
+        TEST_CASE(a_rate_outside_the_stretch_range_plays_at_normal_speed),
         TEST_CASE(the_stretch_starts_with_the_first_input_unchanged),
         TEST_CASE(the_stretch_passes_a_constant_unchanged_at_every_speed),
         TEST_CASE(the_stretch_output_length_follows_the_speed),
@@ -436,12 +340,6 @@ int main(void)
         TEST_CASE(configuring_again_forgets_the_previous_input),
         TEST_CASE(the_stage_always_takes_input_or_gives_output),
         TEST_CASE(push_never_takes_more_than_the_space),
-        TEST_CASE(the_resampler_output_length_is_exact),
-        TEST_CASE(the_resampler_at_double_speed_halves_the_length_and_doubles_the_pitch),
-        TEST_CASE(the_resampler_at_three_quarters_lowers_the_pitch),
-        TEST_CASE(the_resampler_passes_a_constant_unchanged),
-        TEST_CASE(the_resampler_keeps_what_would_fold_back_out),
-        TEST_CASE(the_resampler_never_leaves_24_bits),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

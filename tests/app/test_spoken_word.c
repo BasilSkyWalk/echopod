@@ -455,14 +455,14 @@ static void a_paused_face_asks_for_no_frame(void)
     CHECK_EQUAL(0u, frame_wait_after_drawing_the_face());
 }
 
-static HalAudioSpeed speed_of(uint8_t quarters, bool keep_pitch)
+static HalAudioSpeed speed_of(uint8_t quarters)
 {
-    return (HalAudioSpeed){.quarters = quarters, .keep_pitch = keep_pitch};
+    return (HalAudioSpeed){.quarters = quarters};
 }
 
-static bool speed_is(HalAudioSpeed actual, uint8_t quarters, bool keep_pitch)
+static bool speed_is(HalAudioSpeed actual, uint8_t quarters)
 {
-    return actual.quarters == quarters && actual.keep_pitch == keep_pitch;
+    return actual.quarters == quarters;
 }
 
 static void add_to_up_next(const char *path)
@@ -480,9 +480,9 @@ static void finish_and_update(void)
 static void a_book_plays_at_the_spoken_speed(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     play(SPOKEN_CHAPTER_ONE_PATH, true);
-    CHECK(speed_is(fake_hal_audio_play_speed(), 6, true));
+    CHECK(speed_is(fake_hal_audio_play_speed(), 6));
     CHECK_EQUAL(FAKE_AUDIO_CALL_SET_SPEED, fake_hal_audio_call_at(0));
     CHECK_EQUAL(FAKE_AUDIO_CALL_PLAY, fake_hal_audio_call_at(1));
 }
@@ -490,15 +490,15 @@ static void a_book_plays_at_the_spoken_speed(void)
 static void music_plays_at_normal_speed_whatever_the_spoken_speed(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(8, false));
+    player_set_spoken_speed(&player, speed_of(8));
     play(SPOKEN_SONG_PATH, false);
-    CHECK(speed_is(fake_hal_audio_play_speed(), 4, true));
+    CHECK(speed_is(fake_hal_audio_play_speed(), 4));
 }
 
 static void chapters_at_the_same_speed_stay_gapless(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     play(SPOKEN_CHAPTER_ONE_PATH, true);
     int calls = fake_hal_audio_speed_calls();
     finish_and_update();
@@ -511,14 +511,14 @@ static void chapters_at_the_same_speed_stay_gapless(void)
 static void a_song_after_a_faster_book_starts_once_the_book_ends(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     play(SPOKEN_CHAPTER_THREE_PATH, true);
     add_to_up_next(SPOKEN_SONG_PATH);
     CHECK(fake_hal_audio_queued_path() == NULL);
     finish_and_update();
     CHECK(path_is(fake_hal_audio_playing_path(), SPOKEN_SONG_PATH));
     CHECK_EQUAL(2, fake_hal_audio_play_count());
-    CHECK(speed_is(fake_hal_audio_play_speed(), 4, true));
+    CHECK(speed_is(fake_hal_audio_play_speed(), 4));
     PlayerStatus status = player_status(&player);
     CHECK(!status.spoken);
     CHECK_EQUAL(PLAYER_PLAYING, status.state);
@@ -527,14 +527,14 @@ static void a_song_after_a_faster_book_starts_once_the_book_ends(void)
 static void a_book_after_a_song_starts_at_its_speed_once_the_song_ends(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     play(SPOKEN_SONG_PATH, false);
     add_to_up_next(SPOKEN_CHAPTER_ONE_PATH);
     CHECK(fake_hal_audio_queued_path() == NULL);
     finish_and_update();
     CHECK(path_is(fake_hal_audio_playing_path(), SPOKEN_CHAPTER_ONE_PATH));
     CHECK_EQUAL(2, fake_hal_audio_play_count());
-    CHECK(speed_is(fake_hal_audio_play_speed(), 6, true));
+    CHECK(speed_is(fake_hal_audio_play_speed(), 6));
     CHECK(player_status(&player).spoken);
 }
 
@@ -554,13 +554,13 @@ static void changing_the_speed_during_a_chapter_applies_it_once(void)
     start();
     play(SPOKEN_CHAPTER_ONE_PATH, true);
     int calls = fake_hal_audio_speed_calls();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK_EQUAL(calls + 1, fake_hal_audio_speed_calls());
-    CHECK(speed_is(fake_hal_audio_speed(), 6, true));
+    CHECK(speed_is(fake_hal_audio_speed(), 6));
     CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_CHAPTER_TWO_PATH));
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK_EQUAL(calls + 1, fake_hal_audio_speed_calls());
-    player_set_spoken_speed(&player, speed_of(6, false));
+    player_set_spoken_speed(&player, speed_of(8));
     CHECK_EQUAL(calls + 2, fake_hal_audio_speed_calls());
     CHECK_EQUAL(1, fake_hal_audio_play_count());
 }
@@ -571,24 +571,24 @@ static void changing_the_speed_drops_a_gapless_song_and_plays_it_after_the_chapt
     play(SPOKEN_CHAPTER_THREE_PATH, true);
     add_to_up_next(SPOKEN_SONG_PATH);
     CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_SONG_PATH));
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK(fake_hal_audio_queued_path() == NULL);
     finish_and_update();
     CHECK(path_is(fake_hal_audio_playing_path(), SPOKEN_SONG_PATH));
     CHECK_EQUAL(2, fake_hal_audio_play_count());
-    CHECK(speed_is(fake_hal_audio_play_speed(), 4, true));
+    CHECK(speed_is(fake_hal_audio_play_speed(), 4));
 }
 
 static void going_back_to_normal_speed_makes_a_deferred_song_gapless(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     play(SPOKEN_CHAPTER_THREE_PATH, true);
     add_to_up_next(SPOKEN_SONG_PATH);
     CHECK(fake_hal_audio_queued_path() == NULL);
-    player_set_spoken_speed(&player, speed_of(6, true));
-    player_set_spoken_speed(&player, speed_of(4, true));
-    CHECK(speed_is(fake_hal_audio_speed(), 4, true));
+    player_set_spoken_speed(&player, speed_of(6));
+    player_set_spoken_speed(&player, speed_of(4));
+    CHECK(speed_is(fake_hal_audio_speed(), 4));
     CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_SONG_PATH));
 }
 
@@ -597,7 +597,7 @@ static void changing_the_speed_during_a_song_leaves_the_song_alone(void)
     start();
     play(SPOKEN_SONG_PATH, false);
     int calls = fake_hal_audio_speed_calls();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK_EQUAL(calls, fake_hal_audio_speed_calls());
     CHECK_EQUAL(1, fake_hal_audio_play_count());
 }
@@ -610,7 +610,7 @@ static void a_speed_change_during_a_song_keeps_a_queued_chapter_and_applies_it_a
     CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_CHAPTER_ONE_PATH));
     int calls = fake_hal_audio_speed_calls();
     int audio_calls = fake_hal_audio_call_count();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK_EQUAL(calls, fake_hal_audio_speed_calls());
     CHECK_EQUAL(audio_calls, fake_hal_audio_call_count());
     CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_CHAPTER_ONE_PATH));
@@ -618,7 +618,7 @@ static void a_speed_change_during_a_song_keeps_a_queued_chapter_and_applies_it_a
     CHECK(player_status(&player).spoken);
     CHECK_EQUAL(1, fake_hal_audio_play_count());
     CHECK_EQUAL(calls + 1, fake_hal_audio_speed_calls());
-    CHECK(speed_is(fake_hal_audio_speed(), 6, true));
+    CHECK(speed_is(fake_hal_audio_speed(), 6));
 }
 
 static void a_hand_over_the_hal_already_made_is_followed_before_the_speed_changes(void)
@@ -626,7 +626,7 @@ static void a_hand_over_the_hal_already_made_is_followed_before_the_speed_change
     start();
     play(SPOKEN_CHAPTER_ONE_PATH, true);
     fake_hal_audio_finish_track();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK_EQUAL(spoken_library_track(library, SPOKEN_CHAPTER_TWO_PATH),
                 player_status(&player).track);
     CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_CHAPTER_THREE_PATH));
@@ -639,7 +639,7 @@ static void a_paused_chapter_gets_the_new_speed_while_paused(void)
     play(SPOKEN_CHAPTER_ONE_PATH, true);
     player_toggle_pause(&player);
     int calls = fake_hal_audio_speed_calls();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK_EQUAL(calls + 1, fake_hal_audio_speed_calls());
     CHECK_EQUAL(PLAYER_PAUSED, player_status(&player).state);
 }
@@ -651,17 +651,17 @@ static void a_released_chapter_starts_again_at_the_new_speed(void)
     fake_hal_audio_set_position(42000);
     player_release_output(&player);
     int calls = fake_hal_audio_speed_calls();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     CHECK_EQUAL(calls, fake_hal_audio_speed_calls());
     player_toggle_pause(&player);
-    CHECK(speed_is(fake_hal_audio_play_speed(), 6, true));
+    CHECK(speed_is(fake_hal_audio_play_speed(), 6));
     CHECK_EQUAL(42000, fake_hal_audio_play_start());
 }
 
 static void a_deferred_song_that_cannot_open_stops_like_the_end_of_the_queue(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     play(SPOKEN_CHAPTER_THREE_PATH, true);
     add_to_up_next(SPOKEN_SONG_PATH);
     fake_hal_audio_refuse_plays(1);
@@ -674,7 +674,7 @@ static void a_deferred_song_that_cannot_open_stops_like_the_end_of_the_queue(voi
 static void repeat_one_keeps_a_chapter_gapless_at_any_speed(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     player_set_repeat(&player, REPEAT_ONE);
     play(SPOKEN_CHAPTER_ONE_PATH, true);
     CHECK(path_is(fake_hal_audio_queued_path(), SPOKEN_CHAPTER_ONE_PATH));
@@ -685,11 +685,11 @@ static void repeat_one_keeps_a_chapter_gapless_at_any_speed(void)
 static void a_refused_chapter_moves_on_at_the_spoken_speed(void)
 {
     start();
-    player_set_spoken_speed(&player, speed_of(6, true));
+    player_set_spoken_speed(&player, speed_of(6));
     fake_hal_audio_refuse_plays(1);
     play(SPOKEN_CHAPTER_ONE_PATH, true);
     CHECK(path_is(fake_hal_audio_playing_path(), SPOKEN_CHAPTER_TWO_PATH));
-    CHECK(speed_is(fake_hal_audio_play_speed(), 6, true));
+    CHECK(speed_is(fake_hal_audio_play_speed(), 6));
 }
 
 int main(void)

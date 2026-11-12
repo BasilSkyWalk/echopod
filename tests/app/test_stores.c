@@ -149,14 +149,9 @@ static void hardware_settings_reach_the_hal(void)
 static void the_spoken_speed_setting_becomes_a_hal_speed(void)
 {
     Settings chosen = settings_defaults();
-    HalAudioSpeed normal = settings_store_spoken_speed(&chosen);
-    CHECK_EQUAL(4, normal.quarters);
-    CHECK(normal.keep_pitch);
+    CHECK_EQUAL(4, settings_store_spoken_speed(&chosen).quarters);
     chosen.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_1_5X;
-    chosen.options[OPTION_SPOKEN_PITCH] = SPOKEN_PITCH_FOLLOWS_SPEED;
-    HalAudioSpeed fast = settings_store_spoken_speed(&chosen);
-    CHECK_EQUAL(6, fast.quarters);
-    CHECK(!fast.keep_pitch);
+    CHECK_EQUAL(6, settings_store_spoken_speed(&chosen).quarters);
 }
 
 static void the_saved_spoken_speed_reaches_the_player_at_start(void)
@@ -166,10 +161,8 @@ static void the_saved_spoken_speed_reaches_the_player_at_start(void)
     player_init(&player, fixture_library_open(&fixture));
     settings.settings = settings_defaults();
     settings.settings.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_2X;
-    settings.settings.options[OPTION_SPOKEN_PITCH] = SPOKEN_PITCH_FOLLOWS_SPEED;
     settings_store_restore_playback(&settings, &player, 1);
     CHECK_EQUAL(8, player.spoken_speed.quarters);
-    CHECK(!player.spoken_speed.keep_pitch);
     CHECK_EQUAL(0, fake_hal_audio_speed_calls());
 }
 

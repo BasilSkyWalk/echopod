@@ -119,7 +119,7 @@ static void clear_stream(void)
 static void configure_stage(void)
 {
     SimTrack *track = current_track();
-    SpeedSetting setting = {.quarters = audio.speed.quarters, .keep_pitch = audio.speed.keep_pitch};
+    SpeedSetting setting = {.quarters = audio.speed.quarters};
     audio.finished = false;
     audio.speeding = false;
     if (!track->open) {
@@ -306,7 +306,8 @@ void sim_audio_tick(uint32_t elapsed_ms)
     if (!audio.virtual_output || audio.state != HAL_AUDIO_PLAYING || !track->open) {
         return;
     }
-    track->decoder.frame += sim_speed_frames(audio.speed, elapsed_ms, track->decoder.sample_rate);
+    HalAudioSpeed speed = audio.speeding ? audio.speed : (HalAudioSpeed){0};
+    track->decoder.frame += sim_speed_frames(speed, elapsed_ms, track->decoder.sample_rate);
     if (track->decoder.frame >= track->decoder.total_frames) {
         switch_to_next();
     }
