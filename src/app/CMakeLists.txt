@@ -1,6 +1,7 @@
 add_library(echo_app STATIC
     app.c
     card_files.c
+    conf_file.c
     clock_store.c
     app_screens.c
     bluetooth_link.c

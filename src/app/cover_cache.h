@@ -31,6 +31,7 @@ typedef struct CoverCache {
     HalFile file;
     Covers covers;
     bool available;
+    bool full_with_default;
     CoverSlot halves[COVER_CACHE_SLOTS];
     uint16_t full_album;
     CoverState full_state;
@@ -46,3 +47,4 @@ CoverState cover_cache_full(const CoverCache *cache, uint16_t album, Image *imag
 bool cover_cache_has_cover(CoverCache *cache, uint16_t album);
 bool cover_cache_load_half(CoverCache *cache, int position, uint16_t album);
 bool cover_cache_load_full(CoverCache *cache, uint16_t album);
+bool cover_cache_load_full_or_default(CoverCache *cache, uint16_t album);

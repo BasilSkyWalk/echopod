@@ -6,6 +6,8 @@
 #include "gfx/text.h"
 #include "settings/settings.h"
 #include "settings_screens.h"
+#include "settings_store.h"
+#include "ui/toast.h"
 
 enum {
     TOP_GROUPS = 5
@@ -27,8 +29,8 @@ static const char *const LIBRARY[] = {"Music folders",       "Rescan library",  
                                       "Folders & playlists", "Lyrics",           "Listen history"};
 static const char *const BUTTONS[] = {"Volume buttons", "Swap volume buttons", "Menu button",
                                       "Power on"};
-static const char *const SYSTEM[] = {"Language", "Date & time", "Auto off", "USB mode",
-                                     "Ask when connected"};
+static const char *const SYSTEM[] = {"Language", "Date & time",        "Auto off",
+                                     "USB mode", "Ask when connected", "Config File"};
 
 typedef struct GroupRows {
     const char *title;
@@ -90,14 +92,15 @@ static void each_group_lists_its_rows_in_order(void)
     }
 }
 
-static void every_row_but_rescan_opens_a_screen(void)
+static void every_row_but_actions_opens_a_screen(void)
 {
     start();
     for (int group = 0; group < SETTINGS_GROUP_COUNT; group++) {
         open_group((SettingsGroup)group);
         for (int row = 0; row < GROUPS[group].count; row++) {
-            bool rescan = strcmp("Rescan library", screens.rows[row].label) == 0;
-            CHECK_EQUAL(!rescan, screens.rows[row].opens);
+            const char *label = screens.rows[row].label;
+            bool action = strcmp("Rescan library", label) == 0 || strcmp("Config File", label) == 0;
+            CHECK_EQUAL(!action, screens.rows[row].opens);
         }
     }
 }
@@ -260,12 +263,34 @@ static void every_face_name_fits_the_value_column(void)
     }
 }
 
+static void the_config_file_row_flashes_the_current_value(void)
+{
+    static Toast toast;
+    static EchoConf conf;
+    SettingsStore store = {.settings = settings_defaults()};
+    conf.values[CONF_DEFAULT_COVER] = 1;
+    fake_hal_reset();
+    settings_screens_init(&screens,
+                          (SettingsContext){.store = &store, .toast = &toast, .conf = &conf},
+                          &DEFAULT_THEME);
+    open_group(SETTINGS_SYSTEM);
+    const MenuItem *row = &screens.rows[5];
+    CHECK_EQUAL(0, strcmp("Config File", row->label));
+    CHECK(!row->opens);
+    row->select(row->context);
+    CHECK(toast.visible);
+    CHECK_EQUAL(0, strcmp("CONF_DEFAULT_COVER=1", toast.text));
+    conf.values[CONF_DEFAULT_COVER] = 255;
+    row->select(row->context);
+    CHECK_EQUAL(0, strcmp("CONF_DEFAULT_COVER=255", toast.text));
+}
+
 int main(void)
 {
     const TestCase cases[] = {
         TEST_CASE(the_top_level_lists_the_quick_settings_then_the_groups),
         TEST_CASE(each_group_lists_its_rows_in_order),
-        TEST_CASE(every_row_but_rescan_opens_a_screen),
+        TEST_CASE(every_row_but_actions_opens_a_screen),
         TEST_CASE(a_group_remembers_its_selected_row),
         TEST_CASE(starting_again_forgets_the_selected_rows),
         TEST_CASE(the_theme_choice_lists_every_theme_in_stored_order),
@@ -275,6 +300,7 @@ int main(void)
         TEST_CASE(the_now_playing_row_follows_the_rows_the_theme_hides),
         TEST_CASE(the_now_playing_row_lists_every_face_and_shows_the_chosen_one),
         TEST_CASE(every_face_name_fits_the_value_column),
+        TEST_CASE(the_config_file_row_flashes_the_current_value),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -17,6 +17,8 @@ enum {
     COVERS_CHUNK_ENTRIES = 64
 };
 
+#define ECHO_MINI_DEFAULT_COVER 0xFFFFFFFFu
+
 typedef enum CoverSize {
     COVER_FULL,
     COVER_HALF
