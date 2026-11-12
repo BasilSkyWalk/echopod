@@ -1,5 +1,10 @@
 #include "dsp/speed_fifo.h"
 
+static uint32_t smaller(uint32_t first, uint32_t second)
+{
+    return first < second ? first : second;
+}
+
 void speed_fifo_reset(SpeedFifo *fifo, uint32_t limit)
 {
     fifo->count = 0;
@@ -9,46 +14,31 @@ void speed_fifo_reset(SpeedFifo *fifo, uint32_t limit)
     fifo->finished = false;
 }
 
-static uint32_t room(const SpeedFifo *fifo)
-{
-    return fifo->limit > fifo->count ? fifo->limit - fifo->count : 0;
-}
-
 uint32_t speed_fifo_space(const SpeedFifo *fifo)
 {
-    return fifo->finished ? 0 : fifo->discard + room(fifo);
+    return fifo->finished ? 0 : fifo->discard + fifo->limit - fifo->count;
 }
 
 uint32_t speed_fifo_append(SpeedFifo *fifo, const int32_t *frames, uint32_t count)
 {
-    if (fifo->finished) {
-        return 0;
-    }
-    uint32_t skipped = count < fifo->discard ? count : fifo->discard;
-    uint32_t stored = count - skipped < room(fifo) ? count - skipped : room(fifo);
-    int32_t *target = fifo->samples + SPEED_CHANNELS * fifo->count;
-    for (uint32_t index = 0; index < SPEED_CHANNELS * stored; index++) {
-        target[index] = frames[SPEED_CHANNELS * skipped + index];
-    }
+    uint32_t taken = smaller(count, speed_fifo_space(fifo));
+    uint32_t skipped = smaller(taken, fifo->discard);
+    uint32_t stored = taken - skipped;
+    speed_fifo_copy(fifo->samples + SPEED_CHANNELS * fifo->count, frames + SPEED_CHANNELS * skipped,
+                    stored);
     fifo->discard -= skipped;
     fifo->count += stored;
     fifo->real += stored;
-    return skipped + stored;
+    return taken;
 }
 
 void speed_fifo_drop(SpeedFifo *fifo, uint32_t frames)
 {
-    if (frames >= fifo->count) {
-        fifo->discard += fifo->finished ? 0 : frames - fifo->count;
-        fifo->count = 0;
-        fifo->real = 0;
-        return;
-    }
-    for (uint32_t index = 0; index < SPEED_CHANNELS * (fifo->count - frames); index++) {
-        fifo->samples[index] = fifo->samples[SPEED_CHANNELS * frames + index];
-    }
-    fifo->count -= frames;
-    fifo->real -= frames < fifo->real ? frames : fifo->real;
+    uint32_t removed = smaller(frames, fifo->count);
+    fifo->discard += frames - removed;
+    fifo->count -= removed;
+    fifo->real -= smaller(frames, fifo->real);
+    speed_fifo_copy(fifo->samples, fifo->samples + SPEED_CHANNELS * removed, fifo->count);
 }
 
 void speed_fifo_pad(SpeedFifo *fifo, uint32_t frames)
@@ -62,4 +52,11 @@ void speed_fifo_pad(SpeedFifo *fifo, uint32_t frames)
 const int32_t *speed_fifo_at(const SpeedFifo *fifo, uint32_t frame)
 {
     return fifo->samples + SPEED_CHANNELS * frame;
+}
+
+void speed_fifo_copy(int32_t *target, const int32_t *source, uint32_t frames)
+{
+    for (uint32_t index = 0; index < SPEED_CHANNELS * frames; index++) {
+        target[index] = source[index];
+    }
 }

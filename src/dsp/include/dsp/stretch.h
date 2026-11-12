@@ -31,16 +31,14 @@ typedef struct StretchShape {
 
 typedef struct Stretch {
     StretchShape shape;
-    int32_t tail[SPEED_CHANNELS * STRETCH_MAX_OVERLAP];
-    int16_t reference[STRETCH_MAX_OVERLAP];
-    int16_t window[STRETCH_MAX_SEEK + STRETCH_MAX_OVERLAP];
-    int16_t coarse_reference[STRETCH_MAX_COARSE_OVERLAP];
-    int16_t coarse_window[STRETCH_MAX_COARSE_WINDOW];
     uint32_t offset;
     uint32_t emitted;
     uint32_t carry;
     bool active;
     bool primed;
+    int16_t coarse[STRETCH_MAX_COARSE_OVERLAP + STRETCH_MAX_COARSE_WINDOW];
+    int16_t mids[STRETCH_MAX_OVERLAP + STRETCH_MAX_SEEK + STRETCH_MAX_OVERLAP];
+    int32_t tail[SPEED_CHANNELS * STRETCH_MAX_OVERLAP];
 } Stretch;
 
 void stretch_configure(Stretch *stretch, SpeedFifo *fifo, uint32_t rate, uint32_t quarters);

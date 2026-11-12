@@ -25,6 +25,7 @@ typedef enum SpeedMethod {
 
 typedef struct SpeedStage {
     SpeedMethod method;
+    uint8_t quarters;
     SpeedFifo fifo;
     Stretch stretch;
 } SpeedStage;
