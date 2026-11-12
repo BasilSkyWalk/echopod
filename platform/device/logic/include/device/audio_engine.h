@@ -153,6 +153,7 @@ bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms);
 void audio_engine_lead_in(AudioEngine *engine, uint32_t silence_frames, uint32_t ramp_frames);
 void audio_engine_close_source(AudioEngine *engine);
 bool audio_engine_next_pending(const AudioEngine *engine);
+bool audio_engine_next_opened(const AudioEngine *engine);
 void audio_engine_pause(AudioEngine *engine);
 void audio_engine_resume(AudioEngine *engine);
 void audio_engine_stop(AudioEngine *engine);

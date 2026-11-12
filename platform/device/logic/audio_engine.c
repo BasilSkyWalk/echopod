@@ -207,7 +207,7 @@ bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms,
 void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token)
 {
     engine->has_next = path != NULL;
-    engine->next_replaced = engine->segment_count > 1 || engine->rate_pending;
+    engine->next_replaced = audio_engine_next_opened(engine);
     engine->next.token = token;
     if (path != NULL) {
         copy_path(engine->next.path, path);
@@ -255,6 +255,11 @@ void audio_engine_close_source(AudioEngine *engine)
 bool audio_engine_next_pending(const AudioEngine *engine)
 {
     return engine->has_next;
+}
+
+bool audio_engine_next_opened(const AudioEngine *engine)
+{
+    return engine->segment_count > 1 || engine->rate_pending;
 }
 
 void audio_engine_pause(AudioEngine *engine)

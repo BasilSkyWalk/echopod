@@ -1117,6 +1117,33 @@ static void a_cancelled_next_track_stays_cancelled_after_a_seek(void)
     CHECK_EQUAL(AUDIO_ENGINE_STOPPED, audio_engine_status(&engine).state);
 }
 
+static void a_next_track_counts_as_opened_from_its_decoding_until_it_plays(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_16_44k_stereo", 4);
+    CHECK(!audio_engine_next_opened(&engine));
+    pump_until_full(0);
+    CHECK(audio_engine_next_opened(&engine));
+    audio_engine_pump(&engine, 3000);
+    CHECK(audio_engine_next_opened(&engine));
+    audio_engine_pump(&engine, 3001);
+    CHECK(!audio_engine_next_opened(&engine));
+}
+
+static void a_next_track_waiting_for_its_rate_counts_as_opened(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    audio_engine_queue_next(&engine, "lpc_24_96k_stereo", 4);
+    pump_until_full(0);
+    CHECK(audio_engine_next_opened(&engine));
+    audio_engine_pump(&engine, 3001);
+    CHECK(audio_engine_next_opened(&engine));
+    audio_engine_restart(&engine);
+    CHECK(!audio_engine_next_opened(&engine));
+}
+
 static void a_newer_next_track_wins_over_the_opened_one_after_a_seek(void)
 {
     queue_after_opening_the_next_track("lpc_24_96k_stereo", 9);
@@ -1171,6 +1198,8 @@ int main(void)
         TEST_CASE(the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size),
         TEST_CASE(a_cancelled_next_track_stays_cancelled_after_a_seek),
         TEST_CASE(a_newer_next_track_wins_over_the_opened_one_after_a_seek),
+        TEST_CASE(a_next_track_counts_as_opened_from_its_decoding_until_it_plays),
+        TEST_CASE(a_next_track_waiting_for_its_rate_counts_as_opened),
         TEST_CASE(a_stage_at_unity_speed_leaves_the_ring_bit_identical),
         TEST_CASE(the_position_is_track_time_at_double_speed),
         TEST_CASE(the_position_is_track_time_at_three_quarter_speed),
