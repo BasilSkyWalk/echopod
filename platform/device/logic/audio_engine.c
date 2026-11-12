@@ -78,7 +78,8 @@ void audio_engine_set_speed(AudioEngine *engine, SpeedSetting speed)
 static void use_output_rate(AudioEngine *engine)
 {
     engine->output_rate = engine->decode_rate;
-    equalizer_set_rate(&engine->equalizer, engine->source_rate);
+    equalizer_set_rate(&engine->equalizer,
+                       speed_equalizer_rate(engine->source_rate, engine->track_quarters));
 }
 
 static void release_frame(AudioEngine *engine)
@@ -461,16 +462,14 @@ static void copy_pending(AudioEngine *engine)
     }
 }
 
-static void continue_with_next(AudioEngine *engine, uint32_t previous_rate)
+static void continue_with_next(AudioEngine *engine)
 {
     if (engine->decode_rate != engine->output_rate) {
         engine->rate_pending = true;
         engine->rate_end = engine->produced;
         return;
     }
-    if (engine->source_rate != previous_rate) {
-        equalizer_set_rate(&engine->equalizer, engine->source_rate);
-    }
+    use_output_rate(engine);
     push_segment(engine, engine->next.path, engine->next.token, engine->produced, 0);
 }
 
@@ -479,9 +478,8 @@ static void finish_decoding(AudioEngine *engine)
     close_file(engine);
     if (engine->has_next) {
         engine->has_next = false;
-        uint32_t previous_rate = engine->source_rate;
         if (open_track(engine, engine->next.path, 0)) {
-            continue_with_next(engine, previous_rate);
+            continue_with_next(engine);
             return;
         }
         engine->failed = true;

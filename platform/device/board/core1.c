@@ -6,6 +6,7 @@
 #include "device/core1_control.h"
 #include "device/core1_stream.h"
 #include "device/image_crc.h"
+#include "dsp/speed.h"
 #include "emmc.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -37,6 +38,7 @@ static uint32_t accel_classes;
 static HalCore1Accel run_accel_test(void);
 static Core1Program streaming_program;
 static uint32_t streaming_divider;
+static uint32_t streaming_rate;
 static EqualizerCurve equalizer_curve;
 static uint32_t equalizer_version;
 static uint8_t core1_quarters;
@@ -151,9 +153,16 @@ static bool equalizer_moved(void)
     return false;
 }
 
+static bool equalizable(Core1Program program, uint32_t rate)
+{
+    uint32_t quarters = speed_played_quarters((SpeedSetting){core1_quarters}, rate);
+    return program == CORE1_PROGRAM_FLAC &&
+           speed_equalizer_rate(rate, quarters) <= EQUALIZER_MAX_RATE;
+}
+
 static bool equalizing(Core1Program program, uint32_t rate)
 {
-    return program == CORE1_PROGRAM_FLAC && rate <= EQUALIZER_MAX_RATE && equalizer_moved();
+    return equalizable(program, rate) && equalizer_moved();
 }
 
 static bool hi_res(Core1Program program, uint32_t rate)
@@ -187,7 +196,7 @@ void board_core1_set_speed(uint8_t quarters)
 void board_core1_set_equalizer(const EqualizerCurve *curve)
 {
     equalizer_curve = *curve;
-    if (streaming && streaming_program == CORE1_PROGRAM_FLAC) {
+    if (streaming && equalizable(streaming_program, streaming_rate)) {
         share_equalizer(streaming_divider == 1);
     }
 }
@@ -213,7 +222,9 @@ bool board_core1_needs_restart(Core1Program program, uint32_t rate)
 
 bool board_core1_start_stream(Core1Program program, uint32_t rate)
 {
+    streaming_rate = rate;
     if (streaming && !board_core1_needs_restart(program, rate)) {
+        share_equalizer(equalizing(program, rate) && streaming_divider == 1);
         return true;
     }
     board_core1_stop();

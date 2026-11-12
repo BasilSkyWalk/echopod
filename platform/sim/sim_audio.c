@@ -152,7 +152,8 @@ static int32_t to_fixed(float sample)
 
 static void equalize_chunk(uint64_t frames, uint32_t rate)
 {
-    equalizer_set_rate(&audio.equalizer, rate);
+    equalizer_set_rate(&audio.equalizer,
+                       speed_equalizer_rate(rate, sim_speed_quarters(audio.speed, rate)));
     if (!equalizer_active(&audio.equalizer)) {
         return;
     }

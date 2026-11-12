@@ -868,7 +868,7 @@ static void a_speed_set_while_playing_waits_for_the_next_start(void)
     CHECK_EQUAL(200u, audio_engine_status(&engine).position_ms);
 }
 
-static void a_96_khz_next_track_waits_for_the_stretched_tail_then_plays_at_normal_speed(void)
+static void a_96_khz_next_track_waits_for_the_stretched_tail_then_plays_at_its_speed(void)
 {
     start_engine_at(SIX_QUARTER_SPEED);
     CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
@@ -882,10 +882,10 @@ static void a_96_khz_next_track_waits_for_the_stretched_tail_then_plays_at_norma
     CHECK(audio_engine_wants_rate(&engine, &rate));
     CHECK_EQUAL(96000u, rate);
     audio_engine_restart(&engine);
-    CHECK_EQUAL(SPEED_BYPASS, speed_method(&stage));
+    CHECK_EQUAL(SPEED_STRETCH, speed_method(&stage));
     pump_rounds(0, PUMP_ROUNDS);
     audio_engine_observe(&engine, 9600);
-    CHECK_EQUAL(100u, audio_engine_status(&engine).position_ms);
+    CHECK_EQUAL(150u, audio_engine_status(&engine).position_ms);
     CHECK_EQUAL(4u, audio_engine_status(&engine).token);
 }
 
@@ -971,13 +971,14 @@ static void reference_through_stage(bool equalize)
     curve.bands[0] = (EqualizerBand){.frequency_hz = 1000, .gain_tenths = -60, .q_hundredths = 100};
     Equalizer reference_eq;
     equalizer_init(&reference_eq);
-    equalizer_set_rate(&reference_eq, 44100);
+    uint32_t rate = scripted.rate == 0 ? 44100 : scripted.rate;
+    equalizer_set_rate(&reference_eq, rate);
     equalizer_set_curve(&reference_eq, &curve);
     for (uint32_t frame = 0; frame < 16 * EQUALIZED_SOURCE_FRAMES; frame++) {
         input[2 * frame] = (int32_t)(frame % 16 + 1) * 256 * 100;
         input[2 * frame + 1] = -(int32_t)(frame % 16 + 1) * 256 * 100;
     }
-    speed_configure(&reference_stage, DOUBLE_SPEED, 44100);
+    speed_configure(&reference_stage, DOUBLE_SPEED, rate);
     uint32_t made = 0;
     uint32_t pushed = 0;
     while (made < EQUALIZED_CHECK_FRAMES) {
@@ -994,6 +995,33 @@ static void reference_through_stage(bool equalize)
     }
 }
 
+static void a_96_khz_book_set_to_double_speed_plays_at_one_and_a_half(void)
+{
+    start_scripted_engine_at(0, 2000, DOUBLE_SPEED);
+    scripted.rate = 96000;
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    CHECK(engine.speeding);
+    CHECK_EQUAL(6u, speed_quarters(&stage));
+    pump_rounds(0, PUMP_ROUNDS);
+    audio_engine_observe(&engine, 9600);
+    CHECK_EQUAL(150u, audio_engine_status(&engine).position_ms);
+}
+
+static void a_192_khz_book_plays_at_normal_speed_whatever_the_setting(void)
+{
+    start_scripted_engine_at(0, 200, DOUBLE_SPEED);
+    scripted.rate = 192000;
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
+    CHECK(!engine.speeding);
+    CHECK_EQUAL(SPEED_BYPASS, speed_method(&stage));
+    pump_rounds(0, PUMP_ROUNDS);
+    for (uint32_t frame = 0; frame < 3200; frame++) {
+        CHECK(frame_is(frame, scripted.left[frame % 16], scripted.right[frame % 16], 16));
+    }
+    audio_engine_observe(&engine, 1920);
+    CHECK_EQUAL(10u, audio_engine_status(&engine).position_ms);
+}
+
 static uint32_t equalizer_test_ring_differs_from(bool equalize)
 {
     uint32_t differing = 0;
@@ -1006,10 +1034,11 @@ static uint32_t equalizer_test_ring_differs_from(bool equalize)
     return differing;
 }
 
-static void run_unequalized_scripted_at_double_speed(bool already_equalized)
+static void run_scripted_at_double_speed(bool already_equalized, uint32_t rate)
 {
     start_scripted_engine_at(0, EQUALIZED_SOURCE_FRAMES, DOUBLE_SPEED);
     scripted.equalized = already_equalized;
+    scripted.rate = rate;
     for (int index = 0; index < 16; index++) {
         scripted.left[index] = (index + 1) * 100;
         scripted.right[index] = -(index + 1) * 100;
@@ -1042,16 +1071,29 @@ static void a_ramp_at_speed_rises_over_output_frames(void)
 
 static void the_equalizer_shapes_the_output_of_the_speed_stage(void)
 {
-    run_unequalized_scripted_at_double_speed(false);
+    run_scripted_at_double_speed(false, 44100);
     CHECK_EQUAL(0u, equalizer_test_ring_differs_from(true));
     CHECK(equalizer_test_ring_differs_from(false) > 0);
 }
 
 static void frames_core_1_equalized_are_not_equalized_again_after_the_stage(void)
 {
-    run_unequalized_scripted_at_double_speed(true);
+    run_scripted_at_double_speed(true, 44100);
     CHECK_EQUAL(0u, equalizer_test_ring_differs_from(false));
     CHECK(equalizer_test_ring_differs_from(true) > 0);
+}
+
+static void the_equalizer_runs_at_speed_while_the_decoded_rate_is_at_most_96_khz(void)
+{
+    run_scripted_at_double_speed(false, 48000);
+    CHECK_EQUAL(0u, equalizer_test_ring_differs_from(true));
+    CHECK(equalizer_test_ring_differs_from(false) > 0);
+}
+
+static void the_equalizer_is_off_at_speed_when_the_decoded_rate_passes_96_khz(void)
+{
+    run_scripted_at_double_speed(false, 96000);
+    CHECK_EQUAL(0u, equalizer_test_ring_differs_from(false));
 }
 
 static void queue_after_opening_the_next_track(const char *path, uint32_t token)
@@ -1140,7 +1182,9 @@ int main(void)
         TEST_CASE(seeking_at_speed_resets_the_stage),
         TEST_CASE(a_speed_set_while_playing_waits_for_the_next_start),
         TEST_CASE(a_ramp_at_speed_rises_over_output_frames),
-        TEST_CASE(a_96_khz_next_track_waits_for_the_stretched_tail_then_plays_at_normal_speed),
+        TEST_CASE(a_96_khz_next_track_waits_for_the_stretched_tail_then_plays_at_its_speed),
+        TEST_CASE(a_96_khz_book_set_to_double_speed_plays_at_one_and_a_half),
+        TEST_CASE(a_192_khz_book_plays_at_normal_speed_whatever_the_setting),
         TEST_CASE(a_22_khz_track_at_speed_is_sped_up_before_it_is_doubled),
         TEST_CASE(without_a_stage_the_speed_is_ignored),
         TEST_CASE(double_speed_keeps_the_ring_fed),
@@ -1148,6 +1192,8 @@ int main(void)
         TEST_CASE(a_stage_never_decodes_past_the_end_of_the_source),
         TEST_CASE(the_equalizer_shapes_the_output_of_the_speed_stage),
         TEST_CASE(frames_core_1_equalized_are_not_equalized_again_after_the_stage),
+        TEST_CASE(the_equalizer_runs_at_speed_while_the_decoded_rate_is_at_most_96_khz),
+        TEST_CASE(the_equalizer_is_off_at_speed_when_the_decoded_rate_passes_96_khz),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

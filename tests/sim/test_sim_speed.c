@@ -29,12 +29,22 @@ static void the_virtual_clock_advances_by_the_speed(void)
     CHECK_EQUAL(529, sim_speed_frames(speed_of(3), 16, 44100));
 }
 
+static void a_fast_book_above_72_khz_advances_at_its_capped_speed(void)
+{
+    CHECK_EQUAL(8, sim_speed_quarters(speed_of(8), 64000));
+    CHECK_EQUAL(6, sim_speed_quarters(speed_of(8), 96000));
+    CHECK_EQUAL(4, sim_speed_quarters(speed_of(8), 192000));
+    CHECK_EQUAL(2304, sim_speed_frames(speed_of(8), 16, 96000));
+    CHECK_EQUAL(3072, sim_speed_frames(speed_of(8), 16, 192000));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(speeds_differ_only_by_their_quarters),
         TEST_CASE(a_speed_outside_the_range_is_normal),
         TEST_CASE(the_virtual_clock_advances_by_the_speed),
+        TEST_CASE(a_fast_book_above_72_khz_advances_at_its_capped_speed),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

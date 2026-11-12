@@ -221,6 +221,18 @@ static void every_speed_has_a_short_label(void)
     CHECK(modes_text_is(status, SPOKEN_SPEED_2X, "2x"));
 }
 
+static void a_book_shows_the_speed_it_actually_plays_at(void)
+{
+    PlayerStatus book = {.spoken = true, .format = {.sample_rate = 64000}};
+    CHECK(modes_text_is(book, SPOKEN_SPEED_2X, "2x"));
+    book.format.sample_rate = 96000;
+    CHECK(modes_text_is(book, SPOKEN_SPEED_2X, "1.5x"));
+    CHECK(modes_text_is(book, SPOKEN_SPEED_1_25X, "1.25x"));
+    book.format.sample_rate = 192000;
+    CHECK(modes_text_is(book, SPOKEN_SPEED_2X, ""));
+    CHECK(modes_text_is(book, SPOKEN_SPEED_0_75X, ""));
+}
+
 static void music_and_normal_speed_show_no_speed(void)
 {
     char buffer[TEXT_CAPACITY];
@@ -323,6 +335,7 @@ int main(void)
         TEST_CASE(the_detail_line_shows_bitrate_and_place),
         TEST_CASE(the_detail_line_leaves_out_what_is_unknown),
         TEST_CASE(spoken_word_shows_its_speed_on_the_modes_line),
+        TEST_CASE(a_book_shows_the_speed_it_actually_plays_at),
         TEST_CASE(the_speed_comes_before_shuffle_and_repeat),
         TEST_CASE(every_speed_has_a_short_label),
         TEST_CASE(music_and_normal_speed_show_no_speed),

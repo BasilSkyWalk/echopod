@@ -5,6 +5,7 @@
 #include "core/format.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
+#include "dsp/speed.h"
 #include "gfx/image.h"
 #include "hal/audio.h"
 #include "hal/storage.h"
@@ -766,11 +767,18 @@ static void append_part(StringBuilder *builder, const char *text)
     string_builder_append(builder, text);
 }
 
+static uint32_t played_quarters(const PlayerStatus *status, const uint8_t *options)
+{
+    SpeedSetting chosen = {settings_spoken_quarters(options)};
+    uint32_t rate = status->format.sample_rate;
+    return rate == 0 ? chosen.quarters : speed_played_quarters(chosen, rate);
+}
+
 void now_playing_modes_text(const PlayerStatus *status, const uint8_t *options, char *buffer,
                             size_t capacity)
 {
     StringBuilder builder = string_builder_make(buffer, capacity);
-    uint8_t quarters = settings_spoken_quarters(options);
+    uint32_t quarters = played_quarters(status, options);
     if (status->spoken && quarters != SPOKEN_SPEED_NORMAL_QUARTERS) {
         append_part(&builder, SPOKEN_SPEED_LABELS[quarters - SPOKEN_SPEED_SLOWEST_QUARTERS]);
     }

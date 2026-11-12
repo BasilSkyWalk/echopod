@@ -145,14 +145,43 @@ static void unity_and_out_of_range_speeds_bypass_the_stage(void)
     CHECK_EQUAL(0, speed_space(&stage));
 }
 
-static void the_stage_stretches_up_to_48_khz_and_bypasses_above(void)
+static void the_stage_stretches_up_to_96_khz_and_bypasses_above(void)
 {
     SpeedSetting setting = {6};
-    CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, 48000));
     CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, RATE_22K));
-    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 48001));
-    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 88200));
-    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 192000));
+    CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, 48000));
+    CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, 64000));
+    CHECK_EQUAL(SPEED_STRETCH, speed_method_for(setting, 96000));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 96001));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for(setting, 176400));
+    CHECK_EQUAL(SPEED_BYPASS, speed_method_for((SpeedSetting){3}, 192000));
+}
+
+static void a_fast_speed_is_capped_where_decoding_would_pass_144_khz(void)
+{
+    CHECK_EQUAL(8, speed_played_quarters((SpeedSetting){8}, 48000));
+    CHECK_EQUAL(8, speed_played_quarters((SpeedSetting){8}, 64000));
+    CHECK_EQUAL(8, speed_played_quarters((SpeedSetting){8}, 72000));
+    CHECK_EQUAL(6, speed_played_quarters((SpeedSetting){8}, 88200));
+    CHECK_EQUAL(6, speed_played_quarters((SpeedSetting){8}, 96000));
+    CHECK_EQUAL(6, speed_played_quarters((SpeedSetting){7}, 96000));
+    CHECK_EQUAL(5, speed_played_quarters((SpeedSetting){5}, 96000));
+    CHECK_EQUAL(3, speed_played_quarters((SpeedSetting){3}, 96000));
+    CHECK_EQUAL(4, speed_played_quarters((SpeedSetting){8}, 176400));
+    configure(8, 96000);
+    CHECK_EQUAL(SPEED_STRETCH, speed_method(&stage));
+    CHECK_EQUAL(6, speed_quarters(&stage));
+}
+
+static void the_equalizer_sees_the_decoded_rate_once_that_passes_96_khz(void)
+{
+    CHECK_EQUAL(RATE_44K, speed_equalizer_rate(RATE_44K, 4));
+    CHECK_EQUAL(48000, speed_equalizer_rate(48000, 8));
+    CHECK_EQUAL(64000, speed_equalizer_rate(64000, 6));
+    CHECK_EQUAL(128000, speed_equalizer_rate(64000, 8));
+    CHECK_EQUAL(144000, speed_equalizer_rate(96000, 6));
+    CHECK_EQUAL(96000, speed_equalizer_rate(96000, 3));
+    CHECK_EQUAL(192000, speed_equalizer_rate(192000, 4));
 }
 
 static void the_stage_bypasses_below_the_lowest_stretch_rate(void)
@@ -166,7 +195,7 @@ static void the_stage_bypasses_below_the_lowest_stretch_rate(void)
 
 static void a_rate_outside_the_stretch_range_plays_at_normal_speed(void)
 {
-    const uint32_t rates[] = {24, 96000};
+    const uint32_t rates[] = {24, 176400};
     for (unsigned index = 0; index < 2; index++) {
         configure(6, rates[index]);
         CHECK_EQUAL(SPEED_BYPASS, speed_method(&stage));
@@ -230,6 +259,21 @@ static void the_stretch_keeps_a_sines_pitch_at_every_speed(void)
         configure(speeds[index], RATE_44K);
         uint32_t made = play(SOURCE_MAX);
         double hz = tone_hz(SEQUENCE_44K, made - SEQUENCE_44K, RATE_44K);
+        CHECK(near(TONE_HZ, hz, TONE_HZ * 0.01));
+    }
+}
+
+static void above_48_khz_the_stretch_keeps_the_pitch_in_the_same_memory(void)
+{
+    const uint32_t rates[] = {64000, 88200, 96000};
+    for (unsigned index = 0; index < 3; index++) {
+        fill_tone(TONE_HZ, rates[index], SOURCE_MAX);
+        configure(6, rates[index]);
+        CHECK(speed_space(&stage) <= SPEED_FIFO_FRAMES);
+        uint32_t made = play(SOURCE_MAX);
+        CHECK(made >= 4 * SOURCE_MAX / 6);
+        CHECK(made <= ceil_quarters(SOURCE_MAX, 6) + STRETCH_MAX_SEQUENCE);
+        double hz = tone_hz(STRETCH_MAX_SEQUENCE, made - STRETCH_MAX_SEQUENCE, rates[index]);
         CHECK(near(TONE_HZ, hz, TONE_HZ * 0.01));
     }
 }
@@ -327,13 +371,16 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(unity_and_out_of_range_speeds_bypass_the_stage),
-        TEST_CASE(the_stage_stretches_up_to_48_khz_and_bypasses_above),
+        TEST_CASE(the_stage_stretches_up_to_96_khz_and_bypasses_above),
+        TEST_CASE(a_fast_speed_is_capped_where_decoding_would_pass_144_khz),
+        TEST_CASE(the_equalizer_sees_the_decoded_rate_once_that_passes_96_khz),
         TEST_CASE(the_stage_bypasses_below_the_lowest_stretch_rate),
         TEST_CASE(a_rate_outside_the_stretch_range_plays_at_normal_speed),
         TEST_CASE(the_stretch_starts_with_the_first_input_unchanged),
         TEST_CASE(the_stretch_passes_a_constant_unchanged_at_every_speed),
         TEST_CASE(the_stretch_output_length_follows_the_speed),
         TEST_CASE(the_stretch_keeps_a_sines_pitch_at_every_speed),
+        TEST_CASE(above_48_khz_the_stretch_keeps_the_pitch_in_the_same_memory),
         TEST_CASE(the_stretch_splices_without_jumps),
         TEST_CASE(the_stretch_moves_both_channels_together),
         TEST_CASE(a_finished_stretch_plays_out_its_tail_then_reports_drained),

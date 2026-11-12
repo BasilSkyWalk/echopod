@@ -6,9 +6,10 @@ enum {
     MID_SHIFT = 9
 };
 
-static uint32_t whole_steps(uint32_t rate, uint32_t milliseconds, uint32_t step)
+static uint32_t whole_steps(uint32_t rate, uint32_t milliseconds, uint32_t step, uint32_t most)
 {
-    return rate * milliseconds / MILLISECONDS_PER_SECOND / step * step;
+    uint32_t frames = rate * milliseconds / MILLISECONDS_PER_SECOND;
+    return (frames < most ? frames : most) / step * step;
 }
 
 __attribute__((noinline)) void stretch_configure(Stretch *stretch, SpeedFifo *fifo, uint32_t rate,
@@ -17,9 +18,9 @@ __attribute__((noinline)) void stretch_configure(Stretch *stretch, SpeedFifo *fi
     uint32_t step = (rate + STRETCH_COARSE_RATE - 1) / STRETCH_COARSE_RATE;
     StretchShape *shape = &stretch->shape;
     shape->decimation = step;
-    shape->overlap = whole_steps(rate, STRETCH_OVERLAP_MS, step);
-    shape->seek = whole_steps(rate, STRETCH_SEEK_MS, step);
-    shape->sequence = whole_steps(rate, STRETCH_SEQUENCE_MS, step);
+    shape->overlap = whole_steps(rate, STRETCH_OVERLAP_MS, step, STRETCH_MAX_OVERLAP);
+    shape->seek = whole_steps(rate, STRETCH_SEEK_MS, step, STRETCH_MAX_SEEK);
+    shape->sequence = whole_steps(rate, STRETCH_SEQUENCE_MS, step, STRETCH_MAX_SEQUENCE);
     shape->quarters = quarters;
     stretch->carry = 0;
     stretch->active = false;

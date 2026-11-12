@@ -1,21 +1,38 @@
 #include "dsp/speed.h"
 
+#include "dsp/equalizer.h"
+
+uint32_t speed_played_quarters(SpeedSetting setting, uint32_t rate)
+{
+    bool speeds = setting.quarters >= SPEED_MIN_QUARTERS && setting.quarters <= SPEED_MAX_QUARTERS;
+    bool stretches = rate >= SPEED_STRETCH_MIN_RATE && rate <= SPEED_STRETCH_MAX_RATE;
+    if (!speeds || !stretches) {
+        return SPEED_UNITY_QUARTERS;
+    }
+    uint32_t fastest = SPEED_MAX_DECODED_RATE * SPEED_UNITY_QUARTERS / rate;
+    return setting.quarters < fastest ? setting.quarters : fastest;
+}
+
 SpeedMethod speed_method_for(SpeedSetting setting, uint32_t rate)
 {
-    bool speeds = setting.quarters >= SPEED_MIN_QUARTERS &&
-                  setting.quarters <= SPEED_MAX_QUARTERS &&
-                  setting.quarters != SPEED_UNITY_QUARTERS;
-    bool stretches = rate >= SPEED_STRETCH_MIN_RATE && rate <= SPEED_STRETCH_MAX_RATE;
-    return speeds && stretches ? SPEED_STRETCH : SPEED_BYPASS;
+    return speed_played_quarters(setting, rate) == SPEED_UNITY_QUARTERS ? SPEED_BYPASS
+                                                                        : SPEED_STRETCH;
+}
+
+uint32_t speed_equalizer_rate(uint32_t rate, uint32_t quarters)
+{
+    uint32_t decoded = rate * quarters / SPEED_UNITY_QUARTERS;
+    return decoded > EQUALIZER_MAX_RATE ? decoded : rate;
 }
 
 void speed_configure(SpeedStage *stage, SpeedSetting setting, uint32_t rate)
 {
-    stage->method = speed_method_for(setting, rate);
-    stage->quarters = stage->method == SPEED_BYPASS ? SPEED_UNITY_QUARTERS : setting.quarters;
+    uint32_t quarters = speed_played_quarters(setting, rate);
+    stage->method = quarters == SPEED_UNITY_QUARTERS ? SPEED_BYPASS : SPEED_STRETCH;
+    stage->quarters = (uint8_t)quarters;
     speed_fifo_reset(&stage->fifo, 0);
     if (stage->method == SPEED_STRETCH) {
-        stretch_configure(&stage->stretch, &stage->fifo, rate, setting.quarters);
+        stretch_configure(&stage->stretch, &stage->fifo, rate, quarters);
     }
 }
 
