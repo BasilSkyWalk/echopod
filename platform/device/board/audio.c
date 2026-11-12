@@ -79,6 +79,7 @@ static union {
     FlacMemory flac;
     WavBuffers wav;
 } decoding __attribute__((section(".high_ram")));
+static SpeedStage speed_memory __attribute__((section(".high_ram")));
 static uint32_t music_ring[RING_WORDS];
 static WavSource wav_source;
 static SourceKind source_kind;
@@ -91,6 +92,8 @@ static bool paused_before_clock_change;
 static uint32_t position_before_clock_change;
 static AudioEngine engine;
 static EqualizerCurve equalizer_curve;
+static SpeedSetting chosen_speed;
+static bool restart_pending;
 static DmaItem items[RING_BLOCKS];
 static HalFile file;
 static bool engine_ready;
@@ -362,6 +365,11 @@ static void signal_core1(void)
     __asm__ volatile("sev" ::: "memory");
 }
 
+static uint8_t quarters_set(void)
+{
+    return chosen_speed.quarters == 0 ? HAL_AUDIO_SPEED_UNITY_QUARTERS : chosen_speed.quarters;
+}
+
 static void ensure_engine(void)
 {
     if (engine_ready) {
@@ -374,9 +382,12 @@ static void ensure_engine(void)
     core1_source_set_wake(&core1_source, signal_core1);
     wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
-    audio_engine_init(
-        &engine, (AudioEngineConfig){.source = source, .ring = ring(), .ring_words = RING_WORDS});
+    audio_engine_init(&engine, (AudioEngineConfig){.source = source,
+                                                   .ring = ring(),
+                                                   .ring_words = RING_WORDS,
+                                                   .speed_stage = &speed_memory});
     audio_engine_set_equalizer(&engine, &equalizer_curve);
+    audio_engine_set_speed(&engine, chosen_speed);
     engine_ready = true;
 }
 
@@ -571,7 +582,8 @@ static bool equalizer_on(void)
 
 static uint32_t clock_for(bool light)
 {
-    bool slow = light && slow_allowed && board_saving(HAL_SAVING_SLOW_CLOCK) && !equalizer_on();
+    bool slow = light && chosen_speed.quarters <= HAL_AUDIO_SPEED_UNITY_QUARTERS && slow_allowed &&
+                board_saving(HAL_SAVING_SLOW_CLOCK) && !equalizer_on();
     return slow ? SLOW_CLOCK_MHZ : AUDIO_CLOCK_MHZ;
 }
 
@@ -594,7 +606,8 @@ static bool core1_restart_for(TrackProbe probe)
 
 static void follow_queue(void)
 {
-    if (!engine_ready || queued_path[0] == '\0') {
+    if (!engine_ready || queued_path[0] == '\0' ||
+        !(deferred || audio_engine_next_pending(&engine))) {
         return;
     }
     bool restart = stream_service == NULL && (clock_for(queued_light) != hal_system_clock_mhz() ||
@@ -603,9 +616,48 @@ static void follow_queue(void)
     deferred = restart;
 }
 
+static uint32_t current_position(void)
+{
+    update_consumed();
+    audio_engine_observe(&engine, consumed);
+    return audio_engine_status(&engine).position_ms;
+}
+
+static void seek_to(uint32_t position_ms, bool paused, bool choose);
+
+static void follow_restart(void)
+{
+    bool pending = restart_pending;
+    restart_pending = false;
+    AudioEngineState state = audio_engine_state(&engine);
+    if (!pending || state == AUDIO_ENGINE_STOPPED || resting) {
+        return;
+    }
+    seek_to(current_position(), state == AUDIO_ENGINE_PAUSED, true);
+    follow_queue();
+}
+
+void hal_audio_set_speed(HalAudioSpeed speed)
+{
+    bool valid = speed.quarters >= HAL_AUDIO_SPEED_MIN_QUARTERS &&
+                 speed.quarters <= HAL_AUDIO_SPEED_MAX_QUARTERS;
+    uint8_t quarters = valid ? speed.quarters : HAL_AUDIO_SPEED_UNITY_QUARTERS;
+    bool changed = quarters != quarters_set();
+    chosen_speed.quarters = quarters;
+    board_core1_set_speed(quarters);
+    if (!engine_ready) {
+        return;
+    }
+    audio_engine_set_speed(&engine, chosen_speed);
+    if (changed && audio_engine_state(&engine) != AUDIO_ENGINE_STOPPED) {
+        restart_pending = true;
+    }
+}
+
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 {
     ensure_engine();
+    restart_pending = false;
     resting = false;
     deferred = false;
     stop_tone();
@@ -624,17 +676,18 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 void hal_audio_queue_next(const char *path, uint32_t token)
 {
     ensure_engine();
+    restart_pending = restart_pending || audio_engine_next_opened(&engine);
     deferred = false;
     queued_path[0] = '\0';
     audio_engine_queue_next(&engine, path, token);
-    if (path == NULL) {
-        return;
+    if (path != NULL) {
+        queued_probe = probe_path(path);
+        queued_light = board_saving(HAL_SAVING_SLOW_CLOCK) && light_probe(queued_probe);
+        queued_token = token;
+        remember(queued_path, path);
+        follow_queue();
     }
-    queued_probe = probe_path(path);
-    queued_light = board_saving(HAL_SAVING_SLOW_CLOCK) && light_probe(queued_probe);
-    queued_token = token;
-    remember(queued_path, path);
-    follow_queue();
+    follow_restart();
 }
 
 void hal_audio_allow_slow_clock(bool allowed)
@@ -643,14 +696,12 @@ void hal_audio_allow_slow_clock(bool allowed)
         return;
     }
     slow_allowed = allowed;
-    if (deferred || (engine_ready && audio_engine_next_pending(&engine))) {
-        follow_queue();
-    }
+    follow_queue();
 }
 
 static void start_deferred(void)
 {
-    if (!deferred || audio_engine_status(&engine).state != AUDIO_ENGINE_STOPPED ||
+    if (!deferred || audio_engine_state(&engine) != AUDIO_ENGINE_STOPPED ||
         audio_engine_status(&engine).failed) {
         return;
     }
@@ -661,7 +712,7 @@ static void start_deferred(void)
 void hal_audio_pause(void)
 {
     ensure_engine();
-    if (audio_engine_status(&engine).state != AUDIO_ENGINE_PLAYING) {
+    if (audio_engine_state(&engine) != AUDIO_ENGINE_PLAYING) {
         return;
     }
     if (transferring) {
@@ -675,6 +726,7 @@ void hal_audio_pause(void)
 static void seek_to(uint32_t position_ms, bool paused, bool choose)
 {
     ensure_engine();
+    restart_pending = false;
     resting = false;
     stop_transfer();
     if (choose) {
@@ -695,12 +747,13 @@ static void seek_to(uint32_t position_ms, bool paused, bool choose)
 void hal_audio_resume(void)
 {
     ensure_engine();
-    if (audio_engine_status(&engine).state != AUDIO_ENGINE_PAUSED) {
+    if (audio_engine_state(&engine) != AUDIO_ENGINE_PAUSED) {
         return;
     }
-    if (resting) {
+    if (resting || restart_pending) {
+        uint32_t position = resting ? rest_position_ms : current_position();
         audio_engine_resume(&engine);
-        seek_to(rest_position_ms, false, true);
+        seek_to(position, false, true);
         return;
     }
     if (transferring) {
@@ -713,7 +766,7 @@ void hal_audio_resume(void)
 void hal_audio_seek(uint32_t position_ms)
 {
     ensure_engine();
-    seek_to(position_ms, audio_engine_status(&engine).state == AUDIO_ENGINE_PAUSED, true);
+    seek_to(position_ms, audio_engine_state(&engine) == AUDIO_ENGINE_PAUSED, true);
 }
 
 static DacCurve output_curve(void)
@@ -790,14 +843,12 @@ void hal_audio_set_equalizer(const EqualizerCurve *curve)
         return;
     }
     audio_engine_set_equalizer(&engine, &equalizer_curve);
-    AudioEngineState state = audio_engine_status(&engine).state;
+    AudioEngineState state = audio_engine_state(&engine);
     if (transferring && state != AUDIO_ENGINE_STOPPED && equalizer_on() &&
         hal_system_clock_mhz() < AUDIO_CLOCK_MHZ) {
         seek_to(audio_engine_status(&engine).position_ms, state == AUDIO_ENGINE_PAUSED, true);
     }
-    if (deferred || audio_engine_next_pending(&engine)) {
-        follow_queue();
-    }
+    follow_queue();
 }
 
 static HalAudioState state_of(AudioEngineState state)
@@ -901,7 +952,7 @@ static void change_rate(void)
 
 static void shut_down_when_idle(void)
 {
-    if (audio_engine_status(&engine).state != AUDIO_ENGINE_STOPPED) {
+    if (audio_engine_state(&engine) != AUDIO_ENGINE_STOPPED) {
         stopped_waiting = false;
         return;
     }
@@ -921,8 +972,7 @@ static void shut_down_when_idle(void)
 
 static void rest_when_paused(void)
 {
-    if (!board_saving(HAL_SAVING_PAUSE_OFF) ||
-        audio_engine_status(&engine).state != AUDIO_ENGINE_PAUSED ||
+    if (!board_saving(HAL_SAVING_PAUSE_OFF) || audio_engine_state(&engine) != AUDIO_ENGINE_PAUSED ||
         hal_clock_milliseconds() - paused_since_ms < PAUSE_REST_MS) {
         return;
     }
@@ -960,6 +1010,7 @@ void hal_audio_service(void)
     if (!engine_ready || !transferring || tone_active) {
         return;
     }
+    follow_restart();
     update_consumed();
     pump(consumed);
     start_deferred();

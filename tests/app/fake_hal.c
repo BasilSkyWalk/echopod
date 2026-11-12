@@ -35,6 +35,10 @@ typedef struct FakeDirEntry {
     bool hidden;
 } FakeDirEntry;
 
+enum {
+    FAKE_AUDIO_CALL_LOG = 16
+};
+
 typedef struct FakeAudio {
     HalAudioStatus status;
     char playing_path[PATH_CAPACITY];
@@ -52,6 +56,11 @@ typedef struct FakeAudio {
     HalAudioOutput output;
     EqualizerCurve equalizer;
     int equalizer_changes;
+    HalAudioSpeed speed;
+    HalAudioSpeed play_speed;
+    int speed_calls;
+    FakeAudioCall calls[FAKE_AUDIO_CALL_LOG];
+    int call_count;
     int refused_plays;
     HalAudioJack jack;
     HalAudioRefusal refusal;
@@ -166,6 +175,8 @@ void fake_hal_reset(void)
     fake = (FakeHal){0};
     fake.audio.jack = HAL_AUDIO_JACK_SINGLE_ENDED;
     fake.audio.status.idle = true;
+    fake.audio.speed = (HalAudioSpeed){HAL_AUDIO_SPEED_UNITY_QUARTERS};
+    fake.audio.play_speed = fake.audio.speed;
     hal_system_set_power_savings(HAL_SAVINGS_DEFAULT);
 }
 
@@ -573,9 +584,51 @@ int fake_hal_write_count(void)
     return fake.write_count;
 }
 
+static void log_audio_call(FakeAudioCall call)
+{
+    fake.audio.calls[fake.audio.call_count % FAKE_AUDIO_CALL_LOG] = call;
+    fake.audio.call_count++;
+}
+
+int fake_hal_audio_call_count(void)
+{
+    return fake.audio.call_count < FAKE_AUDIO_CALL_LOG ? fake.audio.call_count
+                                                       : FAKE_AUDIO_CALL_LOG;
+}
+
+FakeAudioCall fake_hal_audio_call_at(int index)
+{
+    int first = fake.audio.call_count - fake_hal_audio_call_count();
+    return fake.audio.calls[(first + index) % FAKE_AUDIO_CALL_LOG];
+}
+
+HalAudioSpeed fake_hal_audio_speed(void)
+{
+    return fake.audio.speed;
+}
+
+HalAudioSpeed fake_hal_audio_play_speed(void)
+{
+    return fake.audio.play_speed;
+}
+
+int fake_hal_audio_speed_calls(void)
+{
+    return fake.audio.speed_calls;
+}
+
+void hal_audio_set_speed(HalAudioSpeed speed)
+{
+    fake.audio.speed = speed;
+    fake.audio.speed_calls++;
+    log_audio_call(FAKE_AUDIO_CALL_SET_SPEED);
+}
+
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 {
     fake.audio.play_count++;
+    fake.audio.play_speed = fake.audio.speed;
+    log_audio_call(FAKE_AUDIO_CALL_PLAY);
     if (fake.audio.refused_plays > 0) {
         fake.audio.refused_plays--;
         fake.audio.status = (HalAudioStatus){
@@ -594,6 +647,7 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 
 void hal_audio_queue_next(const char *path, uint32_t token)
 {
+    log_audio_call(FAKE_AUDIO_CALL_QUEUE_NEXT);
     fake.audio.has_queued = path != NULL;
     if (path != NULL) {
         copy_path(fake.audio.queued_path, path);

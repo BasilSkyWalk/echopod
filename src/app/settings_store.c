@@ -76,12 +76,18 @@ void settings_store_capture(SettingsStore *store, PlayerStatus playback)
     store->settings.repeat = playback.repeat;
 }
 
+HalAudioSpeed settings_store_spoken_speed(const Settings *settings)
+{
+    return (HalAudioSpeed){.quarters = settings_spoken_quarters(settings->options)};
+}
+
 void settings_store_restore_playback(const SettingsStore *store, Player *player, uint32_t seed)
 {
     const Settings *settings = &store->settings;
     player_change_volume(player, (int)settings->volume - (int)player_status(player).volume);
     player_set_shuffle(player, settings->shuffle, seed);
     player_set_repeat(player, settings->repeat);
+    player_set_spoken_speed(player, settings_store_spoken_speed(settings));
 }
 
 void settings_store_apply_hardware(const Settings *settings)

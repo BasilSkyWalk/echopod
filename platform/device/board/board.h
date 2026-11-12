@@ -55,6 +55,7 @@ typedef enum Core1Program {
 bool board_core1_needs_restart(Core1Program program, uint32_t rate);
 bool board_core1_start_stream(Core1Program program, uint32_t rate);
 void board_core1_set_equalizer(const EqualizerCurve *curve);
+void board_core1_set_speed(uint8_t quarters);
 void board_core1_stop(void);
 bool board_core1_streaming(void);
 uint8_t board_core1_load_percent(void);

@@ -30,6 +30,15 @@ static bool detail_text_is(PlayerStatus status, const char *expected)
     return strcmp(expected, buffer) == 0;
 }
 
+static bool modes_text_is(PlayerStatus status, uint8_t speed, const char *expected)
+{
+    uint8_t options[SETTINGS_OPTION_COUNT] = {0};
+    options[OPTION_SPOKEN_SPEED] = speed;
+    char buffer[TEXT_CAPACITY];
+    now_playing_modes_text(&status, options, buffer, sizeof buffer);
+    return strcmp(expected, buffer) == 0;
+}
+
 static NowPlayingCommand command(Key key, KeyGesture gesture)
 {
     return now_playing_command_for((KeyEvent){.key = key, .gesture = gesture}, false);
@@ -192,6 +201,54 @@ static void the_detail_line_shows_bitrate_and_place(void)
     CHECK(detail_text_is(status, "2,304 kbps \xC2\xB7 3 of 10"));
 }
 
+static void spoken_word_shows_its_speed_on_the_modes_line(void)
+{
+    CHECK(modes_text_is((PlayerStatus){.spoken = true}, SPOKEN_SPEED_1_5X, "1.5x"));
+}
+
+static void the_speed_comes_before_shuffle_and_repeat(void)
+{
+    PlayerStatus status = {.spoken = true, .repeat = REPEAT_ALL};
+    CHECK(modes_text_is(status, SPOKEN_SPEED_1_5X, "1.5x \xC2\xB7 Repeat All"));
+}
+
+static void every_speed_has_a_short_label(void)
+{
+    PlayerStatus status = {.spoken = true};
+    CHECK(modes_text_is(status, SPOKEN_SPEED_0_75X, "0.75x"));
+    CHECK(modes_text_is(status, SPOKEN_SPEED_1_25X, "1.25x"));
+    CHECK(modes_text_is(status, SPOKEN_SPEED_1_75X, "1.75x"));
+    CHECK(modes_text_is(status, SPOKEN_SPEED_2X, "2x"));
+}
+
+static void a_book_shows_the_speed_it_actually_plays_at(void)
+{
+    PlayerStatus book = {.spoken = true, .format = {.sample_rate = 64000}};
+    CHECK(modes_text_is(book, SPOKEN_SPEED_2X, "2x"));
+    book.format.sample_rate = 96000;
+    CHECK(modes_text_is(book, SPOKEN_SPEED_2X, "1.5x"));
+    CHECK(modes_text_is(book, SPOKEN_SPEED_1_25X, "1.25x"));
+    book.format.sample_rate = 192000;
+    CHECK(modes_text_is(book, SPOKEN_SPEED_2X, ""));
+    CHECK(modes_text_is(book, SPOKEN_SPEED_0_75X, ""));
+}
+
+static void music_and_normal_speed_show_no_speed(void)
+{
+    char buffer[TEXT_CAPACITY];
+    PlayerStatus book = {.spoken = true};
+    CHECK(modes_text_is((PlayerStatus){0}, SPOKEN_SPEED_2X, ""));
+    CHECK(modes_text_is(book, SPOKEN_SPEED_1X, ""));
+    now_playing_modes_text(&book, NULL, buffer, sizeof buffer);
+    CHECK_EQUAL(0, strcmp("", buffer));
+}
+
+static void shuffle_and_repeat_are_shown_as_before(void)
+{
+    PlayerStatus status = {.shuffle = SHUFFLE_SONGS, .repeat = REPEAT_ONE};
+    CHECK(modes_text_is(status, SPOKEN_SPEED_1X, "Shuffle Songs \xC2\xB7 Repeat One"));
+}
+
 static void the_detail_line_leaves_out_what_is_unknown(void)
 {
     CHECK(detail_text_is((PlayerStatus){.place = {3, 10}}, "3 of 10"));
@@ -277,6 +334,12 @@ int main(void)
         TEST_CASE(an_unknown_stream_shows_nothing),
         TEST_CASE(the_detail_line_shows_bitrate_and_place),
         TEST_CASE(the_detail_line_leaves_out_what_is_unknown),
+        TEST_CASE(spoken_word_shows_its_speed_on_the_modes_line),
+        TEST_CASE(a_book_shows_the_speed_it_actually_plays_at),
+        TEST_CASE(the_speed_comes_before_shuffle_and_repeat),
+        TEST_CASE(every_speed_has_a_short_label),
+        TEST_CASE(music_and_normal_speed_show_no_speed),
+        TEST_CASE(shuffle_and_repeat_are_shown_as_before),
         TEST_CASE(a_volume_tap_changes_the_volume),
         TEST_CASE(holding_volume_up_skips_forward_and_volume_down_skips_back),
         TEST_CASE(play_toggles_pause_and_a_long_play_starts_seeking),

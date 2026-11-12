@@ -17,5 +17,6 @@ typedef struct SettingsStore {
 void settings_store_load(SettingsStore *store);
 bool settings_store_save(SettingsStore *store);
 void settings_store_capture(SettingsStore *store, PlayerStatus playback);
+HalAudioSpeed settings_store_spoken_speed(const Settings *settings);
 void settings_store_restore_playback(const SettingsStore *store, Player *player, uint32_t seed);
 void settings_store_apply_hardware(const Settings *settings);

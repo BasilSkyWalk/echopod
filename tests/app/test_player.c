@@ -98,6 +98,47 @@ static void the_status_counts_the_place_in_the_queue(void)
     CHECK_EQUAL(2, status.place.total);
 }
 
+static void starting_a_track_sends_the_speed_before_playing(void)
+{
+    playing(0);
+    CHECK_EQUAL(1, fake_hal_audio_speed_calls());
+    CHECK_EQUAL(4, fake_hal_audio_play_speed().quarters);
+    CHECK_EQUAL(FAKE_AUDIO_CALL_SET_SPEED, fake_hal_audio_call_at(0));
+    CHECK_EQUAL(FAKE_AUDIO_CALL_PLAY, fake_hal_audio_call_at(1));
+}
+
+static void every_start_sends_the_speed_before_playing(void)
+{
+    Player *started = playing(0);
+    player_skip(started, 1);
+    CHECK_EQUAL(2, fake_hal_audio_speed_calls());
+    CHECK_EQUAL(2, fake_hal_audio_play_count());
+    int last = fake_hal_audio_call_count();
+    CHECK_EQUAL(FAKE_AUDIO_CALL_SET_SPEED, fake_hal_audio_call_at(last - 3));
+    CHECK_EQUAL(FAKE_AUDIO_CALL_PLAY, fake_hal_audio_call_at(last - 2));
+}
+
+static void setting_the_spoken_speed_with_nothing_playing_touches_no_hardware(void)
+{
+    Player *idle = fresh_player();
+    player_set_spoken_speed(idle, (HalAudioSpeed){.quarters = 8});
+    CHECK_EQUAL(0, fake_hal_audio_speed_calls());
+    CHECK_EQUAL(0, fake_hal_audio_call_count());
+}
+
+static void music_keeps_its_gapless_hand_over_at_any_spoken_speed(void)
+{
+    Player *started = fresh_player();
+    player_set_spoken_speed(started, (HalAudioSpeed){.quarters = 8});
+    CHECK(player_play_list(started, back_in_black(), 0, SEED));
+    CHECK(path_is(fake_hal_audio_queued_path(), SHOOT_TO_THRILL_PATH));
+    fake_hal_audio_finish_track();
+    player_update(started, 100);
+    CHECK_EQUAL(SHOOT_TO_THRILL, player_status(started).track);
+    CHECK_EQUAL(1, fake_hal_audio_play_count());
+    CHECK_EQUAL(4, fake_hal_audio_speed().quarters);
+}
+
 static void the_following_track_is_queued_for_gapless_playback(void)
 {
     playing(0);
@@ -608,6 +649,10 @@ int main(void)
         TEST_CASE(a_session_resumes_inside_an_added_song),
         TEST_CASE(releasing_the_output_pauses_where_the_track_was),
         TEST_CASE(play_after_a_release_starts_the_output_again),
+        TEST_CASE(starting_a_track_sends_the_speed_before_playing),
+        TEST_CASE(every_start_sends_the_speed_before_playing),
+        TEST_CASE(setting_the_spoken_speed_with_nothing_playing_touches_no_hardware),
+        TEST_CASE(music_keeps_its_gapless_hand_over_at_any_spoken_speed),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

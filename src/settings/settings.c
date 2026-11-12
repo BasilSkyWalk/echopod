@@ -74,11 +74,18 @@ static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_RETIRED_INTERNAL_STORAGE] = 2,
     [OPTION_STATUS_BAR] = 2,
     [OPTION_POWER_ON] = 2,
-    [OPTION_NOW_PLAYING_FACE] = NP_FACE_OPTION_SLOTS};
+    [OPTION_NOW_PLAYING_FACE] = NP_FACE_OPTION_SLOTS,
+    [OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_COUNT};
 
 _Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
                "the options must fit the file");
 _Static_assert(V8_CHECKSUM_FIELD + 4 == SETTINGS_V8_FILE_SIZE, "version 8 files are 32 bytes");
+_Static_assert(SPOKEN_SPEED_1X == 0 && SPOKEN_SPEED_0_75X == 1 &&
+                   SPOKEN_SPEED_2X == SPOKEN_SPEED_FASTEST_QUARTERS - SPOKEN_SPEED_SLOWEST_QUARTERS,
+               "speeds are stored 1x, 0.75x, then from 1.25x up at their place in the list");
+
+const char *const SPOKEN_SPEED_LABELS[SPOKEN_SPEED_COUNT] = {"0.75x", "1x",    "1.25x",
+                                                             "1.5x",  "1.75x", "2x"};
 
 Settings settings_defaults(void)
 {
@@ -131,6 +138,25 @@ uint32_t settings_animation_ms(const uint8_t *options, uint32_t normal_ms)
     uint8_t speed = options != NULL ? options[OPTION_ANIMATION_SPEED] : ANIMATION_NORMAL;
     uint32_t percent = speed < ANIMATION_SPEED_COUNT ? ANIMATION_PERCENT[speed] : 100;
     return normal_ms * percent / 100;
+}
+
+static uint8_t swap_slowest_and_normal(uint8_t value)
+{
+    return value <= SPOKEN_SPEED_0_75X ? (uint8_t)(SPOKEN_SPEED_0_75X - value) : value;
+}
+
+uint8_t settings_spoken_quarters(const uint8_t *options)
+{
+    uint8_t speed = options != NULL ? options[OPTION_SPOKEN_SPEED] : SPOKEN_SPEED_1X;
+    return speed < SPOKEN_SPEED_COUNT
+               ? (uint8_t)(SPOKEN_SPEED_SLOWEST_QUARTERS + swap_slowest_and_normal(speed))
+               : SPOKEN_SPEED_NORMAL_QUARTERS;
+}
+
+uint8_t settings_spoken_speed_option(uint8_t quarters)
+{
+    uint8_t place = (uint8_t)(quarters - SPOKEN_SPEED_SLOWEST_QUARTERS);
+    return place < SPOKEN_SPEED_COUNT ? swap_slowest_and_normal(place) : SPOKEN_SPEED_1X;
 }
 
 uint8_t settings_option_count(SettingOption option)

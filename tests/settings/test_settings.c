@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "check.h"
 #include "core/hash.h"
 #include "settings/settings.h"
@@ -448,6 +450,108 @@ static void the_new_options_default_to_their_first_choice(void)
     CHECK_EQUAL(TIME_ZONE_UNSET, settings.options[OPTION_TIME_ZONE]);
     CHECK_EQUAL(TIME_ZONE_OPTION_COUNT, settings_option_count(OPTION_TIME_ZONE));
     CHECK_EQUAL(106, TIME_ZONE_OPTION_COUNT);
+    CHECK_EQUAL(SPOKEN_SPEED_1X, settings.options[OPTION_SPOKEN_SPEED]);
+    CHECK_EQUAL(6, settings_option_count(OPTION_SPOKEN_SPEED));
+}
+
+static void the_spoken_speed_is_saved_at_byte_42_and_byte_43_stays_free(void)
+{
+    CHECK_EQUAL(42, OPTIONS_FIELD + OPTION_SPOKEN_SPEED);
+    CHECK_EQUAL(43, OPTIONS_FIELD + SETTINGS_OPTION_COUNT);
+    Settings settings = custom_settings();
+    settings.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_2X;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    CHECK_EQUAL(0, bytes[41]);
+    CHECK_EQUAL(5, bytes[42]);
+    CHECK_EQUAL(0, bytes[43]);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(SPOKEN_SPEED_2X, decoded.options[OPTION_SPOKEN_SPEED]);
+}
+
+static void a_file_with_a_pitch_choice_at_byte_43_still_loads(void)
+{
+    Settings settings = custom_settings();
+    settings.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_1_5X;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[43] = 1;
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(6, settings_spoken_quarters(decoded.options));
+}
+
+static void the_spoken_speed_maps_to_quarters(void)
+{
+    static const uint8_t expected[SPOKEN_SPEED_COUNT] = {4, 3, 5, 6, 7, 8};
+    Settings settings = settings_defaults();
+    for (uint8_t speed = 0; speed < SPOKEN_SPEED_COUNT; speed++) {
+        settings.options[OPTION_SPOKEN_SPEED] = speed;
+        CHECK_EQUAL(expected[speed], settings_spoken_quarters(settings.options));
+    }
+    CHECK_EQUAL(4, settings_spoken_quarters(NULL));
+    settings.options[OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_COUNT;
+    CHECK_EQUAL(4, settings_spoken_quarters(settings.options));
+    for (uint8_t quarters = 3; quarters <= 8; quarters++) {
+        settings.options[OPTION_SPOKEN_SPEED] = settings_spoken_speed_option(quarters);
+        CHECK_EQUAL(quarters, settings_spoken_quarters(settings.options));
+    }
+    CHECK_EQUAL(SPOKEN_SPEED_1X, settings_spoken_speed_option(0));
+    CHECK_EQUAL(SPOKEN_SPEED_1X, settings_spoken_speed_option(9));
+}
+
+static void a_speed_the_list_does_not_offer_is_stored_as_1x(void)
+{
+    uint8_t options[SETTINGS_OPTION_COUNT] = {0};
+    for (int quarters = 0; quarters <= UINT8_MAX; quarters++) {
+        uint8_t option = settings_spoken_speed_option((uint8_t)quarters);
+        bool offered =
+            quarters >= SPOKEN_SPEED_SLOWEST_QUARTERS && quarters <= SPOKEN_SPEED_FASTEST_QUARTERS;
+        options[OPTION_SPOKEN_SPEED] = option;
+        CHECK_EQUAL(offered ? quarters : SPOKEN_SPEED_NORMAL_QUARTERS,
+                    settings_spoken_quarters(options));
+        CHECK(offered || option == SPOKEN_SPEED_1X);
+    }
+    for (int option = SPOKEN_SPEED_COUNT; option <= UINT8_MAX; option++) {
+        options[OPTION_SPOKEN_SPEED] = (uint8_t)option;
+        CHECK_EQUAL(SPOKEN_SPEED_NORMAL_QUARTERS, settings_spoken_quarters(options));
+    }
+}
+
+static void every_speed_has_a_label_in_list_order(void)
+{
+    static const char *const LABELS[SPOKEN_SPEED_COUNT] = {"0.75x", "1x",    "1.25x",
+                                                           "1.5x",  "1.75x", "2x"};
+    for (int place = 0; place < SPOKEN_SPEED_COUNT; place++) {
+        CHECK_EQUAL(0, strcmp(LABELS[place], SPOKEN_SPEED_LABELS[place]));
+    }
+}
+
+static void a_spoken_speed_out_of_range_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    Settings decoded;
+    settings_encode(&settings, bytes);
+    bytes[OPTIONS_FIELD + OPTION_SPOKEN_SPEED] = SPOKEN_SPEED_COUNT;
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+}
+
+static void a_file_from_0_11_plays_spoken_word_at_normal_speed(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[41] = 0;
+    bytes[42] = 0;
+    bytes[43] = 0;
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(4, settings_spoken_quarters(decoded.options));
 }
 
 static void the_animation_speed_scales_animation_times(void)
@@ -645,6 +749,13 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(the_new_options_are_saved_and_read_back),
         TEST_CASE(the_new_options_default_to_their_first_choice),
+        TEST_CASE(the_spoken_speed_is_saved_at_byte_42_and_byte_43_stays_free),
+        TEST_CASE(a_file_with_a_pitch_choice_at_byte_43_still_loads),
+        TEST_CASE(the_spoken_speed_maps_to_quarters),
+        TEST_CASE(a_speed_the_list_does_not_offer_is_stored_as_1x),
+        TEST_CASE(every_speed_has_a_label_in_list_order),
+        TEST_CASE(a_spoken_speed_out_of_range_is_rejected),
+        TEST_CASE(a_file_from_0_11_plays_spoken_word_at_normal_speed),
         TEST_CASE(the_animation_speed_scales_animation_times),
         TEST_CASE(a_version_9_file_is_48_bytes_with_the_checksum_at_the_end),
         TEST_CASE(a_file_from_the_internal_storage_switch_still_loads),

@@ -71,6 +71,9 @@ typedef struct Player {
     uint32_t refusal_count;
     HalAudioRefusal refusal;
     bool spoken;
+    HalAudioSpeed spoken_speed;
+    HalAudioSpeed sent_speed;
+    bool next_deferred;
     PlayerResume resume;
     Mp4Chapters chapters;
 } Player;
@@ -89,6 +92,7 @@ void player_seek(Player *player, uint32_t position_ms);
 void player_change_volume(Player *player, int delta);
 void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed);
 void player_set_repeat(Player *player, RepeatMode repeat);
+void player_set_spoken_speed(Player *player, HalAudioSpeed speed);
 PlayerUpNextResult player_play_next(Player *player, uint16_t track);
 PlayerUpNextResult player_add_to_up_next(Player *player, uint16_t track);
 bool player_jump_to_up_next(Player *player, uint16_t index);

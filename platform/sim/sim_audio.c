@@ -3,8 +3,10 @@
 #include <SDL.h>
 #include <math.h>
 
+#include "dsp/speed.h"
 #include "hal/audio.h"
 #include "sim_decoder.h"
+#include "sim_speed.h"
 #include "sim_storage.h"
 
 enum {
@@ -14,6 +16,7 @@ enum {
     CHUNK_FRAMES = 1024,
     BYTES_PER_FRAME = STEREO * (int)sizeof(float),
     SLOT_COUNT = 2,
+    DRAIN_FRAMES = 512,
     HOST_PATH_CAPACITY = 1024,
     MILLISECONDS_PER_SECOND = 1000
 };
@@ -40,11 +43,17 @@ typedef struct SimAudio {
     HalAudioGain analog_gain;
     HalAudioOutput output;
     Equalizer equalizer;
+    HalAudioSpeed speed;
+    bool speeding;
+    bool finished;
 } SimAudio;
 
 static SimAudio audio;
 static float chunk[CHUNK_FRAMES * STEREO];
 static int32_t fixed_chunk[CHUNK_FRAMES * STEREO];
+static int32_t drained_fixed[DRAIN_FRAMES * STEREO];
+static float drained_chunk[DRAIN_FRAMES * STEREO];
+static SpeedStage stage;
 
 static void lock(void)
 {
@@ -107,6 +116,19 @@ static void clear_stream(void)
     }
 }
 
+static void configure_stage(void)
+{
+    SimTrack *track = current_track();
+    SpeedSetting setting = {.quarters = audio.speed.quarters};
+    audio.finished = false;
+    audio.speeding = false;
+    if (!track->open) {
+        return;
+    }
+    audio.speeding = speed_method_for(setting, track->decoder.sample_rate) != SPEED_BYPASS;
+    speed_configure(&stage, setting, track->decoder.sample_rate);
+}
+
 static bool switch_to_next(void)
 {
     close_track(current_track());
@@ -116,6 +138,7 @@ static bool switch_to_next(void)
     }
     audio.current = 1 - audio.current;
     use_stream_rate(current_track()->decoder.sample_rate);
+    configure_stage();
     return true;
 }
 
@@ -129,7 +152,8 @@ static int32_t to_fixed(float sample)
 
 static void equalize_chunk(uint64_t frames, uint32_t rate)
 {
-    equalizer_set_rate(&audio.equalizer, rate);
+    equalizer_set_rate(&audio.equalizer,
+                       speed_equalizer_rate(rate, sim_speed_quarters(audio.speed, rate)));
     if (!equalizer_active(&audio.equalizer)) {
         return;
     }
@@ -142,6 +166,58 @@ static void equalize_chunk(uint64_t frames, uint32_t rate)
     }
 }
 
+static void put_with_gain(float *samples, uint64_t frames)
+{
+    for (uint64_t sample = 0; sample < frames * STEREO; sample++) {
+        samples[sample] *= audio.gain;
+    }
+    SDL_AudioStreamPut(audio.stream, samples, (int)(frames * BYTES_PER_FRAME));
+}
+
+static uint32_t drain_stage(void)
+{
+    uint32_t total = 0;
+    uint32_t pulled = speed_pull(&stage, drained_fixed, DRAIN_FRAMES);
+    while (pulled > 0) {
+        for (uint32_t sample = 0; sample < pulled * STEREO; sample++) {
+            drained_chunk[sample] = (float)drained_fixed[sample] / SAMPLE_SCALE;
+        }
+        put_with_gain(drained_chunk, pulled);
+        total += pulled;
+        pulled = speed_pull(&stage, drained_fixed, DRAIN_FRAMES);
+    }
+    return total;
+}
+
+static void stretch_chunk(uint64_t frames)
+{
+    for (uint64_t sample = 0; sample < frames * STEREO; sample++) {
+        fixed_chunk[sample] = to_fixed(chunk[sample]);
+    }
+    uint32_t done = 0;
+    while (done < frames) {
+        uint32_t taken =
+            speed_push(&stage, fixed_chunk + (uint64_t)done * STEREO, (uint32_t)frames - done);
+        done += taken;
+        if (drain_stage() == 0 && taken == 0) {
+            break;
+        }
+    }
+}
+
+static bool finish_stage(void)
+{
+    if (!audio.speeding || (audio.finished && speed_drained(&stage))) {
+        return switch_to_next();
+    }
+    if (!audio.finished) {
+        speed_finish(&stage);
+        audio.finished = true;
+    }
+    drain_stage();
+    return true;
+}
+
 static bool decode_chunk(void)
 {
     SimTrack *track = current_track();
@@ -150,13 +226,14 @@ static bool decode_chunk(void)
     }
     uint64_t frames = sim_decoder_read_stereo(&track->decoder, chunk, CHUNK_FRAMES);
     if (frames == 0) {
-        return switch_to_next();
+        return finish_stage();
     }
     equalize_chunk(frames, track->decoder.sample_rate);
-    for (uint64_t sample = 0; sample < frames * STEREO; sample++) {
-        chunk[sample] *= audio.gain;
+    if (audio.speeding) {
+        stretch_chunk(frames);
+    } else {
+        put_with_gain(chunk, frames);
     }
-    SDL_AudioStreamPut(audio.stream, chunk, (int)(frames * BYTES_PER_FRAME));
     return true;
 }
 
@@ -211,6 +288,7 @@ bool sim_audio_start(bool virtual_output)
     SDL_memset(&audio, 0, sizeof audio);
     audio.virtual_output = virtual_output;
     audio.gain = 1.0f;
+    audio.speed = sim_speed_normal((HalAudioSpeed){0});
     audio.state = HAL_AUDIO_STOPPED;
     if (virtual_output) {
         return true;
@@ -229,7 +307,8 @@ void sim_audio_tick(uint32_t elapsed_ms)
     if (!audio.virtual_output || audio.state != HAL_AUDIO_PLAYING || !track->open) {
         return;
     }
-    track->decoder.frame += frames_for(elapsed_ms, track->decoder.sample_rate);
+    HalAudioSpeed speed = audio.speeding ? audio.speed : (HalAudioSpeed){0};
+    track->decoder.frame += sim_speed_frames(speed, elapsed_ms, track->decoder.sample_rate);
     if (track->decoder.frame >= track->decoder.total_frames) {
         switch_to_next();
     }
@@ -259,6 +338,7 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
         sim_decoder_seek(decoder, frames_for(start_ms, decoder->sample_rate));
         use_stream_rate(decoder->sample_rate);
         clear_stream();
+        configure_stage();
     }
     audio.state = opened ? HAL_AUDIO_PLAYING : HAL_AUDIO_STOPPED;
     audio.failed = !opened;
@@ -301,6 +381,7 @@ void hal_audio_seek(uint32_t position_ms)
     if (track->open) {
         sim_decoder_seek(&track->decoder, frames_for(position_ms, track->decoder.sample_rate));
         clear_stream();
+        configure_stage();
     }
     unlock();
 }
@@ -334,6 +415,17 @@ void hal_audio_set_equalizer(const EqualizerCurve *curve)
 {
     lock();
     equalizer_set_curve(&audio.equalizer, curve);
+    unlock();
+}
+
+void hal_audio_set_speed(HalAudioSpeed speed)
+{
+    lock();
+    if (!sim_speed_same(speed, audio.speed)) {
+        audio.speed = sim_speed_normal(speed);
+        clear_stream();
+        configure_stage();
+    }
     unlock();
 }
 

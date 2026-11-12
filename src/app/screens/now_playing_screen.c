@@ -5,6 +5,7 @@
 #include "core/format.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
+#include "dsp/speed.h"
 #include "gfx/image.h"
 #include "hal/audio.h"
 #include "hal/storage.h"
@@ -758,17 +759,34 @@ static void draw_times(const NowPlayingScreen *now_playing, Canvas *canvas)
     draw_right_aligned(canvas, style, area, remaining);
 }
 
-static void modes_text(const PlayerStatus *status, char *buffer, size_t capacity)
+static void append_part(StringBuilder *builder, const char *text)
+{
+    if (builder->length > 0) {
+        string_builder_append(builder, SEPARATOR);
+    }
+    string_builder_append(builder, text);
+}
+
+static uint32_t played_quarters(const PlayerStatus *status, const uint8_t *options)
+{
+    SpeedSetting chosen = {settings_spoken_quarters(options)};
+    uint32_t rate = status->format.sample_rate;
+    return rate == 0 ? chosen.quarters : speed_played_quarters(chosen, rate);
+}
+
+void now_playing_modes_text(const PlayerStatus *status, const uint8_t *options, char *buffer,
+                            size_t capacity)
 {
     StringBuilder builder = string_builder_make(buffer, capacity);
-    if (status->shuffle != SHUFFLE_OFF) {
-        string_builder_append(&builder, i18n_text(SHUFFLE_TEXT[status->shuffle - 1]));
+    uint32_t quarters = played_quarters(status, options);
+    if (status->spoken && quarters != SPOKEN_SPEED_NORMAL_QUARTERS) {
+        append_part(&builder, SPOKEN_SPEED_LABELS[quarters - SPOKEN_SPEED_SLOWEST_QUARTERS]);
     }
-    if (status->shuffle != SHUFFLE_OFF && status->repeat != REPEAT_OFF) {
-        string_builder_append(&builder, SEPARATOR);
+    if (status->shuffle != SHUFFLE_OFF) {
+        append_part(&builder, i18n_text(SHUFFLE_TEXT[status->shuffle - 1]));
     }
     if (status->repeat != REPEAT_OFF) {
-        string_builder_append(&builder, i18n_text(REPEAT_TEXT[status->repeat - 1]));
+        append_part(&builder, i18n_text(REPEAT_TEXT[status->repeat - 1]));
     }
 }
 
@@ -821,7 +839,7 @@ static void draw_details(const NowPlayingScreen *now_playing, Canvas *canvas)
                            (Label){column_area(now_playing, layout.detail_top, SMALL_LINE_HEIGHT),
                                    detail}));
     char modes[STATUS_CAPACITY];
-    modes_text(&now_playing->status, modes, sizeof modes);
+    now_playing_modes_text(&now_playing->status, now_playing->config.options, modes, sizeof modes);
     if (now_playing->scrubbing) {
         StringBuilder seeking = string_builder_make(modes, sizeof modes);
         string_builder_append(&seeking, i18n_text(STR_MENU_SEEKING_HINT));
@@ -914,7 +932,8 @@ static void face_texts(const NowPlayingScreen *now_playing, NowPlayingFrame *fra
     char *modes = detail + FACE_DETAIL_CAPACITY;
     now_playing_stream_text(now_playing->status.format, texts, FACE_STREAM_CAPACITY);
     now_playing_detail_text(&now_playing->status, detail, FACE_DETAIL_CAPACITY);
-    modes_text(&now_playing->status, modes, FACE_MODES_CAPACITY);
+    now_playing_modes_text(&now_playing->status, now_playing->config.options, modes,
+                           FACE_MODES_CAPACITY);
     frame->stream = texts;
     frame->detail = detail;
     frame->modes = modes;

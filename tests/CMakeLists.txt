@@ -67,6 +67,10 @@ echo_add_unit_test(NAME test_equalizer
     SOURCES dsp/test_equalizer.c
     LIBRARIES echo_dsp $<$<PLATFORM_ID:Linux>:m>
 )
+echo_add_unit_test(NAME test_speed
+    SOURCES dsp/test_speed.c
+    LIBRARIES echo_dsp $<$<PLATFORM_ID:Linux>:m>
+)
 echo_add_unit_test(NAME test_equalizer_file SOURCES sound/test_equalizer_file.c LIBRARIES echo_sound)
 echo_add_unit_test(NAME test_equalizer_text SOURCES sound/test_equalizer_text.c LIBRARIES echo_sound)
 
@@ -384,6 +388,10 @@ if(ECHO_BUILD_SIM)
     echo_add_unit_test(NAME test_sim_options
         SOURCES sim/test_sim_options.c
         LIBRARIES echo_sim_options
+    )
+    echo_add_unit_test(NAME test_sim_speed
+        SOURCES sim/test_sim_speed.c
+        LIBRARIES echo_sim_speed
     )
     echo_add_unit_test(NAME test_sim_script
         SOURCES sim/test_sim_script.c
