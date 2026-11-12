@@ -114,6 +114,65 @@ static void the_speed_row_shows_its_value(void)
     CHECK_EQUAL(0, strcmp("0.75x", screens.rows[5].value(screens.rows[5].context)));
 }
 
+static Library empty_library;
+static Player speed_player;
+static Toast speed_toast;
+
+static void start_with_a_player(void)
+{
+    default_store = (SettingsStore){.settings = settings_defaults()};
+    fake_hal_reset();
+    player_init(&speed_player, &empty_library);
+    SettingsContext context = {
+        .store = &default_store, .player = &speed_player, .toast = &speed_toast};
+    settings_screens_init(&screens, context, &DEFAULT_THEME);
+    open_group(SETTINGS_SOUND);
+}
+
+static void choose_in_row(int row, int index)
+{
+    screens.rows[row].select(screens.rows[row].context);
+    screens.choice.config.choose(screens.choice.config.context, index);
+}
+
+static int chosen_in_row(int row)
+{
+    screens.rows[row].select(screens.rows[row].context);
+    return screens.choice.config.current(screens.choice.config.context);
+}
+
+static void the_speed_list_runs_from_slowest_to_fastest(void)
+{
+    static const char *const LABELS[SPOKEN_SPEED_COUNT] = {"0.75x", "1x",    "1.25x",
+                                                           "1.5x",  "1.75x", "2x"};
+    start_with_a_player();
+    screens.rows[5].select(screens.rows[5].context);
+    CHECK_EQUAL(SPOKEN_SPEED_COUNT, screens.choice.config.option_count);
+    for (int index = 0; index < SPOKEN_SPEED_COUNT; index++) {
+        CHECK_EQUAL(0, strcmp(LABELS[index], screens.choice.config.options[index]));
+    }
+    CHECK_EQUAL(1, chosen_in_row(5));
+}
+
+static void choosing_a_speed_hands_it_to_the_player_and_saves_it(void)
+{
+    start_with_a_player();
+    choose_in_row(5, 0);
+    CHECK_EQUAL(SPOKEN_SPEED_0_75X, default_store.settings.options[OPTION_SPOKEN_SPEED]);
+    CHECK_EQUAL(3, speed_player.spoken_speed.quarters);
+    CHECK_EQUAL(0, chosen_in_row(5));
+    choose_in_row(5, 4);
+    CHECK_EQUAL(SPOKEN_SPEED_1_75X, default_store.settings.options[OPTION_SPOKEN_SPEED]);
+    CHECK_EQUAL(7, speed_player.spoken_speed.quarters);
+    CHECK_EQUAL(4, chosen_in_row(5));
+    CHECK_EQUAL(0, fake_hal_audio_speed_calls());
+    uint32_t size = 0;
+    const uint8_t *bytes = fake_hal_file_bytes(SETTINGS_STORE_PATH, &size);
+    Settings saved = settings_defaults();
+    CHECK(bytes != NULL && settings_decode(bytes, size, &saved));
+    CHECK_EQUAL(SPOKEN_SPEED_1_75X, saved.options[OPTION_SPOKEN_SPEED]);
+}
+
 static void a_group_remembers_its_selected_row(void)
 {
     start();
@@ -279,6 +338,8 @@ int main(void)
         TEST_CASE(each_group_lists_its_rows_in_order),
         TEST_CASE(every_row_but_rescan_opens_a_screen),
         TEST_CASE(the_speed_row_shows_its_value),
+        TEST_CASE(the_speed_list_runs_from_slowest_to_fastest),
+        TEST_CASE(choosing_a_speed_hands_it_to_the_player_and_saves_it),
         TEST_CASE(a_group_remembers_its_selected_row),
         TEST_CASE(starting_again_forgets_the_selected_rows),
         TEST_CASE(the_theme_choice_lists_every_theme_in_stored_order),

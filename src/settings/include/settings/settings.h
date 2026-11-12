@@ -232,6 +232,8 @@ typedef struct Settings {
     uint8_t options[SETTINGS_OPTION_COUNT];
 } Settings;
 
+extern const char *const SPOKEN_SPEED_LABELS[SPOKEN_SPEED_COUNT];
+
 Settings settings_defaults(void);
 uint32_t settings_timeout_option_seconds(int option);
 uint32_t settings_sleep_option_minutes(int option);

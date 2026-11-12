@@ -52,7 +52,6 @@ static const uint16_t TIMEOUT_SECONDS[SCREEN_TIMEOUT_OPTION_COUNT] = {10, 20, 30
 static const uint8_t SLEEP_MINUTES[SLEEP_TIMER_OPTION_COUNT] = {0, 15, 30, 45, 60, 90, 120};
 static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
 static const uint8_t ANIMATION_PERCENT[ANIMATION_SPEED_COUNT] = {100, 150, 60};
-static const uint8_t SPOKEN_QUARTERS[SPOKEN_SPEED_COUNT] = {4, 3, 5, 6, 7, 8};
 static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_BATTERY] = 2,
     [OPTION_VOLUME_KEYS] = 2,
@@ -81,6 +80,12 @@ static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
 _Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
                "the options must fit the file");
 _Static_assert(V8_CHECKSUM_FIELD + 4 == SETTINGS_V8_FILE_SIZE, "version 8 files are 32 bytes");
+_Static_assert(SPOKEN_SPEED_1X == 0 && SPOKEN_SPEED_0_75X == 1 &&
+                   SPOKEN_SPEED_2X == SPOKEN_SPEED_FASTEST_QUARTERS - SPOKEN_SPEED_SLOWEST_QUARTERS,
+               "speeds are stored 1x, 0.75x, then from 1.25x up at their place in the list");
+
+const char *const SPOKEN_SPEED_LABELS[SPOKEN_SPEED_COUNT] = {"0.75x", "1x",    "1.25x",
+                                                             "1.5x",  "1.75x", "2x"};
 
 Settings settings_defaults(void)
 {
@@ -135,20 +140,23 @@ uint32_t settings_animation_ms(const uint8_t *options, uint32_t normal_ms)
     return normal_ms * percent / 100;
 }
 
+static uint8_t swap_slowest_and_normal(uint8_t value)
+{
+    return value <= SPOKEN_SPEED_0_75X ? (uint8_t)(SPOKEN_SPEED_0_75X - value) : value;
+}
+
 uint8_t settings_spoken_quarters(const uint8_t *options)
 {
     uint8_t speed = options != NULL ? options[OPTION_SPOKEN_SPEED] : SPOKEN_SPEED_1X;
-    return speed < SPOKEN_SPEED_COUNT ? SPOKEN_QUARTERS[speed] : SPOKEN_SPEED_NORMAL_QUARTERS;
+    return speed < SPOKEN_SPEED_COUNT
+               ? (uint8_t)(SPOKEN_SPEED_SLOWEST_QUARTERS + swap_slowest_and_normal(speed))
+               : SPOKEN_SPEED_NORMAL_QUARTERS;
 }
 
 uint8_t settings_spoken_speed_option(uint8_t quarters)
 {
-    for (uint8_t speed = 0; speed < SPOKEN_SPEED_COUNT; speed++) {
-        if (SPOKEN_QUARTERS[speed] == quarters) {
-            return speed;
-        }
-    }
-    return SPOKEN_SPEED_1X;
+    uint8_t place = (uint8_t)(quarters - SPOKEN_SPEED_SLOWEST_QUARTERS);
+    return place < SPOKEN_SPEED_COUNT ? swap_slowest_and_normal(place) : SPOKEN_SPEED_1X;
 }
 
 uint8_t settings_option_count(SettingOption option)

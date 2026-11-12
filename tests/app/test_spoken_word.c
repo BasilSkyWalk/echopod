@@ -524,6 +524,18 @@ static void a_song_after_a_faster_book_starts_once_the_book_ends(void)
     CHECK_EQUAL(PLAYER_PLAYING, status.state);
 }
 
+static void a_deferred_song_that_starts_is_saved(void)
+{
+    start();
+    player_set_spoken_speed(&player, speed_of(6));
+    play(SPOKEN_CHAPTER_THREE_PATH, true);
+    add_to_up_next(SPOKEN_SONG_PATH);
+    player.save_pending = false;
+    finish_and_update();
+    CHECK(path_is(fake_hal_audio_playing_path(), SPOKEN_SONG_PATH));
+    CHECK(player.save_pending);
+}
+
 static void a_book_after_a_song_starts_at_its_speed_once_the_song_ends(void)
 {
     start();
@@ -724,6 +736,7 @@ int main(void)
         TEST_CASE(music_plays_at_normal_speed_whatever_the_spoken_speed),
         TEST_CASE(chapters_at_the_same_speed_stay_gapless),
         TEST_CASE(a_song_after_a_faster_book_starts_once_the_book_ends),
+        TEST_CASE(a_deferred_song_that_starts_is_saved),
         TEST_CASE(a_book_after_a_song_starts_at_its_speed_once_the_song_ends),
         TEST_CASE(at_normal_speed_a_book_still_hands_over_to_a_song_without_a_gap),
         TEST_CASE(changing_the_speed_during_a_chapter_applies_it_once),

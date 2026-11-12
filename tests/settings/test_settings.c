@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "check.h"
 #include "core/hash.h"
 #include "settings/settings.h"
@@ -500,6 +502,33 @@ static void the_spoken_speed_maps_to_quarters(void)
     CHECK_EQUAL(SPOKEN_SPEED_1X, settings_spoken_speed_option(9));
 }
 
+static void a_speed_the_list_does_not_offer_is_stored_as_1x(void)
+{
+    uint8_t options[SETTINGS_OPTION_COUNT] = {0};
+    for (int quarters = 0; quarters <= UINT8_MAX; quarters++) {
+        uint8_t option = settings_spoken_speed_option((uint8_t)quarters);
+        bool offered =
+            quarters >= SPOKEN_SPEED_SLOWEST_QUARTERS && quarters <= SPOKEN_SPEED_FASTEST_QUARTERS;
+        options[OPTION_SPOKEN_SPEED] = option;
+        CHECK_EQUAL(offered ? quarters : SPOKEN_SPEED_NORMAL_QUARTERS,
+                    settings_spoken_quarters(options));
+        CHECK(offered || option == SPOKEN_SPEED_1X);
+    }
+    for (int option = SPOKEN_SPEED_COUNT; option <= UINT8_MAX; option++) {
+        options[OPTION_SPOKEN_SPEED] = (uint8_t)option;
+        CHECK_EQUAL(SPOKEN_SPEED_NORMAL_QUARTERS, settings_spoken_quarters(options));
+    }
+}
+
+static void every_speed_has_a_label_in_list_order(void)
+{
+    static const char *const LABELS[SPOKEN_SPEED_COUNT] = {"0.75x", "1x",    "1.25x",
+                                                           "1.5x",  "1.75x", "2x"};
+    for (int place = 0; place < SPOKEN_SPEED_COUNT; place++) {
+        CHECK_EQUAL(0, strcmp(LABELS[place], SPOKEN_SPEED_LABELS[place]));
+    }
+}
+
 static void a_spoken_speed_out_of_range_is_rejected(void)
 {
     Settings settings = custom_settings();
@@ -723,6 +752,8 @@ int main(void)
         TEST_CASE(the_spoken_speed_is_saved_at_byte_42_and_byte_43_stays_free),
         TEST_CASE(a_file_with_a_pitch_choice_at_byte_43_still_loads),
         TEST_CASE(the_spoken_speed_maps_to_quarters),
+        TEST_CASE(a_speed_the_list_does_not_offer_is_stored_as_1x),
+        TEST_CASE(every_speed_has_a_label_in_list_order),
         TEST_CASE(a_spoken_speed_out_of_range_is_rejected),
         TEST_CASE(a_file_from_0_11_plays_spoken_word_at_normal_speed),
         TEST_CASE(the_animation_speed_scales_animation_times),

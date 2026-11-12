@@ -38,7 +38,6 @@ enum {
     STATUS_CAPACITY = 64,
     BITRATE_CAPACITY = 24,
     RATE_CAPACITY = 16,
-    SPEED_CAPACITY = 8,
     PORTRAIT_COVER_TOP = 52,
     PORTRAIT_COVER_MIN_GAP = 6,
     PORTRAIT_TEXT_GAP = 10,
@@ -767,24 +766,13 @@ static void append_part(StringBuilder *builder, const char *text)
     string_builder_append(builder, text);
 }
 
-static void append_speed(StringBuilder *builder, uint8_t quarters)
-{
-    static const char *const FRACTIONS[] = {"", ".25", ".5", ".75"};
-    char text[SPEED_CAPACITY];
-    StringBuilder speed = string_builder_make(text, sizeof text);
-    string_builder_append_unsigned(&speed, quarters / 4u);
-    string_builder_append(&speed, FRACTIONS[quarters % 4u]);
-    string_builder_append_char(&speed, 'x');
-    append_part(builder, text);
-}
-
 void now_playing_modes_text(const PlayerStatus *status, const uint8_t *options, char *buffer,
                             size_t capacity)
 {
     StringBuilder builder = string_builder_make(buffer, capacity);
     uint8_t quarters = settings_spoken_quarters(options);
     if (status->spoken && quarters != SPOKEN_SPEED_NORMAL_QUARTERS) {
-        append_speed(&builder, quarters);
+        append_part(&builder, SPOKEN_SPEED_LABELS[quarters - SPOKEN_SPEED_SLOWEST_QUARTERS]);
     }
     if (status->shuffle != SHUFFLE_OFF) {
         append_part(&builder, i18n_text(SHUFFLE_TEXT[status->shuffle - 1]));

@@ -103,17 +103,13 @@ static HalAudioSpeed speed_for(const Player *player, bool spoken)
     return normal ? normal_speed() : player->spoken_speed;
 }
 
-static void send_speed(Player *player)
+static bool send_speed(Player *player, bool even_if_same)
 {
-    player->sent_speed = speed_for(player, player->spoken);
-    hal_audio_set_speed(player->sent_speed);
-}
-
-static bool follow_speed(Player *player)
-{
-    bool changed = !same_speed(speed_for(player, player->spoken), player->sent_speed);
-    if (changed) {
-        send_speed(player);
+    HalAudioSpeed speed = speed_for(player, player->spoken);
+    bool changed = !same_speed(speed, player->sent_speed);
+    if (changed || even_if_same) {
+        player->sent_speed = speed;
+        hal_audio_set_speed(speed);
     }
     return changed;
 }
@@ -200,7 +196,7 @@ static bool start_current(Player *player, uint32_t start_ms)
     player->track = track;
     player->has_track = true;
     player->current_token = new_token(player);
-    send_speed(player);
+    send_speed(player, true);
     player->loaded = hal_audio_play(path, start_ms, player->current_token);
     if (!player->loaded) {
         note_refusal(player);
@@ -487,26 +483,21 @@ static void advance_to_next(Player *player)
     take_next_and_note(player);
     player->current_token = player->next_token;
     player->has_next = false;
-    follow_speed(player);
+    send_speed(player, false);
     queue_upcoming(player);
     save_later(player);
 }
 
-static bool start_deferred(Player *player)
-{
-    if (!player->next_deferred || !move_and_start(player, 1, player->repeat != REPEAT_OFF)) {
-        return false;
-    }
-    save_later(player);
-    return true;
-}
-
 static void finish_track(Player *player, bool failed)
 {
-    if (failed ? move_and_start(player, 1, player->repeat != REPEAT_OFF) : start_deferred(player)) {
+    bool moved = (failed || player->next_deferred) &&
+                 move_and_start(player, 1, player->repeat != REPEAT_OFF);
+    if (moved && failed) {
         return;
     }
-    become_idle(player);
+    if (!moved) {
+        become_idle(player);
+    }
     save_later(player);
 }
 
@@ -529,7 +520,7 @@ void player_set_spoken_speed(Player *player, HalAudioSpeed speed)
     if (player->loaded) {
         follow_audio(player);
     }
-    if (player->loaded && (follow_speed(player) || player->next_deferred)) {
+    if (player->loaded && (send_speed(player, false) || player->next_deferred)) {
         queue_upcoming(player);
     }
 }

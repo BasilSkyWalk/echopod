@@ -73,8 +73,6 @@ static const StringId BLUETOOTH_LEVEL_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_S
 ECHO_RESIDENT static const StringId NP_FACE_OPTIONS[NP_FACE_COUNT] = {
     STR_SETTINGS_STANDARD, STR_SETTINGS_CASSETTE, STR_SETTINGS_VU_METERS, STR_SETTINGS_TURNTABLE,
     STR_SETTINGS_LCD_DECK};
-static const char *const SPOKEN_SPEED_OPTIONS[SPOKEN_SPEED_COUNT] = {"0.75x", "1x",    "1.25x",
-                                                                     "1.5x",  "1.75x", "2x"};
 static const StringId COVER_COUNT_OPTIONS[2] = {STR_SETTINGS_FIVE_COVERS,
                                                 STR_SETTINGS_THREE_COVERS};
 static const StringId ANIMATION_OPTIONS[ANIMATION_SPEED_COUNT] = {
@@ -103,6 +101,8 @@ static Settings *editable_settings(void *context)
 
 static void save(SettingsContext *context)
 {
+    player_set_spoken_speed(context->player,
+                            settings_store_spoken_speed(&context->store->settings));
     settings_store_capture(context->store, player_status(context->player));
     if (!settings_store_save(context->store)) {
         StringId text =
@@ -234,13 +234,6 @@ static void choose_bluetooth_level(void *context, int index)
     apply_and_save(context);
 }
 
-static void apply_spoken_speed(SettingsContext *context)
-{
-    player_set_spoken_speed(context->player,
-                            settings_store_spoken_speed(&context->store->settings));
-    save(context);
-}
-
 static int current_spoken_speed(const void *context)
 {
     return settings_spoken_quarters(settings_of(context)->options) - SPOKEN_SPEED_SLOWEST_QUARTERS;
@@ -250,7 +243,7 @@ static void choose_spoken_speed(void *context, int index)
 {
     editable_settings(context)->options[OPTION_SPOKEN_SPEED] =
         settings_spoken_speed_option((uint8_t)(index + SPOKEN_SPEED_SLOWEST_QUARTERS));
-    apply_spoken_speed(context);
+    save(context);
 }
 
 static int current_filter(const void *context)
@@ -408,8 +401,8 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_STATUS_BAR, STATUS_BAR_OPTIONS, OPTION_STATUS_BAR),
     OPTION_CHOICE(STR_SETTINGS_POWER_ON, POWER_ON_OPTIONS, OPTION_POWER_ON),
     OPTION_CHOICE(STR_MENU_NOW_PLAYING, NP_FACE_OPTIONS, OPTION_NOW_PLAYING_FACE),
-    {STR_SETTINGS_SPOKEN_SPEED, NULL, SPOKEN_SPEED_OPTIONS, SPOKEN_SPEED_COUNT,
-     current_spoken_speed, choose_spoken_speed, NULL, 0},
+    {STR_SETTINGS_SPOKEN_SPEED, NULL, SPOKEN_SPEED_LABELS, SPOKEN_SPEED_COUNT, current_spoken_speed,
+     choose_spoken_speed, NULL, 0},
 };
 
 static ScreenAction open_choice(void *context)
