@@ -307,6 +307,22 @@ static void the_end_of_a_track_without_a_next_one_stops_and_goes_silent(void)
     CHECK(!status.failed);
 }
 
+static void the_state_follows_play_pause_resume_and_the_end_of_the_track(void)
+{
+    start_engine();
+    CHECK_EQUAL(AUDIO_ENGINE_STOPPED, audio_engine_state(&engine));
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    CHECK_EQUAL(AUDIO_ENGINE_PLAYING, audio_engine_state(&engine));
+    audio_engine_pause(&engine);
+    CHECK_EQUAL(AUDIO_ENGINE_PAUSED, audio_engine_state(&engine));
+    audio_engine_resume(&engine);
+    pump_until_full(0);
+    audio_engine_pump(&engine, 3000);
+    CHECK_EQUAL(AUDIO_ENGINE_PLAYING, audio_engine_state(&engine));
+    audio_engine_pump(&engine, 3001);
+    CHECK_EQUAL(AUDIO_ENGINE_STOPPED, audio_engine_state(&engine));
+}
+
 static void a_queued_track_follows_without_a_gap(void)
 {
     start_engine();
@@ -1088,6 +1104,7 @@ int main(void)
         TEST_CASE(the_position_follows_what_the_dma_consumed),
         TEST_CASE(twenty_four_bit_audio_reaches_the_ring_exactly),
         TEST_CASE(the_end_of_a_track_without_a_next_one_stops_and_goes_silent),
+        TEST_CASE(the_state_follows_play_pause_resume_and_the_end_of_the_track),
         TEST_CASE(a_queued_track_follows_without_a_gap),
         TEST_CASE(the_status_describes_the_playing_tracks_stream),
         TEST_CASE(the_stream_description_follows_the_audio_into_the_next_track),

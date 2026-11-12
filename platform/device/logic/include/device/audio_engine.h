@@ -130,8 +130,7 @@ typedef struct AudioEngine {
     uint32_t output_rate;
     bool has_next;
     bool next_replaced;
-    uint32_t next_token;
-    char next_path[AUDIO_ENGINE_PATH_CAPACITY];
+    AudioSegment next;
     uint32_t gain;
     Equalizer equalizer;
     SpeedSetting speed;
@@ -165,4 +164,5 @@ void audio_engine_restart(AudioEngine *engine);
 uint32_t audio_engine_rate(const AudioEngine *engine);
 uint32_t audio_engine_buffered(const AudioEngine *engine, uint32_t consumed);
 AudioEngineStatus audio_engine_status(const AudioEngine *engine);
+AudioEngineState audio_engine_state(const AudioEngine *engine);
 AudioRefusal audio_engine_refusal(const AudioEngine *engine);
