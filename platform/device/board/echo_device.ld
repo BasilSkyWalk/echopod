@@ -4,8 +4,8 @@ MEMORY
 {
     DATA_RAM (rw) : ORIGIN = 0x03004000, LENGTH = 0x48000
     CODE_RAM (rx) : ORIGIN = 0x03050000, LENGTH = 0x2666C
-    HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x11A00
-    NP_FACES_RAM (rx) : ORIGIN = 0x0308BA00, LENGTH = 0x3600
+    HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x11000
+    NP_FACES_RAM (rx) : ORIGIN = 0x0308B000, LENGTH = 0x4000
     LANGUAGE_RAM (rw) : ORIGIN = 0x0308F000, LENGTH = 0x3000
     GLYPH_RAM (rw) : ORIGIN = 0x03092000, LENGTH = 0x8800
     RESIDENT_RAM (rw) : ORIGIN = 0x0309A800, LENGTH = 0x4800
@@ -95,5 +95,5 @@ ASSERT(ADDR(.data) == 0x03004000, "the entry vector must be at 0x03004000")
 ASSERT(SIZEOF(.data) == 8, "only the entry vector may be in .data: make initialised globals const")
 ASSERT(device_noinit_end <= 0x0304C000, ".data, .bss and .noinit must end below 0x0304C000")
 ASSERT(ADDR(.resident) == 0x0309A800, "the resident tables must start at 0x0309A800")
-ASSERT(ADDR(.np_faces) == 0x0308BA00, "the Now Playing faces must start at 0x0308BA00")
-ASSERT(NOW_PLAYING_FACES == 0x0308BA10, "the Now Playing faces entry must follow the 16-byte header")
+ASSERT(ADDR(.np_faces) == 0x0308B000, "the Now Playing faces must start at 0x0308B000")
+ASSERT(NOW_PLAYING_FACES == 0x0308B010, "the Now Playing faces entry must follow the 16-byte header")

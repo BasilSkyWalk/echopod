@@ -3152,7 +3152,8 @@ static void each_face_chrome_background_matches_the_backdrop_that_face_draws(voi
         ShotSetup setup = {SHOT_LANDSCAPE, SHOT_PLAYING, (uint8_t)face, true};
         reach_shot(setup);
         const ThemeColors *chrome = face_code_in_use()->chrome[face];
-        CHECK_EQUAL(chrome->background, fake_hal_pixel(0, DEFAULT_THEME.metrics.header_height));
+        int x = face == NP_FACE_MINIMAL ? DEFAULT_THEME.metrics.screen_width - 1 : 0;
+        CHECK_EQUAL(chrome->background, fake_hal_pixel(x, DEFAULT_THEME.metrics.header_height));
     }
 }
 

@@ -146,8 +146,8 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(lines[1], "loaded total (code + .data + .bss): 135,176 of 437,600 bytes, "
                                    "302,424 free")
         self.assertEqual(lines[2], "resident tables: 15,152 of 18,432 bytes, 3,280 free")
-        self.assertEqual(lines[3], "np_faces: 6,160 of 13,824 bytes, 7,664 free")
-        self.assertEqual(lines[4], ".high_ram: 69,632 of 72,192 bytes, 2,560 free")
+        self.assertEqual(lines[3], "np_faces: 6,160 of 16,384 bytes, 10,224 free")
+        self.assertEqual(lines[4], ".high_ram: 69,632 of 69,632 bytes, 0 free")
         self.assertEqual(lines[5], "rescan overlay: 81,920 of 86,016 bytes, 4,096 free")
 
     def test_summary_omits_the_faces_and_high_ram_lines_a_map_does_not_have(self):
@@ -157,12 +157,12 @@ class ReportTest(unittest.TestCase):
 
     def test_summary_flags_high_ram_and_the_faces_when_they_overflow(self):
         over = MAP.replace(".high_ram       0x0307a000    0x11000",
-                           ".high_ram       0x0307a000    0x11a10")
+                           ".high_ram       0x0307a000    0x11010")
         over = over.replace(".np_faces       0x0308c000     0x1810",
-                            ".np_faces       0x0308c000     0x3610")
+                            ".np_faces       0x0308c000     0x4010")
         lines = size_report.summary(over)
-        self.assertIn("np_faces: 13,840 of 13,824 bytes, -16 free  OVER BY 16", lines)
-        self.assertIn(".high_ram: 72,208 of 72,192 bytes, -16 free  OVER BY 16", lines)
+        self.assertIn("np_faces: 16,400 of 16,384 bytes, -16 free  OVER BY 16", lines)
+        self.assertIn(".high_ram: 69,648 of 69,632 bytes, -16 free  OVER BY 16", lines)
 
     def test_summary_measures_the_usb_overlay_in_the_image_and_with_its_zeroed_memory(self):
         lines = size_report.summary(MAP, OVERLAY_MAP, USB_OVERLAY_MAP)
