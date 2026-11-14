@@ -573,16 +573,14 @@ class ResidentTablesTest(unittest.TestCase):
         image = build(parts)
         self.assertEqual(make_image.crc32(parts.code), word(image, make_image.RESIDENT_OFFSET + 12))
 
-    def test_the_tables_sit_after_the_opus_program_and_before_the_mp3_slot(self):
+    def test_the_faces_sit_at_the_top_of_the_free_space_before_the_overlay(self):
         opus_end = (make_image.CORE1_OPUS_OFFSET + make_image.CORE1_MODULE_HEADER_SIZE
                     + make_image.CORE1_MODULE_CAPACITY)
         self.assertEqual(opus_end, make_image.RESIDENT_OFFSET)
-        self.assertEqual(make_image.NP_FACES_OFFSET,
-                         make_image.RESIDENT_OFFSET + make_image.RESIDENT_CAPACITY)
-        self.assertEqual(make_image.CORE1_MP3_OFFSET,
+        self.assertEqual(make_image.OVERLAY_OFFSET,
                          make_image.NP_FACES_OFFSET + make_image.NP_FACES_CAPACITY)
+        self.assertEqual(make_image.GLYPH_REGIONS[0][1], make_image.NP_FACES_OFFSET)
         self.assertEqual(0x0308F000, make_image.NP_FACES_END)
-        self.assertNotIn(0x23FA00, [low for low, _ in make_image.GLYPH_REGIONS])
         self.assertEqual(3, len(make_image.GLYPH_REGIONS))
 
     def test_the_tables_are_not_loaded_at_start(self):
@@ -639,7 +637,7 @@ class NpFacesTest(unittest.TestCase):
         parts = firmware(code_tail=b"!C" * 40, np_faces=faces)
         image = build(parts)
         offset = make_image.NP_FACES_OFFSET
-        self.assertEqual(0x23CA00, offset)
+        self.assertEqual(0x1FC000, offset)
         self.assertEqual(b"ENPF", image[offset:offset + 4])
         self.assertEqual(len(faces), word(image, offset + 4))
         self.assertEqual(make_image.crc32(faces[16:]), word(image, offset + 8))
@@ -673,7 +671,7 @@ class NpFacesTest(unittest.TestCase):
 
     def test_the_faces_come_from_the_elf_section_at_their_address(self):
         parts = firmware(np_faces=self.faces(b"\x01\x02\x03\x04"))
-        section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, parts.np_faces,
+        section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308B000, parts.np_faces,
                    len(parts.np_faces))
         self.assertEqual(parts, make_image.firmware_from_elf(firmware_elf(parts, [section])))
 
@@ -689,7 +687,7 @@ class NpFacesTest(unittest.TestCase):
 
 
 class WindowReferenceTest(unittest.TestCase):
-    INSIDE = 0x0308BA10
+    INSIDE = 0x0308B010
     HERE = make_image.CODE_BASE + 256
 
     def code_with(self, patch):
@@ -703,7 +701,7 @@ class WindowReferenceTest(unittest.TestCase):
                                          sanctioned=sanctioned, regions=regions))
 
     def test_the_encoder_and_decoder_agree(self):
-        for target in (0x03050000, 0x03051000, 0x0308BA10, 0x0308EFFC):
+        for target in (0x03050000, 0x03051000, 0x0308B010, 0x0308EFFC):
             self.assertEqual(target, decoded(encode_branch(0x03050100, target), 0x03050100))
             self.assertEqual(target, decoded(encode_branch(0x03050100, target, False), 0x03050100))
 
@@ -726,10 +724,10 @@ class WindowReferenceTest(unittest.TestCase):
             self.build_code(code)
 
     def test_the_edges_of_the_region_are_inside_and_outside(self):
-        for target in (0x0308BA00, 0x0308EFFC):
+        for target in (0x0308B000, 0x0308EFFC):
             with self.assertRaises(make_image.ImageError):
                 self.build_code(self.code_with(encode_branch(self.HERE, target)))
-        for target in (0x0308F000, 0x0308B9FC):
+        for target in (0x0308F000, 0x0308AFFC):
             self.build_code(self.code_with(encode_branch(self.HERE, target)))
 
     def test_a_bl_to_the_main_program_is_fine(self):
@@ -815,7 +813,7 @@ class WindowReferenceTest(unittest.TestCase):
 
     def test_main_checks_symbols_when_the_elf_has_faces(self):
         parts = firmware(np_faces=bytes(16) + b"\x5A" * 8)
-        section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, parts.np_faces,
+        section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308B000, parts.np_faces,
                    len(parts.np_faces))
         with tempfile.TemporaryDirectory() as directory:
             elf = Path(directory) / "echo.elf"

@@ -963,11 +963,18 @@ static void draw_face(const NowPlayingScreen *now_playing, const NowPlayingFaces
                       Canvas *canvas)
 {
     char texts[FACE_TEXTS_CAPACITY];
+    uint8_t face = face_of(now_playing);
     Theme dressed = *now_playing->config.theme;
-    dressed.colors = *faces->chrome[face_of(now_playing)];
-    header_draw(canvas, &dressed, now_playing->screen.title);
+    dressed.colors = *faces->chrome[face];
+    if (face != NP_FACE_MINIMAL) {
+        header_draw(canvas, &dressed, now_playing->screen.title);
+    }
     NowPlayingFrame frame;
     frame_of(now_playing, &frame, texts);
+    if (face == NP_FACE_MINIMAL) {
+        frame.area = (Rect){0, 0, now_playing->config.theme->metrics.screen_width,
+                            now_playing->config.theme->metrics.screen_height};
+    }
     request_tick(now_playing);
     faces->draw(&frame, canvas);
 }

@@ -4,6 +4,7 @@ add_library(echo_np_faces STATIC
     face_shapes.c
     face_text.c
     face_lcd.c
+    face_minimal.c
     face_turntable.c
     face_vu.c
 )
