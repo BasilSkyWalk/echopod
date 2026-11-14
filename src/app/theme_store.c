@@ -28,7 +28,13 @@ typedef struct ThemeMemory {
     uint8_t count;
     char names[THEME_STORE_FILES][THEME_PACKAGE_NAME_BYTES];
     const char *options[THEME_STORE_OPTIONS];
+    ThemeIcons icons;
+    ThemeAssets assets;
+    uint8_t file[THEME_PACKAGE_MAX_BYTES];
 } ThemeMemory;
+
+_Static_assert(sizeof(ThemeMemory) <= HAL_THEME_MEMORY_BYTES,
+               "the theme memory the platform hands over holds the store");
 
 static ThemeMemory *memory(void)
 {
@@ -73,33 +79,52 @@ static size_t stem_length(const char *file)
     return length - SUFFIX_BYTES;
 }
 
-static bool read_package(const char *name, ThemePackage *package)
+static bool decode(ThemeMemory *block, uint32_t size)
+{
+    ThemePackage decoded = {.colors = DEFAULT_THEME_DARK_COLORS, .boxes = THEME_STANDARD_BOXES};
+    if (!theme_package_decode(block->file, size, &decoded)) {
+        return false;
+    }
+    for (int id = 0; id < THEME_ICON_COUNT; id++) {
+        ThemePackageIcon icon = decoded.icons[id];
+        const uint8_t *levels = icon.width > 0 ? block->file + icon.offset : NULL;
+        block->icons.masks[id] = (IconMask){levels, icon.width, icon.height};
+    }
+    block->package = decoded;
+    return true;
+}
+
+static bool open_theme(const char *name, HalFile *file)
 {
     char path[PATH_CAPACITY];
-    uint8_t bytes[THEME_PACKAGE_MAX_BYTES];
     StringBuilder builder = string_builder_make(path, sizeof path);
     string_builder_append(&builder, THEME_STORE_FOLDER);
     string_builder_append_char(&builder, '/');
     string_builder_append(&builder, name);
     string_builder_append(&builder, SUFFIX);
+    return hal_file_open(file, path);
+}
+
+static bool read_package(const char *name, ThemeMemory *block)
+{
     HalFile file;
-    if (!hal_file_open(&file, path)) {
+    if (!open_theme(name, &file)) {
         return false;
     }
-    bool read = file.size <= sizeof bytes && hal_file_read(file, 0, bytes, file.size);
+    uint32_t held = file.size < sizeof block->file ? file.size : sizeof block->file;
+    bool read = hal_file_read(file, 0, block->file, held);
     hal_file_close(&file);
-    ThemePackage decoded = {.colors = DEFAULT_THEME_DARK_COLORS, .boxes = THEME_STANDARD_BOXES};
-    if (!read || !theme_package_decode(bytes, file.size, &decoded)) {
+    if (!read || !decode(block, held)) {
         return false;
     }
-    copy_name(decoded.name, name, THEME_PACKAGE_NAME_BYTES - 1);
-    *package = decoded;
+    copy_name(block->package.name, name, THEME_PACKAGE_NAME_BYTES - 1);
     return true;
 }
 
 static void apply(ThemeMemory *block, const char *name)
 {
-    block->active = name[0] != '\0' && read_package(name, &block->package);
+    block->active = name[0] != '\0' && read_package(name, block);
+    theme_assets_reset(&block->assets, &block->package);
     block->revision++;
 }
 
@@ -148,6 +173,50 @@ const ThemePackage *theme_store_package(void)
 {
     const ThemeMemory *block = memory();
     return block != NULL && block->active ? &block->package : NULL;
+}
+
+const ThemeIcons *theme_store_icons(void)
+{
+    const ThemeMemory *block = memory();
+    return block != NULL && block->active ? &block->icons : NULL;
+}
+
+const Font *theme_store_font(ThemeFontId id)
+{
+    ThemeMemory *block = memory();
+    return block != NULL && block->active ? theme_assets_font(&block->assets, &block->package, id)
+                                          : NULL;
+}
+
+const Wallpaper *theme_store_wallpaper(bool portrait)
+{
+    ThemeMemory *block = memory();
+    if (block == NULL || !block->active) {
+        return NULL;
+    }
+    return theme_assets_wallpaper(&block->assets, &block->package, portrait);
+}
+
+void theme_store_watch_assets(void)
+{
+    ThemeMemory *block = memory();
+    if (block != NULL && block->active) {
+        theme_assets_watch(&block->assets);
+    }
+}
+
+bool theme_store_tend_assets(void)
+{
+    theme_store_watch_assets();
+    ThemeMemory *block = memory();
+    HalFile file;
+    if (block == NULL || !block->active || !theme_assets_wanted(&block->assets) ||
+        !open_theme(block->package.name, &file)) {
+        return false;
+    }
+    bool changed = theme_assets_tend(&block->assets, &block->package, file);
+    hal_file_close(&file);
+    return changed;
 }
 
 uint8_t theme_store_revision(void)
@@ -212,18 +281,13 @@ bool theme_store_choose(int index)
     return block->active;
 }
 
-bool theme_store_wear(const uint8_t *bytes, uint32_t size)
+bool theme_store_wear(const char *name)
 {
     ThemeMemory *block = memory();
-    ThemePackage decoded = {.colors = DEFAULT_THEME_DARK_COLORS, .boxes = THEME_STANDARD_BOXES};
     if (block == NULL) {
         return false;
     }
-    block->active = theme_package_decode(bytes, size, &decoded);
-    if (block->active) {
-        block->package = decoded;
-    }
-    block->revision++;
+    apply(block, name);
     return block->active;
 }
 

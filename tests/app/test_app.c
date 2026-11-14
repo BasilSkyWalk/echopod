@@ -3534,6 +3534,255 @@ static void a_theme_file_spaces_the_rows_it_draws(void)
     CHECK(fill != fake_hal_pixel(4, row_top + 28));
 }
 
+static void a_theme_file_brings_its_icons_and_a_missing_one_brings_none(void)
+{
+    start_app_wearing("ember.echotheme", "Ember");
+    const ThemeIcons *icons = theme_store_icons();
+    CHECK(icons != NULL);
+    CHECK_EQUAL(22, icons->masks[THEME_ICON_BATTERY].width);
+    CHECK_EQUAL(7, icons->masks[THEME_ICON_CHEVRON].width);
+    CHECK(icons->masks[THEME_ICON_CHEVRON].levels != NULL);
+    start_app_wearing("dark.echotheme", "Dark");
+    CHECK(theme_store_icons() != NULL);
+    CHECK(theme_store_icons()->masks[THEME_ICON_BATTERY].levels == NULL);
+    start_app_wearing(NULL, "Ember");
+    CHECK(theme_store_icons() == NULL);
+}
+
+enum {
+    PAPER_X = 10,
+    PAPER_Y = 162
+};
+
+static Color paper_pixel(void)
+{
+    return fake_hal_pixel(PAPER_X, PAPER_Y);
+}
+
+static void a_theme_file_paints_its_wallpaper_from_the_first_frame(void)
+{
+    start_app_wearing("ember.echotheme", "Ember");
+    CHECK_EQUAL(COLOR_RGB(0x22, 0x18, 0x14), paper_pixel());
+    CHECK_EQUAL(COLOR_RGB(0x18, 0x12, 0x10), fake_hal_pixel(PAPER_X + 1, PAPER_Y));
+    CHECK(theme_store_wallpaper(false)->ready);
+}
+
+static void a_wiped_wallpaper_is_never_drawn_and_comes_back_on_the_next_step(void)
+{
+    start_app_wearing("ember.echotheme", "Ember");
+    fake_hal_wipe_theme_assets();
+    app_show_notice("Busy", "Working");
+    CHECK_EQUAL(COLOR_RGB(0x18, 0x12, 0x10), paper_pixel());
+    CHECK(!theme_store_wallpaper(false)->ready);
+    step();
+    CHECK(theme_store_wallpaper(false)->ready);
+    CHECK_EQUAL(COLOR_RGB(0x22, 0x18, 0x14), paper_pixel());
+}
+
+static void a_wallpaper_that_fails_its_check_leaves_the_plain_background(void)
+{
+    uint32_t size = 0;
+    fake_hal_reset();
+    uint8_t *bytes = theme_fixture_on_card("ember.echotheme", "Ember.echotheme", &size);
+    bytes[size - 1] ^= 0x10;
+    remember_theme_file("Ember");
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+    step();
+    step();
+    CHECK_EQUAL(COLOR_RGB(0x18, 0x12, 0x10), paper_pixel());
+    CHECK(!theme_store_wallpaper(false)->ready);
+    CHECK(theme_store_icons() != NULL);
+}
+
+static void a_small_wallpaper_serves_the_upright_screen_too(void)
+{
+    start_app_wearing("ember.echotheme", "Ember");
+    CHECK(theme_store_wallpaper(true) != NULL);
+    start_app_wearing("dark.echotheme", "Dark");
+    CHECK(theme_store_wallpaper(false) == NULL);
+    CHECK(theme_store_wallpaper(true) == NULL);
+}
+
+static void start_app_lettered(LetteredSpoil spoil)
+{
+    uint32_t size = 0;
+    fake_hal_reset();
+    theme_fixture_lettered("Lettered.echotheme", spoil, &size);
+    remember_theme_file("Lettered");
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+    step();
+}
+
+static bool solid_square_in_first_row(Color color)
+{
+    int top = DEFAULT_THEME.metrics.header_height;
+    for (int y = top; y + 4 <= top + DEFAULT_THEME.metrics.row_height; y++) {
+        for (int x = 0; x < 80; x++) {
+            bool solid = true;
+            for (int cell = 0; cell < 16 && solid; cell++) {
+                solid = fake_hal_pixel(x + cell % 4, y + cell / 4) == color;
+            }
+            if (solid) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static void a_theme_font_draws_the_letters_it_has_and_borrows_the_rest(void)
+{
+    start_app_lettered(LETTERED_SOUND);
+    const Font *body = theme_store_font(THEME_FONT_BODY);
+    CHECK(body != NULL);
+    CHECK_EQUAL(2, body->glyph_count);
+    CHECK_EQUAL(4, font_find_glyph(body, 'M')->width);
+    CHECK(font_find_glyph(body, 'u') == font_find_glyph(DEFAULT_THEME.fonts.body, 'u'));
+    CHECK(theme_store_font(THEME_FONT_TITLE) == NULL);
+    CHECK(solid_square_in_first_row(DEFAULT_THEME_DARK_COLORS.selection_text));
+    start_app_wearing("dark.echotheme", "Dark");
+    CHECK(!solid_square_in_first_row(DEFAULT_THEME_DARK_COLORS.selection_text));
+}
+
+static void a_wiped_theme_font_borrows_every_letter_until_it_is_read_again(void)
+{
+    start_app_lettered(LETTERED_SOUND);
+    fake_hal_wipe_theme_assets();
+    app_show_notice("Busy", "Working");
+    const Font *body = theme_store_font(THEME_FONT_BODY);
+    CHECK_EQUAL(0, body->glyph_count);
+    CHECK(font_find_glyph(body, 'M') == font_find_glyph(DEFAULT_THEME.fonts.body, 'M'));
+    CHECK_EQUAL(DEFAULT_THEME.fonts.body->ascent, body->ascent);
+    step();
+    CHECK_EQUAL(2, theme_store_font(THEME_FONT_BODY)->glyph_count);
+    CHECK(solid_square_in_first_row(DEFAULT_THEME_DARK_COLORS.selection_text));
+}
+
+static void a_theme_font_that_fails_its_checks_is_left_for_the_players_own(void)
+{
+    const LetteredSpoil spoils[] = {LETTERED_DAMAGED, LETTERED_OUT_OF_ORDER};
+    for (int index = 0; index < 2; index++) {
+        start_app_lettered(spoils[index]);
+        CHECK(theme_store_package() != NULL);
+        CHECK_EQUAL(0, theme_store_font(THEME_FONT_BODY)->glyph_count);
+        CHECK(!solid_square_in_first_row(DEFAULT_THEME_DARK_COLORS.selection_text));
+    }
+}
+
+static void a_wallpaper_lies_after_the_fonts_in_the_shared_memory(void)
+{
+    start_app_lettered(LETTERED_PAPERED);
+    const Font *body = theme_store_font(THEME_FONT_BODY);
+    const Wallpaper *wallpaper = theme_store_wallpaper(false);
+    CHECK(wallpaper->ready);
+    CHECK_EQUAL(2, body->glyph_count);
+    CHECK_EQUAL(32, (const uint8_t *)(const void *)wallpaper->pairs -
+                        (const uint8_t *)(const void *)body->glyphs);
+    CHECK_EQUAL(0xFFFFu, wallpaper->pairs[0x01] & 0xFFFFu);
+    CHECK_EQUAL(0u, wallpaper->pairs[0x01] >> 16);
+}
+
+static ThemeLayout unplaced(void)
+{
+    ThemeLayout layout;
+    for (int id = 0; id < THEME_LAYOUT_COUNT; id++) {
+        layout.boxes[id] = (ThemeLayoutBox){.align = THEME_ALIGN_UNSET};
+    }
+    return layout;
+}
+
+static void start_library_placed(const ThemeLayout *wide)
+{
+    uint32_t size = 0;
+    uint32_t covers_size = 0;
+    const uint8_t *bytes = fixture_bytes(&size);
+    const uint8_t *covers = fixture_covers_bytes(&covers_size);
+    fake_hal_reset();
+    fake_hal_add_file("/.echo/library.db", bytes, size);
+    fake_hal_add_file("/.echo/covers.bin", covers, covers_size);
+    fake_hal_add_file("/.echo/build.tmp", NULL, 16 * 1024 * 1024);
+    if (wide != NULL) {
+        theme_fixture_placed("Placed.echotheme", wide, NULL, &size);
+        remember_theme_file("Placed");
+    }
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+}
+
+static bool band_is_plain(Rect band, Color color)
+{
+    for (int y = band.y; y < band.y + band.height; y++) {
+        for (int x = band.x; x < band.x + band.width; x++) {
+            if (fake_hal_pixel(x, y) != color) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static Rect builtin_box(ThemeLayoutId id)
+{
+    ThemeLayout layout;
+    app_now_playing_layout(&layout);
+    ThemeLayoutBox box = layout.boxes[id];
+    return (Rect){box.x, box.y + 2, box.width, box.height - 4};
+}
+
+static void a_theme_layout_moves_the_progress_bar_and_hides_the_title(void)
+{
+    Color background = DEFAULT_THEME_DARK_COLORS.background;
+    start_library_placed(NULL);
+    play_first_album_track();
+    wait_ms(1000);
+    Rect title = builtin_box(THEME_LAYOUT_TITLE);
+    CHECK(!band_is_plain(title, background));
+    ThemeLayout layout = unplaced();
+    layout.boxes[THEME_LAYOUT_PROGRESS] = (ThemeLayoutBox){0, 100, 320, 6, THEME_ALIGN_LEFT};
+    layout.boxes[THEME_LAYOUT_TITLE] = (ThemeLayoutBox){0, 0, 0, 22, THEME_ALIGN_LEFT};
+    start_library_placed(&layout);
+    play_first_album_track();
+    wait_ms(1000);
+    CHECK(title_is("Now Playing"));
+    CHECK(theme_store_package() != NULL);
+    CHECK(band_is_plain(title, background));
+    CHECK_EQUAL(DEFAULT_THEME_DARK_COLORS.divider, fake_hal_pixel(160, 103));
+    CHECK_EQUAL(background, fake_hal_pixel(160, 149));
+    CHECK_EQUAL(title.x, builtin_box(THEME_LAYOUT_TITLE).x);
+}
+
+static void lyrics_hide_only_the_lines_they_overlap(void)
+{
+    Color background = DEFAULT_THEME_DARK_COLORS.background;
+    start_library_placed(NULL);
+    fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.lrc", HELLS_BELLS_LYRICS,
+                      sizeof HELLS_BELLS_LYRICS - 1);
+    play_first_album_track();
+    wait_ms(1000);
+    fake_hal_audio_set_position(1000);
+    wait_ms(1000);
+    Rect artist = builtin_box(THEME_LAYOUT_ARTIST);
+    Rect detail = builtin_box(THEME_LAYOUT_DETAIL);
+    CHECK(band_is_plain(artist, background));
+    ThemeLayout layout = unplaced();
+    layout.boxes[THEME_LAYOUT_LYRICS] = (ThemeLayoutBox){10, 128, 300, 38, THEME_ALIGN_LEFT};
+    start_library_placed(&layout);
+    fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.lrc", HELLS_BELLS_LYRICS,
+                      sizeof HELLS_BELLS_LYRICS - 1);
+    play_first_album_track();
+    wait_ms(1000);
+    fake_hal_audio_set_position(1000);
+    wait_ms(1000);
+    CHECK_EQUAL(0, strcmp("I'm a rolling thunder", app_now_playing_lyric()));
+    CHECK(!band_is_plain(artist, background));
+    CHECK(band_is_plain(detail, background));
+}
+
 static void a_remembered_theme_file_that_is_gone_leaves_the_built_in_theme(void)
 {
     start_app_wearing(NULL, "Ember");
@@ -3595,6 +3844,17 @@ int main(void)
         TEST_CASE(a_remembered_theme_file_colours_the_screen_from_the_first_frame),
         TEST_CASE(a_theme_file_draws_its_own_selection_box),
         TEST_CASE(a_theme_file_spaces_the_rows_it_draws),
+        TEST_CASE(a_theme_file_brings_its_icons_and_a_missing_one_brings_none),
+        TEST_CASE(a_theme_file_paints_its_wallpaper_from_the_first_frame),
+        TEST_CASE(a_wiped_wallpaper_is_never_drawn_and_comes_back_on_the_next_step),
+        TEST_CASE(a_wallpaper_that_fails_its_check_leaves_the_plain_background),
+        TEST_CASE(a_small_wallpaper_serves_the_upright_screen_too),
+        TEST_CASE(a_theme_font_draws_the_letters_it_has_and_borrows_the_rest),
+        TEST_CASE(a_wiped_theme_font_borrows_every_letter_until_it_is_read_again),
+        TEST_CASE(a_theme_font_that_fails_its_checks_is_left_for_the_players_own),
+        TEST_CASE(a_wallpaper_lies_after_the_fonts_in_the_shared_memory),
+        TEST_CASE(a_theme_layout_moves_the_progress_bar_and_hides_the_title),
+        TEST_CASE(lyrics_hide_only_the_lines_they_overlap),
         TEST_CASE(a_remembered_theme_file_that_is_gone_leaves_the_built_in_theme),
         TEST_CASE(the_theme_file_record_is_one_of_the_player_files),
         TEST_CASE(the_app_starts_through_its_loaded_start_up_code),

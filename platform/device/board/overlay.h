@@ -29,4 +29,5 @@ typedef struct BoardOverlay {
 bool board_overlay_load(const BoardOverlay *overlay);
 const void *board_usb_overlay_load(void);
 void board_np_faces_forget(void);
+void board_theme_assets_forget(void);
 bool board_startup_keep(void);

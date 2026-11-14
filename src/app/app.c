@@ -41,6 +41,7 @@
 #include "settings/rocker.h"
 #include "settings_store.h"
 #include "theme_store.h"
+#include "ui/backdrop.h"
 #include "ui/choice_screen.h"
 #include "ui/fade.h"
 #include "ui/header.h"
@@ -237,12 +238,37 @@ static void wear_spacing(ThemeMetrics *metrics, const uint8_t *spacing)
     }
 }
 
-static void wear_theme_file(Theme *theme)
+static void wear_fonts(ThemeFonts *fonts)
+{
+    const Font **fields[] = {&fonts->title, &fonts->body, &fonts->small, &fonts->status};
+    const Font *const builtin[THEME_FONT_COUNT] = {
+#define THEME_FONT(id, name, height) DEFAULT_THEME.fonts.name,
+#include "ui/theme_fonts.def"
+#undef THEME_FONT
+    };
+    for (size_t field = 0; field < sizeof fields / sizeof fields[0]; field++) {
+        for (int id = 0; id < THEME_FONT_COUNT; id++) {
+            const Font *worn = theme_store_font((ThemeFontId)id);
+            if (*fields[field] == builtin[id] && worn != NULL) {
+                *fields[field] = worn;
+                break;
+            }
+        }
+    }
+}
+
+static void wear_theme_file(Theme *theme, Theme *stage)
 {
     const ThemePackage *package = theme_store_package();
     if (package != NULL) {
+        wear_fonts(&theme->fonts);
+        wear_fonts(&stage->fonts);
         theme->colors = &package->colors;
         theme->boxes = &package->boxes;
+        theme->icons = theme_store_icons();
+        theme->wallpaper = theme_store_wallpaper(theme_is_portrait(theme));
+        theme->layout = &package->layouts[theme_is_portrait(theme) ? THEME_WALLPAPER_PORTRAIT
+                                                                   : THEME_WALLPAPER_LANDSCAPE];
         theme->selection = (ThemeSelection)package->selection;
         wear_spacing(&theme->metrics, package->spacing);
     }
@@ -259,11 +285,11 @@ static void apply_orientation(void)
                           .flat = settings->options[OPTION_HIGHLIGHT] != 0};
     app.theme = default_theme_styled(portrait, choice, &app.colors);
     app.stage_theme = default_theme_stage(portrait, choice, &app.colors);
-    wear_theme_file(&app.theme);
     if (settings->options[OPTION_STATUS_BAR] == STATUS_BAR_LARGE) {
         default_theme_enlarge_status(&app.theme);
         default_theme_enlarge_status(&app.stage_theme);
     }
+    wear_theme_file(&app.theme, &app.stage_theme);
     hal_display_set_rotation(rotation_for(orientation));
     frame_diff_init(&app.frame_diff, row_hashes, app.theme.metrics.screen_height);
 }
@@ -272,6 +298,9 @@ static void follow_orientation(void)
 {
     if (theme_key(&app.settings.settings) != app.shown_theme) {
         apply_orientation();
+    }
+    if (theme_store_tend_assets()) {
+        app.frame_stable = false;
     }
     app.power.menu_is_media = app.settings.settings.options[OPTION_MENU_KEY] == MENU_KEY_NEXT;
 }
@@ -801,14 +830,24 @@ static StatusBarState current_status_bar(void)
     };
 }
 
+static void paint_backdrop(void *context, Canvas *canvas)
+{
+    (void)context;
+    backdrop_paint(canvas, current_theme(), canvas->clip);
+}
+
 static void render(FrameDrawer drawer, bool drawer_paints_everything, int strip_height)
 {
+    theme_store_watch_assets();
+    const Wallpaper *wallpaper = current_theme()->wallpaper;
+    bool papered = wallpaper != NULL && wallpaper->ready;
     StripRenderer renderer = {
         .strip_pixels = strip_pixels,
         .screen_width = current_theme()->metrics.screen_width,
         .screen_height = current_theme()->metrics.screen_height,
         .strip_height = strip_height,
         .background = current_theme()->colors->background,
+        .backdrop = {.draw = papered ? paint_backdrop : NULL},
         .drawer_paints_everything = drawer_paints_everything,
     };
     FrameSink sink = {.write = write_to_display, .context = NULL};
@@ -1499,6 +1538,11 @@ void app_stop(void)
 PlayerStatus app_player_status(void)
 {
     return player_status(&app.player);
+}
+
+void app_now_playing_layout(ThemeLayout *out)
+{
+    now_playing_builtin_layout(&app.screens.now_playing, out);
 }
 
 const char *app_now_playing_lyric(void)

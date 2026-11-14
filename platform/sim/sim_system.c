@@ -8,7 +8,7 @@ extern const NowPlayingFaces NOW_PLAYING_FACES;
 
 enum {
     BOOT_CLOCK_MHZ = 24,
-    SIM_THEME_MEMORY_WORDS = 256,
+    SIM_THEME_MEMORY_WORDS = HAL_THEME_MEMORY_BYTES / sizeof(uint32_t),
     BUILD_YEAR_DIVISOR = 10000,
     BUILD_MONTH_DIVISOR = 100
 };
@@ -112,6 +112,18 @@ void *hal_system_theme_memory(uint32_t *size)
     static uint32_t memory[SIM_THEME_MEMORY_WORDS];
     *size = sizeof memory;
     return memory;
+}
+
+void *hal_system_theme_assets(uint32_t *size)
+{
+    static uint32_t memory[HAL_THEME_ASSET_BYTES / sizeof(uint32_t)];
+    *size = sizeof memory;
+    return memory;
+}
+
+uint32_t hal_system_theme_asset_wipes(void)
+{
+    return 0;
 }
 
 void *hal_system_borrow_listing(uint32_t *size)

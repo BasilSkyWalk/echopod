@@ -21,7 +21,7 @@ extern const NowPlayingFaces NOW_PLAYING_FACES;
 
 enum {
     TRANSITION_CAPACITY = 16,
-    FAKE_THEME_MEMORY_WORDS = 256,
+    FAKE_THEME_MEMORY_WORDS = HAL_THEME_MEMORY_BYTES / sizeof(uint32_t),
     FILE_CAPACITY = 16,
     DIR_CAPACITY = 48,
     WRITTEN_CAPACITY = 1100,
@@ -166,6 +166,8 @@ typedef struct FakeHal {
 
 static FakeHal fake;
 static uint32_t theme_memory[FAKE_THEME_MEMORY_WORDS];
+static uint32_t asset_memory[HAL_THEME_ASSET_BYTES / sizeof(uint32_t)];
+static uint32_t asset_wipes;
 
 void fake_hal_reset(void)
 {
@@ -1223,6 +1225,23 @@ void *hal_system_theme_memory(uint32_t *size)
 {
     *size = sizeof theme_memory;
     return theme_memory;
+}
+
+void *hal_system_theme_assets(uint32_t *size)
+{
+    *size = sizeof asset_memory;
+    return asset_memory;
+}
+
+uint32_t hal_system_theme_asset_wipes(void)
+{
+    return asset_wipes;
+}
+
+void fake_hal_wipe_theme_assets(void)
+{
+    memset(asset_memory, 0, sizeof asset_memory);
+    asset_wipes++;
 }
 
 void *hal_system_borrow_listing(uint32_t *size)

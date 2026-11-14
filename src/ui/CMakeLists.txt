@@ -1,4 +1,5 @@
 add_library(echo_ui STATIC
+    backdrop.c
     box.c
     choice_screen.c
     cover_flow.c

@@ -13,6 +13,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--page);
@@ -59,8 +63,11 @@ main {
 
 #stage {
   position: sticky;
-  top: 16px;
+  top: 0;
+  z-index: 1;
   flex: 0 0 auto;
+  padding: 16px 0 8px;
+  background: var(--page);
 }
 
 #device {
@@ -197,4 +204,176 @@ summary {
   grid-column: 1 / -1;
   justify-content: flex-start;
   gap: 12px;
+}
+
+#warnings {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#warnings li {
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-left: 3px solid #f2b24a;
+  border-radius: 4px;
+  background: #2a2417;
+  color: #f4d9a6;
+}
+
+nav a,
+.links a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+nav a:hover,
+.links a:hover {
+  text-decoration: underline;
+}
+
+#gallery-page {
+  display: block;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.note {
+  max-width: 720px;
+  color: var(--muted);
+}
+
+code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+#gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.card h2 {
+  margin: 12px 0 0;
+  font-size: 16px;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.card p {
+  margin: 4px 0 0;
+}
+
+.card .by {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 6px;
+}
+
+#icons .row {
+  margin: 0;
+  padding: 4px 12px 10px;
+}
+
+.icon-grid {
+  display: block;
+  margin: 0 12px 12px;
+  max-width: calc(100% - 24px);
+  border: 1px solid var(--line);
+  image-rendering: pixelated;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+@media (max-width: 1060px) {
+  #stage {
+    flex-basis: 100%;
+  }
+}
+
+#wallpapers .row {
+  margin: 0;
+  padding: 4px 12px 10px;
+}
+
+.wallpaper-shown {
+  display: block;
+  margin: 0 12px 12px;
+  max-width: calc(100% - 24px);
+  border: 1px solid var(--line);
+  image-rendering: pixelated;
+}
+
+#fonts .row {
+  margin: 0;
+  padding: 4px 12px 10px;
+}
+
+#fonts .hint {
+  margin: 0 12px 8px;
+  color: #ff8a7a;
+}
+
+.font-sample {
+  display: block;
+  margin: 0 12px 12px;
+  padding: 6px;
+  background: #101114;
+  border: 1px solid var(--line);
+  image-rendering: pixelated;
+  zoom: 2;
+}
+
+#device {
+  position: relative;
+}
+
+#overlay {
+  position: absolute;
+  left: 15px;
+  top: 15px;
+  pointer-events: none;
+  cursor: move;
+}
+
+#layout {
+  padding: 4px 12px 12px;
+}
+
+#layout .place {
+  margin-top: 6px;
+  gap: 6px 10px;
+}
+
+#layout .place input[type="number"] {
+  width: 58px;
+}
+
+#layout .place.picked > label:first-child {
+  color: #f2b24a;
 }

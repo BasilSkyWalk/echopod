@@ -3,7 +3,9 @@
 #include <stddef.h>
 
 #include "gfx/text.h"
+#include "ui/backdrop.h"
 #include "ui/box.h"
+#include "ui/icons.h"
 #include "ui/label.h"
 
 enum {
@@ -240,9 +242,14 @@ static Row draw_chevron(const ListView *view, Canvas *canvas, Row row)
     }
     Color color = row.selected ? theme_selected_text(view->theme) : view->theme->colors->chevron;
     TextStyle style = {.font = view->theme->fonts.title, .color = color};
-    int width = text_width(style.font, CHEVRON);
+    const IconMask *mask = theme_icon(view->theme, THEME_ICON_CHEVRON);
+    int width = mask != NULL ? mask->width : text_width(style.font, CHEVRON);
     Rect area = {row.text.x + row.text.width - width, row.text.y, width, row.text.height};
-    label_draw(canvas, style, (Label){.area = area, .text = CHEVRON});
+    if (mask != NULL) {
+        icon_draw(canvas, view->theme, (Icon){THEME_ICON_CHEVRON, area, color});
+    } else {
+        label_draw(canvas, style, (Label){.area = area, .text = CHEVRON});
+    }
     row.text.width -= width + view->theme->metrics.detail_gap;
     return row;
 }
@@ -345,7 +352,7 @@ static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32
 
 void list_view_draw(const ListView *view, Canvas *canvas, Rect area, uint32_t now_ms)
 {
-    canvas_fill_rect(canvas, area, view->theme->colors->background);
+    backdrop_paint(canvas, view->theme, area);
     Rect rows = area;
     int visible = list_view_rows(view);
     int top = top_showing_selection(view);

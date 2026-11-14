@@ -1,5 +1,7 @@
 #include "ui/theme.h"
 
+#include <stddef.h>
+
 const ThemeBoxes THEME_STANDARD_BOXES = {
     .selection = {.fill_top = THEME_COLOR_SELECTION_TOP,
                   .fill_bottom = THEME_COLOR_SELECTION_BACKGROUND,
@@ -61,6 +63,12 @@ void theme_space(ThemeMetrics *metrics, ThemeSpacingId id, int value)
 const BoxStyle *theme_selection_box(const Theme *theme)
 {
     return &((const BoxStyle *)theme->boxes)[theme->selection];
+}
+
+const IconMask *theme_icon(const Theme *theme, ThemeIconId id)
+{
+    const IconMask *mask = theme->icons != NULL ? &theme->icons->masks[id] : NULL;
+    return mask != NULL && mask->levels != NULL ? mask : NULL;
 }
 
 Rect theme_header_area(const Theme *theme)

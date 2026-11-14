@@ -20,6 +20,7 @@ typedef struct Font {
     uint8_t ascent;
     uint8_t descent;
     uint8_t pack_faces[2];
+    const struct Font *fallback;
 } Font;
 
 enum {

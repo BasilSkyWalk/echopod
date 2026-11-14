@@ -1,43 +1,30 @@
+import { buildIcons } from "./icon_editor.js";
+import { KEY, Preview } from "./preview_host.js";
+import { buildFonts } from "./font_editor.js";
+import { buildLayout } from "./layout_editor.js";
+import { buildWallpapers } from "./wallpaper_editor.js";
 import {
   BOX_COLOR_FIELDS,
   EDGES,
   ThemeError,
+  assetMemory,
   defaultTheme,
+  lint,
   pack,
   toToml,
   unpack,
 } from "./theme_format.js";
 
-const KEY_DOWN = 0;
-const KEY_UP = 1;
-const KEY_PLAY = 2;
-const KEY_MENU = 3;
-const KEY_BACK = 4;
 const KEYBOARD = {
-  ArrowDown: KEY_DOWN,
-  ArrowUp: KEY_UP,
-  Enter: KEY_PLAY,
-  " ": KEY_PLAY,
-  Backspace: KEY_BACK,
-  Escape: KEY_BACK,
-  m: KEY_MENU,
+  ArrowDown: KEY.down,
+  ArrowUp: KEY.up,
+  Enter: KEY.play,
+  " ": KEY.play,
+  Backspace: KEY.back,
+  Escape: KEY.back,
+  m: KEY.menu,
 };
-const TAP_MS = 60;
-const SETTLE_MS = 380;
-const LONG_MS = 800;
-const HELD_MS = 600000;
-const STEP_MS = 16;
 const MAX_CATCH_UP_MS = 1000;
-const THEME_BUFFER = 512;
-const TO_ALBUMS = [tap(KEY_PLAY), tap(KEY_DOWN), tap(KEY_DOWN), tap(KEY_DOWN), tap(KEY_PLAY)];
-const SCREENS = {
-  home: [],
-  list: TO_ALBUMS,
-  playing: [...TO_ALBUMS, tap(KEY_PLAY), tap(KEY_PLAY)],
-  toast: [...TO_ALBUMS, hold(KEY_PLAY, LONG_MS)],
-  letters: [tap(KEY_PLAY), ...Array(6).fill(tap(KEY_DOWN)), tap(KEY_PLAY), hold(KEY_DOWN, HELD_MS, 0)],
-  settings: [tap(KEY_DOWN), tap(KEY_PLAY)],
-};
 const BOX_NUMBERS = [
   ["border_width", "Border width", 8],
   ["shine_height", "Shine height", 8],
@@ -56,22 +43,13 @@ const COLOR_LABELS = {
 const status = document.getElementById("status");
 const canvas = document.getElementById("screen");
 const context = canvas.getContext("2d");
+const warnings = document.getElementById("warnings");
 let schema;
-let wasm;
+let preview;
 let theme;
-let themePointer;
-let script = [];
-let waitMs = 0;
 let lastFrame;
 let currentScreen = "list";
-
-function tap(key) {
-  return { key, down: TAP_MS, after: SETTLE_MS };
-}
-
-function hold(key, down, after = SETTLE_MS) {
-  return { key, down, after };
-}
+let layoutEditor;
 
 function label(name) {
   const words = name.replaceAll("_", " ");
@@ -83,12 +61,6 @@ function say(text, bad = false) {
   status.classList.toggle("bad", bad);
 }
 
-function put(bytes) {
-  const pointer = wasm.preview_alloc(bytes.length);
-  new Uint8Array(wasm.memory.buffer, pointer, bytes.length).set(bytes);
-  return pointer;
-}
-
 async function fetchBytes(path) {
   const response = await fetch(path);
   if (!response.ok) {
@@ -97,50 +69,41 @@ async function fetchBytes(path) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function addFile(cardPath, sitePath) {
-  const bytes = await fetchBytes(sitePath);
-  wasm.preview_add_file(put(new TextEncoder().encode(cardPath + "\0")), put(bytes), bytes.length);
+function showWarnings(found) {
+  warnings.replaceChildren(...found.map((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    return item;
+  }));
 }
 
 function applyTheme() {
   try {
     const bytes = pack(theme, schema);
-    new Uint8Array(wasm.memory.buffer, themePointer, bytes.length).set(bytes);
-    const accepted = wasm.preview_theme(themePointer, bytes.length) === 1;
-    say(accepted ? `${bytes.length} bytes` : "The player refused this theme", !accepted);
+    const accepted = preview.wear(bytes);
+    const memory = assetMemory(theme, schema);
+    const used = memory > 0 ? `, ${memory.toLocaleString("en")} of ${schema.asset_memory.toLocaleString("en")} bytes of player memory` : "";
+    say(accepted ? `${bytes.length.toLocaleString("en")} bytes${used}` : "The player refused this theme", !accepted);
+    showWarnings(lint(theme, schema));
     return bytes;
   } catch (error) {
     if (!(error instanceof ThemeError)) {
       throw error;
     }
     say(error.message, true);
+    showWarnings([]);
     return null;
   }
 }
 
-function restart() {
-  const orientation = Number(document.getElementById("orientation").value);
-  wasm.preview_start(orientation, 0);
-  applyTheme();
-  script = SCREENS[currentScreen].map((step) => ({ ...step, pressed: false }));
-  waitMs = SETTLE_MS;
+function orientation() {
+  return Number(document.getElementById("orientation").value);
 }
 
-function runScript(elapsed) {
-  waitMs -= elapsed;
-  if (waitMs > 0 || script.length === 0) {
-    return;
-  }
-  const step = script[0];
-  if (!step.pressed) {
-    wasm.preview_key(step.key, 1);
-    step.pressed = true;
-    waitMs = step.down;
-  } else {
-    wasm.preview_key(step.key, 0);
-    script.shift();
-    waitMs = step.after;
-  }
+function restart() {
+  preview.start(orientation(), currentScreen);
+  applyTheme();
+  layoutEditor?.build();
 }
 
 function resize(width, height) {
@@ -154,23 +117,18 @@ function resize(width, height) {
 }
 
 function draw() {
-  const width = wasm.preview_width();
-  const height = wasm.preview_height();
+  const { width, height, pixels } = preview.frame();
   resize(width, height);
-  const pixels = new Uint8ClampedArray(wasm.memory.buffer, wasm.preview_pixels(), width * height * 4);
   context.putImageData(new ImageData(pixels, width, height), 0, 0);
 }
 
 function frame(now) {
-  let behind = Math.min(Math.round(now - (lastFrame ?? now)), MAX_CATCH_UP_MS);
+  preview.advance(Math.min(Math.round(now - (lastFrame ?? now)), MAX_CATCH_UP_MS));
   lastFrame = now;
-  do {
-    const slice = Math.min(behind, STEP_MS);
-    runScript(slice);
-    wasm.preview_step(slice);
-    behind -= slice;
-  } while (behind > 0);
   draw();
+  if (currentScreen === "playing") {
+    layoutEditor?.draw();
+  }
   requestAnimationFrame(frame);
 }
 
@@ -300,7 +258,12 @@ function buildPanel() {
   buildSpacing();
   buildSelection();
   buildBoxes();
+  buildIcons(document.getElementById("icons"), theme, schema, applyTheme);
+  buildWallpapers(document.getElementById("wallpapers"), theme, schema, applyTheme);
+  buildFonts(document.getElementById("fonts"), theme, schema, applyTheme);
   applyTheme();
+  const context = { schema, preview, changed: applyTheme, orientation, screen: canvas };
+  layoutEditor = buildLayout(document.getElementById("layout"), theme, context);
 }
 
 function download(name, bytes, type) {
@@ -324,8 +287,7 @@ function wear(bytes) {
 }
 
 function press(key, pressed) {
-  script = [];
-  wasm.preview_key(key, pressed ? 1 : 0);
+  preview.key(key, pressed);
 }
 
 function wireKeys() {
@@ -401,21 +363,17 @@ function wireStage() {
 
 async function main() {
   schema = await (await fetch("theme_schema.json")).json();
-  const loaded = await WebAssembly.instantiateStreaming(fetch("echo_preview.wasm"), {});
-  wasm = loaded.instance.exports;
-  await addFile("/.echo/library.db", "library.db");
-  await addFile("/.echo/covers.bin", "covers.bin");
-  for (const face of schema.faces) {
-    const bytes = await fetchBytes(face.file);
-    wasm.preview_add_face(face.index, put(bytes), bytes.length);
-  }
-  themePointer = wasm.preview_alloc(THEME_BUFFER);
+  preview = await Preview.load(fetchBytes, schema);
   theme = defaultTheme(schema);
   wireKeys();
   wirePanel();
   wireStage();
   buildPanel();
   restart();
+  const asked = new URLSearchParams(location.search).get("theme");
+  if (schema.samples.includes(asked)) {
+    wear(await fetchBytes(`themes/${asked}.echotheme`));
+  }
   requestAnimationFrame(frame);
 }
 

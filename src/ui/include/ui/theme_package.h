@@ -14,9 +14,57 @@ enum {
     THEME_PACKAGE_BOX_BYTES_FIELD = 20,
     THEME_PACKAGE_SELECTION_FIELD = 21,
     THEME_PACKAGE_SPACING_FIELD = 22,
+    THEME_PACKAGE_ICONS_FIELD = 23,
     THEME_PACKAGE_NAME_FIELD = 24,
-    THEME_PACKAGE_MAX_BYTES = 512
+    THEME_PACKAGE_ICON_ENTRY_BYTES = 4,
+    THEME_PACKAGE_ASSETS_FIELD = 48,
+    THEME_PACKAGE_LAYOUTS_FIELD = 49,
+    THEME_PACKAGE_LAYOUT_BOX_BYTES = 8,
+    THEME_LAYOUT_REACH = 320,
+    THEME_LAYOUT_MOST_COVER = 170,
+    THEME_PACKAGE_ASSET_HEADER_BYTES = 52,
+    THEME_PACKAGE_ASSET_ENTRY_BYTES = 16,
+    THEME_PACKAGE_PALETTE_COLORS = 16,
+    THEME_PACKAGE_PALETTE_BYTES = 2 * THEME_PACKAGE_PALETTE_COLORS,
+    THEME_PACKAGE_MAX_BYTES = 3072,
+    THEME_WALLPAPER_LONG_SIDE = 320,
+    THEME_WALLPAPER_SHORT_SIDE = 170,
+    THEME_FONT_MAX_GLYPHS = 512,
+    THEME_GLYPH_RECORD_BYTES = 10
 };
+
+typedef enum ThemeWallpaperKind {
+    THEME_WALLPAPER_LANDSCAPE,
+    THEME_WALLPAPER_PORTRAIT,
+    THEME_WALLPAPER_COUNT
+} ThemeWallpaperKind;
+
+enum {
+    THEME_ASSET_FIRST_FONT = THEME_WALLPAPER_COUNT,
+    THEME_ASSET_KINDS = THEME_ASSET_FIRST_FONT + THEME_FONT_COUNT
+};
+
+typedef struct ThemePackageFont {
+    uint32_t offset;
+    uint32_t checksum;
+    uint16_t glyph_count;
+    uint16_t bitmap_bytes;
+    uint8_t ascent;
+    uint8_t descent;
+} ThemePackageFont;
+
+typedef struct ThemePackageWallpaper {
+    uint32_t offset;
+    uint32_t checksum;
+    uint16_t width;
+    uint16_t height;
+} ThemePackageWallpaper;
+
+typedef struct ThemePackageIcon {
+    uint16_t offset;
+    uint8_t width;
+    uint8_t height;
+} ThemePackageIcon;
 
 typedef struct ThemePackage {
     ThemeColors colors;
@@ -24,6 +72,10 @@ typedef struct ThemePackage {
     uint8_t selection;
     uint8_t spacing[THEME_SPACING_COUNT];
     char name[THEME_PACKAGE_NAME_BYTES];
+    ThemePackageIcon icons[THEME_ICON_COUNT];
+    ThemePackageWallpaper wallpapers[THEME_WALLPAPER_COUNT];
+    ThemePackageFont fonts[THEME_FONT_COUNT];
+    ThemeLayout layouts[THEME_WALLPAPER_COUNT];
 } ThemePackage;
 
 enum {

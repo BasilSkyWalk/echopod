@@ -190,6 +190,7 @@ Choose Settings on Home, or hold ≡ anywhere except on Now Playing. The top of 
   - **Olive:** a mid-tone, reflective handheld-LCD look with a dark block for the selected row.
   - **High contrast:** black and white with a yellow block and a grey header.
   - **Accent color** changes the selection bar on Dark and Light only; the other themes keep their own colours, and the row is hidden for them. **Highlight** (gradient or flat) applies to themes with a gradient bar (Dark, Light, Fjord, Dusk and Paper) and is hidden on the rest. Choosing another theme keeps your accent and highlight for when you come back. Cover Flow and the cover panel on Home stay dark on every theme.
+  - **Theme files:** themes made by other people, or by you, are files ending in `.echotheme`. Put them in a folder called `Themes` at the top of the card and they appear in the Theme list after the built-in ones, up to 8 of them, each under its file name. A theme file sets its own colours, bar shapes, row spacing and icons, and may bring a wallpaper, its own fonts and its own Now Playing layout, so Accent color and Highlight are hidden while one is chosen. `docs/themes.md` covers making and sharing them.
   - **Now Playing** picks how the Now Playing screen looks:
     - **Standard:** the default, in the theme's colours.
     - **Cassette:** a tape deck with turning reels; the tape across the head opening is the progress bar (portrait adds a J-card).

@@ -30,8 +30,12 @@ enum {
     GREEN_SHIFT = 5,
     RED_MASK = 0x1F,
     GREEN_MASK = 0x3F,
-    BLUE_MASK = 0x1F
+    BLUE_MASK = 0x1F,
+    THEME_BYTES = 160 * 1024
 };
+
+static const char THEME_NAME[] = "Preview";
+static const char THEME_PATH[] = "/Themes/Preview.echotheme";
 
 typedef struct PreviewFile {
     const char *path;
@@ -44,12 +48,13 @@ static PreviewFile faces[FONT_PACK_FACES];
 static uint32_t glyph_cache[GLYPH_CACHE_WORDS];
 static int file_count;
 static uint8_t settings_bytes[SETTINGS_FILE_SIZE];
-static uint8_t theme_bytes[THEME_PACKAGE_MAX_BYTES];
+static uint8_t theme_bytes[THEME_BYTES];
 static uint32_t theme_size;
 static uint32_t pixels[PIXELS];
 static uint32_t now_ms = START_MS;
 static uint32_t position_ms;
 static int plays_seen;
+static bool started;
 
 PREVIEW_EXPORT(preview_alloc) void *preview_alloc(uint32_t size);
 PREVIEW_EXPORT(preview_add_file)
@@ -63,6 +68,7 @@ PREVIEW_EXPORT(preview_theme) int preview_theme(const uint8_t *bytes, uint32_t s
 PREVIEW_EXPORT(preview_width) int preview_width(void);
 PREVIEW_EXPORT(preview_height) int preview_height(void);
 PREVIEW_EXPORT(preview_pixels) const uint32_t *preview_pixels(void);
+PREVIEW_EXPORT(preview_layout) int preview_layout(int16_t *out);
 
 void *preview_alloc(uint32_t size)
 {
@@ -99,7 +105,7 @@ void preview_add_face(int face, const uint8_t *bytes, uint32_t size)
 static void wear_theme(void)
 {
     if (theme_size > 0) {
-        (void)theme_store_wear(theme_bytes, theme_size);
+        (void)theme_store_wear(THEME_NAME);
     }
 }
 
@@ -117,10 +123,12 @@ void preview_start(int orientation, int face)
     }
     fake_hal_add_file("/.echo/settings.bin", settings_bytes, sizeof settings_bytes);
     fake_hal_add_file("/.echo/build.tmp", NULL, SCRATCH_FILE_BYTES);
+    fake_hal_add_file(THEME_PATH, theme_bytes, sizeof theme_bytes);
     fake_hal_set_milliseconds(now_ms);
     position_ms = 0;
     plays_seen = 0;
     app_start();
+    started = true;
     wear_theme();
 }
 
@@ -169,7 +177,12 @@ int preview_theme(const uint8_t *bytes, uint32_t size)
 {
     theme_size = size <= sizeof theme_bytes ? size : 0;
     memcpy(theme_bytes, bytes, theme_size);
-    return theme_store_wear(theme_bytes, theme_size) ? 1 : 0;
+    if (started) {
+        return theme_size > 0 && theme_store_wear(THEME_NAME) ? 1 : 0;
+    }
+    ThemePackage checked = {0};
+    uint32_t held = theme_size < THEME_PACKAGE_MAX_BYTES ? theme_size : THEME_PACKAGE_MAX_BYTES;
+    return theme_package_decode(theme_bytes, held, &checked) ? 1 : 0;
 }
 
 static bool portrait(void)
@@ -210,4 +223,20 @@ const uint32_t *preview_pixels(void)
         }
     }
     return pixels;
+}
+
+int preview_layout(int16_t *out)
+{
+    ThemeLayout layout;
+    app_now_playing_layout(&layout);
+    for (int id = 0; id < THEME_LAYOUT_COUNT; id++) {
+        ThemeLayoutBox box = layout.boxes[id];
+        int16_t *place = out + 5 * id;
+        place[0] = box.x;
+        place[1] = box.y;
+        place[2] = (int16_t)box.width;
+        place[3] = box.height;
+        place[4] = box.align;
+    }
+    return THEME_LAYOUT_COUNT;
 }

@@ -20,6 +20,7 @@ typedef struct StripRenderer {
     int screen_height;
     int strip_height;
     Color background;
+    FrameDrawer backdrop;
     bool drawer_paints_everything;
 } StripRenderer;
 

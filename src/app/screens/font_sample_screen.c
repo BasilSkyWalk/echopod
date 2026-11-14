@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "core/i18n.h"
+#include "ui/backdrop.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/navigation.h"
@@ -74,7 +75,7 @@ static void draw(void *context, Canvas *canvas)
     const FontSampleScreen *sample = context;
     const Theme *theme = sample->theme;
     Rect content = theme_content_area(theme);
-    canvas_fill_rect(canvas, content, theme->colors->background);
+    backdrop_paint(canvas, theme, content);
     header_draw(canvas, theme, sample->screen.title);
     for (int index = 0; index < LINE_COUNT; index++) {
         draw_line(canvas, theme, content, index);

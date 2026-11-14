@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "gfx/color.h"
@@ -9,6 +10,7 @@ typedef struct Canvas {
     Color *pixels;
     Rect bounds;
     Rect clip;
+    bool backdrop_painted;
 } Canvas;
 
 Canvas canvas_make(Color *pixels, Rect bounds);

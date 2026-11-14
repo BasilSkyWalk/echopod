@@ -9,6 +9,7 @@
 #include "hal/clock.h"
 #include "library/sort_key.h"
 #include "settings/settings.h"
+#include "ui/backdrop.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/list_navigation.h"
@@ -613,7 +614,7 @@ static void update(void *context, uint32_t now_ms)
 static void draw_empty(Canvas *canvas, const Theme *theme, Rect content, const char *message)
 {
     TextStyle style = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
-    canvas_fill_rect(canvas, content, theme->colors->background);
+    backdrop_paint(canvas, theme, content);
     Rect area = label_centered_area(style.font, content, message);
     label_draw(canvas, style, (Label){.area = area, .text = message});
 }

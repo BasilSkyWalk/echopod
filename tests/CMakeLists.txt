@@ -130,7 +130,7 @@ echo_add_unit_test(NAME test_theme_package
 target_compile_definitions(test_theme_package PRIVATE
     ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 
-foreach(ui_test theme theme_layout box list_view list_navigation fast_scroll header menu_screen message_screen
+foreach(ui_test theme theme_layout backdrop box list_view list_navigation fast_scroll header menu_screen message_screen
         choice_screen toast status_bar)
     echo_add_unit_test(NAME test_${ui_test}
         SOURCES ui/test_${ui_test}.c

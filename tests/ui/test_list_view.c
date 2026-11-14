@@ -322,6 +322,27 @@ static void a_row_that_opens_something_shows_a_chevron(void)
     CHECK(ui_test_area_has_only(&canvas, right_of_row_two, TEST_THEME.colors->background));
 }
 
+static void a_theme_chevron_is_drawn_from_its_mask_and_takes_its_width(void)
+{
+    static const uint8_t solid[] = {0xFF, 0xFF, 0xFF, 0xFF};
+    ThemeIcons icons = {.masks[THEME_ICON_CHEVRON] = {solid, 4, 2}};
+    Theme theme = TEST_THEME;
+    theme.icons = &icons;
+    ListView view = list_of(3);
+    view.theme = &theme;
+    items.opens_at_one = true;
+    Canvas canvas = ui_test_canvas();
+    list_view_draw(&view, &canvas, theme_content_area(&theme), 100);
+    Rect row = row_rect(1);
+    int inked = 0;
+    for (int y = row.y; y < row.y + row.height; y++) {
+        for (int x = 0; x < TEST_SCREEN_WIDTH; x++) {
+            inked += canvas_pixel_at(&canvas, x, y) == theme.colors->chevron;
+        }
+    }
+    CHECK_EQUAL(8, inked);
+}
+
 static void the_scrollbar_appears_only_when_items_overflow(void)
 {
     Rect content = theme_content_area(&TEST_THEME);
@@ -388,6 +409,7 @@ int main(void)
         TEST_CASE(a_gradient_selection_draws_its_label_in_the_selection_text),
         TEST_CASE(the_scrollbar_thumb_sits_inset_without_a_track),
         TEST_CASE(a_row_that_opens_something_shows_a_chevron),
+        TEST_CASE(a_theme_chevron_is_drawn_from_its_mask_and_takes_its_width),
         TEST_CASE(a_detail_is_drawn_in_the_secondary_color_at_the_right),
         TEST_CASE(a_long_detail_stops_at_its_maximum_width),
     };

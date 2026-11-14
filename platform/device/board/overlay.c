@@ -20,6 +20,7 @@ extern const uint8_t device_code_end[];
 
 static NpFacesGate np_faces_gate;
 static bool startup_running;
+static uint32_t asset_wipes;
 
 static const BoardOverlay NP_FACES_OVERLAY = {NP_FACES_IMAGE_OFFSET, NP_FACES_IMAGE_MAGIC,
                                               (uint8_t *)NP_FACES_BASE, NP_FACES_BYTES};
@@ -122,6 +123,7 @@ static const void *load_window(uint32_t image_offset, uint32_t magic, uint32_t c
         return NULL;
     }
     board_np_faces_forget();
+    board_theme_assets_forget();
     board_audio_shut_down();
     return board_overlay_load(&overlay) ? base + OVERLAY_HEADER_BYTES : NULL;
 }
@@ -134,6 +136,16 @@ const void *hal_system_load_rescan_code(void)
 void board_np_faces_forget(void)
 {
     np_faces_gate_forget(&np_faces_gate);
+}
+
+void board_theme_assets_forget(void)
+{
+    asset_wipes++;
+}
+
+uint32_t hal_system_theme_asset_wipes(void)
+{
+    return asset_wipes;
 }
 
 static bool np_faces_header_intact(void)
