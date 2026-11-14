@@ -194,6 +194,22 @@ static void folder_views_show_folder_names_and_file_names(void)
     CHECK(label_is(library, folder, hells_bells, "1-01 - Hells Bells"));
 }
 
+static void folder_tracks_join_the_folder_and_its_subfolders(void)
+{
+    Library *library = open_fixture();
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseQuery acdc = child_of(root, item_at(library, root, 0));
+    BrowseQuery tracks = browse_folder_tracks(acdc);
+    CHECK_EQUAL(BROWSE_FOLDER_TRACKS, tracks.kind);
+    CHECK_EQUAL(3, browse_count(library, tracks));
+    CHECK_EQUAL(HELLS_BELLS, item_at(library, tracks, 0).index);
+    CHECK_EQUAL(1, item_at(library, tracks, 1).index);
+    CHECK_EQUAL(4, item_at(library, tracks, 2).index);
+    BrowseItem past;
+    CHECK(!browse_item(library, tracks, 3, &past));
+    CHECK(title_is(library, tracks, "AC DC"));
+}
+
 static void views_have_titles(void)
 {
     Library *library = open_fixture();
@@ -284,6 +300,7 @@ int main(void)
         TEST_CASE(an_album_reached_directly_lists_every_track),
         TEST_CASE(album_artists_and_genres_open_their_albums),
         TEST_CASE(folders_list_subfolders_before_tracks),
+        TEST_CASE(folder_tracks_join_the_folder_and_its_subfolders),
         TEST_CASE(tracks_open_nothing),
         TEST_CASE(positions_past_the_end_are_refused),
         TEST_CASE(items_show_names_years_and_durations),

@@ -1,5 +1,11 @@
 # EchoPod release notes
 
+## Unreleased
+
+### New
+
+- **Shuffle all in folders.** Every folder that holds songs, either its own or in its immediate subfolders, starts with **Shuffle all**. It plays those songs shuffled and leaves songs in deeper folders out. The top-level Folders list has no Shuffle all, and audiobooks and podcasts don't get one. The list still opens on the first song.
+
 ## 0.12.0
 
 New looks and new formats, from five community pull requests: seven colour themes, four retro Now Playing faces, `.m4b` audiobooks with chapters, QOA playback, folder order by file name and a complete Polish translation. Tested on one Echo Mini 8 GB.
