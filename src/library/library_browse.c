@@ -33,6 +33,7 @@ static LibrarySection group_section_of(BrowseKind kind)
     case BROWSE_GROUP_ALBUMS:
     case BROWSE_ALBUM_TRACKS:
     case BROWSE_FOLDER:
+    case BROWSE_FOLDER_TRACKS:
         return LIBRARY_ARTISTS;
     }
     return LIBRARY_ARTISTS;
@@ -151,6 +152,13 @@ BrowseQuery browse_group_tracks(BrowseQuery albums)
     return albums;
 }
 
+BrowseQuery browse_folder_tracks(BrowseQuery folder)
+{
+    folder.kind = BROWSE_FOLDER_TRACKS;
+    folder.artist = LIBRARY_NONE;
+    return folder;
+}
+
 static uint32_t folder_item_count(const Library *library, uint32_t subject)
 {
     LibraryFolder folder;
@@ -158,6 +166,24 @@ static uint32_t folder_item_count(const Library *library, uint32_t subject)
         return 0;
     }
     return (uint32_t)folder.subfolder_count + folder.track_count;
+}
+
+static uint32_t folder_nested_track_count(const Library *library, uint32_t subject)
+{
+    LibraryFolder folder;
+    if (!library_read_folder(library, subject, &folder)) {
+        return 0;
+    }
+    uint32_t count = folder.track_count;
+    for (uint32_t link = 0; link < folder.subfolder_count; link++) {
+        uint16_t child = 0;
+        LibraryFolder nested;
+        if (library_read_index(library, LIBRARY_LINKS, folder.first_link + link, &child) &&
+            library_read_folder(library, child, &nested)) {
+            count += nested.track_count;
+        }
+    }
+    return count;
 }
 
 uint32_t browse_count(const Library *library, BrowseQuery query)
@@ -184,6 +210,8 @@ uint32_t browse_count(const Library *library, BrowseQuery query)
         return library_count(library, LIBRARY_PLAYLISTS);
     case BROWSE_GROUP_TRACKS:
         return group_track_count(library, query);
+    case BROWSE_FOLDER_TRACKS:
+        return folder_nested_track_count(library, query.subject);
     }
     return 0;
 }
@@ -264,6 +292,35 @@ static bool folder_item(const Library *library, uint32_t subject, uint32_t posit
     return linked_item(library, folder.first_link + position, kind, item);
 }
 
+static bool folder_track_item(const Library *library, uint32_t subject, uint32_t position,
+                              BrowseItem *item)
+{
+    LibraryFolder folder;
+    if (!library_read_folder(library, subject, &folder)) {
+        return false;
+    }
+    if (position < folder.track_count) {
+        return linked_item(library, folder.first_link + folder.subfolder_count + position,
+                           BROWSE_ITEM_TRACK, item);
+    }
+    uint32_t seen = folder.track_count;
+    for (uint32_t link = 0; link < folder.subfolder_count; link++) {
+        uint16_t child = 0;
+        LibraryFolder nested;
+        if (!library_read_index(library, LIBRARY_LINKS, folder.first_link + link, &child) ||
+            !library_read_folder(library, child, &nested)) {
+            continue;
+        }
+        if (position < seen + nested.track_count) {
+            return linked_item(library,
+                               nested.first_link + nested.subfolder_count + (position - seen),
+                               BROWSE_ITEM_TRACK, item);
+        }
+        seen += nested.track_count;
+    }
+    return false;
+}
+
 bool browse_item(const Library *library, BrowseQuery query, uint32_t position, BrowseItem *item)
 {
     switch (query.kind) {
@@ -285,6 +342,8 @@ bool browse_item(const Library *library, BrowseQuery query, uint32_t position, B
         return folder_item(library, query.subject, position, item);
     case BROWSE_GROUP_TRACKS:
         return group_track_item(library, query, position, item);
+    case BROWSE_FOLDER_TRACKS:
+        return folder_track_item(library, query.subject, position, item);
     }
     return false;
 }
@@ -371,7 +430,7 @@ static bool album_text(const Library *library, BrowseItem item, BrowseText text)
 static bool track_label(const Library *library, BrowseQuery query, LibraryTrack track,
                         BrowseText text)
 {
-    if (query.kind != BROWSE_FOLDER) {
+    if (query.kind != BROWSE_FOLDER && query.kind != BROWSE_FOLDER_TRACKS) {
         return library_read_string(library, track.title, text.label, text.label_capacity);
     }
     char path[PATH_CAPACITY];
@@ -455,6 +514,7 @@ static bool subject_title(const Library *library, BrowseQuery query, char *buffe
         return library_read_album(library, query.subject, &album) &&
                library_read_string(library, album.title, buffer, capacity);
     case BROWSE_FOLDER:
+    case BROWSE_FOLDER_TRACKS:
         return library_read_folder(library, query.subject, &folder) &&
                browse_folder_name(library, &folder, buffer, capacity);
     case BROWSE_ARTISTS:
@@ -492,6 +552,7 @@ bool browse_title(const Library *library, BrowseQuery query, char *buffer, size_
     case BROWSE_ALBUM_TRACKS:
     case BROWSE_PLAYLIST_TRACKS:
     case BROWSE_GROUP_TRACKS:
+    case BROWSE_FOLDER_TRACKS:
         return subject_title(library, query, buffer, capacity);
     }
     return false;
