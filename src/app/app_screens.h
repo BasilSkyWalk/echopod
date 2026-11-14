@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "app/conf_file.h"
 #include "browse_screen.h"
 #include "core/power_policy.h"
 #include "cover_cache.h"
@@ -105,6 +106,7 @@ typedef struct AppScreensContext {
     BluetoothLink *bluetooth;
     EqualizerStore *equalizer;
     ClockStore *clock;
+    const EchoConf *conf;
 } AppScreensContext;
 
 Screen *app_screens_init(AppScreens *screens, AppScreensContext context);

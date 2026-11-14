@@ -174,6 +174,7 @@ static void build_settings(AppScreens *screens, AppScreensContext context)
         .date_time = &screens->date_time,
         .folders = &screens->folders,
         .sleep_option = 0,
+        .conf = context.conf,
     };
     DateTimeConfig date_time = {.clock = context.clock,
                                 .store = context.settings,
@@ -258,7 +259,8 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
                                     .theme = theme,
                                     .covers = context.covers,
                                     .up_next = up_next_screen_init(&screens->up_next, up_next),
-                                    .options = context.settings->settings.options};
+                                    .options = context.settings->settings.options,
+                                    .conf = context.conf};
     EqualizerConfig equalizer = {
         .store = context.equalizer, .toast = context.toast, .theme = theme};
     now_playing.equalizer = equalizer_screen_init(&screens->equalizer, equalizer);

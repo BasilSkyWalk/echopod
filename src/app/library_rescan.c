@@ -196,7 +196,7 @@ static bool music_root_exists(void)
 }
 
 static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *scan,
-                               CoverStats *stats)
+                               CoverStats *stats, bool default_cover)
 {
     RescanFiles *files = scan->files.context;
     uint32_t capacity = reserved_size_of(COVER_CACHE_PATH);
@@ -224,6 +224,7 @@ static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *sca
         .memory = scan->memory,
         .size = scan->size,
         .progress = {report_covers, files},
+        .default_cover = default_cover,
     };
     ScanResult result = entry->covers(&job, stats);
     if (previous) {
@@ -233,7 +234,8 @@ static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *sca
     return result;
 }
 
-static void run_passes(const LibraryScanEntry *entry, const ScanJob *job, RescanOutcome *outcome)
+static void run_passes(const LibraryScanEntry *entry, const ScanJob *job, RescanOutcome *outcome,
+                       bool default_cover)
 {
     for (uint32_t slot = 0; slot < TIME_SLOTS * 2; slot++) {
         spent[slot] = 0;
@@ -245,13 +247,13 @@ static void run_passes(const LibraryScanEntry *entry, const ScanJob *job, Rescan
     if (outcome->result == SCAN_OK) {
         pass = 1;
         since = hal_clock_microseconds();
-        outcome->cover_result = build_covers(entry, job, &outcome->covers);
+        outcome->cover_result = build_covers(entry, job, &outcome->covers, default_cover);
         spend(TIME_TOTAL, since);
     }
     (void)hal_file_write(RESCAN_TIMES_PATH, spent, sizeof spent);
 }
 
-RescanOutcome library_rescan_run(RescanProgress progress)
+RescanOutcome library_rescan_run(RescanProgress progress, bool default_cover)
 {
     static RescanFiles files;
     RescanOutcome outcome = {.result = SCAN_NO_MUSIC_ROOT, .cover_result = SCAN_OK};
@@ -296,7 +298,7 @@ RescanOutcome library_rescan_run(RescanProgress progress)
         .capacity = capacity,
         .progress = {report, &files},
     };
-    run_passes(entry, &job, &outcome);
+    run_passes(entry, &job, &outcome, default_cover);
     hal_file_close(&files.scratch);
     hal_system_return_scratch();
     hal_input_drop_presses();

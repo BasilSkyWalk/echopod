@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "app/conf_file.h"
 #include "core/key_tracker.h"
 #include "cover_cache.h"
 #include "library/library.h"
@@ -61,6 +62,7 @@ typedef struct NowPlayingConfig {
     Screen *up_next;
     Screen *equalizer;
     const uint8_t *options;
+    const EchoConf *conf;
 } NowPlayingConfig;
 
 typedef struct NowPlayingLyrics {

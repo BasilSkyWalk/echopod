@@ -2,6 +2,7 @@
 
 #include "core/i18n.h"
 #include "core/resident.h"
+#include "core/string_builder.h"
 #include "default_theme.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -434,6 +435,23 @@ static ScreenAction request_rescan(void *context)
     return screen_action_none();
 }
 
+static ScreenAction show_conf_value(void *context)
+{
+    SettingsContext *settings = context;
+    static uint8_t conf_index;
+    conf_index = (uint8_t)((conf_index + 1) % CONF_COUNT);
+    ConfKey key = (ConfKey)conf_index;
+
+    static char text[23];
+    StringBuilder builder = string_builder_make(text, sizeof text);
+    string_builder_append(&builder, conf_key_name(key));
+    string_builder_append(&builder, "=");
+    string_builder_append_unsigned(&builder, settings->conf->values[key]);
+
+    toast_show(settings->toast, text, hal_clock_milliseconds());
+    return screen_action_none();
+}
+
 enum {
     CHOICE_SHUFFLE,
     CHOICE_REPEAT,
@@ -474,6 +492,7 @@ enum {
     ROW_DATE_TIME,
     ROW_FOLDERS,
     ROW_RESCAN,
+    ROW_CONF_FILE,
     ROW_GROUP
 };
 
@@ -495,6 +514,7 @@ ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
     {STR_SETTINGS_DATE_TIME, date_time_screen_open, date_time_screen_summary},
     {STR_SETTINGS_MUSIC_FOLDERS, folders_screen_open, folders_screen_summary},
     {STR_SETTINGS_RESCAN, request_rescan, NULL},
+    {STR_SETTINGS_CONF_FILE, show_conf_value, NULL},
 };
 
 ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
@@ -540,7 +560,8 @@ ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
                                              ROW_DATE_TIME,
                                              CHOICE_AUTO_OFF,
                                              CHOICE_USB_MODE,
-                                             CHOICE_USB_PROMPT};
+                                             CHOICE_USB_PROMPT,
+                                             ROW_CONF_FILE};
 
 enum {
     SOUND_ROWS = 5,
@@ -551,7 +572,7 @@ enum {
     BUTTONS_FIRST = LIBRARY_FIRST + LIBRARY_ROWS,
     BUTTONS_ROWS = 4,
     SYSTEM_FIRST = BUTTONS_FIRST + BUTTONS_ROWS,
-    SYSTEM_ROWS = 5
+    SYSTEM_ROWS = 6
 };
 
 ECHO_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
@@ -598,8 +619,12 @@ static MenuItem row_item(SettingsScreens *screens, int row)
                           .opens = true};
     }
     SettingsContext *settings = &screens->context;
-    void *contexts[] = {settings->bluetooth, settings->equalizer, settings->date_time,
-                        settings->folders, settings};
+    void *contexts[] = {settings->bluetooth,
+                        settings->equalizer,
+                        settings->date_time,
+                        settings->folders,
+                        settings,
+                        settings};
     const SettingsLink *link = &LINKS[row - ROW_BLUETOOTH];
     return (MenuItem){.label = i18n_text(link->label),
                       .select = link->select,

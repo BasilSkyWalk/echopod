@@ -542,7 +542,12 @@ static void update(void *context, uint32_t now_ms)
     refresh(now_playing, now_ms);
     follow_lyrics(now_playing, now_ms);
     if (now_playing->config.covers != NULL && now_playing->status.has_track) {
-        cover_cache_load_full(now_playing->config.covers, now_playing->album_index);
+        const EchoConf *conf = now_playing->config.conf;
+        if (conf != NULL && conf->values[CONF_DEFAULT_COVER] != 0) {
+            cover_cache_load_full_or_default(now_playing->config.covers, now_playing->album_index);
+        } else {
+            cover_cache_load_full(now_playing->config.covers, now_playing->album_index);
+        }
     }
 }
 
