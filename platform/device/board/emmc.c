@@ -354,7 +354,8 @@ bool emmc_start(EmmcInfo *info)
             }
         }
         BlockDevice device = emmc_device();
-        started = started && emmc_layout_read(&emmc.layout, &device, emmc.sector_count);
+        started =
+            started && emmc_layout_read(&emmc.layout, &device, emmc.sector_count, sd_nand_mode);
         emmc.sd_nand = sd_nand_mode;
     }
     *info = emmc;

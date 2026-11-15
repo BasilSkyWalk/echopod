@@ -18,7 +18,9 @@ enum {
     IMAGE_MAGIC_AT = 0x1F8,
     MAX_IMAGE_BYTES = 0x1000000,
     SECOND_SLOT_MARGIN = 0x4000,
-    SECOND_SLOT_TRIES = 20
+    SECOND_SLOT_TRIES = 20,
+    SMALL_SLOT_SECTORS = 0x10000,
+    SMALL_FIRMWARE_SECTORS = 0x20000
 };
 
 static uint32_t sector_words[2 * SECTOR_SIZE / 4] __attribute__((aligned(4)));
@@ -151,8 +153,25 @@ static void find_second_slot(EmmcLayout *layout, const BlockDevice *device)
     }
 }
 
-bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t total_sectors)
+bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t total_sectors,
+                      bool small_nand)
 {
+    uint32_t image_bytes = 0;
+    uint32_t image_sum = 0;
+    if (small_nand) {
+        *layout = (EmmcLayout){
+            .slot_1 = 0,
+            .slot_2 = SMALL_SLOT_SECTORS,
+            .slot_sectors = SMALL_SLOT_SECTORS,
+            .firmware_end = SMALL_FIRMWARE_SECTORS,
+            .slots_valid = read_image_header(device, 0, &image_bytes, &image_sum),
+        };
+        if (!find_volume(device, layout->firmware_end, total_sectors, &layout->volume_start)) {
+            return false;
+        }
+        layout->volume_sectors = total_sectors - layout->volume_start;
+        return true;
+    }
     uint32_t system_mib = 0;
     if (!read_system_mib(device, &system_mib)) {
         return false;
@@ -166,8 +185,6 @@ bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t to
         .slots_valid = false,
     };
     find_second_slot(layout, device);
-    uint32_t image_bytes = 0;
-    uint32_t image_sum = 0;
     layout->slots_valid = read_image_header(device, layout->slot_1, &image_bytes, &image_sum);
     if (!find_volume(device, layout->firmware_end, total_sectors, &layout->volume_start)) {
         return false;
