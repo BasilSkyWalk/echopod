@@ -466,7 +466,7 @@ export function faceDesign(face, consts, make) {
         make("shape", f(5, 3, 310, 140), f(4, 3, 162, 274), { kind: "rect", color: consts.GLASS, radius: 0, thickness: 2 }),
         make("playmark", f(12, 10, 9, 9), f(10, 10, 9, 9), { color: ink }),
         text(f(41, 7, 260, 16), f(40, 7, 120, 16), { source: "modes", size: "small", color: ink, scroll: false }),
-        text(f(12, 26, 60, 16), f(37, 58, 60, 16), { source: "custom", custom: "TRACK", size: "small", color: ink, scroll: false }),
+        text(f(12, 26, 60, 16), f(37, 58, 60, 16), { source: "custom", custom: "TRACK", size: "small", color: ink, scroll: false, tallAlign: "left" }),
         make("tracknumber", f(12, 42, 45, 24), f(85, 47, 45, 24), { colours: lit }),
         make("clock", f(68, 26, 134, 40), f(16, 79, 134, 40), { colours: lit }),
         make("levels", f(220, 28, 88, 38), f(14, 128, 142, 38), { colours: lit }),
