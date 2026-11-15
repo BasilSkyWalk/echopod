@@ -23,6 +23,9 @@ ECHO_NP_FACES_DATA static const ThemeColors TURNTABLE_CHROME =
 ECHO_NP_FACES_DATA static const ThemeColors LCD_CHROME =
     CHROME(COLOR_RGB(64, 64, 72), COLOR_RGB(24, 24, 32), COLOR_RGB(72, 72, 80),
            COLOR_RGB(176, 196, 104), COLOR_RGB(144, 168, 80), COLOR_RGB(32, 32, 40));
+ECHO_NP_FACES_DATA static const ThemeColors MINIMAL_CHROME =
+    CHROME(COLOR_RGB(46, 47, 54), COLOR_RGB(22, 23, 27), COLOR_RGB(48, 49, 56),
+           COLOR_RGB(242, 242, 245), COLOR_RGB(160, 160, 168), COLOR_RGB(0, 0, 0));
 
 ECHO_NP_FACES_CODE static void draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
@@ -39,6 +42,9 @@ ECHO_NP_FACES_CODE static void draw(const NowPlayingFrame *frame, Canvas *canvas
     case NP_FACE_LCD:
         face_lcd_draw(frame, canvas);
         break;
+    case NP_FACE_MINIMAL:
+        face_minimal_draw(frame, canvas);
+        break;
     default:
         break;
     }
@@ -50,5 +56,6 @@ ECHO_NP_FACES_ENTRY const NowPlayingFaces NOW_PLAYING_FACES = {
     .chrome = {[NP_FACE_CASSETTE] = &CASSETTE_CHROME,
                [NP_FACE_VU_METERS] = &VU_CHROME,
                [NP_FACE_TURNTABLE] = &TURNTABLE_CHROME,
-               [NP_FACE_LCD] = &LCD_CHROME},
+               [NP_FACE_LCD] = &LCD_CHROME,
+               [NP_FACE_MINIMAL] = &MINIMAL_CHROME},
 };

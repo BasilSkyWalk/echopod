@@ -472,10 +472,12 @@ endif()
 
 find_program(ARM_GCC arm-none-eabi-gcc)
 if(ARM_GCC)
+    get_filename_component(ARM_GCC_DIRECTORY ${ARM_GCC} DIRECTORY)
     add_test(NAME target_audit
         COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/target_audit.py
             --source-root ${PROJECT_SOURCE_DIR}/src
             --budget-bytes ${ECHO_APP_RAM_BUDGET_BYTES}
+            --toolchain-prefix ${ARM_GCC_DIRECTORY}/arm-none-eabi-
     )
     add_test(NAME device_build
         COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}

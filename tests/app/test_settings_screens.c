@@ -231,8 +231,8 @@ static void the_now_playing_row_follows_the_rows_the_theme_hides(void)
 
 static void the_now_playing_row_lists_every_face_and_shows_the_chosen_one(void)
 {
-    static const char *const NAMES[NP_FACE_COUNT] = {"Standard", "Cassette", "VU meters",
-                                                     "Turntable", "LCD deck"};
+    static const char *const NAMES[NP_FACE_COUNT] = {"Standard",  "Cassette", "VU meters",
+                                                     "Turntable", "LCD deck", "Minimal"};
     SettingsStore store;
     start_with_theme(&store, THEME_DARK);
     const MenuItem *row = &screens.rows[3];
