@@ -49,10 +49,10 @@ enum {
     EXT_CSD_SECTOR_COUNT = 212,
     MUX_SETTLE_US = 10,
     IDLE_SETTLE_US = 100,
-    EMMC_PROBE_TRIES = 10,
-    EMMC_PROBE_DELAY_MS = 20,
+    EMMC_PROBE_TRIES = 3,
+    EMMC_PROBE_DELAY_MS = 5,
     BLOCK_LENGTH = 512,
-    PROBE_32M_SECTOR = 0x20000,
+    PROBE_64M_SECTOR = 0x20000,
     PROBE_256M_SECTOR = 0x80000
 };
 
@@ -362,8 +362,8 @@ EmmcProbe emmc_probe(void)
         probe.lba0_0 = first[0];
         probe.lba0_1 = first[1];
     }
-    if (started && emmc_read(NULL, PROBE_32M_SECTOR, 1, first)) {
-        probe.head_32m = first[0];
+    if (started && emmc_read(NULL, PROBE_64M_SECTOR, 1, first)) {
+        probe.head_64m = first[0];
     }
     if (started && emmc_read(NULL, PROBE_256M_SECTOR, 1, first)) {
         probe.head_256m = first[0];

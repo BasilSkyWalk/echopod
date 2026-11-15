@@ -22,7 +22,7 @@ typedef struct EmmcProbe {
     uint32_t lba0_ok;
     uint32_t lba0_0;
     uint32_t lba0_1;
-    uint32_t head_32m;
+    uint32_t head_64m;
     uint32_t head_256m;
 } EmmcProbe;
 

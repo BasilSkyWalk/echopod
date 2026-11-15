@@ -85,10 +85,11 @@ __attribute__((used, noinline)) void device_start(void)
 
 __attribute__((naked, noreturn)) void device_reset(void)
 {
-    __asm__ volatile("ldr r0, =0x03004000\n\t"
+    __asm__ volatile("ldr r0, =%0\n\t"
                      "msr msp, r0\n\t"
                      "movs r0, #0\n\t"
                      "msr control, r0\n\t"
                      "isb\n\t"
-                     "b device_start");
+                     "b device_start" ::"i"(STACK_TOP)
+                     : "r0", "memory");
 }

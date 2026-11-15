@@ -210,6 +210,9 @@ set_target_properties(echo_device PROPERTIES
     SUFFIX .elf
     LINK_DEPENDS ${ECHO_DEVICE_LINKER_SCRIPT}
 )
+if(ECHO_RELEASE)
+    target_compile_definitions(echo_device PRIVATE ECHO_RELEASE=1)
+endif()
 set_source_files_properties(board/libc.c board/startup.c PROPERTIES
     COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns;-fno-lto"
 )
