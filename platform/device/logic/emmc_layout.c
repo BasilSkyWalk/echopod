@@ -60,25 +60,43 @@ static bool read_system_mib(const BlockDevice *device, uint32_t *system_mib)
     return false;
 }
 
+static bool is_fat_or_exfat(const uint8_t *sector)
+{
+    bool exfat = matches(sector + 3, "EXFAT   ", 8);
+    bool fat = (sector[0] == 0xEB || sector[0] == 0xE9) && le16(sector + 11) == SECTOR_SIZE;
+    return exfat || fat;
+}
+
 static bool is_volume_start(const uint8_t *sector)
 {
     if (le16(sector + SIGNATURE) != 0xAA55) {
         return false;
     }
+    if (is_fat_or_exfat(sector)) {
+        return true;
+    }
     const uint8_t *entry = sector + PARTITION_ENTRY;
-    bool exfat = matches(sector + 3, "EXFAT   ", 8);
-    bool fat = (sector[0] == 0xEB || sector[0] == 0xE9) && le16(sector + 11) == SECTOR_SIZE;
-    bool mbr = (entry[0] == 0x00 || entry[0] == 0x80) && entry[4] != 0 && le32(entry + 8) != 0;
-    return exfat || fat || mbr;
+    return (entry[0] == 0x00 || entry[0] == 0x80) && entry[4] != 0 && le32(entry + 8) != 0;
 }
 
 static bool find_volume(const BlockDevice *device, uint32_t first, uint32_t total, uint32_t *start)
 {
     uint32_t *words = sector_words;
     for (uint32_t lba = first; lba < SCAN_LIMIT && lba < total; lba += SECTORS_PER_MIB) {
-        if (device->read(device->context, lba, 1, words) &&
-            is_volume_start((const uint8_t *)words)) {
+        if (!device->read(device->context, lba, 1, words)) {
+            continue;
+        }
+        const uint8_t *bytes = (const uint8_t *)words;
+        if (!is_volume_start(bytes)) {
+            continue;
+        }
+        if (is_fat_or_exfat(bytes)) {
             *start = lba;
+            return true;
+        }
+        uint32_t partition = le32(bytes + PARTITION_ENTRY + 8);
+        if (partition != 0 && partition < total - lba) {
+            *start = lba + partition;
             return true;
         }
     }

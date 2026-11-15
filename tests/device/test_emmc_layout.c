@@ -40,6 +40,19 @@ static void write_save_block(FakeDisk *disk, uint32_t lba)
     memcpy(sector, "SAVE", 4);
 }
 
+static void write_mbr(FakeDisk *disk, uint32_t lba, uint32_t partition_start)
+{
+    uint8_t *mbr = fake_disk_sector(disk, lba);
+    mbr[0x1BE] = 0x00;
+    mbr[0x1C2] = 0x0C;
+    mbr[0x1C6] = (uint8_t)partition_start;
+    mbr[0x1C7] = (uint8_t)(partition_start >> 8);
+    mbr[0x1C8] = (uint8_t)(partition_start >> 16);
+    mbr[0x1C9] = (uint8_t)(partition_start >> 24);
+    mbr[510] = 0x55;
+    mbr[511] = 0xAA;
+}
+
 static void write_image_header(FakeDisk *disk, uint32_t lba);
 
 static bool read_layout(FakeDisk *disk, EmmcLayout *layout)
@@ -54,7 +67,8 @@ static void the_512_mb_layout_has_two_32_mib_slots_at_lba_0(void)
     fake_disk_init(&disk, SMALL_TOTAL_SECTORS);
     write_image_header(&disk, 0);
     write_image_header(&disk, 0x10000);
-    write_fat_boot_sector(&disk, 0x20000);
+    write_mbr(&disk, 0x20000, 0x40);
+    write_fat_boot_sector(&disk, 0x20040);
     EmmcLayout layout;
     BlockDevice device = fake_disk_device(&disk);
     CHECK(emmc_layout_read(&layout, &device, SMALL_TOTAL_SECTORS, true));
@@ -62,11 +76,12 @@ static void the_512_mb_layout_has_two_32_mib_slots_at_lba_0(void)
     CHECK_EQUAL(0x10000, layout.slot_2);
     CHECK_EQUAL(0x10000, layout.slot_sectors);
     CHECK_EQUAL(0x20000, layout.firmware_end);
-    CHECK_EQUAL(0x20000, layout.volume_start);
+    CHECK_EQUAL(0x20040, layout.volume_start);
     CHECK(layout.slots_valid);
     CHECK(emmc_layout_allows_write(&layout, 0, 1));
     CHECK(emmc_layout_allows_write(&layout, 0x10000, 1));
-    CHECK(emmc_layout_allows_write(&layout, 0x20000, 1));
+    CHECK(!emmc_layout_allows_write(&layout, 0x20000, 1));
+    CHECK(emmc_layout_allows_write(&layout, 0x20040, 1));
 }
 
 static void the_firmware_area_and_slots_follow_the_idb_system_size(void)
@@ -174,7 +189,7 @@ static void an_mbr_or_exfat_volume_is_also_accepted(void)
     mbr[511] = 0xAA;
     EmmcLayout layout;
     CHECK(read_layout(&disk, &layout));
-    CHECK_EQUAL(0x24800, layout.volume_start);
+    CHECK_EQUAL(0x2483F, layout.volume_start);
 
     fake_disk_init(&disk, TOTAL_SECTORS);
     write_idb(&disk, 0, RECHORD_SYSTEM_MIB);
