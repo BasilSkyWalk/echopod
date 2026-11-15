@@ -1,3 +1,5 @@
+import { PART_TYPES, dotLines, faceDesign, faceOf, isPart, partLines, partProps, partSize } from "./face_parts.js";
+
 export const AREAS = {
   wide: { top: 24, width: 320, height: 146 },
   tall: { top: 40, width: 170, height: 280 },
@@ -11,6 +13,7 @@ export const LAYER_TYPES = {
   shape: "Shape",
   playmark: "Play and pause mark",
   spinner: "Turning mark",
+  ...PART_TYPES,
 };
 
 export const HOME_LAYER_TYPES = {
@@ -21,6 +24,7 @@ export const HOME_LAYER_TYPES = {
   times: "Times",
   shape: "Shape",
   playmark: "Play and pause mark",
+  ...PART_TYPES,
 };
 
 export const TEXT_SOURCES = {
@@ -59,6 +63,42 @@ function frame(x, y, w, h) {
 
 function layer(type, wide, tall, props = {}) {
   return { id: nextId++, type, hidden: false, frames: { wide, tall }, ...props };
+}
+
+function defaultsOf(type, screen) {
+  if (isPart(type)) {
+    return partProps(type);
+  }
+  return {
+    menu: menuProps(),
+    cover: { shape: "square", border: 0, borderColor: "@divider", placeholder: "@divider", reflection: false },
+    text: { source: screen === "home" ? "item" : "song", custom: "Hello", size: "medium", align: "left", tallAlign: "center", color: "@text", scroll: true, feedback: false },
+    times: { size: "small", color: "@text_secondary", color2: "@text_tertiary" },
+    progress: { style: "bar", color: "@selection_background", track: "@divider", thickness: 3 },
+    shape: { kind: "rounded", color: "@header_background", radius: 8, thickness: 3 },
+    playmark: { color: "@text" },
+    spinner: { color: "@selection_shine", speed: 3, length: 4 },
+  }[type] ?? {};
+}
+
+export { PART_COLOURS } from "./face_parts.js";
+export { isPart, partSize };
+
+export function sizedFrame(item, box, shape = "wide") {
+  const fixed = partSize(item, shape);
+  return fixed && box ? { ...box, w: fixed.w, h: fixed.h } : box;
+}
+
+export function designFromScript(script, consts) {
+  const face = faceOf(script);
+  if (!face) {
+    return null;
+  }
+  return faceDesign(face, consts, (type, wide, tall, props) => {
+    const made = layer(type, wide, tall, { ...defaultsOf(type, "playing"), ...props });
+    made.frames = { wide: sizedFrame(made, wide, "wide"), tall: sizedFrame(made, tall, "tall") };
+    return made;
+  });
 }
 
 export function layerTypes(screen) {
@@ -128,16 +168,7 @@ export function readDesign(text) {
 export function newLayer(type, screen = "playing") {
   const wide = frame(110, 50, 100, 40);
   const tall = frame(35, 120, 100, 40);
-  const props = {
-    menu: menuProps(),
-    cover: { shape: "square", border: 0, borderColor: "@divider", placeholder: "@divider", reflection: false },
-    text: { source: screen === "home" ? "item" : "song", custom: "Hello", size: "medium", align: "left", tallAlign: "center", color: "@text", scroll: true, feedback: false },
-    times: { size: "small", color: "@text_secondary", color2: "@text_tertiary" },
-    progress: { style: "bar", color: "@selection_background", track: "@divider", thickness: 3 },
-    shape: { kind: "rounded", color: "@header_background", radius: 8, thickness: 3 },
-    playmark: { color: "@text" },
-    spinner: { color: "@selection_shine", speed: 3, length: 4 },
-  }[type];
+  const props = defaultsOf(type, screen);
   if (type === "text" || type === "times") {
     wide.h = tall.h = 20;
   }
@@ -154,7 +185,22 @@ export function newLayer(type, screen = "playing") {
     Object.assign(wide, frame(10, 10, 200, 120));
     Object.assign(tall, frame(10, 10, 150, 200));
   }
-  return layer(type, wide, tall, props);
+  if (type === "levels") {
+    Object.assign(wide, frame(110, 50, 88, 38));
+    Object.assign(tall, frame(14, 120, 142, 38));
+  }
+  const made = layer(type, wide, tall, props);
+  for (const [shape, area] of Object.entries(AREAS)) {
+    const fixed = partSize(made, shape);
+    if (fixed) {
+      const box = made.frames[shape];
+      box.w = fixed.w;
+      box.h = fixed.h;
+      box.x = Math.max(0, Math.round((area.width - fixed.w) / 2));
+      box.y = Math.max(0, Math.round((area.height - fixed.h) / 2));
+    }
+  }
+  return made;
 }
 
 export function colorOf(value, theme) {
@@ -168,18 +214,32 @@ function quoted(text) {
   return `"${String(text).replace(/[\\"]/g, (mark) => `\\${mark}`).replace(/\n/g, " ")}"`;
 }
 
-function at(item, shape) {
+function at(item, shape, shared = false) {
   const f = item.frames[shape];
-  return {
-    x: `x + ${Math.round(f.x)}`,
-    y: `y + ${Math.round(f.y)}`,
+  const common = {
     w: Math.max(1, Math.round(f.w)),
     h: Math.max(1, Math.round(f.h)),
+    r: Math.max(1, Math.floor(Math.min(f.w, f.h) / 2)),
+  };
+  if (shared) {
+    return {
+      ...common,
+      x: "at_x",
+      y: "at_y",
+      cx: `at_x + ${Math.round(f.w / 2)}`,
+      cy: `at_y + ${Math.round(f.h / 2)}`,
+      cx16: `at_x * 16 + ${Math.round(f.w) * 8}`,
+      cy16: `at_y * 16 + ${Math.round(f.h) * 8}`,
+    };
+  }
+  return {
+    ...common,
+    x: `x + ${Math.round(f.x)}`,
+    y: `y + ${Math.round(f.y)}`,
     cx: `x + ${Math.round(f.x + f.w / 2)}`,
     cy: `y + ${Math.round(f.y + f.h / 2)}`,
     cx16: `(x + ${Math.round(f.x)}) * 16 + ${Math.round(f.w) * 8}`,
     cy16: `(y + ${Math.round(f.y)}) * 16 + ${Math.round(f.h) * 8}`,
-    r: Math.max(1, Math.floor(Math.min(f.w, f.h) / 2)),
   };
 }
 
@@ -301,9 +361,12 @@ function coverLines(item, place, theme) {
     `    rect(${place.x}, ${place.y}, ${side}, ${side}, ${empty})`, `}`];
 }
 
-function layerLines(item, shape, theme) {
-  const place = at(item, shape);
+function layerLines(item, shape, theme, shared = false) {
+  const place = at(item, shape, shared);
   const color = colorOf(item.color, theme);
+  if (isPart(item.type)) {
+    return partLines(item, place, colorOf, theme, shape);
+  }
   switch (item.type) {
     case "menu":
       return menuLines(item, place, theme, shape);
@@ -319,6 +382,9 @@ function layerLines(item, shape, theme) {
         const length = Math.max(1, Math.round(item.thickness ?? 6));
         return [`let lit = progress(${RING_TICKS})`, `repeat tick_mark from 0 to ${RING_TICKS} {`,
           `    spoke(${place.cx}, ${place.cy}, tick_mark * 16 / 3, 32, ${Math.max(0, place.r - length)}, ${place.r}, tick_mark < lit ? ${color} : ${track})`, `}`];
+      }
+      if (item.style === "dots") {
+        return dotLines(place, color, track);
       }
       return [`bar(${place.x}, ${place.y}, ${place.w}, ${place.h}, ${track}, ${color}, ${color})`];
     }
@@ -361,11 +427,44 @@ function backgroundLines(design, theme) {
   return [`rect(x, y, width, height, ${colorOf(background.color, theme)})`];
 }
 
+function indented(lines) {
+  return lines.map((line) => `    ${line}`);
+}
+
+function sharedLines(item, theme) {
+  const { wide, tall } = item.frames;
+  if (!wide || !tall || Math.round(wide.w) !== Math.round(tall.w) || Math.round(wide.h) !== Math.round(tall.h)) {
+    return null;
+  }
+  const sideways = layerLines(item, "wide", theme, true);
+  const upright = layerLines(item, "tall", theme, true);
+  if (sideways.join("\n") !== upright.join("\n")) {
+    return null;
+  }
+  return [
+    `let at_x = width > height ? x + ${Math.round(wide.x)} : x + ${Math.round(tall.x)}`,
+    `let at_y = width > height ? y + ${Math.round(wide.y)} : y + ${Math.round(tall.y)}`,
+    ...sideways,
+  ];
+}
+
+function itemLines(item, theme) {
+  const shared = sharedLines(item, theme);
+  if (shared) {
+    return shared;
+  }
+  const { wide, tall } = item.frames;
+  if (wide && tall) {
+    return ["if width > height {", ...indented(layerLines(item, "wide", theme)), "} else {",
+      ...indented(layerLines(item, "tall", theme)), "}"];
+  }
+  const [shape, test] = wide ? ["wide", "width > height"] : ["tall", "width <= height"];
+  return [`if ${test} {`, ...indented(layerLines(item, shape, theme)), "}"];
+}
+
 export function designScript(design, theme) {
-  const side = (shape) => design.layers
-    .filter((item) => !item.hidden && item.frames?.[shape])
-    .flatMap((item) => ["{", ...layerLines(item, shape, theme).map((line) => `    ${line}`), "}"]);
-  const blocks = (lines) => lines.map((line) => `    ${line}`);
-  return [...backgroundLines(design, theme), "if width > height {", ...blocks(side("wide")), "} else {",
-    ...blocks(side("tall")), "}", ""].join("\n").replace(/^(\s*)\{$/gm, "$1if 1 {");
+  const body = design.layers
+    .filter((item) => !item.hidden && (item.frames?.wide || item.frames?.tall))
+    .flatMap((item) => ["{", ...indented(itemLines(item, theme)), "}"]);
+  return [...backgroundLines(design, theme), ...body, ""].join("\n").replace(/^(\s*)\{$/gm, "$1if 1 {");
 }

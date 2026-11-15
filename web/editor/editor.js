@@ -3,6 +3,11 @@ import { buildFonts } from "./font_editor.js";
 import { buildIcons } from "./icon_editor.js";
 import {
   AREAS,
+  PART_COLOURS,
+  designFromScript,
+  isPart,
+  partSize,
+  sizedFrame,
   BACKGROUNDS,
   MENU_STYLES,
   colorOf,
@@ -756,8 +761,27 @@ function moveLayer(index, step) {
   changed({ rebuild: true });
 }
 
+function missingField(item) {
+  const other = shape() === "wide" ? "tall" : "wide";
+  const here = shape() === "wide" ? "sideways" : "upright";
+  return el("div", { class: "field stack" },
+    el("span", {}, `Not on the ${here} screen`),
+    el("button", { type: "button", onclick: () => {
+      const area = AREAS[shape()];
+      const source = item.frames[other] ?? { x: 0, y: 0, w: 60, h: 30 };
+      const w = Math.min(source.w, area.width);
+      const h = Math.min(source.h, area.height);
+      item.frames[shape()] = sizedFrame(item, { x: Math.round((area.width - w) / 2), y: Math.round((area.height - h) / 2), w, h }, shape());
+      changed({ rebuild: true });
+    } }, `Show it on the ${here} screen too`));
+}
+
 function placeField(item) {
   const box = item.frames[shape()];
+  if (!box) {
+    return missingField(item);
+  }
+  const fixed = partSize(item, shape());
   const number = (key, label) => {
     const input = el("input", { type: "number", value: Math.round(box[key]), style: "width:58px" });
     input.addEventListener("change", () => {
@@ -766,9 +790,42 @@ function placeField(item) {
     });
     return el("span", { class: "color-control" }, label, input);
   };
+  if (fixed) {
+    return el("div", { class: "field stack" }, el("span", {}, "Place", el("small", {}, "This part keeps its own size")),
+      el("span", { class: "color-control" }, number("x", "Left"), number("y", "Top")));
+  }
   return el("div", { class: "field stack" }, el("span", {}, "Place and size"),
     el("span", { class: "color-control" }, number("x", "Left"), number("y", "Top")),
     el("span", { class: "color-control" }, number("w", "Width"), number("h", "Height")));
+}
+
+function partFields(item, set, setAndShow) {
+  const fields = [];
+  if (item.type === "vu") {
+    const needles = [["left", "Left"], ["right", "Right"], ["both", "Both"]];
+    const key = shape() === "tall" ? "tallChannel" : "channel";
+    fields.push(field("Needle", chips(needles, item[key] ?? item.channel ?? "left", setAndShow(key)), "Both puts left and right on one meter"));
+  }
+  if (item.type === "cassette") {
+    const key = shape() === "tall" ? "tallSize" : "size";
+    const current = shape() === "tall" ? item.tallSize ?? item.size ?? "small" : item.size ?? "large";
+    fields.push(field("Size", chips([["large", "Large"], ["small", "Small"]], current, (size) => {
+      item[key] = size;
+      item.frames[shape()] = sizedFrame(item, item.frames[shape()], shape());
+      changed({ rebuild: true });
+    }), shape() === "tall" ? "Large is wider than the upright screen" : null));
+    if (current === "large") {
+      fields.push(field("Song on the label", toggle(item.writing !== false, setAndShow("writing"))));
+    }
+  }
+  item.colours ??= {};
+  for (const [key, label, value] of PART_COLOURS[item.type]) {
+    fields.push(field(label, choiceColour(item.colours[key] ?? value, (picked) => {
+      item.colours[key] = picked;
+      changed();
+    })));
+  }
+  return fields;
 }
 
 function layerFields(item) {
@@ -782,7 +839,9 @@ function layerFields(item) {
   };
   const fields = [];
   const home = designScreen() === "home";
-  if (item.type === "menu") {
+  if (isPart(item.type)) {
+    fields.push(...partFields(item, set, setAndShow));
+  } else if (item.type === "menu") {
     fields.push(...menuFields(item, set, setAndShow));
   } else if (item.type === "cover") {
     fields.push(field("Shape", chips([["square", "Square"], ["circle", "Round"]], item.shape, setAndShow("shape"))));
@@ -822,7 +881,7 @@ function layerFields(item) {
     fields.push(field("Time played", choiceColour(item.color, set("color"))));
     fields.push(field("Time left", choiceColour(item.color2, set("color2"))));
   } else if (item.type === "progress") {
-    fields.push(field("Style", chips([["bar", "Bar"], ["ring", "Ring of lights"]], item.style, setAndShow("style"))));
+    fields.push(field("Style", chips([["bar", "Bar"], ["dots", "Dots"], ["ring", "Ring of lights"]], item.style, setAndShow("style"))));
     if (item.style === "ring") {
       fields.push(field("Light length", range(item.thickness ?? 6, 1, 20, set("thickness"))));
     }
@@ -906,7 +965,7 @@ function setMode(mode) {
   if (handWritten(step)) {
     state.stash[step] = state.theme[key];
   }
-  state.designs[step] = mode === "design" ? state.designs[step] ?? defaultDesign(screen) : null;
+  state.designs[step] = mode === "design" ? state.designs[step] ?? designFrom(step) ?? defaultDesign(screen) : null;
   if (mode === "standard") {
     state.theme[key] = null;
   } else if (mode === "script") {
@@ -915,6 +974,15 @@ function setMode(mode) {
   state.picked = null;
   changed({ rebuild: true });
   restart();
+}
+
+function designFrom(step) {
+  const script = state.stash[step]?.script;
+  if (typeof script !== "string") {
+    return null;
+  }
+  const consts = Object.fromEntries(scriptColours(script).map(({ name, value }) => [name, value]));
+  return designFromScript(script, consts);
 }
 
 function scriptColours(script) {
@@ -967,12 +1035,15 @@ function copyOtherSide() {
   const down = (b.height - a.height * scale) / 2;
   for (const item of currentDesign().layers) {
     const box = item.frames[from];
-    item.frames[shape()] = {
+    if (!box) {
+      continue;
+    }
+    item.frames[shape()] = sizedFrame(item, {
       x: Math.round(box.x * scale + across),
       y: Math.round(box.y * scale + down),
       w: Math.max(1, Math.round(box.w * scale)),
       h: Math.max(1, Math.round(box.h * scale)),
-    };
+    }, shape());
   }
   changed({ rebuild: true });
 }
@@ -1183,7 +1254,7 @@ function drawOverlay() {
     pen.lineWidth = picked ? 1.5 : 1;
     pen.strokeStyle = picked ? "#ffffff" : "rgba(255, 255, 255, 0.35)";
     pen.strokeRect(box.x * zoom + 0.5, box.y * zoom + 0.5, box.w * zoom - 1, box.h * zoom - 1);
-    if (picked) {
+    if (picked && !partSize(item, shape())) {
       pen.setLineDash([]);
       const hx = (box.x + box.w) * zoom - HANDLE / 2;
       const hy = (box.y + box.h) * zoom - HANDLE / 2;
@@ -1216,6 +1287,9 @@ function layerAt(point) {
 }
 
 function nearHandle(item, point) {
+  if (partSize(item, shape()) || !item.frames[shape()]) {
+    return false;
+  }
   const box = areaBox(item);
   const reach = HANDLE / state.zoom + 1;
   return Math.abs(point.x - (box.x + box.w)) <= reach && Math.abs(point.y - (box.y + box.h)) <= reach;
@@ -1365,6 +1439,9 @@ function nudge(event) {
   const [dx, dy] = steps[event.key];
   const scale = event.shiftKey ? 10 : 1;
   const box = item.frames[shape()];
+  if (!box) {
+    return false;
+  }
   box.x += dx * scale;
   box.y += dy * scale;
   event.preventDefault();

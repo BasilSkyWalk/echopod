@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from "./icon_editor.js";
 import { coveredCodes } from "./font_editor.js";
-import { defaultDesign, designScript, newLayer, readDesign, LAYER_TYPES } from "./now_playing_designer.js";
+import { defaultDesign, designFromScript, designScript, isPart, newLayer, readDesign, LAYER_TYPES } from "./now_playing_designer.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
 import {
@@ -93,6 +93,28 @@ for (const style of ["list", "tiles", "focus"]) {
   assert.deepEqual(Array.from(pack(reopened, schema)), Array.from(homeBytes));
   assert.match(toToml(homeTheme, schema), /\[home_scene\]/);
 }
+for (const face of ["vu", "cassette", "turntable", "lcd"]) {
+  const worn = unpack(new Uint8Array(readFileSync(join(site, "themes", `${face}.echotheme`))), schema);
+  const script = worn.now_playing_scene.script;
+  const consts = Object.fromEntries([...script.matchAll(/^const ([A-Z][A-Z0-9_]*) = (#[0-9a-fA-F]{6})/gm)].map((found) => [found[1], found[2]]));
+  const design = designFromScript(script, consts);
+  assert.ok(design && design.layers.length > 5, `${face} becomes a design`);
+  worn.now_playing_scene = { script: designScript(design, worn), chrome: worn.now_playing_scene.chrome, design: JSON.stringify(design) };
+  const repacked = pack(worn, schema);
+  assert.deepEqual(Array.from(pack(unpack(repacked, schema), schema)), Array.from(repacked), `${face} design repacks`);
+}
+assert.equal(designFromScript(["const SPACE = #000000", "rect(x, y, 1, 1, SPACE)"].join(String.fromCharCode(10)), { SPACE: "#000000" }), null);
+for (const type of Object.keys(LAYER_TYPES)) {
+  const design = { version: 1, background: { style: "solid", color: "@background" }, layers: [newLayer(type, "playing")] };
+  compileScene(designScript(design, homeTheme), schema.scene);
+}
+const meter = newLayer("vu", "playing");
+const meterOnce = designScript({ version: 1, background: { style: "solid", color: "@background" }, layers: [meter] }, homeTheme);
+assert.equal(meterOnce.match(/rounded\(ox, oy, 146, 72/g).length, 1, "a part placed alike both ways is written once");
+assert.match(meterOnce, /let at_x = width > height \? x \+ \d+ : x \+ \d+/);
+meter.tallChannel = "both";
+const meterTwice = designScript({ version: 1, background: { style: "solid", color: "@background" }, layers: [meter] }, homeTheme);
+assert.equal(meterTwice.match(/rounded\(ox, oy, 146, 72/g).length, 2, "a part drawn differently each way is written twice");
 const coverOnly = defaultDesign("home");
 assert.match(designScript(coverOnly, homeTheme), /reflect\(x \+ 192, y \+ 8, 112, 26\)/);
 
@@ -335,7 +357,7 @@ assert.throws(() => pack(broken, schema), /Now Playing scene: line 1: rect\(\) t
 assert.equal(unpack(pack({ ...tape, now_playing_scene: null }, schema), schema).now_playing_scene, null);
 
 const designed = defaultDesign();
-for (const type of Object.keys(LAYER_TYPES)) {
+for (const type of Object.keys(LAYER_TYPES).filter((name) => !isPart(name))) {
   designed.layers.push(newLayer(type));
 }
 designed.layers.push({ ...newLayer("progress"), style: "ring" }, { ...newLayer("cover"), shape: "circle", border: 2 });
