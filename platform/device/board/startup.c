@@ -14,6 +14,7 @@ extern uint32_t device_bss_start;
 extern uint32_t device_bss_end;
 
 void device_reset(void);
+void device_start(void);
 void device_default_handler(void);
 
 __attribute__((section(".entry_vector"), used)) static const Handler ENTRY_VECTOR[2] = {
@@ -72,7 +73,7 @@ static void use_code_vectors(void)
     __asm__ volatile("dsb\n\tisb" ::: "memory");
 }
 
-void device_reset(void)
+__attribute__((used, noinline)) void device_start(void)
 {
     quiet_interrupts();
     zero_bss();
@@ -80,4 +81,14 @@ void device_reset(void)
     board_main();
     for (;;) {
     }
+}
+
+__attribute__((naked, noreturn)) void device_reset(void)
+{
+    __asm__ volatile("ldr r0, =0x03004000\n\t"
+                     "msr msp, r0\n\t"
+                     "movs r0, #0\n\t"
+                     "msr control, r0\n\t"
+                     "isb\n\t"
+                     "b device_start");
 }
