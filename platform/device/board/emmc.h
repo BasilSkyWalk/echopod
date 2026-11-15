@@ -10,6 +10,7 @@ typedef struct EmmcInfo {
     uint32_t sector_count;
     uint32_t serial;
     EmmcLayout layout;
+    bool sd_nand;
 } EmmcInfo;
 
 bool emmc_start(EmmcInfo *info);

@@ -28,6 +28,11 @@ typedef enum UpdateCheck {
     UPDATE_STOCK
 } UpdateCheck;
 
+typedef enum UpdateModel {
+    UPDATE_MODEL_8GB,
+    UPDATE_MODEL_512MB
+} UpdateModel;
+
 typedef struct UpdateFile {
     bool (*read)(void *context, uint32_t offset, void *buffer, uint32_t length);
     uint32_t size;
@@ -41,6 +46,7 @@ typedef struct UpdateStorage {
     uint32_t slot_1;
     uint32_t slot_2;
     uint32_t slot_sectors;
+    UpdateModel model;
 } UpdateStorage;
 
 typedef struct UpdateProgress {

@@ -5,6 +5,8 @@
 #include "board.h"
 #include "cru.h"
 #include "device/card_write.h"
+#include "device/sd_card.h"
+#include "hal/clock.h"
 #include "mmc.h"
 #include "registers.h"
 
@@ -47,6 +49,8 @@ enum {
     EXT_CSD_SECTOR_COUNT = 212,
     MUX_SETTLE_US = 10,
     IDLE_SETTLE_US = 100,
+    EMMC_PROBE_TRIES = 10,
+    EMMC_PROBE_DELAY_MS = 20,
     BLOCK_LENGTH = 512
 };
 
@@ -55,10 +59,82 @@ static const MmcHost EMMC_HOST = {EMMC_BASE, CRU_EMMC_IDENTIFY, CRU_EMMC_TRANSFE
                                   &emmc_fifo_depth};
 static EmmcInfo emmc;
 static bool started;
+static bool sd_nand_mode;
+static SdCard sd_nand_card;
 
 static bool command(uint8_t index, uint32_t argument, SdResponse response, uint32_t words[4])
 {
     return mmc_command(&EMMC_HOST, (SdCommand){index, argument, response, false}, words);
+}
+
+static bool nand_command(void *context, SdCommand command, uint32_t response[4])
+{
+    (void)context;
+    return mmc_command(&EMMC_HOST, command, response);
+}
+
+static void nand_set_clock(void *context, SdClock clock)
+{
+    (void)context;
+    mmc_set_clock(&EMMC_HOST, clock);
+}
+
+static void nand_set_bus_width(void *context, uint8_t bits)
+{
+    (void)context;
+    mmc_set_bus_width(&EMMC_HOST, bits);
+}
+
+static void nand_delay_ms(void *context, uint32_t milliseconds)
+{
+    (void)context;
+    board_delay_ms(milliseconds);
+}
+
+static bool nand_card_present(void *context)
+{
+    (void)context;
+    return true;
+}
+
+static void nand_stop(void *context)
+{
+    (void)context;
+    mmc_stop_clock(&EMMC_HOST);
+}
+
+static uint32_t nand_now_ms(void *context)
+{
+    (void)context;
+    return hal_clock_milliseconds();
+}
+
+static const SdHost NAND_HOST = {
+    nand_command,      nand_set_clock, nand_set_bus_width, nand_delay_ms,
+    nand_card_present, nand_stop,      nand_now_ms,        NULL};
+
+static bool emmc_answers(void)
+{
+    uint32_t words[4] = {0, 0, 0, 0};
+    uint32_t none[4] = {0, 0, 0, 0};
+    mmc_command(&EMMC_HOST, (SdCommand){CMD_GO_IDLE, 0, SD_RESPONSE_NONE, true}, none);
+    board_delay_us(IDLE_SETTLE_US);
+    for (int attempt = 0; attempt < EMMC_PROBE_TRIES; attempt++) {
+        if (command(CMD_SEND_OP_COND, OCR_ARGUMENT, SD_RESPONSE_SHORT_NO_CRC, words)) {
+            return true;
+        }
+        board_delay_ms(EMMC_PROBE_DELAY_MS);
+    }
+    return false;
+}
+
+static bool sd_nand_start(void)
+{
+    mmc_reset_controller(&EMMC_HOST);
+    mmc_power_cycle(&EMMC_HOST);
+    board_delay_ms(10);
+    mmc_set_clock(&EMMC_HOST, SD_CLOCK_IDENTIFY);
+    return sd_card_init(&sd_nand_card, &NAND_HOST);
 }
 
 static void power_controller(void)
@@ -151,8 +227,11 @@ bool emmc_read(void *context, uint32_t lba, uint32_t count, void *buffer)
     (void)context;
     uint32_t *words = buffer;
     for (uint32_t index = 0; index < count; index++) {
-        if (!started || lba >= emmc.sector_count || index >= emmc.sector_count - lba ||
-            !mmc_read_block(&EMMC_HOST, CMD_READ_SINGLE_BLOCK, lba + index,
+        if (!started || lba >= emmc.sector_count || index >= emmc.sector_count - lba) {
+            return false;
+        }
+        uint32_t address = sd_nand_mode ? sd_card_address(&sd_nand_card, lba + index) : lba + index;
+        if (!mmc_read_block(&EMMC_HOST, CMD_READ_SINGLE_BLOCK, address,
                             words + index * (BLOCK_LENGTH / 4))) {
             return false;
         }
@@ -185,13 +264,40 @@ static bool wait_until_ready(void *context)
 
 static const CardWriter WRITER = {write_data, stop_writing, wait_until_ready, NULL};
 
+static bool nand_write_data(void *context, uint8_t command, uint32_t address, uint32_t count,
+                            const uint32_t *words)
+{
+    (void)context;
+    return mmc_write_blocks(&EMMC_HOST, command, sd_card_address(&sd_nand_card, address), count,
+                            words);
+}
+
+static bool nand_stop_writing(void *context)
+{
+    (void)context;
+    return mmc_stop(&EMMC_HOST, sd_card_rca_argument(&sd_nand_card));
+}
+
+static bool nand_wait_until_ready(void *context)
+{
+    (void)context;
+    if (sd_card_wait_transfer(&NAND_HOST, &sd_nand_card)) {
+        return true;
+    }
+    mmc_note_failure(&EMMC_HOST, MMC_STEP_TRANSFER_STATE);
+    return false;
+}
+
+static const CardWriter SD_WRITER = {nand_write_data, nand_stop_writing, nand_wait_until_ready,
+                                     NULL};
+
 bool emmc_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
 {
     (void)context;
     if (!started || !emmc_layout_allows_write(&emmc.layout, lba, count)) {
         return false;
     }
-    return card_write(&WRITER, lba, count, buffer);
+    return card_write(sd_nand_mode ? &SD_WRITER : &WRITER, lba, count, buffer);
 }
 
 uint32_t emmc_fifo_depth_words(void)
@@ -224,7 +330,8 @@ bool emmc_volume_write(void *context, uint32_t lba, uint32_t count, const void *
 bool emmc_status(uint32_t *status)
 {
     uint32_t words[4] = {0, 0, 0, 0};
-    if (!started || !command(CMD_SEND_STATUS, RCA_ARGUMENT, SD_RESPONSE_SHORT, words)) {
+    uint32_t rca = sd_nand_mode ? sd_card_rca_argument(&sd_nand_card) : RCA_ARGUMENT;
+    if (!started || !command(CMD_SEND_STATUS, rca, SD_RESPONSE_SHORT, words)) {
         return false;
     }
     *status = words[0];
@@ -234,10 +341,21 @@ bool emmc_status(uint32_t *status)
 bool emmc_start(EmmcInfo *info)
 {
     if (!started) {
+        sd_nand_mode = false;
         power_controller();
-        started = identify() && select_and_widen();
+        if (emmc_answers()) {
+            started = identify() && select_and_widen();
+        } else {
+            sd_nand_mode = sd_nand_start();
+            started = sd_nand_mode;
+            if (sd_nand_mode) {
+                emmc.serial = 0;
+                emmc.sector_count = sd_nand_card.sector_count;
+            }
+        }
         BlockDevice device = emmc_device();
         started = started && emmc_layout_read(&emmc.layout, &device, emmc.sector_count);
+        emmc.sd_nand = sd_nand_mode;
     }
     *info = emmc;
     return started;

@@ -21,6 +21,8 @@ enum {
     SECOND_SLOT_TRIES = 20
 };
 
+static uint32_t sector_words[2 * SECTOR_SIZE / 4] __attribute__((aligned(4)));
+
 static uint32_t le16(const uint8_t *bytes)
 {
     return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8;
@@ -43,7 +45,7 @@ static bool matches(const uint8_t *bytes, const char *text, int length)
 
 static bool read_system_mib(const BlockDevice *device, uint32_t *system_mib)
 {
-    static uint32_t words[2 * SECTOR_SIZE / 4];
+    uint32_t *words = sector_words;
     const uint8_t *bytes = (const uint8_t *)words;
     for (uint32_t copy = 0; copy < IDB_COPIES; copy++) {
         uint32_t lba = IDB_FIRST + copy * IDB_STRIDE;
@@ -70,7 +72,7 @@ static bool is_volume_start(const uint8_t *sector)
 
 static bool find_volume(const BlockDevice *device, uint32_t first, uint32_t total, uint32_t *start)
 {
-    static uint32_t words[SECTOR_SIZE / 4];
+    uint32_t *words = sector_words;
     for (uint32_t lba = first; lba < SCAN_LIMIT && lba < total; lba += SECTORS_PER_MIB) {
         if (device->read(device->context, lba, 1, words) &&
             is_volume_start((const uint8_t *)words)) {
@@ -88,15 +90,16 @@ static bool inside(uint32_t start, uint32_t length, uint32_t lba, uint32_t count
 
 bool emmc_layout_allows_write(const EmmcLayout *layout, uint32_t lba, uint32_t count)
 {
+    bool slot = inside(layout->slot_1, layout->slot_sectors, lba, count) ||
+                inside(layout->slot_2, layout->slot_sectors, lba, count);
     return count > 0 && (inside(layout->volume_start, layout->volume_sectors, lba, count) ||
-                         inside(layout->slot_1, layout->slot_sectors, lba, count) ||
-                         inside(layout->slot_2, layout->slot_sectors, lba, count));
+                         (layout->slots_valid && slot));
 }
 
 static bool read_image_header(const BlockDevice *device, uint32_t lba, uint32_t *image_bytes,
                               uint32_t *sum)
 {
-    static uint32_t words[SECTOR_SIZE / 4];
+    uint32_t *words = sector_words;
     const uint8_t *bytes = (const uint8_t *)words;
     if (!device->read(device->context, lba, 1, words) ||
         !matches(bytes + IMAGE_MAGIC_AT, "RKnanoFW", 8)) {
@@ -160,8 +163,12 @@ bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t to
         .slot_2 = FIRMWARE_START + firmware_sectors / 2,
         .slot_sectors = firmware_sectors / 2,
         .firmware_end = FIRMWARE_START + firmware_sectors,
+        .slots_valid = false,
     };
     find_second_slot(layout, device);
+    uint32_t image_bytes = 0;
+    uint32_t image_sum = 0;
+    layout->slots_valid = read_image_header(device, layout->slot_1, &image_bytes, &image_sum);
     if (!find_volume(device, layout->firmware_end, total_sectors, &layout->volume_start)) {
         return false;
     }

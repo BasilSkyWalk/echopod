@@ -327,7 +327,9 @@ add_custom_target(echo_device_image ALL
         --output ${ECHO_DEVICE_IMAGE}
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
         --build ${CMAKE_BINARY_DIR} --summary --nm ${CMAKE_NM}
-    BYPRODUCTS ${ECHO_DEVICE_IMAGE}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ECHO_DEVICE_IMAGE}
+        ${CMAKE_BINARY_DIR}/MINIV898.IMG
+    BYPRODUCTS ${ECHO_DEVICE_IMAGE} ${CMAKE_BINARY_DIR}/MINIV898.IMG
     DEPENDS echo_device echo_rescan_overlay echo_usb_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
         ${ECHO_CORE1_AAC_BINARY} ${ECHO_CORE1_OPUS_BINARY}
         ${PROJECT_SOURCE_DIR}/tools/make_image.py

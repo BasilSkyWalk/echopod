@@ -214,7 +214,8 @@ static EmmcLayout rechord_layout(void)
                         .slot_sectors = 0x11000,
                         .firmware_end = 0x24000,
                         .volume_start = 0x88000,
-                        .volume_sectors = TOTAL_SECTORS - 0x88000};
+                        .volume_sectors = TOTAL_SECTORS - 0x88000,
+                        .slots_valid = true};
 }
 
 static void writes_inside_the_user_volume_are_allowed(void)
@@ -241,6 +242,15 @@ static void writes_to_the_idb_the_save_block_or_the_gap_are_refused(void)
     CHECK(!emmc_layout_allows_write(&layout, 0x24000, 1));
     CHECK(!emmc_layout_allows_write(&layout, 0x87FFF, 2));
     CHECK(!emmc_layout_allows_write(&layout, 0x88000, 0));
+}
+
+static void slot_writes_need_a_valid_slot_1_header(void)
+{
+    EmmcLayout layout = rechord_layout();
+    layout.slots_valid = false;
+    CHECK(!emmc_layout_allows_write(&layout, 0x2000, 16));
+    CHECK(!emmc_layout_allows_write(&layout, 0x13000, 16));
+    CHECK(emmc_layout_allows_write(&layout, 0x88000, 8));
 }
 
 static void a_corrupt_system_size_is_rejected(void)
@@ -303,6 +313,7 @@ int main(void)
         TEST_CASE(writes_inside_the_user_volume_are_allowed),
         TEST_CASE(writes_inside_one_firmware_slot_are_allowed),
         TEST_CASE(writes_to_the_idb_the_save_block_or_the_gap_are_refused),
+        TEST_CASE(slot_writes_need_a_valid_slot_1_header),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
