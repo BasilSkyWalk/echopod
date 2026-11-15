@@ -24,6 +24,9 @@ enum {
     STOCK_SLOT_SECTORS = STOCK_FW_END / 512 + 16,
     STOCK_SLOT_2 = SLOT_1 + STOCK_SLOT_SECTORS,
     STORAGE_SECTORS = STOCK_SLOT_2 + STOCK_SLOT_SECTORS,
+    SMALL_SLOT_SECTORS = 30 * 2048,
+    SMALL_SLOT_2 = SLOT_1 + SMALL_SLOT_SECTORS,
+    SMALL_AREA_SECTORS = 2 * SMALL_SLOT_SECTORS,
     PAYLOAD_END = 0x5000,
     CODE_OFFSET = 0xD68,
     CODE_SIZE = PAYLOAD_END - CODE_OFFSET - 8,
@@ -55,6 +58,7 @@ static FakeStorage storage;
 static FakeFile file;
 static int progress_reports;
 static uint32_t last_done;
+static uint32_t last_total;
 static bool progress_went_backwards;
 
 static void put_le32(uint8_t *bytes, uint32_t value)
@@ -149,15 +153,16 @@ static bool file_read(void *context, uint32_t offset, void *buffer, uint32_t len
 static void report(void *context, uint32_t done, uint32_t total)
 {
     (void)context;
-    (void)total;
     progress_went_backwards = progress_went_backwards || done < last_done;
     last_done = done;
+    last_total = total;
     progress_reports++;
 }
 
 static UpdateStorage target(void)
 {
-    return (UpdateStorage){storage_read, storage_write, NULL, SLOT_1, SLOT_2, SLOT_SECTORS};
+    return (UpdateStorage){storage_read, storage_write,   NULL, SLOT_1, SLOT_2,
+                           SLOT_SECTORS, 2 * SLOT_SECTORS};
 }
 
 static UpdateFile source(void)
@@ -183,6 +188,7 @@ static void reset(uint8_t *image, uint32_t size)
     file = (FakeFile){image, size};
     progress_reports = 0;
     last_done = 0;
+    last_total = 0;
     progress_went_backwards = false;
 }
 
@@ -406,8 +412,8 @@ static uint8_t *stock_image(uint8_t seed)
 
 static UpdateStorage stock_target(void)
 {
-    return (UpdateStorage){storage_read, storage_write, NULL,
-                           SLOT_1,       STOCK_SLOT_2,  STOCK_SLOT_SECTORS};
+    return (UpdateStorage){storage_read,       storage_write,         NULL, SLOT_1, STOCK_SLOT_2,
+                           STOCK_SLOT_SECTORS, 2 * STOCK_SLOT_SECTORS};
 }
 
 static UpdateCheck check_stock(uint8_t *image, uint32_t size, uint32_t slot_sectors)
@@ -478,13 +484,6 @@ static void damaged_or_other_model_stock_images_are_invalid(void)
                 check_stock(stock_image(1), STOCK_IMAGE_SIZE - 4, STOCK_SLOT_SECTORS));
 }
 
-static void a_stock_image_needs_a_slot_it_fits(void)
-{
-    CHECK_EQUAL(UPDATE_INVALID,
-                check_stock(stock_image(1), STOCK_IMAGE_SIZE, STOCK_FW_END / 512 - 1));
-    CHECK_EQUAL(UPDATE_REFUSED_ROOM, updater_refusal());
-}
-
 static void a_refused_image_says_why(void)
 {
     uint8_t *image = stock_image(1);
@@ -512,6 +511,83 @@ static void installing_a_stock_image_fills_both_slots_slot_2_first(void)
     CHECK(progress_reports > 0);
     CHECK(!progress_went_backwards);
     CHECK_EQUAL(2u * (STOCK_FW_END / (CHUNK_SECTORS * 512)), last_done);
+}
+
+static UpdateStorage small_slot_target(void)
+{
+    return (UpdateStorage){storage_read,       storage_write,     NULL, SLOT_1, SMALL_SLOT_2,
+                           SMALL_SLOT_SECTORS, SMALL_AREA_SECTORS};
+}
+
+static void a_stock_image_too_big_for_a_slot_is_accepted_when_the_area_holds_it(void)
+{
+    reset(stock_image(1), STOCK_IMAGE_SIZE);
+    UpdateStorage storage_target = small_slot_target();
+    UpdateFile update = source();
+    CHECK_EQUAL(UPDATE_STOCK, updater_check(&update, &storage_target));
+}
+
+static void a_stock_image_bigger_than_the_firmware_area_is_refused(void)
+{
+    reset(stock_image(1), STOCK_IMAGE_SIZE);
+    UpdateStorage storage_target = small_slot_target();
+    storage_target.area_sectors = STOCK_FW_END / 512 - 1;
+    UpdateFile update = source();
+    CHECK_EQUAL(UPDATE_INVALID, updater_check(&update, &storage_target));
+    CHECK_EQUAL(UPDATE_REFUSED_ROOM, updater_refusal());
+    CHECK(!updater_install(&update, &storage_target, progress()));
+    CHECK_EQUAL(0, storage.writes);
+}
+
+static void a_stock_image_too_big_for_a_slot_goes_into_slot_1_only(void)
+{
+    uint8_t *image = stock_image(2);
+    reset(image, STOCK_IMAGE_SIZE);
+    UpdateStorage storage_target = small_slot_target();
+    UpdateFile update = source();
+    CHECK(updater_install(&update, &storage_target, progress()));
+    CHECK(memcmp(storage.sectors + (size_t)SLOT_1 * 512, image, STOCK_FW_END) == 0);
+    CHECK_EQUAL(SLOT_1, storage.log[0].lba);
+    CHECK_EQUAL(0xFF, storage.log[0].first_byte);
+    CHECK_EQUAL(SLOT_1, storage.log[storage.writes - 1].lba);
+    CHECK_EQUAL(image[0], storage.log[storage.writes - 1].first_byte);
+    for (int index = 0; index < storage.writes; index++) {
+        CHECK(storage.log[index].lba + storage.log[index].count <= SLOT_1 + STOCK_FW_END / 512);
+    }
+    CHECK(progress_reports > 0);
+    CHECK(!progress_went_backwards);
+    CHECK_EQUAL(STOCK_FW_END / (CHUNK_SECTORS * 512), last_done);
+    CHECK_EQUAL(last_done, last_total);
+}
+
+static void slot_2_keeps_its_image_until_the_slot_1_write_reaches_it(void)
+{
+    uint8_t *installed = valid_image(7);
+    uint8_t *image = stock_image(2);
+    reset(image, STOCK_IMAGE_SIZE);
+    memcpy(storage.sectors + (size_t)SMALL_SLOT_2 * 512, installed, FW_END);
+    storage.fail_lba = SMALL_SLOT_2 - CHUNK_SECTORS;
+    UpdateStorage storage_target = small_slot_target();
+    UpdateFile update = source();
+    CHECK(!updater_install(&update, &storage_target, progress()));
+    CHECK(slot_holds(SMALL_SLOT_2, installed));
+    for (int index = 0; index < storage.writes; index++) {
+        CHECK(storage.log[index].lba + storage.log[index].count <= SMALL_SLOT_2);
+    }
+    free(installed);
+}
+
+static void a_slot_1_only_install_that_failed_can_be_run_again(void)
+{
+    uint8_t *image = stock_image(2);
+    reset(image, STOCK_IMAGE_SIZE);
+    storage.fail_lba = SLOT_1 + 40 * CHUNK_SECTORS;
+    UpdateStorage storage_target = small_slot_target();
+    UpdateFile update = source();
+    CHECK(!updater_install(&update, &storage_target, progress()));
+    storage.fail_lba = UINT32_MAX;
+    CHECK(updater_install(&update, &storage_target, progress()));
+    CHECK(memcmp(storage.sectors + (size_t)SLOT_1 * 512, image, STOCK_FW_END) == 0);
 }
 
 static void a_half_installed_image_is_installed_again(void)
@@ -546,9 +622,13 @@ int main(void)
         TEST_CASE(the_512_mb_model_and_unmarked_images_are_invalid),
         TEST_CASE(a_stock_header_copy_off_a_sector_is_invalid),
         TEST_CASE(damaged_or_other_model_stock_images_are_invalid),
-        TEST_CASE(a_stock_image_needs_a_slot_it_fits),
         TEST_CASE(a_refused_image_says_why),
         TEST_CASE(installing_a_stock_image_fills_both_slots_slot_2_first),
+        TEST_CASE(a_stock_image_too_big_for_a_slot_is_accepted_when_the_area_holds_it),
+        TEST_CASE(a_stock_image_bigger_than_the_firmware_area_is_refused),
+        TEST_CASE(a_stock_image_too_big_for_a_slot_goes_into_slot_1_only),
+        TEST_CASE(slot_2_keeps_its_image_until_the_slot_1_write_reaches_it),
+        TEST_CASE(a_slot_1_only_install_that_failed_can_be_run_again),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     free(storage.sectors);

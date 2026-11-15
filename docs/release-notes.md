@@ -6,6 +6,26 @@
 
 - **Shuffle all in folders.** Every folder that holds songs, either its own or in its immediate subfolders, starts with **Shuffle all**. It plays those songs shuffled and leaves songs in deeper folders out. The top-level Folders list has no Shuffle all, and audiobooks and podcasts don't get one. The list still opens on the first song.
 
+## 0.12.1
+
+One fix, for going back to FiiO's firmware.
+
+### Fixed
+
+- **"isn't a valid image for this player (E6/30)" when going back to FiiO's firmware** (issue 1). On some 8 GB players the firmware area holds two copies of EchoPod but not two copies of FiiO's 32 MiB image, and EchoPod refused FiiO's file because it didn't fit a slot. On those players EchoPod now writes FiiO's image over the first copy only, checking every block as it goes: the same write the maskrom recovery in `docs/device-recovery.md` makes. Players with room for two copies install FiiO's firmware as before, second copy first.
+- **The code after "isn't a valid image"** has a third number, the size of the firmware area in MiB, after the slot size: `(E6/30/60)`.
+
+### Known limits
+
+- **A power cut near the end of that one-copy install** leaves the player unable to start until FiiO's firmware is written through maskrom. EchoPod's own copy stays usable until the write reaches it, which on a player with 30 MiB slots is the last 2 MiB. Install with the battery charged, and don't unplug or press RST while it runs.
+- **The cause is read from the code and the E6/30 report, not from an affected player.** The one-copy install is tested on a computer; nobody has run it yet on a player that showed E6/30.
+
+### When you update
+
+- Your settings and library stay.
+- After an update installs, restart the player before connecting it to a computer again.
+- Delete the update file from the player once it has installed, or it installs again.
+
 ## 0.12.0
 
 New looks and new formats, from five community pull requests: seven colour themes, four retro Now Playing faces, `.m4b` audiobooks with chapters, QOA playback, folder order by file name and a complete Polish translation. Tested on one Echo Mini 8 GB.

@@ -86,6 +86,7 @@ typedef struct SlotCopy {
     UpdateProgress progress;
     uint32_t pass;
     uint32_t chunks;
+    uint32_t passes;
 } SlotCopy;
 
 static uint32_t le32(const uint8_t *bytes)
@@ -271,6 +272,16 @@ static bool crc_is_valid(const UpdateFile *file, uint32_t fw_end, ModelScan *sca
            crc == le32((const uint8_t *)&stored);
 }
 
+static bool fits_each_slot(const UpdateStorage *storage, uint32_t sectors)
+{
+    return sectors <= storage->slot_sectors;
+}
+
+static bool fits_from_slot_1(const UpdateStorage *storage, uint32_t sectors)
+{
+    return sectors <= storage->area_sectors;
+}
+
 static UpdateCheck stock_check(const UpdateFile *file, const UpdateStorage *storage,
                                const uint32_t *header)
 {
@@ -279,7 +290,8 @@ static UpdateCheck stock_check(const UpdateFile *file, const UpdateStorage *stor
     bool copy_fits = fw_size >= HEADER_BYTES && fw_size % SECTOR_BYTES == 0 &&
                      fw_size <= STOCK_FW_END - HEADER_BYTES;
     ModelScan scan = {.carried = false, .eight_gb = false, .small_model = false};
-    if (STOCK_FW_END / SECTOR_BYTES > storage->slot_sectors) {
+    if (!fits_each_slot(storage, STOCK_FW_END / SECTOR_BYTES) &&
+        !fits_from_slot_1(storage, STOCK_FW_END / SECTOR_BYTES)) {
         return refuse(UPDATE_REFUSED_ROOM);
     }
     if (!copy_fits || !has_text(bytes + MAGIC_OFFSET, MAGIC, sizeof MAGIC) ||
@@ -370,7 +382,7 @@ static void report(const SlotCopy *copy, uint32_t chunk)
 {
     if (copy->progress.report != NULL) {
         copy->progress.report(copy->progress.context, copy->pass * copy->chunks + chunk,
-                              PASSES * copy->chunks);
+                              copy->passes * copy->chunks);
     }
 }
 
@@ -398,7 +410,11 @@ bool updater_install(const UpdateFile *file, const UpdateStorage *storage, Updat
         return false;
     }
     uint32_t chunks = (file->size - 4) / UPDATER_CHUNK_BYTES;
-    SlotCopy second = {file, storage, 0, storage->slot_2, progress, 0, chunks};
-    SlotCopy first = {NULL, storage, storage->slot_2, storage->slot_1, progress, 1, chunks};
+    if (!fits_each_slot(storage, chunks * CHUNK_SECTORS)) {
+        SlotCopy only = {file, storage, 0, storage->slot_1, progress, 0, chunks, 1};
+        return fits_from_slot_1(storage, chunks * CHUNK_SECTORS) && copy_slot(&only);
+    }
+    SlotCopy second = {file, storage, 0, storage->slot_2, progress, 0, chunks, PASSES};
+    SlotCopy first = {NULL, storage, storage->slot_2, storage->slot_1, progress, 1, chunks, PASSES};
     return copy_slot(&second) && copy_slot(&first);
 }

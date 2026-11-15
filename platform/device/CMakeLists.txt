@@ -276,6 +276,10 @@ target_link_options(echo_rescan_overlay PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_rescan_overlay.map
 )
 
+if(ECHO_TEST_SLOT_1_RESTORE)
+    set_property(SOURCE board/update.c APPEND PROPERTY COMPILE_DEFINITIONS ECHO_TEST_SLOT_1_RESTORE)
+endif()
+
 set(ECHO_USB_OVERLAY_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/overlay/usb_overlay.ld)
 add_executable(echo_usb_overlay
     overlay/usb_overlay.c
