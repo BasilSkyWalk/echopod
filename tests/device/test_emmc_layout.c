@@ -61,27 +61,28 @@ static bool read_layout(FakeDisk *disk, EmmcLayout *layout)
     return emmc_layout_read(layout, &device, TOTAL_SECTORS, false);
 }
 
-static void the_512_mb_layout_has_two_32_mib_slots_at_lba_0(void)
+static void the_512_mb_layout_has_two_32_mib_slots_at_the_tool_base(void)
 {
     static FakeDisk disk;
     fake_disk_init(&disk, SMALL_TOTAL_SECTORS);
-    write_image_header(&disk, 0);
-    write_image_header(&disk, 0x10000);
-    write_mbr(&disk, 0x20000, 0x40);
-    write_fat_boot_sector(&disk, 0x20040);
+    write_image_header(&disk, 0x2000);
+    write_image_header(&disk, 0x12000);
+    write_mbr(&disk, 0x88000, 0x40);
+    write_fat_boot_sector(&disk, 0x88040);
     EmmcLayout layout;
     BlockDevice device = fake_disk_device(&disk);
     CHECK(emmc_layout_read(&layout, &device, SMALL_TOTAL_SECTORS, true));
-    CHECK_EQUAL(0, layout.slot_1);
-    CHECK_EQUAL(0x10000, layout.slot_2);
+    CHECK_EQUAL(0x2000, layout.slot_1);
+    CHECK_EQUAL(0x12000, layout.slot_2);
     CHECK_EQUAL(0x10000, layout.slot_sectors);
-    CHECK_EQUAL(0x20000, layout.firmware_end);
-    CHECK_EQUAL(0x20040, layout.volume_start);
+    CHECK_EQUAL(0x22000, layout.firmware_end);
+    CHECK_EQUAL(0x88040, layout.volume_start);
     CHECK(layout.slots_valid);
-    CHECK(emmc_layout_allows_write(&layout, 0, 1));
-    CHECK(emmc_layout_allows_write(&layout, 0x10000, 1));
-    CHECK(!emmc_layout_allows_write(&layout, 0x20000, 1));
-    CHECK(emmc_layout_allows_write(&layout, 0x20040, 1));
+    CHECK(!emmc_layout_allows_write(&layout, 0, 1));
+    CHECK(emmc_layout_allows_write(&layout, 0x2000, 1));
+    CHECK(emmc_layout_allows_write(&layout, 0x12000, 1));
+    CHECK(!emmc_layout_allows_write(&layout, 0x22000, 1));
+    CHECK(emmc_layout_allows_write(&layout, 0x88040, 1));
 }
 
 static void the_firmware_area_and_slots_follow_the_idb_system_size(void)
@@ -335,7 +336,7 @@ static void without_a_matching_copy_the_first_header_found_is_used(void)
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(the_512_mb_layout_has_two_32_mib_slots_at_lba_0),
+        TEST_CASE(the_512_mb_layout_has_two_32_mib_slots_at_the_tool_base),
         TEST_CASE(a_stale_header_loses_to_the_copy_that_matches_slot_1),
         TEST_CASE(without_a_matching_copy_the_first_header_found_is_used),
         TEST_CASE(the_firmware_area_and_slots_follow_the_idb_system_size),
