@@ -449,6 +449,26 @@ static void now_playing_keys_control_the_player(void)
     CHECK(playing_path_is(HELLS_BELLS_PATH));
 }
 
+static void a_folder_listing_starts_with_shuffle_all(void)
+{
+    start_app_with_library();
+    open_music_entry(MUSIC_FOLDERS_INDEX);
+    tap(KEY_PLAY);
+    tap(KEY_PLAY);
+    CHECK(title_is("Back In Black"));
+    move_up(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Now Playing"));
+    bool started_hells_bells = playing_path_is(HELLS_BELLS_PATH);
+    CHECK(started_hells_bells || playing_path_is(SHOOT_TO_THRILL_PATH));
+    hold(KEY_VOLUME_UP);
+    if (started_hells_bells) {
+        CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
+    } else {
+        CHECK(playing_path_is(HELLS_BELLS_PATH));
+    }
+}
+
 static void lists_still_move_as_soon_as_a_volume_key_goes_down(void)
 {
     start_app_with_library();
@@ -3470,6 +3490,7 @@ int main(void)
         TEST_CASE(an_artist_leads_to_their_albums),
         TEST_CASE(back_returns_to_the_previous_list),
         TEST_CASE(folders_can_be_browsed_down_to_an_album),
+        TEST_CASE(a_folder_listing_starts_with_shuffle_all),
         TEST_CASE(without_a_library_the_lists_explain_what_is_missing),
         TEST_CASE(without_a_card_the_lists_ask_for_one),
         TEST_CASE(without_a_card_a_setting_change_asks_for_one),

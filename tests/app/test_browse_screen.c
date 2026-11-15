@@ -2,6 +2,7 @@
 
 #include "browse_screen.h"
 #include "check.h"
+#include "core/i18n.h"
 #include "default_theme.h"
 #include "fake_hal.h"
 #include "fixture_library.h"
@@ -9,6 +10,7 @@
 static FixtureLibrary fixture;
 static BrowsePool pool;
 static FavoritesStore favorites;
+static Player player;
 
 static BrowseScreen *opened(BrowseQuery query)
 {
@@ -26,6 +28,119 @@ static BrowseScreen *opened(BrowseQuery query)
 static int section_at(const BrowseScreen *browse, int index)
 {
     return browse->model.section(browse->model.context, index);
+}
+
+static uint16_t folder_id(const Library *library, bool with_tracks)
+{
+    for (uint32_t index = 1; index < library_count(library, LIBRARY_FOLDERS); index++) {
+        LibraryFolder record;
+        if (!library_read_folder(library, index, &record)) {
+            return LIBRARY_NONE;
+        }
+        bool matches = with_tracks ? record.track_count > 0
+                                   : record.track_count == 0 && record.subfolder_count > 0;
+        if (matches) {
+            return (uint16_t)index;
+        }
+    }
+    return LIBRARY_NONE;
+}
+
+static BrowseScreen *opened_folder(bool with_tracks)
+{
+    fake_hal_reset();
+    Library *library = fixture_library_open(&fixture);
+    BrowseQuery query = browse_root_query(BROWSE_FOLDER);
+    BrowseItem item = {.kind = BROWSE_ITEM_FOLDER, .index = folder_id(library, with_tracks)};
+    CHECK(browse_child(query, item, &query));
+    player_init(&player, library);
+    favorites = (FavoritesStore){.library = library};
+    browse_pool_init(&pool, (BrowsePoolConfig){.library = library,
+                                               .theme = &DEFAULT_THEME,
+                                               .player = &player,
+                                               .favorites = &favorites});
+    Screen *screen = browse_pool_open(&pool, 0, query);
+    screen->enter(screen->context, 0);
+    return screen->context;
+}
+
+static void a_folder_with_tracks_starts_with_shuffle_all(void)
+{
+    BrowseScreen *browse = opened_folder(true);
+    CHECK_EQUAL(1, browse->extra);
+    CHECK_EQUAL(1, browse->list.selected);
+    CHECK(strcmp(i18n_text(STR_MENU_SHUFFLE_ALL), browse->model.label(browse, 0)) == 0);
+    CHECK_EQUAL((int)browse_count(pool.config.library, browse->query) + 1, (int)browse->count);
+}
+
+static void a_folder_of_folders_still_starts_with_shuffle_all(void)
+{
+    BrowseScreen *browse = opened_folder(false);
+    CHECK_EQUAL(1, browse->extra);
+    CHECK_EQUAL(1, browse->list.selected);
+    CHECK(strcmp(i18n_text(STR_MENU_SHUFFLE_ALL), browse->model.label(browse, 0)) == 0);
+    CHECK_EQUAL((int)browse_count(pool.config.library, browse->query) + 1, (int)browse->count);
+}
+
+static BrowseScreen *opened_root_folder(void)
+{
+    fake_hal_reset();
+    Library *library = fixture_library_open(&fixture);
+    player_init(&player, library);
+    favorites = (FavoritesStore){.library = library};
+    browse_pool_init(&pool, (BrowsePoolConfig){.library = library,
+                                               .theme = &DEFAULT_THEME,
+                                               .player = &player,
+                                               .favorites = &favorites});
+    Screen *screen = browse_pool_open(&pool, 0, browse_root_query(BROWSE_FOLDER));
+    screen->enter(screen->context, 0);
+    return screen->context;
+}
+
+static void the_root_folder_has_no_shuffle_all(void)
+{
+    BrowseScreen *browse = opened_root_folder();
+    CHECK_EQUAL(0, browse->extra);
+    CHECK_EQUAL(0, browse->list.selected);
+    CHECK(strcmp(i18n_text(STR_MENU_SHUFFLE_ALL), browse->model.label(browse, 0)) != 0);
+}
+
+static void shuffle_all_plays_the_folders_tracks_shuffled(void)
+{
+    BrowseScreen *browse = opened_folder(true);
+    uint16_t folder = browse->query.subject;
+    list_view_select(&browse->list, 0, 0);
+    ScreenAction action =
+        browse->screen.handle_key(browse, (KeyEvent){KEY_PLAY, KEY_GESTURE_PRESS}, 0);
+    CHECK_EQUAL(SCREEN_ACTION_PUSH, action.type);
+    PlayerStatus status = player_status(&player);
+    CHECK(status.has_track);
+    CHECK(status.state != PLAYER_IDLE);
+    LibraryTrack anchor;
+    CHECK(library_read_track(pool.config.library, status.track, &anchor));
+    CHECK_EQUAL(folder, anchor.folder);
+    LibraryFolder record;
+    CHECK(library_read_folder(pool.config.library, folder, &record));
+    CHECK_EQUAL(record.track_count, player.queue.count);
+    CHECK_EQUAL(SHUFFLE_SONGS, player.queue.plan.shuffle);
+}
+
+static void shuffle_all_plays_tracks_of_subfolders_too(void)
+{
+    BrowseScreen *browse = opened_folder(false);
+    uint16_t folder = browse->query.subject;
+    list_view_select(&browse->list, 0, 0);
+    ScreenAction action =
+        browse->screen.handle_key(browse, (KeyEvent){KEY_PLAY, KEY_GESTURE_PRESS}, 0);
+    CHECK_EQUAL(SCREEN_ACTION_PUSH, action.type);
+    PlayerStatus status = player_status(&player);
+    CHECK(status.has_track);
+    LibraryTrack anchor;
+    CHECK(library_read_track(pool.config.library, status.track, &anchor));
+    CHECK(anchor.folder != folder);
+    CHECK_EQUAL(BROWSE_FOLDER_TRACKS, player.queue.plan.source.kind);
+    CHECK_EQUAL(3, player.queue.count);
+    CHECK_EQUAL(SHUFFLE_SONGS, player.queue.plan.shuffle);
 }
 
 static void albums_are_lettered_by_their_sort_key(void)
@@ -163,6 +278,11 @@ int main(void)
         TEST_CASE(albums_are_lettered_by_their_sort_key),
         TEST_CASE(lettered_lists_never_go_backwards),
         TEST_CASE(album_tracks_have_no_letters),
+        TEST_CASE(a_folder_with_tracks_starts_with_shuffle_all),
+        TEST_CASE(a_folder_of_folders_still_starts_with_shuffle_all),
+        TEST_CASE(the_root_folder_has_no_shuffle_all),
+        TEST_CASE(shuffle_all_plays_the_folders_tracks_shuffled),
+        TEST_CASE(shuffle_all_plays_tracks_of_subfolders_too),
         TEST_CASE(scrolling_one_row_at_a_time_keeps_every_row_right),
         TEST_CASE(a_jump_longer_than_the_window_reloads_every_row),
         TEST_CASE(scrolling_one_row_loads_only_the_new_row),

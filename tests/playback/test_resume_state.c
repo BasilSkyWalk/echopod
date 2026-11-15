@@ -6,6 +6,7 @@
 
 enum {
     SHUFFLE_FIELD = 6,
+    SOURCE_KIND_FIELD = 16,
     CHECKSUM_FIELD = 40
 };
 
@@ -126,12 +127,43 @@ static void playlist_sources_are_accepted(void)
     CHECK_EQUAL(LIBRARY_PLAYLISTS, decoded.plan.source.group);
 }
 
+static void folder_track_sources_are_accepted(void)
+{
+    ResumeState state = sample_state();
+    state.plan.source = (BrowseQuery){.kind = BROWSE_FOLDER_TRACKS,
+                                      .group = LIBRARY_ARTISTS,
+                                      .subject = 4,
+                                      .artist = LIBRARY_NONE};
+    uint8_t bytes[RESUME_STATE_SIZE];
+    ResumeState decoded;
+    resume_state_encode(&state, bytes);
+    CHECK(resume_state_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(BROWSE_FOLDER_TRACKS, decoded.plan.source.kind);
+    CHECK_EQUAL(LIBRARY_ARTISTS, decoded.plan.source.group);
+    CHECK_EQUAL(4, decoded.plan.source.subject);
+}
+
+static void unknown_source_kinds_are_rejected(void)
+{
+    ResumeState state = sample_state();
+    uint8_t bytes[RESUME_STATE_SIZE];
+    resume_state_encode(&state, bytes);
+    bytes[SOURCE_KIND_FIELD] = BROWSE_FOLDER_TRACKS + 1;
+    rewrite_checksum(bytes);
+    CHECK(!resume_state_decode(bytes, sizeof bytes, &state));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(a_state_survives_a_round_trip),       TEST_CASE(a_wrong_magic_is_rejected),
-        TEST_CASE(a_corrupted_byte_fails_the_checksum), TEST_CASE(a_short_file_is_rejected),
-        TEST_CASE(unknown_modes_are_rejected),          TEST_CASE(playlist_sources_are_accepted),
+        TEST_CASE(a_state_survives_a_round_trip),
+        TEST_CASE(a_wrong_magic_is_rejected),
+        TEST_CASE(a_corrupted_byte_fails_the_checksum),
+        TEST_CASE(a_short_file_is_rejected),
+        TEST_CASE(unknown_modes_are_rejected),
+        TEST_CASE(playlist_sources_are_accepted),
+        TEST_CASE(folder_track_sources_are_accepted),
+        TEST_CASE(unknown_source_kinds_are_rejected),
         TEST_CASE(a_song_from_up_next_is_remembered),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

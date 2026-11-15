@@ -135,6 +135,21 @@ static void folders_queue_only_their_tracks(void)
     CHECK_EQUAL(SHOOT_TO_THRILL, track_after(tracks, REPEAT_OFF));
 }
 
+static void folder_track_queues_take_their_subfolders_tracks_too(void)
+{
+    Library *library = fixture_library_open(&fixture);
+    BrowseQuery root = browse_root_query(BROWSE_FOLDER);
+    BrowseItem acdc;
+    CHECK(browse_item(library, root, 0, &acdc));
+    CHECK_EQUAL(BROWSE_ITEM_FOLDER, acdc.kind);
+    BrowseQuery folder;
+    CHECK(browse_child(root, acdc, &folder));
+    PlayQueue *tracks = built(browse_folder_tracks(folder), HELLS_BELLS, SHUFFLE_OFF, 1);
+    CHECK_EQUAL(3, tracks->count);
+    CHECK_EQUAL(HELLS_BELLS, current_track(tracks));
+    CHECK_EQUAL(SHOOT_TO_THRILL, track_after(tracks, REPEAT_OFF));
+}
+
 static void an_anchor_outside_the_list_plays_first(void)
 {
     PlayQueue *list = built(album_tracks(BACK_IN_BLACK), SHOOTS, SHUFFLE_OFF, 1);
@@ -405,6 +420,7 @@ int main(void)
         TEST_CASE(a_list_queue_starts_at_the_anchor),
         TEST_CASE(all_songs_play_in_title_order),
         TEST_CASE(folders_queue_only_their_tracks),
+        TEST_CASE(folder_track_queues_take_their_subfolders_tracks_too),
         TEST_CASE(an_anchor_outside_the_list_plays_first),
         TEST_CASE(the_end_of_the_list_stops_without_repeat),
         TEST_CASE(repeat_all_wraps_and_repeat_one_stays),

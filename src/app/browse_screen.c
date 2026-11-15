@@ -14,10 +14,13 @@
 #include "ui/list_navigation.h"
 
 enum {
-    NO_LEVEL = -1
+    NO_LEVEL = -1,
+    ROOT_FOLDER = 0
 };
 
 static const char STAR[] = "\xE2\x98\x85";
+
+static Screen *open_level(BrowsePool *pool, int level, BrowseQuery query, SpokenKind shelf);
 
 static int min_of(int first, int second)
 {
@@ -291,6 +294,7 @@ static bool is_lettered(BrowseKind kind)
     case BROWSE_FOLDER:
     case BROWSE_PLAYLIST_TRACKS:
     case BROWSE_GROUP_TRACKS:
+    case BROWSE_FOLDER_TRACKS:
         break;
     }
     return false;
@@ -347,14 +351,18 @@ static ScreenAction play_from(BrowseScreen *browse, int index)
 
 static ScreenAction play_all(BrowseScreen *browse, bool shuffled)
 {
-    BrowseQuery source = browse->query.kind == BROWSE_GROUP_ALBUMS
-                             ? browse_group_tracks(browse->query)
-                             : browse->query;
-    uint32_t count = browse_count(browse->pool->config.library, source);
-    uint32_t seed = hal_clock_microseconds();
+    BrowseQuery source = browse->query;
+    if (source.kind == BROWSE_GROUP_ALBUMS) {
+        source = browse_group_tracks(source);
+    } else if (source.kind == BROWSE_FOLDER) {
+        source = browse_folder_tracks(source);
+    }
+    const Library *library = browse->pool->config.library;
+    uint32_t count = browse_count(library, source);
     if (count == 0) {
         return screen_action_none();
     }
+    uint32_t seed = hal_clock_microseconds();
     PlayerListStart start = {.source = source,
                              .position = shuffled ? seed % count : 0,
                              .seed = seed,
@@ -392,11 +400,10 @@ static ScreenAction open_child(BrowseScreen *browse, BrowseItem item)
     if (!browse_child(browse->query, item, &child)) {
         return screen_action_none();
     }
-    Screen *next = browse_pool_open(browse->pool, browse->level + 1, child);
+    Screen *next = open_level(browse->pool, browse->level + 1, child, browse->shelf);
     if (next == NULL) {
         return screen_action_none();
     }
-    browse->pool->screens[browse->level + 1].shelf = browse->shelf;
     browse->pool->screens[browse->level + 1].in_flow = browse->in_flow;
     return screen_action_push(next);
 }
@@ -645,7 +652,13 @@ void browse_pool_init(BrowsePool *pool, BrowsePoolConfig config)
     }
 }
 
-Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
+static bool folder_shows_shuffle(const BrowsePoolConfig *config, BrowseQuery query)
+{
+    return query.subject != ROOT_FOLDER &&
+           browse_count(config->library, browse_folder_tracks(query)) > 0;
+}
+
+static Screen *open_level(BrowsePool *pool, int level, BrowseQuery query, SpokenKind shelf)
 {
     if (level < 0 || level >= BROWSE_DEPTH) {
         return NULL;
@@ -656,7 +669,7 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     forget_rows(browse);
     browse->query = query;
     browse->favorites_only = false;
-    browse->shelf = SPOKEN_NONE;
+    browse->shelf = shelf;
     browse->shelf_root = false;
     browse->in_flow = false;
     browse->count = browse_count(pool->config.library, query);
@@ -664,7 +677,9 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
     if (browse->count > 0 && pool->config.player != NULL) {
         bool group = query.kind == BROWSE_GROUP_ALBUMS && query.group != LIBRARY_PLAYLISTS;
         bool songs = query.kind == BROWSE_ALL_SONGS || query.kind == BROWSE_PLAYLIST_TRACKS;
-        browse->extra = group ? 2 : songs ? 1 : 0;
+        bool folder = query.kind == BROWSE_FOLDER && shelf == SPOKEN_NONE &&
+                      folder_shows_shuffle(&pool->config, query);
+        browse->extra = group ? 2 : (songs || folder) ? 1 : 0;
     }
     browse->count += (uint32_t)browse->extra;
     browse_title(pool->config.library, query, browse->title, sizeof browse->title);
@@ -685,6 +700,11 @@ Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
         .draw = draw,
     };
     return &browse->screen;
+}
+
+Screen *browse_pool_open(BrowsePool *pool, int level, BrowseQuery query)
+{
+    return open_level(pool, level, query, SPOKEN_NONE);
 }
 
 Screen *browse_pool_open_favorites(BrowsePool *pool, int level)
@@ -720,7 +740,7 @@ static BrowseQuery shelf_query(const BrowsePool *pool, SpokenKind shelf, bool *f
 Screen *browse_pool_open_shelf(BrowsePool *pool, int level, SpokenKind shelf)
 {
     bool found = false;
-    Screen *screen = browse_pool_open(pool, level, shelf_query(pool, shelf, &found));
+    Screen *screen = open_level(pool, level, shelf_query(pool, shelf, &found), shelf);
     if (screen == NULL) {
         return NULL;
     }
@@ -728,7 +748,6 @@ Screen *browse_pool_open_shelf(BrowsePool *pool, int level, SpokenKind shelf)
     StringBuilder title = string_builder_make(browse->title, sizeof browse->title);
     string_builder_append(
         &title, i18n_text(shelf == SPOKEN_PODCAST ? STR_MENU_PODCASTS : STR_MENU_AUDIOBOOKS));
-    browse->shelf = shelf;
     browse->shelf_root = true;
     browse->count = found ? browse->count : 0;
     return screen;
