@@ -51,7 +51,9 @@ enum {
     IDLE_SETTLE_US = 100,
     EMMC_PROBE_TRIES = 10,
     EMMC_PROBE_DELAY_MS = 20,
-    BLOCK_LENGTH = 512
+    BLOCK_LENGTH = 512,
+    PROBE_32M_SECTOR = 0x20000,
+    PROBE_256M_SECTOR = 0x80000
 };
 
 static uint32_t emmc_fifo_depth;
@@ -336,6 +338,37 @@ bool emmc_status(uint32_t *status)
     }
     *status = words[0];
     return true;
+}
+
+EmmcProbe emmc_probe(void)
+{
+    static uint32_t first[BLOCK_LENGTH / 4];
+    EmmcProbe probe = {started ? 1u : 0u,
+                       sd_nand_mode ? 1u : 0u,
+                       emmc.sector_count,
+                       emmc.layout.volume_start,
+                       0,
+                       0,
+                       0,
+                       0,
+                       0,
+                       0};
+    uint32_t status = 0;
+    if (emmc_status(&status)) {
+        probe.status = status;
+    }
+    if (started && emmc_read(NULL, 0, 1, first)) {
+        probe.lba0_ok = 1;
+        probe.lba0_0 = first[0];
+        probe.lba0_1 = first[1];
+    }
+    if (started && emmc_read(NULL, PROBE_32M_SECTOR, 1, first)) {
+        probe.head_32m = first[0];
+    }
+    if (started && emmc_read(NULL, PROBE_256M_SECTOR, 1, first)) {
+        probe.head_256m = first[0];
+    }
+    return probe;
 }
 
 bool emmc_start(EmmcInfo *info)

@@ -39,6 +39,7 @@ void board_stall_beat(void);
 void board_stall_pause(bool paused);
 void board_stall_report(const uint32_t *frame);
 void board_panic_show(const char *title, const uint32_t *frame, uint32_t status);
+void board_panic_words(const char *title, const uint32_t *words, int lines);
 void board_watchdog_start(void);
 void board_watchdog_kick(void);
 void board_watchdog_after_clock_change(void);

@@ -112,6 +112,14 @@ void board_panic_show(const char *title, const uint32_t *frame, uint32_t status)
     draw_run_line();
 }
 
+void board_panic_words(const char *title, const uint32_t *words, int lines)
+{
+    start_screen(title);
+    for (int index = 0; index < lines; index++) {
+        draw_words_line(words + index * WORDS_PER_LINE);
+    }
+}
+
 void board_panic_poll_power(uint32_t now_ms)
 {
     if (!board_power_key_down()) {

@@ -5,6 +5,7 @@
 #include "board.h"
 #include "emmc.h"
 #include "gfx/font_pack.h"
+#include "hal/clock.h"
 #include "hal/system.h"
 
 #define GLYPH_TABLE_OFFSET 0x2C0000u
@@ -80,6 +81,19 @@ bool board_glyphs_entry(uint32_t entry, uint32_t *offset, uint32_t *size)
     return true;
 }
 
+static void storage_failed(EmmcProbe probe, uint32_t magic)
+{
+    uint32_t words[12] = {probe.started,      probe.sd_nand, probe.sector_count,
+                          probe.volume_start, probe.status,  probe.lba0_ok,
+                          probe.lba0_0,       probe.lba0_1,  probe.head_32m,
+                          probe.head_256m,    magic,         0};
+    board_panic_words("STORAGE", words, 4);
+    for (;;) {
+        board_watchdog_kick();
+        board_panic_poll_power(hal_clock_milliseconds());
+    }
+}
+
 void board_glyphs_start(void)
 {
     EmmcInfo info;
@@ -87,11 +101,13 @@ void board_glyphs_start(void)
     face_count = 0;
     entry_count = 0;
     sector_lba = NO_SECTOR;
+    table[0] = 0;
     board_resident_load();
-    if (!emmc_start(&info) ||
+    bool started = emmc_start(&info);
+    if (!started ||
         !emmc_read(NULL, info.layout.slot_1 + GLYPH_TABLE_OFFSET / SECTOR_BYTES, 1, table) ||
         table[0] != GLYPH_TABLE_MAGIC) {
-        return;
+        storage_failed(emmc_probe(), table[0]);
     }
     slot_1 = info.layout.slot_1;
     entry_count = table[1] < MAX_ENTRIES ? table[1] : MAX_ENTRIES;
