@@ -149,6 +149,13 @@ function button(text) {
   return made;
 }
 
+const kept = new Map();
+
+function keptFor(entry, theme) {
+  const saved = kept.get(entry.name);
+  return saved && saved.made === JSON.stringify(theme.wallpapers[entry.name]) ? saved : null;
+}
+
 function wallpaperPanel(entry, theme, changed) {
   const details = document.createElement("details");
   const summary = document.createElement("summary");
@@ -159,7 +166,8 @@ function wallpaperPanel(entry, theme, changed) {
   const tile = document.createElement("input");
   const choose = button("Choose an image…");
   const remove = button("Remove");
-  let picture = null;
+  const saved = keptFor(entry, theme);
+  let picture = saved?.picture ?? null;
 
   const show = () => {
     const paper = theme.wallpapers[entry.name];
@@ -174,6 +182,11 @@ function wallpaperPanel(entry, theme, changed) {
   };
   const put = (paper) => {
     theme.wallpapers[entry.name] = paper;
+    if (picture && paper) {
+      kept.set(entry.name, { picture, dim: dim.value, tile: tile.checked, made: JSON.stringify(paper) });
+    } else {
+      kept.delete(entry.name);
+    }
     show();
     changed();
   };
@@ -186,9 +199,10 @@ function wallpaperPanel(entry, theme, changed) {
   };
 
   Object.assign(picker, { type: "file", accept: "image/*", hidden: true });
-  Object.assign(dim, { type: "range", min: 0, max: MOST_DIM, value: DEFAULT_DIM });
+  Object.assign(dim, { type: "range", min: 0, max: MOST_DIM, value: saved?.dim ?? DEFAULT_DIM });
   dim.title = "How far the picture fades into the background colour";
   tile.type = "checkbox";
+  tile.checked = saved?.tile ?? false;
   shown.className = "wallpaper-shown";
   controls.className = "row";
   controls.append(choose, control("Fade", dim), control("Repeat a small picture", tile), remove, picker);
@@ -196,8 +210,15 @@ function wallpaperPanel(entry, theme, changed) {
   choose.addEventListener("click", () => picker.click());
   picker.addEventListener("change", async () => {
     if (picker.files.length > 0) {
-      picture = await createImageBitmap(picker.files[0]);
-      picker.value = "";
+      try {
+        picture = await createImageBitmap(picker.files[0]);
+      } catch {
+        summary.textContent = `${LABELS[entry.name]}: that file isn't a picture this browser can read`;
+        details.open = true;
+        return;
+      } finally {
+        picker.value = "";
+      }
       remake();
     }
   });

@@ -227,7 +227,7 @@ function accentBytes(accent) {
   const name = typeof accent.name === "string" ? accent.name : "";
   const encoded = new TextEncoder().encode(name);
   if (encoded.length === 0 || encoded.length >= ACCENT_NAME_SIZE) {
-    throw new ThemeError(`an accent's name needs 1 to ${ACCENT_NAME_SIZE - 1} bytes`);
+    throw new ThemeError(`Give each accent a name, up to ${ACCENT_NAME_SIZE - 1} letters`);
   }
   const bytes = new Uint8Array(ACCENT_SIZE);
   const view = new DataView(bytes.buffer);
@@ -253,7 +253,7 @@ function accentSection(theme) {
 function nameBytes(name) {
   const encoded = new TextEncoder().encode(name);
   if (encoded.length === 0 || encoded.length >= NAME_SIZE) {
-    throw new ThemeError(`the name needs 1 to ${NAME_SIZE - 1} bytes`);
+    throw new ThemeError(`Give the theme a name, up to ${NAME_SIZE - 1} letters`);
   }
   const padded = new Uint8Array(NAME_SIZE);
   padded.set(encoded);
@@ -468,8 +468,8 @@ function sceneAssets(theme, schema) {
   const sections = found.filter((asset) => SCENES.some((scene) => scene.kinds[0] === asset.head[0]));
   const total = sections.reduce((sum, asset) => sum + Math.ceil(asset.bytes.length / 4) * 4, 0);
   if (total > SCENE_MOST_BYTES) {
-    const what = sections.length === 1 ? "the scene is" : "the Now Playing and Home designs together are";
-    throw new ThemeError(`${what} ${total.toLocaleString("en")} bytes; at most ${SCENE_MOST_BYTES.toLocaleString("en")}`);
+    const what = sections.length === 1 ? "This screen's design is" : "The Home and Now Playing designs together are";
+    throw new ThemeError(`${what} too big for the player (${total.toLocaleString("en")} of ${SCENE_MOST_BYTES.toLocaleString("en")} bytes). Remove a few layers.`);
   }
   return found;
 }
@@ -915,7 +915,13 @@ function tomlBox(box) {
 }
 
 export function toToml(theme, schema) {
-  const parts = [`name = ${JSON.stringify(theme.name)}`, `selection = "${theme.selection}"`];
+  const parts = [`name = ${JSON.stringify(theme.name)}`];
+  for (const key of ["author", "description"]) {
+    if (typeof theme[key] === "string" && theme[key].trim() !== "") {
+      parts.push(`${key} = ${JSON.stringify(theme[key].trim())}`);
+    }
+  }
+  parts.push(`selection = "${theme.selection}"`);
   if (theme.home_art === false) {
     parts.push("home_art = false");
   }

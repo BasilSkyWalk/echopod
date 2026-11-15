@@ -188,6 +188,13 @@ function button(text) {
   return made;
 }
 
+const kept = new Map();
+
+function keptFor(entry, theme) {
+  const saved = kept.get(entry.name);
+  return saved && saved.made === JSON.stringify(theme.fonts[entry.name]) ? saved : null;
+}
+
 function fontPanel(entry, theme, schema, changed) {
   const details = document.createElement("details");
   const summary = document.createElement("summary");
@@ -198,7 +205,8 @@ function fontPanel(entry, theme, schema, changed) {
   const choose = button("Choose a font file…");
   const remove = button("Use the player's own");
   const note = document.createElement("p");
-  let source = null;
+  const saved = keptFor(entry, theme);
+  let source = saved?.source ?? null;
 
   const show = () => {
     const font = theme.fonts[entry.name];
@@ -214,6 +222,11 @@ function fontPanel(entry, theme, schema, changed) {
   };
   const put = (font) => {
     theme.fonts[entry.name] = font;
+    if (source && font) {
+      kept.set(entry.name, { source, size: size.value, made: JSON.stringify(font) });
+    } else {
+      kept.delete(entry.name);
+    }
     show();
     changed();
   };
@@ -232,7 +245,7 @@ function fontPanel(entry, theme, schema, changed) {
   };
 
   Object.assign(picker, { type: "file", accept: ".ttf,.otf", hidden: true });
-  Object.assign(size, { type: "number", min: LEAST_SIZE, max: MOST_SIZE, placeholder: "fit" });
+  Object.assign(size, { type: "number", min: LEAST_SIZE, max: MOST_SIZE, placeholder: "fit", value: saved?.size ?? "" });
   size.title = "Pixel size; leave empty for the largest that fits";
   sample.className = "font-sample";
   note.className = "hint";

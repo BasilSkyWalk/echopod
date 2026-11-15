@@ -1,5 +1,7 @@
 import { ACCENT_SHADES, MOST_ACCENTS } from "./theme_format.js";
 
+const NAME_BYTES = 12;
+
 const SHADE_LABELS = {
   selection_background: "Fill",
   selection_top: "Top",
@@ -32,6 +34,9 @@ function accentRow(theme, index, context, rebuild) {
   Object.assign(name, { type: "text", value: accent.name, maxLength: 12, size: 10 });
   name.setAttribute("aria-label", "Accent name");
   name.addEventListener("input", () => {
+    while (new TextEncoder().encode(name.value).length > NAME_BYTES) {
+      name.value = Array.from(name.value).slice(0, -1).join("");
+    }
     accent.name = name.value;
     context.changed();
   });

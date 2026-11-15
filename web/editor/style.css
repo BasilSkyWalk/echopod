@@ -345,6 +345,7 @@ input[type="radio"] {
   left: 22px;
   top: 22px;
   cursor: pointer;
+  touch-action: none;
 }
 
 #overlay.designing {

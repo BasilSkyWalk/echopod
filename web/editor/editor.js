@@ -15,6 +15,7 @@ import {
 } from "./now_playing_designer.js";
 import { KEY, Preview } from "./preview_host.js";
 import {
+  ACCENT_SHADES,
   ThemeError,
   assetMemory,
   defaultTheme,
@@ -51,14 +52,12 @@ const DESIGNS = {
     key: "home_scene",
     title: "Home",
     lead: "Lay out the first screen however you like: the menu, the album art, what's playing. Drag things on the screen to move them, and drag a corner to resize. The buttons still move through the menu from top to bottom.",
-    outside: "This theme's Home screen was made outside the editor, so it can't be arranged here. Choose “My own design” to make a new one in its place.",
   },
   playing: {
     screen: "playing",
     key: "now_playing_scene",
     title: "Now Playing",
     lead: "Arrange the Now Playing screen however you like: drag things on the screen to move them, and drag a corner to resize.",
-    outside: "This theme's Now Playing screen was made outside the editor, so it can't be arranged here. Choose “My own design” to make a new one in its place.",
   },
 };
 const COLOUR_GROUPS = [
@@ -87,6 +86,18 @@ const HISTORY_LIMIT = 80;
 const SETTLE_MS = 350;
 const DRAFT = "echopod-theme-draft";
 const HANDLE = 7;
+const NAME_BYTES = 23;
+const SLUG_LETTERS = 23;
+const MERGED_PARTS = ["colors", "boxes", "spacing", "icons", "wallpapers", "fonts"];
+const SKIP_STEP_MS = 100;
+const COLOUR_SLACK = 24;
+const GRADIENT_SLACK = 12;
+const GRADIENT_LEAST = 30;
+const SKIP_LIMIT_MS = 20000;
+const SKIP_SETTLE_MS = 700;
+const SCRIPT_COLOUR = /^const ([A-Z][A-Z0-9_]*) = (#[0-9a-fA-F]{6})[ \t]*$/gm;
+const SCRIPT_WORDS = { HI: "highlight", ALU: "metal", DIM: "dim", BG: "background", SOFT: "soft" };
+const CHROME_ROLES = [["header_top", "Title bar, top"], ["header_background", "Title bar"], ["header_text", "Title"]];
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("screen");
@@ -99,6 +110,9 @@ const state = {
   preview: null,
   theme: null,
   designs: { playing: null, home: null },
+  stash: {},
+  open: new Set(),
+  draftFailed: false,
   step: "start",
   screen: "home",
   turn: 0,
@@ -153,11 +167,29 @@ function snapshot() {
   return JSON.stringify({ theme: state.theme, designs: state.designs });
 }
 
+function mergedTheme(saved) {
+  const base = defaultTheme(state.schema);
+  const theme = { ...base, ...saved };
+  for (const part of MERGED_PARTS) {
+    theme[part] = { ...base[part], ...(saved[part] ?? {}) };
+  }
+  for (const name of Object.keys(base.boxes)) {
+    theme.boxes[name] = { ...base.boxes[name], ...(saved.boxes?.[name] ?? {}) };
+  }
+  theme.layouts = Object.fromEntries(Object.keys(base.layouts).map((key) =>
+    [key, { ...base.layouts[key], ...(saved.layouts?.[key] ?? {}) }]));
+  return theme;
+}
+
+function revived(design) {
+  return design ? readDesign(JSON.stringify(design)) : null;
+}
+
 function restore(text) {
   const saved = JSON.parse(text);
-  state.theme = saved.theme;
-  state.theme.home_scene ??= null;
-  state.designs = saved.designs ?? { playing: saved.design ?? null, home: null };
+  state.theme = mergedTheme(saved.theme ?? {});
+  const designs = saved.designs ?? { playing: saved.design ?? null, home: null };
+  state.designs = { playing: revived(designs.playing), home: revived(designs.home) };
   state.picked = currentDesign()?.layers?.some((item) => item.id === state.picked) ? state.picked : null;
 }
 
@@ -169,18 +201,31 @@ function designScreen() {
   return DESIGNS[state.step]?.screen ?? "playing";
 }
 
+function record() {
+  const now = snapshot();
+  if (state.history[state.history.length - 1] !== now) {
+    state.history.push(now);
+    state.history.splice(0, Math.max(0, state.history.length - HISTORY_LIMIT));
+    state.future = [];
+    saveDraft(now);
+  }
+  refreshUndo();
+}
+
 function remember() {
   clearTimeout(state.remember);
   state.remember = setTimeout(() => {
-    const now = snapshot();
-    if (state.history[state.history.length - 1] !== now) {
-      state.history.push(now);
-      state.history.splice(0, Math.max(0, state.history.length - HISTORY_LIMIT));
-      state.future = [];
-      saveDraft(now);
-    }
-    refreshUndo();
+    state.remember = null;
+    record();
   }, SETTLE_MS);
+}
+
+function settleHistory() {
+  if (state.remember) {
+    clearTimeout(state.remember);
+    state.remember = null;
+    record();
+  }
 }
 
 function refreshUndo() {
@@ -189,6 +234,7 @@ function refreshUndo() {
 }
 
 function travel(back) {
+  settleHistory();
   if (back) {
     if (state.history.length < 2) {
       return;
@@ -210,6 +256,17 @@ function travel(back) {
 function saveDraft(text) {
   try {
     localStorage.setItem(DRAFT, text);
+  } catch {
+    if (!state.draftFailed) {
+      state.draftFailed = true;
+      say("This browser won't keep your work between visits. Download it before you close the page.", true);
+    }
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT);
   } catch {
     return;
   }
@@ -246,6 +303,19 @@ function apply() {
     }
     say(error.message, true);
     return null;
+  }
+}
+
+function fits() {
+  syncScene();
+  try {
+    pack(state.theme, state.schema);
+    return true;
+  } catch (error) {
+    if (!(error instanceof ThemeError)) {
+      throw error;
+    }
+    return false;
   }
 }
 
@@ -303,9 +373,23 @@ function colourInput(value, set) {
   return el("span", { class: "color-control" }, picker, hex);
 }
 
+function shownAccentOf(role) {
+  const accents = state.theme.accents ?? [];
+  return ACCENT_SHADES.includes(role) && accents.length > 0 ? accents[Math.min(state.accent, accents.length - 1)] : null;
+}
+
+function shownColour(role) {
+  return shownAccentOf(role)?.[role] ?? state.theme.colors[role];
+}
+
 function roleColour(role) {
-  const control = colourInput(state.theme.colors[role], (value) => {
-    state.theme.colors[role] = value;
+  const control = colourInput(shownColour(role), (value) => {
+    const accent = shownAccentOf(role);
+    if (accent) {
+      accent[role] = value;
+    } else {
+      state.theme.colors[role] = value;
+    }
     changed();
   });
   const row = field(ROLE_LABELS[role], control);
@@ -350,8 +434,8 @@ function chips(options, current, set) {
     el("button", { type: "button", "aria-pressed": String(value === current), onclick: () => set(value) }, label)));
 }
 
-function toggle(checked, set) {
-  const box = el("input", { type: "checkbox" });
+function toggle(checked, set, label) {
+  const box = el("input", { type: "checkbox", "aria-label": label, title: label });
   box.checked = checked;
   box.addEventListener("change", () => set(box.checked));
   return box;
@@ -428,12 +512,30 @@ function sampleName(sample) {
   return words[0].toUpperCase() + words.slice(1);
 }
 
+function fitBytes(input, most) {
+  const encoder = new TextEncoder();
+  while (encoder.encode(input.value).length > most) {
+    input.value = Array.from(input.value).slice(0, -1).join("");
+  }
+  return input.value;
+}
+
+function slug(name) {
+  const tidy = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return (tidy || "theme").slice(0, SLUG_LETTERS).replace(/-+$/, "");
+}
+
 function panelStart() {
-  const name = el("input", { value: state.theme.name, maxlength: 23 });
+  const name = el("input", { value: state.theme.name, maxlength: NAME_BYTES });
   name.addEventListener("input", () => {
-    state.theme.name = name.value;
+    state.theme.name = fitBytes(name, NAME_BYTES);
     $("name").value = name.value;
     changed();
+  });
+  const about = el("input", { value: state.theme.description ?? "", maxlength: 120, placeholder: "A line about it" });
+  about.addEventListener("input", () => {
+    state.theme.description = about.value;
+    remember();
   });
   const author = el("input", { value: state.theme.author ?? "", maxlength: 40, placeholder: "Your name" });
   author.addEventListener("input", () => {
@@ -447,7 +549,8 @@ function panelStart() {
   return [
     el("h2", {}, "Make a theme"),
     el("p", { class: "lead" }, "Everything you change shows on the player straight away. When you're happy, download it and copy it to the Themes folder on your card."),
-    group(field("Name", name), field("Made by", author, "Shown in the gallery if you share it")),
+    group(field("Name", name), field("Made by", author, "Shown in the gallery if you share it"),
+      field("Description", about, "One line for the gallery")),
     el("h3", {}, "Begin from"),
     starts,
     el("div", { class: "actions" },
@@ -457,7 +560,14 @@ function panelStart() {
 }
 
 function panelColours() {
-  const groups = COLOUR_GROUPS.map(([title, roles]) => [el("h3", {}, title), group(...roles.map(([role]) => roleColour(role)))]);
+  const accent = shownAccentOf("selection_background");
+  const groups = COLOUR_GROUPS.map(([title, roles]) => [
+    el("h3", {}, title),
+    title === "Selected row" && accent
+      ? el("p", { class: "hint" }, `These are the “${accent.name}” accent's colours, the one the preview shows. People pick an accent on the player; change the list under Accent choices below.`)
+      : null,
+    group(...roles.map(([role]) => roleColour(role))),
+  ].filter(Boolean));
   const cover = toggle(state.theme.cover_flow === "dark", (dark) => {
     state.theme.cover_flow = dark ? "dark" : "theme";
     changed();
@@ -497,7 +607,7 @@ function panelShapes() {
     const custom = toggle(current !== null, (on) => {
       state.theme.spacing[name] = on ? entry.least + Math.round((entry.most - entry.least) / 2) : null;
       changed({ rebuild: true });
-    });
+    }, "Use my own spacing");
     const control = current === null
       ? el("span", { class: "hint" }, "Player's own")
       : range(current, entry.least, entry.most, (value) => {
@@ -541,6 +651,17 @@ function panelShapes() {
 function panelLegacy(title, lead, build) {
   const host = el("div", { class: "legacy" });
   build(host, state.theme, state.schema, () => changed());
+  host.querySelectorAll("details").forEach((details, index) => {
+    const key = `${state.step}:${index}`;
+    details.open = state.open.has(key);
+    details.addEventListener("toggle", () => {
+      if (details.open) {
+        state.open.add(key);
+      } else {
+        state.open.delete(key);
+      }
+    });
+  });
   return [el("h2", {}, title), el("p", { class: "lead" }, lead), host];
 }
 
@@ -679,7 +800,13 @@ function layerFields(item) {
     fields.push(field("Shows", source));
     if (item.source === "custom") {
       const words = el("input", { value: item.custom ?? "", maxlength: 40 });
-      words.addEventListener("input", () => set("custom")(words.value));
+      words.addEventListener("input", () => {
+        set("custom")(words.value);
+        const named = inspector.querySelector('.layers [aria-selected="true"] span');
+        if (named) {
+          named.textContent = layerName(item);
+        }
+      });
       fields.push(field("Words", words));
     }
     fields.push(field("Size", chips([["large", "Large"], ["medium", "Medium"], ["small", "Small"]], item.size, setAndShow("size"))));
@@ -769,27 +896,82 @@ function backgroundFields() {
   return fields;
 }
 
-function useDesign(on) {
+function handWritten(step) {
+  return !state.designs[step] && typeof state.theme[DESIGNS[step].key]?.script === "string";
+}
+
+function setMode(mode) {
   const step = state.step;
-  state.designs[step] = on ? state.designs[step] ?? defaultDesign(DESIGNS[step].screen) : null;
-  if (!on) {
-    state.theme[DESIGNS[step].key] = null;
+  const { key, screen } = DESIGNS[step];
+  if (handWritten(step)) {
+    state.stash[step] = state.theme[key];
+  }
+  state.designs[step] = mode === "design" ? state.designs[step] ?? defaultDesign(screen) : null;
+  if (mode === "standard") {
+    state.theme[key] = null;
+  } else if (mode === "script") {
+    state.theme[key] = state.stash[step] ?? null;
   }
   state.picked = null;
   changed({ rebuild: true });
   restart();
 }
 
+function scriptColours(script) {
+  return [...script.matchAll(SCRIPT_COLOUR)].map((found) => ({ name: found[1], value: found[2].toLowerCase() }));
+}
+
+function friendlyName(name) {
+  const words = name.split("_").map((word) => SCRIPT_WORDS[word] ?? word.toLowerCase()).join(" ");
+  return words[0].toUpperCase() + words.slice(1);
+}
+
+function setScriptColour(step, name, value) {
+  const scene = state.theme[DESIGNS[step].key];
+  scene.script = scene.script.replace(new RegExp(`^const ${name} = #[0-9a-fA-F]{6}`, "m"), `const ${name} = ${value}`);
+  changed();
+}
+
+function scriptPanel(step) {
+  const scene = state.theme[DESIGNS[step].key];
+  const colours = scriptColours(scene.script).map(({ name, value }) => {
+    const row = field(friendlyName(name), colourInput(value, (picked) => setScriptColour(step, name, picked)));
+    row.dataset.script = name;
+    return row;
+  });
+  const parts = [
+    el("p", { class: "hint" }, "This screen comes with the theme. Change its colours here, or choose “My own design” to arrange a screen of your own."),
+  ];
+  if (colours.length > 0) {
+    parts.push(el("h3", {}, "Its colours"), group(...colours));
+  }
+  if (scene.chrome) {
+    const titles = CHROME_ROLES.map(([role, label]) => {
+      const row = field(label, colourInput(scene.chrome[role] ?? state.theme.colors[role], (picked) => {
+        scene.chrome[role] = picked;
+        changed();
+      }));
+      row.dataset.chrome = role;
+      return row;
+    });
+    parts.push(el("h3", {}, "Title bar on this screen"), group(...titles));
+  }
+  return parts;
+}
+
 function copyOtherSide() {
   const from = shape() === "wide" ? "tall" : "wide";
   const [a, b] = [AREAS[from], AREAS[shape()]];
+  const scale = Math.min(b.width / a.width, b.height / a.height);
+  const across = (b.width - a.width * scale) / 2;
+  const down = (b.height - a.height * scale) / 2;
   for (const item of currentDesign().layers) {
     const box = item.frames[from];
     item.frames[shape()] = {
-      x: Math.round((box.x * b.width) / a.width),
-      y: Math.round((box.y * b.height) / a.height),
-      w: Math.max(1, Math.round((box.w * b.width) / a.width)),
-      h: Math.max(1, Math.round((box.h * b.height) / a.height)),
+      x: Math.round(box.x * scale + across),
+      y: Math.round(box.y * scale + down),
+      w: Math.max(1, Math.round(box.w * scale)),
+      h: Math.max(1, Math.round(box.h * scale)),
     };
   }
   changed({ rebuild: true });
@@ -798,18 +980,26 @@ function copyOtherSide() {
 function panelDesign(step) {
   const config = DESIGNS[step];
   const design = state.designs[step];
-  const handWritten = !design && typeof state.theme[config.key]?.script === "string";
-  const mode = design ? "design" : handWritten ? "" : "standard";
+  const scripted = handWritten(step);
+  const mode = design ? "design" : scripted ? "script" : "standard";
+  const modes = [["standard", "The player's own"]];
+  if (scripted || state.stash[step]) {
+    modes.push(["script", "This theme's own"]);
+  }
+  modes.push(["design", "My own design"]);
   const parts = [
     el("h2", {}, config.title),
     el("p", { class: "lead" }, config.lead),
-    group(el("div", { class: "field stack" }, chips([["standard", "The player's own"], ["design", "My own design"]], mode, (value) => useDesign(value === "design")))),
+    group(el("div", { class: "field stack" }, chips(modes, mode, setMode))),
   ];
-  if (handWritten) {
-    parts.push(el("p", { class: "notice" }, config.outside));
+  if (scripted) {
+    return [...parts, ...scriptPanel(step)];
   }
   if (!design) {
     return parts;
+  }
+  if (config.screen === "home" && !design.layers.some((item) => item.type === "menu" && !item.hidden)) {
+    parts.push(el("p", { class: "notice" }, "This Home screen shows no menu. The buttons still move through Music, Settings and the rest, so add a Menu layer."));
   }
   const picked = pickedLayer();
   const other = shape() === "wide" ? "upright" : "sideways";
@@ -822,6 +1012,12 @@ function panelDesign(step) {
       el("button", { type: "button", onclick: () => {
         const item = newLayer(type, config.screen);
         design.layers.push(item);
+        if (!fits()) {
+          design.layers.pop();
+          syncScene();
+          say("There's no room for another layer on this screen. Remove one first.", true);
+          return;
+        }
         state.picked = item.id;
         changed({ rebuild: true });
       } }, `+ ${label}`))),
@@ -913,6 +1109,11 @@ function restart() {
   state.accent = shownAccent(state.theme, state.accent);
   state.preview.start(state.turn, state.screen, state.accent);
   apply();
+  for (let spent = 0; state.preview.busy && spent < SKIP_LIMIT_MS; spent += SKIP_STEP_MS) {
+    state.preview.advance(SKIP_STEP_MS);
+  }
+  state.preview.advance(SKIP_SETTLE_MS);
+  state.lastFrame = null;
 }
 
 function fitZoom(width, height) {
@@ -1020,27 +1221,80 @@ function nearHandle(item, point) {
   return Math.abs(point.x - (box.x + box.w)) <= reach && Math.abs(point.y - (box.y + box.h)) <= reach;
 }
 
+function shownScript() {
+  const step = Object.keys(DESIGNS).find((name) => DESIGNS[name].screen === state.screen);
+  return step && handWritten(step) ? step : null;
+}
+
+function scriptRoles(point) {
+  const step = shownScript();
+  const scene = step ? state.theme[DESIGNS[step].key] : null;
+  if (!scene) {
+    return [];
+  }
+  if (point.y < AREAS[shape()].top) {
+    return scene.chrome ? CHROME_ROLES.map(([role]) => [`chrome:${step}:${role}`, scene.chrome[role]]) : [];
+  }
+  return scriptColours(scene.script).map(({ name, value }) => [`script:${step}:${name}`, value]);
+}
+
 function roleAt(point) {
+  const own = scriptRoles(point);
+  const theme = Object.keys(state.theme.colors).map((role) => [role, shownColour(role)]);
+  return (own.length > 0 && closestRole(point, own)) || closestRole(point, theme);
+}
+
+function channels(value) {
+  const number = parseInt(value.slice(1), 16);
+  return [number >> 16, (number >> 8) & 255, number & 255];
+}
+
+function gapBetween(first, second) {
+  return first.reduce((sum, part, index) => sum + Math.abs(part - second[index]), 0);
+}
+
+function blendOf(shade, candidates) {
+  let best = null;
+  let distance = Infinity;
+  for (const [role, value] of candidates) {
+    for (const [, other] of candidates) {
+      const [from, to] = [channels(value), channels(other)];
+      const span = gapBetween(from, to);
+      const along = gapBetween(from, shade) + gapBetween(shade, to) - span;
+      const near = gapBetween(from, shade);
+      if (span > GRADIENT_LEAST && along <= GRADIENT_SLACK && near <= span / 2 && near < distance) {
+        distance = near;
+        best = role;
+      }
+    }
+  }
+  return best;
+}
+
+function closestRole(point, candidates) {
   const { width, pixels } = state.preview.frame();
   const index = (Math.floor(point.y) * width + Math.floor(point.x)) * 4;
   const shade = [pixels[index], pixels[index + 1], pixels[index + 2]];
   let best = null;
   let distance = Infinity;
-  for (const [role, value] of Object.entries(state.theme.colors)) {
-    const number = parseInt(value.slice(1), 16);
-    const gap = Math.abs((number >> 16) - shade[0]) + Math.abs(((number >> 8) & 255) - shade[1]) + Math.abs((number & 255) - shade[2]);
+  for (const [role, value] of candidates) {
+    const gap = gapBetween(channels(value), shade);
     if (gap < distance) {
       distance = gap;
       best = role;
     }
   }
-  return distance <= 24 ? best : null;
+  return distance <= COLOUR_SLACK ? best : blendOf(shade, candidates);
 }
 
 function jumpToRole(role) {
-  state.step = "colours";
+  const [kind, step, name] = role.split(":");
+  const own = kind === "script" || kind === "chrome";
+  state.step = own ? step : "colours";
   render();
-  const row = inspector.querySelector(`[data-role="${role}"]`);
+  const row = own
+    ? inspector.querySelector(`[data-${kind}="${name}"]`)
+    : inspector.querySelector(`[data-role="${role}"]`);
   if (row) {
     row.scrollIntoView({ block: "center", behavior: "smooth" });
     row.classList.add("flash");
@@ -1051,11 +1305,12 @@ function wireOverlay() {
   overlay.addEventListener("pointerdown", (event) => {
     const point = pointer(event);
     if (!designing()) {
+      event.preventDefault();
       const role = roleAt(point);
       if (role) {
         jumpToRole(role);
       } else {
-        say("That part comes from a picture: the wallpaper or a cover");
+        say("Couldn't tell which colour that is. It may be part of a picture, such as the wallpaper or a cover.");
       }
       canvas.focus({ preventScroll: true });
       return;
@@ -1090,12 +1345,15 @@ function wireOverlay() {
       : { ...start, x: start.x + dx, y: start.y + dy };
     apply();
   });
-  overlay.addEventListener("pointerup", () => {
+  const endDrag = () => {
     if (state.drag) {
       state.drag = null;
       changed({ rebuild: true });
     }
-  });
+  };
+  overlay.addEventListener("pointerup", endDrag);
+  overlay.addEventListener("pointercancel", endDrag);
+  overlay.addEventListener("lostpointercapture", endDrag);
 }
 
 function nudge(event) {
@@ -1117,13 +1375,13 @@ function nudge(event) {
 function download() {
   const bytes = apply();
   if (bytes) {
-    save(`${state.theme.name || "theme"}.echotheme`, bytes, "application/octet-stream");
+    save(`${slug(state.theme.name)}.echotheme`, bytes, "application/octet-stream");
   }
 }
 
 function downloadSource() {
   syncScene();
-  save(`${state.theme.name || "theme"}.toml`, toToml(state.theme, state.schema), "text/plain");
+  save(`${slug(state.theme.name)}.toml`, toToml(state.theme, state.schema), "text/plain");
 }
 
 function save(name, bytes, type) {
@@ -1133,6 +1391,7 @@ function save(name, bytes, type) {
 }
 
 function wear(bytes) {
+  settleHistory();
   try {
     const theme = unpack(bytes, state.schema);
     state.theme = theme;
@@ -1140,15 +1399,18 @@ function wear(bytes) {
       playing: theme.now_playing_scene?.design ? readDesign(theme.now_playing_scene.design) : null,
       home: theme.home_scene?.design ? readDesign(theme.home_scene.design) : null,
     };
+    state.stash = {};
     state.picked = null;
     restart();
     remember();
     render();
+    return true;
   } catch (error) {
     if (!(error instanceof ThemeError)) {
       throw error;
     }
     say(error.message, true);
+    return false;
   }
 }
 
@@ -1160,14 +1422,23 @@ async function fetchBytes(path) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function openSample(sample) {
-  wear(await fetchBytes(`themes/${sample}.echotheme`));
-  say(`Started from ${sampleName(sample)}`);
+async function openSample(sample, kept = false) {
+  let bytes;
+  try {
+    bytes = await fetchBytes(`themes/${sample}.echotheme`);
+  } catch {
+    say(`${sampleName(sample)} couldn't be opened. Check your connection and try again.`, true);
+    return;
+  }
+  if (wear(bytes)) {
+    say(kept ? `Opened ${sampleName(sample)}. Undo brings back the theme you were making.` : `Started from ${sampleName(sample)}`);
+  }
 }
 
 function startOver() {
   state.theme = defaultTheme(state.schema);
   state.designs = { playing: null, home: null };
+  state.stash = {};
   state.picked = null;
   restart();
   changed({ rebuild: true });
@@ -1241,12 +1512,15 @@ async function main() {
   state.theme = defaultTheme(state.schema);
   const asked = new URLSearchParams(location.search).get("theme");
   const draft = loadDraft();
-  if (draft && !asked) {
+  if (draft) {
     try {
       restore(draft);
+      syncScene();
+      pack(state.theme, state.schema);
     } catch {
       state.theme = defaultTheme(state.schema);
       state.designs = { playing: null, home: null };
+      clearDraft();
     }
   }
   wireControls();
@@ -1255,8 +1529,13 @@ async function main() {
   state.history = [snapshot()];
   render();
   refreshUndo();
-  if (state.schema.samples.includes(asked)) {
-    await openSample(asked);
+  if (asked !== null) {
+    history.replaceState(null, "", location.pathname);
+    if (state.schema.samples.includes(asked)) {
+      await openSample(asked, Boolean(draft));
+    } else {
+      say(`There's no theme called “${asked}” here, so your own theme is open.`, true);
+    }
   }
   requestAnimationFrame(frame);
 }
