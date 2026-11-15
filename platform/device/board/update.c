@@ -17,15 +17,18 @@ enum {
     PERCENT_CAPACITY = 8,
     PERCENT_STEP = 5,
     PERCENT = 100,
-    HIGHEST_NUMBER = 97,
+    HIGHEST_8GB = 97,
+    HIGHEST_512MB = 898,
+    LOWEST_512MB = 300,
     TENS_AT = 7,
     UNITS_AT = 8,
     SECTORS_PER_MIB = 2048
 };
 
-static const char UPDATE_TEMPLATE[] = "/HIFIEC00.IMG";
+static const char UPDATE_TEMPLATE_8GB[] = "/HIFIEC00.IMG";
+static const char UPDATE_TEMPLATE_512MB[] = "/MINIV000.IMG";
 static const char MODEL_UPDATE[] = "/ECHOMINI.IMG";
-static char update_path[sizeof UPDATE_TEMPLATE];
+static char update_path[sizeof UPDATE_TEMPLATE_8GB];
 static const char *install_title;
 
 static FatVolume volume;
@@ -62,21 +65,33 @@ static void report(void *context, uint32_t done, uint32_t total)
     }
 }
 
-static bool open_highest_numbered(void)
+static bool open_highest_numbered(bool small_model)
 {
-    _Static_assert(sizeof MODEL_UPDATE == sizeof UPDATE_TEMPLATE, "same length");
-    for (size_t index = 0; index < sizeof MODEL_UPDATE; index++) {
-        update_path[index] = MODEL_UPDATE[index];
+    _Static_assert(sizeof MODEL_UPDATE == sizeof UPDATE_TEMPLATE_8GB, "same length");
+    _Static_assert(sizeof UPDATE_TEMPLATE_512MB == sizeof UPDATE_TEMPLATE_8GB, "same length");
+    if (!small_model) {
+        for (size_t index = 0; index < sizeof MODEL_UPDATE; index++) {
+            update_path[index] = MODEL_UPDATE[index];
+        }
+        if (fat_open(&volume, update_path, &file)) {
+            return true;
+        }
     }
-    if (fat_open(&volume, update_path, &file)) {
-        return true;
+    const char *template = small_model ? UPDATE_TEMPLATE_512MB : UPDATE_TEMPLATE_8GB;
+    for (size_t index = 0; index < sizeof update_path; index++) {
+        update_path[index] = template[index];
     }
-    for (size_t index = 0; index < sizeof UPDATE_TEMPLATE; index++) {
-        update_path[index] = UPDATE_TEMPLATE[index];
-    }
-    for (int number = HIGHEST_NUMBER; number >= 0; number--) {
-        update_path[TENS_AT] = (char)('0' + number / 10);
-        update_path[UNITS_AT] = (char)('0' + number % 10);
+    int highest = small_model ? HIGHEST_512MB : HIGHEST_8GB;
+    int lowest = small_model ? LOWEST_512MB : 0;
+    for (int number = highest; number >= lowest; number--) {
+        if (small_model) {
+            update_path[TENS_AT - 1] = (char)('0' + number / 100);
+            update_path[TENS_AT] = (char)('0' + number / 10 % 10);
+            update_path[UNITS_AT] = (char)('0' + number % 10);
+        } else {
+            update_path[TENS_AT] = (char)('0' + number / 10);
+            update_path[UNITS_AT] = (char)('0' + number % 10);
+        }
         if (fat_open(&volume, update_path, &file)) {
             return true;
         }
@@ -88,11 +103,17 @@ static bool open_update(UpdateStorage *storage)
 {
     EmmcInfo info;
     BlockDevice device = {emmc_volume_read, NULL, NULL};
-    if (!emmc_start(&info) || !fat_mount(&volume, device) || !open_highest_numbered()) {
+    if (!emmc_start(&info) || !info.layout.slots_valid || !fat_mount(&volume, device) ||
+        !open_highest_numbered(info.sd_nand)) {
         return false;
     }
-    *storage = (UpdateStorage){emmc_read,          emmc_write,         NULL,
-                               info.layout.slot_1, info.layout.slot_2, info.layout.slot_sectors};
+    *storage = (UpdateStorage){.read = emmc_read,
+                               .write = emmc_write,
+                               .context = NULL,
+                               .slot_1 = info.layout.slot_1,
+                               .slot_2 = info.layout.slot_2,
+                               .slot_sectors = info.layout.slot_sectors,
+                               .model = info.sd_nand ? UPDATE_MODEL_512MB : UPDATE_MODEL_8GB};
     return true;
 }
 

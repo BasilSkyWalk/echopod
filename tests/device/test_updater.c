@@ -157,7 +157,13 @@ static void report(void *context, uint32_t done, uint32_t total)
 
 static UpdateStorage target(void)
 {
-    return (UpdateStorage){storage_read, storage_write, NULL, SLOT_1, SLOT_2, SLOT_SECTORS};
+    return (UpdateStorage){.read = storage_read,
+                           .write = storage_write,
+                           .context = NULL,
+                           .slot_1 = SLOT_1,
+                           .slot_2 = SLOT_2,
+                           .slot_sectors = SLOT_SECTORS,
+                           .model = UPDATE_MODEL_8GB};
 }
 
 static UpdateFile source(void)
@@ -406,17 +412,29 @@ static uint8_t *stock_image(uint8_t seed)
 
 static UpdateStorage stock_target(void)
 {
-    return (UpdateStorage){storage_read, storage_write, NULL,
-                           SLOT_1,       STOCK_SLOT_2,  STOCK_SLOT_SECTORS};
+    return (UpdateStorage){.read = storage_read,
+                           .write = storage_write,
+                           .context = NULL,
+                           .slot_1 = SLOT_1,
+                           .slot_2 = STOCK_SLOT_2,
+                           .slot_sectors = STOCK_SLOT_SECTORS,
+                           .model = UPDATE_MODEL_8GB};
 }
 
-static UpdateCheck check_stock(uint8_t *image, uint32_t size, uint32_t slot_sectors)
+static UpdateCheck check_stock_model(uint8_t *image, uint32_t size, uint32_t slot_sectors,
+                                     UpdateModel model)
 {
     reset(image, size);
     UpdateStorage storage_target = stock_target();
     storage_target.slot_sectors = slot_sectors;
+    storage_target.model = model;
     UpdateFile update = source();
     return updater_check(&update, &storage_target);
+}
+
+static UpdateCheck check_stock(uint8_t *image, uint32_t size, uint32_t slot_sectors)
+{
+    return check_stock_model(image, size, slot_sectors, UPDATE_MODEL_8GB);
 }
 
 static void a_stock_image_is_recognised_as_stock(void)
@@ -450,6 +468,19 @@ static void the_512_mb_model_and_unmarked_images_are_invalid(void)
     memcpy(image + 2 * MARKER_AT, SMALL_MODEL_MARKER, MARKER_LENGTH);
     seal_stock(image);
     CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+}
+
+static void a_512_mb_stock_image_is_accepted_on_the_512_mb_model(void)
+{
+    uint8_t *small = model_image(1, STOCK_V4_FW_SIZE, SMALL_MODEL_MARKER, MARKER_AT);
+    CHECK_EQUAL(UPDATE_STOCK,
+                check_stock_model(small, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS, UPDATE_MODEL_512MB));
+    uint8_t *eight = stock_image(2);
+    CHECK_EQUAL(UPDATE_INVALID,
+                check_stock_model(eight, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS, UPDATE_MODEL_512MB));
+    uint8_t *cross = model_image(3, STOCK_V4_FW_SIZE, SMALL_MODEL_MARKER, MARKER_AT);
+    CHECK_EQUAL(UPDATE_INVALID,
+                check_stock_model(cross, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS, UPDATE_MODEL_8GB));
 }
 
 static void a_stock_header_copy_off_a_sector_is_invalid(void)
@@ -544,6 +575,7 @@ int main(void)
         TEST_CASE(firmware_4_stock_images_are_recognised_as_stock),
         TEST_CASE(a_model_marker_across_two_reads_is_found),
         TEST_CASE(the_512_mb_model_and_unmarked_images_are_invalid),
+        TEST_CASE(a_512_mb_stock_image_is_accepted_on_the_512_mb_model),
         TEST_CASE(a_stock_header_copy_off_a_sector_is_invalid),
         TEST_CASE(damaged_or_other_model_stock_images_are_invalid),
         TEST_CASE(a_stock_image_needs_a_slot_it_fits),

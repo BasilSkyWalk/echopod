@@ -63,8 +63,13 @@ int main(int argument_count, char **arguments)
     static uint32_t scratch[UPDATER_SCRATCH_WORDS];
     updater_use_scratch(scratch);
     UpdateFile file = {read_image, (uint32_t)image_size, NULL};
-    UpdateStorage storage = {read_blank, refuse_write,          NULL,
-                             0x2000,     0x2000 + SLOT_SECTORS, SLOT_SECTORS};
+    UpdateStorage storage = {.read = read_blank,
+                             .write = refuse_write,
+                             .context = NULL,
+                             .slot_1 = 0x2000,
+                             .slot_2 = 0x2000 + SLOT_SECTORS,
+                             .slot_sectors = SLOT_SECTORS,
+                             .model = UPDATE_MODEL_8GB};
     UpdateCheck check = updater_check(&file, &storage);
     free(image);
     printf("updater check: %s\n", check == UPDATE_VALID ? "valid" : "INVALID");

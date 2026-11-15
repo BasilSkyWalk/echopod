@@ -12,7 +12,9 @@ typedef struct EmmcLayout {
     uint32_t firmware_end;
     uint32_t volume_start;
     uint32_t volume_sectors;
+    bool slots_valid;
 } EmmcLayout;
 
-bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t total_sectors);
+bool emmc_layout_read(EmmcLayout *layout, const BlockDevice *device, uint32_t total_sectors,
+                      bool small_nand);
 bool emmc_layout_allows_write(const EmmcLayout *layout, uint32_t lba, uint32_t count);
