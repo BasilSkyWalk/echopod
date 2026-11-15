@@ -21,7 +21,7 @@ static const char *const SOUND[] = {"Gain", "Output", "Filter", "Balance", "Blue
 static const char *const DISPLAY[] = {
     "Theme",           "Accent color",        "Highlight",   "Now Playing",
     "Brightness",      "Screen timeout",      "Orientation", "Animations",
-    "Battery percent", "Portrait status bar", "Clock"};
+    "Battery percent", "Portrait status bar", "Clock",       "Shuffle and repeat icons"};
 static const char *const LIBRARY[] = {"Music folders",       "Rescan library",   "Start screen",
                                       "Cover Flow",          "Cover Flow order", "Artist albums",
                                       "Folders & playlists", "Lyrics",           "Listen history"};
@@ -191,14 +191,14 @@ static void hidden_rows_leave_the_other_display_rows_in_place(void)
 {
     SettingsStore store;
     start_with_theme(&store, THEME_DARK);
-    CHECK_EQUAL(11, shown_display_rows());
+    CHECK_EQUAL(12, shown_display_rows());
     start_with_theme(&store, THEME_NEON);
-    CHECK_EQUAL(9, shown_display_rows());
+    CHECK_EQUAL(10, shown_display_rows());
     CHECK(shown_display_row_is(0, "Theme"));
     CHECK(shown_display_row_is(1, "Now Playing"));
     CHECK(shown_display_row_is(2, "Brightness"));
     start_with_theme(&store, THEME_FJORD);
-    CHECK_EQUAL(10, shown_display_rows());
+    CHECK_EQUAL(11, shown_display_rows());
     CHECK(shown_display_row_is(1, "Highlight"));
     CHECK(shown_display_row_is(2, "Now Playing"));
     CHECK(shown_display_row_is(3, "Brightness"));

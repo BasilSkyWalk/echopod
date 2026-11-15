@@ -114,3 +114,38 @@ void icon_draw_bluetooth(Canvas *canvas, Rect area, Color color)
         }
     }
 }
+
+enum {
+    MODE_ROWS = 11,
+    MODE_COLUMNS = 13
+};
+
+static const uint16_t SHUFFLE_MARK[MODE_ROWS] = {0x400, 0xC00, 0x1E0F, 0xD10, 0x4A0, 0x040,
+                                                 0x4A0, 0xD10, 0x1E0F, 0xC00, 0x400};
+static const uint16_t REPEAT_MARK[MODE_ROWS] = {0x400,  0xFFE,  0x1401, 0x1001, 0x1001, 0x1001,
+                                                0x1001, 0x1001, 0x1005, 0xFFE,  0x004};
+static const uint16_t REPEAT_ONE_MARK[MODE_ROWS] = {0x400,  0xFFE,  0x1401, 0x1041, 0x1061, 0x1041,
+                                                    0x1041, 0x10E1, 0x1005, 0xFFE,  0x004};
+
+static void draw_mode_mark(Canvas *canvas, Rect area, Color color, const uint16_t *rows)
+{
+    int left = area.x + (area.width - MODE_COLUMNS) / 2;
+    int top = area.y + (area.height - MODE_ROWS) / 2;
+    for (int row = 0; row < MODE_ROWS; row++) {
+        for (int column = 0; column < MODE_COLUMNS; column++) {
+            if ((rows[row] >> column & 1) != 0) {
+                canvas_fill_rect(canvas, (Rect){left + column, top + row, 1, 1}, color);
+            }
+        }
+    }
+}
+
+void icon_draw_shuffle(Canvas *canvas, Rect area, Color color)
+{
+    draw_mode_mark(canvas, area, color, SHUFFLE_MARK);
+}
+
+void icon_draw_repeat(Canvas *canvas, Rect area, Color color, bool one)
+{
+    draw_mode_mark(canvas, area, color, one ? REPEAT_ONE_MARK : REPEAT_MARK);
+}

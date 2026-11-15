@@ -358,3 +358,4 @@ STR_SETTINGS_LIBRARY = Bibliotheek
 STR_SETTINGS_BUTTONS = Knoppen
 STR_SETTINGS_SYSTEM = Systeem
 STR_MENU_CHAPTERS = Hoofdstukken
+STR_SETTINGS_PLAY_MODE_ICONS = Shuffle- en herhaalpictogrammen

@@ -8,7 +8,7 @@
 
 enum {
     MP4_CHAPTERS_MAX = 255,
-    MP4_CHAPTERS_KEPT = 160
+    MP4_CHAPTERS_KEPT = 128
 };
 
 typedef struct Mp4Chapters {

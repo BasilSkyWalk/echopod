@@ -759,12 +759,23 @@ static const char *status_clock_text(void)
     return text;
 }
 
+static StatusRepeat repeat_of(RepeatMode repeat)
+{
+    return repeat == REPEAT_ONE   ? STATUS_REPEAT_ONE
+           : repeat == REPEAT_ALL ? STATUS_REPEAT_ALL
+                                  : STATUS_REPEAT_OFF;
+}
+
 static StatusBarState current_status_bar(void)
 {
     HalBattery battery = hal_power_battery();
+    PlayerStatus status = player_status(&app.player);
     return (StatusBarState){
-        .playback = playback_of(player_status(&app.player).state),
+        .playback = playback_of(status.state),
         .bluetooth = bluetooth_of(&app.bluetooth),
+        .play_modes = app.settings.settings.options[OPTION_PLAY_MODE_ICONS] == PLAY_MODE_ICONS_ON,
+        .shuffle = status.shuffle != SHUFFLE_OFF,
+        .repeat = repeat_of(status.repeat),
         .battery_known = battery.known,
         .battery_percent = battery.percent,
         .charging = battery.charging,

@@ -19,6 +19,12 @@ typedef enum StatusBluetooth {
     STATUS_BLUETOOTH_CONNECTED
 } StatusBluetooth;
 
+typedef enum StatusRepeat {
+    STATUS_REPEAT_OFF,
+    STATUS_REPEAT_ONE,
+    STATUS_REPEAT_ALL
+} StatusRepeat;
+
 enum {
     STATUS_BAR_LOW_BATTERY_PERCENT = 15,
     STATUS_BAR_PERCENT_CAPACITY = 8
@@ -27,6 +33,9 @@ enum {
 typedef struct StatusBarState {
     StatusPlayback playback;
     StatusBluetooth bluetooth;
+    bool play_modes;
+    bool shuffle;
+    StatusRepeat repeat;
     bool battery_known;
     uint8_t battery_percent;
     bool charging;
@@ -36,6 +45,9 @@ typedef struct StatusBarState {
 
 Rect status_bar_playback_area(const Theme *theme);
 Rect status_bar_bluetooth_area(const Theme *theme);
+Rect status_bar_shuffle_area(const Theme *theme);
+Rect status_bar_repeat_area(const Theme *theme);
+Rect status_bar_repeat_icon_area(const Theme *theme, StatusBarState state);
 Rect status_bar_battery_area(const Theme *theme);
 int status_bar_battery_fill_width(uint8_t percent, int inner_width);
 void status_bar_percent_text(uint8_t percent, char *text, size_t capacity);

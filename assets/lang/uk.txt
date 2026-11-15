@@ -357,3 +357,4 @@ STR_SETTINGS_LIBRARY = Медіатека
 STR_SETTINGS_BUTTONS = Кнопки
 STR_SETTINGS_SYSTEM = Система
 STR_MENU_CHAPTERS = Розділи
+STR_SETTINGS_PLAY_MODE_ICONS = Значки перемішування і повтору

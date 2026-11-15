@@ -11,6 +11,7 @@ enum {
     NUB_DIVISOR = 5,
     BOLT_WIDTH_TENTHS = 6,
     BLUETOOTH_WIDTH_TENTHS = 7,
+    MODE_ICON_WIDTH = 13,
     TENTHS = 10,
     FULL_PERCENT = 100,
     CLOCK_TEXT_CAPACITY = 16
@@ -45,6 +46,25 @@ Rect status_bar_bluetooth_area(const Theme *theme)
     int width = playback.width * BLUETOOTH_WIDTH_TENTHS / TENTHS;
     return (Rect){playback.x + playback.width + theme->metrics.padding / 2, playback.y,
                   width > 0 ? width : 1, playback.height};
+}
+
+Rect status_bar_shuffle_area(const Theme *theme)
+{
+    Rect bluetooth = status_bar_bluetooth_area(theme);
+    return (Rect){bluetooth.x + bluetooth.width + theme->metrics.padding / 2, bluetooth.y,
+                  MODE_ICON_WIDTH, bluetooth.height};
+}
+
+Rect status_bar_repeat_area(const Theme *theme)
+{
+    Rect shuffle = status_bar_shuffle_area(theme);
+    return (Rect){shuffle.x + shuffle.width + theme->metrics.padding / 2, shuffle.y,
+                  MODE_ICON_WIDTH, shuffle.height};
+}
+
+Rect status_bar_repeat_icon_area(const Theme *theme, StatusBarState state)
+{
+    return state.shuffle ? status_bar_repeat_area(theme) : status_bar_shuffle_area(theme);
 }
 
 Rect status_bar_battery_area(const Theme *theme)
@@ -132,8 +152,9 @@ static int clock_room(const Font *font, const char *clock)
 Rect status_bar_clock_area(const Theme *theme, StatusBarState state)
 {
     Rect bluetooth = status_bar_bluetooth_area(theme);
+    Rect last = state.play_modes ? status_bar_repeat_area(theme) : bluetooth;
     int gap = percent_gap(theme);
-    int left = bluetooth.x + bluetooth.width + gap;
+    int left = last.x + last.width + gap;
     int right = right_items_left(theme, state) - gap;
     int width = state.clock != NULL ? clock_room(status_font(theme), state.clock) : 0;
     bool centered = theme->metrics.status_height > 0;
@@ -210,6 +231,13 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
         Color tint =
             state.bluetooth == STATUS_BLUETOOTH_CONNECTED ? color : theme->colors.text_tertiary;
         icon_draw_bluetooth(canvas, status_bar_bluetooth_area(theme), tint);
+    }
+    if (state.play_modes && state.shuffle) {
+        icon_draw_shuffle(canvas, status_bar_shuffle_area(theme), color);
+    }
+    if (state.play_modes && state.repeat != STATUS_REPEAT_OFF) {
+        icon_draw_repeat(canvas, status_bar_repeat_icon_area(theme, state), color,
+                         state.repeat == STATUS_REPEAT_ONE);
     }
     Rect clock = status_bar_clock_area(theme, state);
     if (!rect_is_empty(clock)) {
