@@ -85,12 +85,18 @@ typedef enum SettingOption {
     OPTION_STATUS_BAR,
     OPTION_POWER_ON,
     OPTION_NOW_PLAYING_FACE,
+    OPTION_PLAY_MODE_ICONS,
     SETTINGS_OPTION_COUNT
 } SettingOption;
 
 enum {
     CLOCK_OFF,
     CLOCK_ON
+};
+
+enum {
+    PLAY_MODE_ICONS_OFF,
+    PLAY_MODE_ICONS_ON
 };
 
 enum {

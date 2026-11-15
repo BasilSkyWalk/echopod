@@ -9,3 +9,5 @@ void icon_draw_next(Canvas *canvas, Rect area, Color color);
 void icon_draw_previous(Canvas *canvas, Rect area, Color color);
 void icon_draw_bolt(Canvas *canvas, Rect area, Color color);
 void icon_draw_bluetooth(Canvas *canvas, Rect area, Color color);
+void icon_draw_shuffle(Canvas *canvas, Rect area, Color color);
+void icon_draw_repeat(Canvas *canvas, Rect area, Color color, bool one);

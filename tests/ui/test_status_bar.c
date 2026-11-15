@@ -266,6 +266,117 @@ static void the_percentage_gives_way_to_a_clock_that_does_not_fit_beside_it(void
     CHECK(!ui_test_area_has_only(&expected, clock, theme.colors.header_background));
 }
 
+static Theme modes_theme(void)
+{
+    Theme theme = status_theme();
+    theme.metrics.padding = 1;
+    return theme;
+}
+
+static StatusBarState with_modes(bool shuffle, StatusRepeat repeat)
+{
+    return (StatusBarState){.playback = STATUS_PLAYBACK_PLAYING,
+                            .play_modes = true,
+                            .shuffle = shuffle,
+                            .repeat = repeat};
+}
+
+static void the_mode_icons_follow_the_bluetooth_icon_in_order(void)
+{
+    Theme theme = modes_theme();
+    Rect bluetooth = status_bar_bluetooth_area(&theme);
+    Rect shuffle = status_bar_shuffle_area(&theme);
+    Rect repeat = status_bar_repeat_area(&theme);
+    CHECK(shuffle.x >= bluetooth.x + bluetooth.width);
+    CHECK(repeat.x >= shuffle.x + shuffle.width);
+    CHECK_EQUAL(bluetooth.y, shuffle.y);
+    CHECK_EQUAL(bluetooth.y, repeat.y);
+}
+
+static void a_mode_that_is_on_is_drawn_and_one_that_is_off_is_not(void)
+{
+    Theme theme = modes_theme();
+    Rect shuffle = status_bar_shuffle_area(&theme);
+    Rect repeat = status_bar_repeat_area(&theme);
+    Canvas none = draw_status(&theme, with_modes(false, STATUS_REPEAT_OFF));
+    CHECK(ui_test_area_has_only(&none, shuffle, theme.colors.header_background));
+    CHECK(ui_test_area_has_only(&none, repeat, theme.colors.header_background));
+    Canvas shuffled = draw_status(&theme, with_modes(true, STATUS_REPEAT_OFF));
+    CHECK(ui_test_area_has_color(&shuffled, shuffle, theme.colors.header_text));
+    CHECK(ui_test_area_has_only(&shuffled, repeat, theme.colors.header_background));
+    Canvas both = draw_status(&theme, with_modes(true, STATUS_REPEAT_ALL));
+    CHECK(ui_test_area_has_color(&both, shuffle, theme.colors.header_text));
+    CHECK(ui_test_area_has_color(&both, repeat, theme.colors.header_text));
+}
+
+static void repeat_moves_up_to_the_shuffle_slot_when_shuffle_is_off(void)
+{
+    Theme theme = modes_theme();
+    Rect shuffle = status_bar_shuffle_area(&theme);
+    Rect repeat = status_bar_repeat_area(&theme);
+    StatusBarState state = with_modes(false, STATUS_REPEAT_ALL);
+    CHECK_EQUAL(shuffle.x, status_bar_repeat_icon_area(&theme, state).x);
+    Canvas moved = draw_status(&theme, state);
+    CHECK(ui_test_area_has_color(&moved, shuffle, theme.colors.header_text));
+    CHECK(ui_test_area_has_only(&moved, repeat, theme.colors.header_background));
+    state.shuffle = true;
+    CHECK_EQUAL(repeat.x, status_bar_repeat_icon_area(&theme, state).x);
+}
+
+static void repeating_one_song_looks_different_from_repeating_all(void)
+{
+    enum {
+        MAX_AREA = 256
+    };
+    Theme theme = modes_theme();
+    Rect repeat = status_bar_repeat_icon_area(&theme, with_modes(false, STATUS_REPEAT_ALL));
+    Color all[MAX_AREA];
+    int count = 0;
+    Canvas canvas = draw_status(&theme, with_modes(false, STATUS_REPEAT_ALL));
+    for (int y = repeat.y; y < repeat.y + repeat.height; y++) {
+        for (int x = repeat.x; x < repeat.x + repeat.width; x++) {
+            all[count++] = canvas_pixel_at(&canvas, x, y);
+        }
+    }
+    CHECK(count <= MAX_AREA);
+    canvas = draw_status(&theme, with_modes(false, STATUS_REPEAT_ONE));
+    CHECK(ui_test_area_has_color(&canvas, repeat, theme.colors.header_text));
+    bool different = false;
+    count = 0;
+    for (int y = repeat.y; y < repeat.y + repeat.height; y++) {
+        for (int x = repeat.x; x < repeat.x + repeat.width; x++) {
+            different = different || all[count++] != canvas_pixel_at(&canvas, x, y);
+        }
+    }
+    CHECK(different);
+}
+
+static void modes_that_are_hidden_by_the_setting_draw_nothing(void)
+{
+    Theme theme = modes_theme();
+    StatusBarState state = with_modes(true, STATUS_REPEAT_ONE);
+    state.play_modes = false;
+    Canvas canvas = draw_status(&theme, state);
+    CHECK(ui_test_area_has_only(&canvas, status_bar_shuffle_area(&theme),
+                                theme.colors.header_background));
+    CHECK(ui_test_area_has_only(&canvas, status_bar_repeat_area(&theme),
+                                theme.colors.header_background));
+}
+
+static void the_clock_moves_past_the_mode_icons_when_they_are_shown(void)
+{
+    Theme theme = modes_theme();
+    theme.metrics.header_inset = 3 * CLOCK_INSET;
+    StatusBarState state = {.playback = STATUS_PLAYBACK_PLAYING, .clock = "12:34"};
+    Rect before = status_bar_clock_area(&theme, state);
+    state.play_modes = true;
+    Rect after = status_bar_clock_area(&theme, state);
+    Rect repeat = status_bar_repeat_area(&theme);
+    CHECK(before.width > 0 && after.width > 0);
+    CHECK(after.x >= repeat.x + repeat.width);
+    CHECK(after.x > before.x);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -285,6 +396,12 @@ int main(void)
         TEST_CASE(a_charging_battery_is_drawn_in_the_success_color),
         TEST_CASE(a_charging_battery_has_a_bolt_beside_it),
         TEST_CASE(the_percentage_moves_left_of_the_bolt_while_charging),
+        TEST_CASE(the_mode_icons_follow_the_bluetooth_icon_in_order),
+        TEST_CASE(a_mode_that_is_on_is_drawn_and_one_that_is_off_is_not),
+        TEST_CASE(repeat_moves_up_to_the_shuffle_slot_when_shuffle_is_off),
+        TEST_CASE(repeating_one_song_looks_different_from_repeating_all),
+        TEST_CASE(modes_that_are_hidden_by_the_setting_draw_nothing),
+        TEST_CASE(the_clock_moves_past_the_mode_icons_when_they_are_shown),
         TEST_CASE(a_status_font_replaces_the_small_font),
         TEST_CASE(a_clock_too_wide_to_center_sits_after_the_left_icons),
         TEST_CASE(the_percentage_gives_way_to_a_clock_that_does_not_fit_beside_it),

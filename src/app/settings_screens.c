@@ -387,6 +387,7 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_STATUS_BAR, STATUS_BAR_OPTIONS, OPTION_STATUS_BAR),
     OPTION_CHOICE(STR_SETTINGS_POWER_ON, POWER_ON_OPTIONS, OPTION_POWER_ON),
     OPTION_CHOICE(STR_MENU_NOW_PLAYING, NP_FACE_OPTIONS, OPTION_NOW_PLAYING_FACE),
+    OPTION_CHOICE(STR_SETTINGS_PLAY_MODE_ICONS, SWITCH_OPTIONS, OPTION_PLAY_MODE_ICONS),
 };
 
 static ScreenAction open_choice(void *context)
@@ -469,6 +470,7 @@ enum {
     CHOICE_STATUS_BAR,
     CHOICE_POWER_ON,
     CHOICE_NOW_PLAYING_FACE,
+    CHOICE_PLAY_MODE_ICONS,
     ROW_BLUETOOTH = SETTINGS_CHOICE_COUNT,
     ROW_EQUALIZER,
     ROW_DATE_TIME,
@@ -523,6 +525,7 @@ ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
                                              CHOICE_BATTERY,
                                              CHOICE_STATUS_BAR,
                                              CHOICE_CLOCK,
+                                             CHOICE_PLAY_MODE_ICONS,
                                              ROW_FOLDERS,
                                              ROW_RESCAN,
                                              CHOICE_START,
@@ -545,7 +548,7 @@ ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
 enum {
     SOUND_ROWS = 5,
     DISPLAY_FIRST = SETTINGS_TOP_COUNT + SOUND_ROWS,
-    DISPLAY_ROWS = 11,
+    DISPLAY_ROWS = 12,
     LIBRARY_FIRST = DISPLAY_FIRST + DISPLAY_ROWS,
     LIBRARY_ROWS = 9,
     BUTTONS_FIRST = LIBRARY_FIRST + LIBRARY_ROWS,

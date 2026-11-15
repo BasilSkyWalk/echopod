@@ -445,6 +445,8 @@ static void the_new_options_default_to_their_first_choice(void)
     CHECK_EQUAL(2, settings_option_count(OPTION_USB_PROMPT));
     CHECK_EQUAL(2, settings_option_count(OPTION_LISTEN_HISTORY));
     CHECK_EQUAL(CLOCK_OFF, settings.options[OPTION_CLOCK]);
+    CHECK_EQUAL(2, settings_option_count(OPTION_PLAY_MODE_ICONS));
+    CHECK_EQUAL(PLAY_MODE_ICONS_OFF, settings.options[OPTION_PLAY_MODE_ICONS]);
     CHECK_EQUAL(TIME_ZONE_UNSET, settings.options[OPTION_TIME_ZONE]);
     CHECK_EQUAL(TIME_ZONE_OPTION_COUNT, settings_option_count(OPTION_TIME_ZONE));
     CHECK_EQUAL(106, TIME_ZONE_OPTION_COUNT);

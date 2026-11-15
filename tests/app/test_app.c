@@ -3264,6 +3264,43 @@ static void start_app_with_clock(bool clock_on)
     step();
 }
 
+static void start_app_with_play_modes(bool icons_on, ShuffleMode shuffle)
+{
+    static uint8_t mode_settings[SETTINGS_FILE_SIZE];
+    Settings settings = settings_defaults();
+    settings.options[OPTION_PLAY_MODE_ICONS] = icons_on ? PLAY_MODE_ICONS_ON : PLAY_MODE_ICONS_OFF;
+    settings.shuffle = shuffle;
+    settings.repeat = REPEAT_ONE;
+    settings_encode(&settings, mode_settings);
+    fake_hal_reset();
+    fake_hal_add_file("/.echo/settings.bin", mode_settings, sizeof mode_settings);
+    now_ms = START_MS;
+    fake_hal_set_milliseconds(now_ms);
+    app_start();
+    step();
+}
+
+static void the_status_bar_shows_shuffle_and_repeat_only_when_the_setting_is_on(void)
+{
+    Rect shuffle = status_bar_shuffle_area(&DEFAULT_THEME);
+    Rect repeat = status_bar_repeat_area(&DEFAULT_THEME);
+    start_app_with_play_modes(false, SHUFFLE_SONGS);
+    CHECK(!area_has_color(shuffle, DEFAULT_THEME.colors.header_text));
+    CHECK(!area_has_color(repeat, DEFAULT_THEME.colors.header_text));
+    start_app_with_play_modes(true, SHUFFLE_SONGS);
+    CHECK(area_has_color(shuffle, DEFAULT_THEME.colors.header_text));
+    CHECK(area_has_color(repeat, DEFAULT_THEME.colors.header_text));
+}
+
+static void repeat_takes_the_shuffle_slot_while_shuffle_is_off(void)
+{
+    Rect shuffle = status_bar_shuffle_area(&DEFAULT_THEME);
+    Rect repeat = status_bar_repeat_area(&DEFAULT_THEME);
+    start_app_with_play_modes(true, SHUFFLE_OFF);
+    CHECK(area_has_color(shuffle, DEFAULT_THEME.colors.header_text));
+    CHECK(!area_has_color(repeat, DEFAULT_THEME.colors.header_text));
+}
+
 static HalTime chip_on(uint16_t year, uint8_t month, uint8_t day)
 {
     return (HalTime){
@@ -3620,6 +3657,8 @@ int main(void)
         TEST_CASE(connecting_writes_the_scrobbler_log_while_the_history_is_on),
         TEST_CASE(the_clock_is_under_display_and_date_time_under_system),
         TEST_CASE(a_clock_dated_before_the_firmware_shows_no_time),
+        TEST_CASE(the_status_bar_shows_shuffle_and_repeat_only_when_the_setting_is_on),
+        TEST_CASE(repeat_takes_the_shuffle_slot_while_shuffle_is_off),
         TEST_CASE(the_landscape_clock_and_battery_show_at_every_minute),
         TEST_CASE(the_listen_history_has_no_time_while_the_clock_predates_the_firmware),
         TEST_CASE(a_new_firmware_asks_once_for_the_clock_after_the_start_up_screen),

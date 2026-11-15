@@ -358,3 +358,4 @@ STR_SETTINGS_LIBRARY = Biblioteca
 STR_SETTINGS_BUTTONS = Botões
 STR_SETTINGS_SYSTEM = Sistema
 STR_MENU_CHAPTERS = Capítulos
+STR_SETTINGS_PLAY_MODE_ICONS = Ícones de aleatório e repetição
