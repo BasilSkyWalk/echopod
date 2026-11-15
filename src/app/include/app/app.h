@@ -1,7 +1,9 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
+#include "conf_file.h"
 #include "core/frame_stats.h"
 #include "core/strings.h"
 
@@ -37,3 +39,4 @@ void app_request_rescan_if_music_changed(void);
 void app_show_splash(void);
 bool app_charging(void);
 bool app_idle(void);
+uint8_t app_conf_value(ConfKey key);

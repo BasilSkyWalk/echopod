@@ -27,6 +27,7 @@ typedef struct CoverJob {
     void *memory;
     uint32_t size;
     CoverProgress progress;
+    bool default_cover;
 } CoverJob;
 
 typedef struct CoverStats {

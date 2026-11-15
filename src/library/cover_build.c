@@ -113,6 +113,11 @@ static void set_bit(uint8_t *bits, uint32_t index)
     bits[index / BITS_PER_BYTE] |= (uint8_t)(1u << (index % BITS_PER_BYTE));
 }
 
+static void clear_bit(uint8_t *bits, uint32_t index)
+{
+    bits[index / BITS_PER_BYTE] &= (uint8_t)~(1u << (index % BITS_PER_BYTE));
+}
+
 static CoverLayout layout_for(uint32_t capacity)
 {
     uint32_t room = capacity > COVERS_HEADER_SIZE ? capacity - COVERS_HEADER_SIZE : 0;
@@ -124,7 +129,8 @@ static CoverLayout layout_for(uint32_t capacity)
 
 static uint32_t index_capacity(CoverLayout layout, uint32_t albums, uint32_t previous)
 {
-    uint32_t limit = layout.slots < albums ? layout.slots : albums;
+    uint32_t wanted = albums + (albums < COVER_BUILD_MAX_COVERS ? 1 : 0);
+    uint32_t limit = layout.slots < wanted ? layout.slots : wanted;
     return limit > previous ? limit : previous;
 }
 
@@ -318,13 +324,17 @@ static void drop_unclaimed(CoverState *state)
     state->count = count;
 }
 
-static void keep_present(CoverState *state, uint32_t albums)
+static void keep_present(CoverState *state, uint32_t albums, bool default_cover)
 {
     for (uint32_t album_index = 0; album_index < albums && state->kept > 0; album_index++) {
         uint32_t position = 0;
         if (find_kept(state, library_album_key(&state->library, album_index), &position)) {
             set_bit(state->claimed, position);
         }
+    }
+    uint32_t position = 0;
+    if (default_cover && find_kept(state, ECHO_MINI_DEFAULT_COVER, &position)) {
+        set_bit(state->claimed, position);
     }
     drop_unclaimed(state);
     state->kept = state->count;
@@ -530,6 +540,14 @@ static bool open_art(CoverState *state, const CoverJob *job, ArtFile *art)
     return open_any_embedded(state, job, art) || open_folder_art(state, job, art);
 }
 
+static bool open_default_art(CoverState *state, const CoverJob *job, ArtFile *art)
+{
+    state->path[0] = '/';
+    state->path[1] = '\0';
+    const CoverMatch *match = best_match(state, job);
+    return match != NULL && open_art_file(state, job, *match, art);
+}
+
 static bool decode_art(CoverState *state, const ArtFile *art)
 {
     ImageSource image = {art->source.read, art->source.context, art->offset, art->length};
@@ -601,6 +619,22 @@ static ScanResult cover_album(CoverState *state, const CoverJob *job, CoverStats
     ArtFile art;
     if (!open_art(state, job, &art)) {
         stats->missing++;
+        return SCAN_OK;
+    }
+    ScanResult result = place_cover(state, job, &art, stats);
+    job->files.close_file(job->files.context);
+    return result;
+}
+
+static ScanResult build_default(CoverState *state, const CoverJob *job, CoverStats *stats)
+{
+    ArtFile art;
+    state->key = ECHO_MINI_DEFAULT_COVER;
+    if (!open_default_art(state, job, &art)) {
+        uint32_t position = 0;
+        if (find_kept(state, state->key, &position)) {
+            clear_bit(state->claimed, position);
+        }
         return SCAN_OK;
     }
     ScanResult result = place_cover(state, job, &art, stats);
@@ -750,9 +784,13 @@ ScanResult cover_build(const CoverJob *job, CoverStats *stats)
         return SCAN_NO_ROOM;
     }
     state->library = probe;
-    keep_present(state, stats->albums);
+    keep_present(state, stats->albums, job->default_cover);
     if (!clear_header(job)) {
         return SCAN_WRITE_FAILED;
     }
-    return finish(state, job, stats, build_albums(state, job, stats));
+    ScanResult result = build_albums(state, job, stats);
+    if (result == SCAN_OK && job->default_cover) {
+        result = build_default(state, job, stats);
+    }
+    return finish(state, job, stats, result);
 }

@@ -133,6 +133,7 @@ typedef struct AppState {
     ListenHistory history;
     ClockStore clock;
     bool usb_written;
+    EchoConf conf;
     CoverCache covers;
     PowerPolicy power;
     LowBattery low_battery;
@@ -881,6 +882,7 @@ static void start_screens(uint32_t now_ms)
         .bluetooth = &app.bluetooth,
         .equalizer = &app.equalizer,
         .clock = &app.clock,
+        .conf = &app.conf,
     };
     Screen *root = app_screens_init(&app.screens, context);
     screen_stack_init(&app.stack, root, now_ms);
@@ -938,6 +940,7 @@ void app_start(void)
     app.splash = (Fade){.active = false};
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
+    conf_file_load(&app.conf, &app.toast, now_ms);
     settings_store_load(&app.settings);
     hal_power_confirm_start(app.settings.settings.options[OPTION_POWER_ON] == POWER_ON_HOLD);
     clock_store_start(&app.clock, &app.settings.settings, now_ms);
@@ -1014,7 +1017,7 @@ static void run_rescan(void)
     listen_history_close(&app.history, hal_clock_milliseconds());
     app_show_notice(i18n_text(STR_RESCAN_TITLE), i18n_text(STR_RESCAN_STARTING));
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
-    RescanOutcome outcome = library_rescan_run(progress);
+    RescanOutcome outcome = library_rescan_run(progress, app_conf_value(CONF_DEFAULT_COVER) != 0);
     static char message[MESSAGE_TEXT_CAPACITY];
     const char *text = library_rescan_message(outcome, message, sizeof message);
     if (outcome.result == SCAN_OK) {
@@ -1454,4 +1457,9 @@ const char *app_diagnostics_value(int index)
 void app_forget_clock(void)
 {
     app.clock.started = false;
+}
+
+uint8_t app_conf_value(ConfKey key)
+{
+    return key < CONF_COUNT ? app.conf.values[key] : 0;
 }

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "app/conf_file.h"
 #include "core/i18n.h"
 #include "core/power_policy.h"
 #include "player.h"
@@ -41,6 +42,7 @@ typedef struct SettingsContext {
     DateTimeScreen *date_time;
     FoldersScreen *folders;
     int sleep_option;
+    const EchoConf *conf;
 } SettingsContext;
 
 typedef struct SettingChoice {

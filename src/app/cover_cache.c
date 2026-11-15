@@ -15,6 +15,7 @@ static void clear_slots(CoverCache *cache)
         cache->halves[slot].position = -1;
     }
     cache->full_state = COVER_EMPTY;
+    cache->full_with_default = false;
 }
 
 void cover_cache_close(CoverCache *cache)
@@ -72,16 +73,20 @@ CoverState cover_cache_full(const CoverCache *cache, uint16_t album, Image *imag
     return state_of(cache->full_state, image, loaded);
 }
 
-static CoverState read_cover(CoverCache *cache, uint16_t album, CoverSize size, Color *pixels)
+static CoverState read_key(CoverCache *cache, uint32_t key, CoverSize size, Color *pixels)
 {
     uint32_t record = 0;
-    if (!cache->available) {
-        return COVER_MISSING;
-    }
-    uint32_t key = library_album_key(cache->library, album);
     bool found = covers_find(&cache->covers, key, &record) &&
                  covers_read(&cache->covers, record, size, pixels);
     return found ? COVER_LOADED : COVER_MISSING;
+}
+
+static CoverState read_cover(CoverCache *cache, uint16_t album, CoverSize size, Color *pixels)
+{
+    if (!cache->available) {
+        return COVER_MISSING;
+    }
+    return read_key(cache, library_album_key(cache->library, album), size, pixels);
 }
 
 bool cover_cache_has_cover(CoverCache *cache, uint16_t album)
@@ -107,10 +112,27 @@ bool cover_cache_load_half(CoverCache *cache, int position, uint16_t album)
 bool cover_cache_load_full(CoverCache *cache, uint16_t album)
 {
     Image ignored;
-    if (cover_cache_full(cache, album, &ignored) != COVER_EMPTY) {
+    if (cover_cache_full(cache, album, &ignored) != COVER_EMPTY && !cache->full_with_default) {
+        return false;
+    }
+    cache->full_album = album;
+    cache->full_with_default = false;
+    cache->full_state = read_cover(cache, album, COVER_FULL, cache->full);
+    return true;
+}
+
+bool cover_cache_load_full_or_default(CoverCache *cache, uint16_t album)
+{
+    Image ignored;
+    CoverState state = cover_cache_full(cache, album, &ignored);
+    if (state == COVER_LOADED || (state == COVER_MISSING && cache->full_with_default)) {
         return false;
     }
     cache->full_album = album;
     cache->full_state = read_cover(cache, album, COVER_FULL, cache->full);
+    cache->full_with_default = cache->full_state != COVER_LOADED;
+    if (cache->full_state == COVER_MISSING && cache->available) {
+        cache->full_state = read_key(cache, ECHO_MINI_DEFAULT_COVER, COVER_FULL, cache->full);
+    }
     return true;
 }

@@ -438,6 +438,27 @@ static void replace_cover(const char *album, Color color)
     file->modified++;
 }
 
+static void replace_root_cover(Color color)
+{
+    CardFile *file = find_file("/cover.png");
+    CHECK(file != NULL);
+    uint8_t *png = card.pngs[card.png_count++];
+    file->size = make_png(png, color);
+    file->bytes = png;
+    file->modified++;
+}
+
+static void remove_file(const char *path)
+{
+    uint32_t kept = 0;
+    for (uint32_t index = 0; index < card.count; index++) {
+        if (strcmp(card.files[index].path, path) != 0) {
+            card.files[kept++] = card.files[index];
+        }
+    }
+    card.count = kept;
+}
+
 static void remove_album(const char *album)
 {
     char prefix[PATH_CAPACITY];
@@ -466,7 +487,7 @@ static void reset(void)
     memset(covers_file.bytes, 0, COVERS_CAPACITY);
 }
 
-static ScanResult rescan(bool keep, CoverStats *stats)
+static ScanResult rescan_options(bool keep, bool default_cover, CoverStats *stats)
 {
     static uint8_t memory[MEMORY_SIZE];
     ScanFileSystem files = {card_open_dir,  card_next_entry, card_close_dir,
@@ -488,8 +509,14 @@ static ScanResult rescan(bool keep, CoverStats *stats)
                     .previous = {keep ? buffer_read : NULL, &covers_file},
                     .capacity = covers_capacity,
                     .memory = memory,
-                    .size = sizeof memory};
+                    .size = sizeof memory,
+                    .default_cover = default_cover};
     return cover_build(&job, stats);
+}
+
+static ScanResult rescan(bool keep, CoverStats *stats)
+{
+    return rescan_options(keep, false, stats);
 }
 
 static uint32_t album_key(const char *title)
@@ -517,6 +544,19 @@ static uint16_t cover_pixel(const char *title)
     uint32_t record = 0;
     CHECK(covers_open(&covers, (ByteSource){buffer_read, &covers_file}, covers_capacity));
     if (!covers_find(&covers, album_key(title), &record)) {
+        return 0;
+    }
+    CHECK(covers_read(&covers, record, COVER_FULL, pixels));
+    return pixels[COVER_FULL_PIXELS / 2];
+}
+
+static uint16_t default_pixel(void)
+{
+    static uint16_t pixels[COVER_FULL_PIXELS];
+    Covers covers;
+    uint32_t record = 0;
+    CHECK(covers_open(&covers, (ByteSource){buffer_read, &covers_file}, covers_capacity));
+    if (!covers_find(&covers, ECHO_MINI_DEFAULT_COVER, &record)) {
         return 0;
     }
     CHECK(covers_read(&covers, record, COVER_FULL, pixels));
@@ -725,6 +765,123 @@ static void albums_sharing_a_folder_find_art_in_later_tracks(void)
     CHECK_EQUAL(4u, stats.reused);
 }
 
+static void the_default_cover_is_cached_only_when_enabled(void)
+{
+    CoverStats stats;
+    three_albums();
+    add_file("/Bare/01.flac", card.flac, card.flac_size);
+    add_png("/cover.png", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(4u, stats.albums);
+    CHECK_EQUAL(4u, stats.covers);
+    CHECK_EQUAL(1u, stats.missing);
+    CHECK_EQUAL(WHITE.pixel, default_pixel());
+    CHECK_EQUAL(0u, cover_pixel("Bare"));
+    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, false, &stats));
+    CHECK_EQUAL(3u, stats.covers);
+    CHECK_EQUAL(0u, default_pixel());
+    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+}
+
+static void the_default_cover_uses_the_folder_art_names(void)
+{
+    CoverStats stats;
+    reset();
+    add_album("Alpha", RED);
+    add_png("/FOLDER.PNG", GREEN);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(GREEN.pixel, default_pixel());
+    add_png("/cover.png", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(2u, stats.covers);
+    CHECK_EQUAL(1u, stats.reused);
+    CHECK_EQUAL(WHITE.pixel, default_pixel());
+}
+
+static void an_unchanged_default_cover_is_reused(void)
+{
+    CoverStats stats;
+    three_albums();
+    add_png("/cover.png", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(4u, stats.covers);
+    CHECK_EQUAL(4u, stats.reused);
+    CHECK_EQUAL(WHITE.pixel, default_pixel());
+}
+
+static void disabling_the_default_drops_its_entry(void)
+{
+    CoverStats stats;
+    three_albums();
+    add_png("/cover.png", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, false, &stats));
+    CHECK_EQUAL(3u, stats.covers);
+    CHECK_EQUAL(0u, default_pixel());
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(4u, stats.covers);
+    CHECK_EQUAL(3u, stats.reused);
+    CHECK_EQUAL(WHITE.pixel, default_pixel());
+}
+
+static void removing_the_root_art_drops_the_default(void)
+{
+    CoverStats stats;
+    three_albums();
+    add_png("/cover.png", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    remove_file("/cover.png");
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(3u, stats.covers);
+    CHECK_EQUAL(3u, stats.reused);
+    CHECK_EQUAL(0u, default_pixel());
+}
+
+static void replaced_default_art_is_decoded_again(void)
+{
+    CoverStats stats;
+    three_albums();
+    add_png("/cover.png", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    replace_root_cover(BLUE);
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(4u, stats.covers);
+    CHECK_EQUAL(3u, stats.reused);
+    CHECK_EQUAL(BLUE.pixel, default_pixel());
+}
+
+static void the_default_fits_beside_every_album(void)
+{
+    CoverStats stats;
+    three_albums();
+    add_png("/cover.png", WHITE);
+    covers_capacity = COVERS_HEADER_SIZE + 4 * RECORD_SLOT;
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(4u, stats.covers);
+    CHECK_EQUAL(0u, stats.missing);
+    CHECK_EQUAL(WHITE.pixel, default_pixel());
+    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+    CHECK_EQUAL(GREEN.pixel, cover_pixel("Beta"));
+    CHECK_EQUAL(BLUE.pixel, cover_pixel("Gamma"));
+}
+
+static void albums_keep_their_slots_when_the_default_cannot_fit(void)
+{
+    CoverStats stats;
+    three_albums();
+    add_png("/cover.png", WHITE);
+    covers_capacity = COVERS_HEADER_SIZE + 3 * RECORD_SLOT;
+    CHECK_EQUAL(SCAN_OK, rescan_options(true, true, &stats));
+    CHECK_EQUAL(3u, stats.covers);
+    CHECK_EQUAL(1u, stats.missing);
+    CHECK_EQUAL(0u, default_pixel());
+    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+    CHECK_EQUAL(GREEN.pixel, cover_pixel("Beta"));
+    CHECK_EQUAL(BLUE.pixel, cover_pixel("Gamma"));
+}
+
 static void add_apple_double(const char *path)
 {
     static const uint8_t HEADER[] = {0x00, 0x05, 0x16, 0x07, 0x00, 0x02, 0x00, 0x00,
@@ -778,6 +935,14 @@ int main(void)
         TEST_CASE(without_a_previous_file_everything_is_decoded),
         TEST_CASE(opus_art_is_decoded_and_kept),
         TEST_CASE(albums_sharing_a_folder_find_art_in_later_tracks),
+        TEST_CASE(the_default_cover_is_cached_only_when_enabled),
+        TEST_CASE(the_default_cover_uses_the_folder_art_names),
+        TEST_CASE(an_unchanged_default_cover_is_reused),
+        TEST_CASE(disabling_the_default_drops_its_entry),
+        TEST_CASE(removing_the_root_art_drops_the_default),
+        TEST_CASE(replaced_default_art_is_decoded_again),
+        TEST_CASE(the_default_fits_beside_every_album),
+        TEST_CASE(albums_keep_their_slots_when_the_default_cannot_fit),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
