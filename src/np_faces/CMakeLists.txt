@@ -2,6 +2,7 @@ add_library(echo_np_faces STATIC
     np_faces.c
     face_cassette.c
     face_shapes.c
+    face_blur.c
     face_text.c
     face_lcd.c
     face_turntable.c

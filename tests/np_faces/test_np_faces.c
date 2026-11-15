@@ -103,6 +103,21 @@ static void a_face_outside_the_clip_writes_nothing(void)
     }
 }
 
+static void blur_shortens_the_shuffle_songs_mode(void)
+{
+    static const char *const FULL[] = {"Shuffle Songs", "Shuffle Songs \xC2\xB7 Repeat all"};
+    static const char *const SHORT[] = {"Shuffle", "Shuffle \xC2\xB7 Repeat all"};
+    for (size_t index = 0; index < sizeof FULL / sizeof FULL[0]; index++) {
+        NpTestScene full = np_test_scene(NP_FACE_BLUR, NP_TEST_LAYOUTS[0], NP_TEST_PLAYING);
+        full.frame.modes = FULL[index];
+        NpTestScene shortened = full;
+        shortened.frame.modes = SHORT[index];
+        np_test_draw(&full, first);
+        np_test_draw(&shortened, second);
+        CHECK(np_test_same(first, second, full.layout));
+    }
+}
+
 static void the_standard_face_draws_nothing(void)
 {
     NpTestScene scene = np_test_scene(NP_FACE_STANDARD, NP_TEST_LAYOUTS[0], NP_TEST_PLAYING);
@@ -121,6 +136,7 @@ int main(void)
         TEST_CASE(a_paused_face_does_not_change_with_the_clock),
         TEST_CASE(every_badge_kind_paints_cleanly),
         TEST_CASE(a_face_outside_the_clip_writes_nothing),
+        TEST_CASE(blur_shortens_the_shuffle_songs_mode),
         TEST_CASE(the_standard_face_draws_nothing),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
