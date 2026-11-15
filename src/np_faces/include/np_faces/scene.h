@@ -8,7 +8,7 @@ enum {
     SCENE_STRING_BASE = 64,
     SCENE_MOST_OPERANDS = 8,
     SCENE_MOST_STEPS = 20000,
-    SCENE_WORK_BYTES = 1024
+    SCENE_WORK_BYTES = 960
 };
 
 void scene_draw(const NowPlayingFrame *frame, Canvas *canvas);

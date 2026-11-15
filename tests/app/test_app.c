@@ -344,9 +344,12 @@ static void the_frame_overlay_splits_the_drawing(void)
     char text[FRAME_OVERLAY_TEXT_CAPACITY];
     uint32_t parts[DRAW_PART_COUNT] = {[DRAW_PART_COVERS] = 9400, [DRAW_PART_REFLECTIONS] = 3100,
                                        [DRAW_PART_TEXT] = 2000,   [DRAW_PART_BACKDROP] = 600,
+                                       [DRAW_PART_BOXES] = 4200,  [DRAW_PART_SHAPES] = 7600,
                                        [DRAW_PART_HASH] = 1500,   [DRAW_PART_AUDIO] = 0};
-    frame_overlay_format_parts(parts, text, sizeof text);
-    CHECK(strcmp("c9 r3 t2 b1 h2 a0", text) == 0);
+    frame_overlay_format_parts(parts, 0, text, sizeof text);
+    CHECK(strcmp("c9 r3 t2 b1", text) == 0);
+    frame_overlay_format_parts(parts, DRAW_PART_COUNT / 2, text, sizeof text);
+    CHECK(strcmp("x4 g8 h2 a0", text) == 0);
 }
 
 static void the_frame_overlay_shows_the_audio_numbers(void)

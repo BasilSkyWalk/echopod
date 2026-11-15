@@ -2,10 +2,10 @@
 
 #include <stddef.h>
 
+#include "core/draw_profile.h"
 #include "core/i18n.h"
 #include "core/random.h"
 #include "core/string_builder.h"
-#include "draw_profile.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "settings/settings.h"

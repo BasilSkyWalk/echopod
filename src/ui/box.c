@@ -1,8 +1,11 @@
 #include "ui/box.h"
 
+#include "core/draw_profile.h"
+
 enum {
     CORNER_SAMPLES = 4,
-    CORNER_SCALE = 2 * CORNER_SAMPLES
+    CORNER_SCALE = 2 * CORNER_SAMPLES,
+    ROOT_TOP_BIT = 1 << 14
 };
 
 static Rect inset_area(Rect area, int across, int down)
@@ -79,28 +82,67 @@ typedef struct Shape {
     uint8_t alpha;
 } Shape;
 
-static uint8_t corner_coverage(Corner corner, int column)
+static int root(int value)
+{
+    int found = 0;
+    for (int bit = ROOT_TOP_BIT; bit > 0; bit >>= 1) {
+        int trial = found | bit;
+        if (trial * trial <= value) {
+            found = trial;
+        }
+    }
+    return found;
+}
+
+static void corner_reaches(Corner corner, int *reaches)
+{
+    int reach = CORNER_SCALE * corner.radius;
+    for (int sub = 0; sub < CORNER_SAMPLES; sub++) {
+        int down = reach - (CORNER_SCALE * corner.row + 2 * sub + 1);
+        int room = reach * reach - down * down;
+        reaches[sub] = room < 0 ? -1 : root(room);
+    }
+}
+
+static uint8_t corner_coverage(Corner corner, const int *reaches, int column)
 {
     int reach = CORNER_SCALE * corner.radius;
     int inside = 0;
-    for (int sample = 0; sample < CORNER_SAMPLES * CORNER_SAMPLES; sample++) {
-        int across = reach - (CORNER_SCALE * column + 2 * (sample % CORNER_SAMPLES) + 1);
-        int down = reach - (CORNER_SCALE * corner.row + 2 * (sample / CORNER_SAMPLES) + 1);
-        inside += across * across + down * down <= reach * reach ? 1 : 0;
+    for (int sub = 0; sub < CORNER_SAMPLES; sub++) {
+        int first = reach - CORNER_SCALE * column - 1 - reaches[sub];
+        int skipped = first <= 0 ? 0 : (first + 1) / 2;
+        inside += reaches[sub] < 0 || skipped >= CORNER_SAMPLES ? 0 : CORNER_SAMPLES - skipped;
     }
     return (uint8_t)(inside * COLOR_ALPHA_OPAQUE / (CORNER_SAMPLES * CORNER_SAMPLES));
 }
 
-static void draw_corner_row(Canvas *canvas, Rect line, Corner corner, Color color, uint8_t opacity)
+static void blend_around(Canvas *canvas, Rect span, Color color, uint8_t alpha, Rect hole)
 {
+    bool crosses = span.y >= hole.y && span.y < hole.y + hole.height && hole.width > 0;
+    if (!crosses) {
+        canvas_blend_rect(canvas, span, color, alpha);
+        return;
+    }
+    int right = span.x + span.width;
+    int hole_right = hole.x + hole.width;
+    canvas_blend_rect(canvas, (Rect){span.x, span.y, hole.x - span.x, 1}, color, alpha);
+    canvas_blend_rect(canvas, (Rect){hole_right, span.y, right - hole_right, 1}, color, alpha);
+}
+
+static void draw_corner_row(Canvas *canvas, Rect line, Corner corner, Color color, uint8_t opacity,
+                            Rect hole)
+{
+    int reaches[CORNER_SAMPLES];
+    corner_reaches(corner, reaches);
     for (int column = 0; column < corner.radius; column++) {
-        uint8_t alpha = (uint8_t)(corner_coverage(corner, column) * opacity / COLOR_ALPHA_OPAQUE);
+        uint8_t alpha =
+            (uint8_t)(corner_coverage(corner, reaches, column) * opacity / COLOR_ALPHA_OPAQUE);
         int mirrored = line.x + line.width - 1 - column;
         canvas_blend_pixel(canvas, (Point){line.x + column, line.y}, color, alpha);
         canvas_blend_pixel(canvas, (Point){mirrored, line.y}, color, alpha);
     }
     Rect middle = {line.x + corner.radius, line.y, line.width - 2 * corner.radius, 1};
-    canvas_blend_rect(canvas, middle, color, opacity);
+    blend_around(canvas, middle, color, opacity, hole);
 }
 
 static Color shape_row_color(const Shape *shape, int height, int row)
@@ -112,7 +154,7 @@ static Color shape_row_color(const Shape *shape, int height, int row)
     return color_between(shape->top, shape->bottom, row - shape->shine_height, steps);
 }
 
-static void draw_shape(Canvas *canvas, Rect area, const Shape *shape)
+static void draw_shape(Canvas *canvas, Rect area, const Shape *shape, Rect hole)
 {
     int shorter = area.width < area.height ? area.width : area.height;
     int radius = shape->radius < shorter / 2 ? shape->radius : shorter / 2;
@@ -124,9 +166,9 @@ static void draw_shape(Canvas *canvas, Rect area, const Shape *shape)
             continue;
         }
         if (from_edge < radius) {
-            draw_corner_row(canvas, line, (Corner){radius, from_edge}, color, shape->alpha);
+            draw_corner_row(canvas, line, (Corner){radius, from_edge}, color, shape->alpha, hole);
         } else {
-            canvas_blend_rect(canvas, line, color, shape->alpha);
+            blend_around(canvas, line, color, shape->alpha, hole);
         }
     }
 }
@@ -144,13 +186,17 @@ static void draw_rounded(Canvas *canvas, const ThemeColors *colors, const BoxSty
                   .shine_height = style->shine_height,
                   .radius = style->radius > width ? style->radius - width : 0,
                   .alpha = opacity_of(style)};
+    Rect inner = inner_area(outer, style);
+    int shorter = inner.width < inner.height ? inner.width : inner.height;
+    int curve = body.radius < shorter / 2 ? body.radius : shorter / 2;
+    Rect hole = {inner.x + curve, inner.y, inner.width - 2 * curve, inner.height};
     if (width > 0 && style->border_edges != 0) {
-        draw_shape(canvas, outer, &rim);
+        draw_shape(canvas, outer, &rim, hole);
     }
-    draw_shape(canvas, inner_area(outer, style), &body);
+    draw_shape(canvas, inner, &body, (Rect){0, 0, 0, 0});
 }
 
-void box_draw(Canvas *canvas, const ThemeColors *colors, const BoxStyle *style, Rect area)
+static void draw_box(Canvas *canvas, const ThemeColors *colors, const BoxStyle *style, Rect area)
 {
     Rect outer = inset_area(area, style->inset_across, style->inset_down);
     if (style->radius > 0) {
@@ -162,4 +208,11 @@ void box_draw(Canvas *canvas, const ThemeColors *colors, const BoxStyle *style, 
         draw_edges(canvas, outer, inner, theme_color(colors, style->border), opacity_of(style));
     }
     draw_fill(canvas, colors, style, inner);
+}
+
+void box_draw(Canvas *canvas, const ThemeColors *colors, const BoxStyle *style, Rect area)
+{
+    uint32_t started_us = draw_profile_now();
+    draw_box(canvas, colors, style, area);
+    draw_profile_since(DRAW_PART_BOXES, started_us);
 }

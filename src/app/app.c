@@ -9,6 +9,7 @@
 #include "card_files.h"
 #include "clock_store.h"
 #include "core/deadline.h"
+#include "core/draw_profile.h"
 #include "core/i18n.h"
 #include "core/key_tracker.h"
 #include "core/low_battery.h"
@@ -17,7 +18,6 @@
 #include "core/string_builder.h"
 #include "cover_cache.h"
 #include "default_theme.h"
-#include "draw_profile.h"
 #include "equalizer_store.h"
 #include "favorites_store.h"
 #include "frame_overlay.h"
@@ -884,7 +884,7 @@ static void render_frame(void)
     frame_stats_record(&app.send_stats, app.send_us);
     frame_stats_record(&app.draw_stats, render_us - app.send_us);
     draw_profile_finish_frame();
-    app.frame_stable = !app.frame_changed;
+    app.frame_stable = !app.frame_changed || marquee_frame_paced();
     app.idle_render_ms = hal_clock_milliseconds() + IDLE_RENDER_MS;
     uint32_t marquee_wait_ms = marquee_frame_wait_ms();
     if (marquee_wait_ms > 0 &&
@@ -1007,6 +1007,7 @@ ECHO_STARTUP_CODE static void start_up(void)
     frame_stats_reset(&app.update_stats);
     frame_stats_reset(&app.draw_stats);
     frame_stats_reset(&app.send_stats);
+    draw_profile_use_clock(hal_clock_microseconds);
     app.options = (AppOptions){.show_frame_time = false, .ignore_power_taps = false};
     app.toast = (Toast){.visible = false};
     app.powered_off = false;

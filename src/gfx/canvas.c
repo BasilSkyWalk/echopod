@@ -53,18 +53,65 @@ void canvas_fill_rect(Canvas *canvas, Rect area, Color color)
     }
 }
 
+enum {
+    BLEND_RED_LEVELS = 32,
+    BLEND_GREEN_LEVELS = 64,
+    BLEND_BLUE_LEVELS = 32
+};
+
+typedef struct BlendTable {
+    Color red[BLEND_RED_LEVELS];
+    Color green[BLEND_GREEN_LEVELS];
+    Color blue[BLEND_BLUE_LEVELS];
+    Color color;
+    uint8_t alpha_after;
+} BlendTable;
+
+static BlendTable blend_table;
+
+static unsigned blended(unsigned back, unsigned paint, unsigned alpha)
+{
+    unsigned weighted = back * (COLOR_ALPHA_OPAQUE - alpha) + paint * alpha;
+    return (weighted + COLOR_ALPHA_OPAQUE / 2) / COLOR_ALPHA_OPAQUE;
+}
+
+__attribute__((cold, noinline)) static const BlendTable *table_for(Color color, uint8_t alpha)
+{
+    BlendTable *table = &blend_table;
+    if (table->alpha_after == alpha + 1 && table->color == color) {
+        return table;
+    }
+    for (unsigned level = 0; level < BLEND_GREEN_LEVELS; level++) {
+        table->green[level] = (Color)(blended(level, color >> 5 & 0x3F, alpha) << 5);
+        if (level < BLEND_RED_LEVELS) {
+            table->red[level] = (Color)(blended(level, (unsigned)color >> 11, alpha) << 11);
+            table->blue[level] = (Color)blended(level, color & 0x1F, alpha);
+        }
+    }
+    table->color = color;
+    table->alpha_after = (uint8_t)(alpha + 1);
+    return table;
+}
+
+static void blend_row(Color *row, int count, const BlendTable *table)
+{
+    for (int column = 0; column < count; column++) {
+        unsigned back = row[column];
+        row[column] =
+            table->red[back >> 11] | table->green[back >> 5 & 0x3F] | table->blue[back & 0x1F];
+    }
+}
+
 void canvas_blend_rect(Canvas *canvas, Rect area, Color color, uint8_t alpha)
 {
     Rect visible = rect_intersection(canvas->clip, area);
-    if (alpha == COLOR_ALPHA_OPAQUE || rect_is_empty(visible)) {
+    if (alpha >= COLOR_ALPHA_OPAQUE || rect_is_empty(visible)) {
         canvas_fill_rect(canvas, visible, color);
         return;
     }
+    const BlendTable *table = table_for(color, alpha);
     for (int y = visible.y; y < visible.y + visible.height; y++) {
-        Color *row = pixel_address(canvas, visible.x, y);
-        for (int column = 0; column < visible.width; column++) {
-            row[column] = color_blend(row[column], color, alpha);
-        }
+        blend_row(pixel_address(canvas, visible.x, y), visible.width, table);
     }
 }
 

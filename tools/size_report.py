@@ -19,6 +19,11 @@ LOADED_LIMIT = 437600
 OVERLAY_CAPACITY = 0x15000
 RESIDENT_CAPACITY = 0x4800
 NP_FACES_CAPACITY = 0x3600
+SECTOR_BYTES = 512
+OVERLAY_HEADER_BYTES = 16
+SCENE_STAMP_BYTES = 44
+SCENE_WORK_BYTES = 960
+SCENES_MOST_BYTES = 6144
 STARTUP_CAPACITY = 0x3000
 USB_OVERLAY_WINDOW = 0x11A00
 HIGH_RAM_CAPACITY = 0x11A00
@@ -180,6 +185,11 @@ def limit_line(label, used, limit):
     return f"{label}: {used:,} of {limit:,} bytes, {free:,} free{state}"
 
 
+def scene_room(np_faces):
+    loaded = -(-(np_faces + OVERLAY_HEADER_BYTES) // SECTOR_BYTES) * SECTOR_BYTES
+    return NP_FACES_CAPACITY - loaded - SCENE_STAMP_BYTES - SCENE_WORK_BYTES
+
+
 def summary(device_map, overlay_map=None, usb_overlay_map=None):
     sizes = output_sizes(device_map)
     code = sizes.get(".code", 0)
@@ -191,6 +201,8 @@ def summary(device_map, overlay_map=None, usb_overlay_map=None):
         lines.append(limit_line("resident tables", sizes[".resident"], RESIDENT_CAPACITY))
     if ".np_faces" in sizes:
         lines.append(limit_line("np_faces", sizes[".np_faces"], NP_FACES_CAPACITY))
+        lines.append(limit_line("scenes after np_faces", SCENES_MOST_BYTES,
+                                scene_room(sizes[".np_faces"])))
     if ".startup" in sizes:
         lines.append(limit_line("start-up code", sizes[".startup"], STARTUP_CAPACITY))
     if ".high_ram" in sizes:

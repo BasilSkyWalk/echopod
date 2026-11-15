@@ -147,8 +147,15 @@ class ReportTest(unittest.TestCase):
                                    "302,424 free")
         self.assertEqual(lines[2], "resident tables: 15,152 of 18,432 bytes, 3,280 free")
         self.assertEqual(lines[3], "np_faces: 6,160 of 13,824 bytes, 7,664 free")
-        self.assertEqual(lines[4], ".high_ram: 69,632 of 72,192 bytes, 2,560 free")
-        self.assertEqual(lines[5], "rescan overlay: 81,920 of 86,016 bytes, 4,096 free")
+        self.assertEqual(lines[4], "scenes after np_faces: 6,144 of 6,164 bytes, 20 free")
+        self.assertEqual(lines[5], ".high_ram: 69,632 of 72,192 bytes, 2,560 free")
+        self.assertEqual(lines[6], "rescan overlay: 81,920 of 86,016 bytes, 4,096 free")
+
+    def test_faces_code_that_crowds_out_the_scenes_is_flagged(self):
+        grown = MAP.replace(".np_faces       0x0308c000     0x1810",
+                            ".np_faces       0x0308c000     0x19f1")
+        self.assertIn("scenes after np_faces: 6,144 of 5,652 bytes, -492 free  OVER BY 492",
+                      size_report.summary(grown))
 
     def test_summary_omits_the_faces_and_high_ram_lines_a_map_does_not_have(self):
         bare = MAP.split(".high_ram ")[0]
@@ -172,8 +179,8 @@ class ReportTest(unittest.TestCase):
 
     def test_summary_measures_the_usb_overlay_in_the_image_and_with_its_zeroed_memory(self):
         lines = size_report.summary(MAP, OVERLAY_MAP, USB_OVERLAY_MAP)
-        self.assertEqual(lines[6], "USB overlay code: 12,288 of 65,536 bytes, 53,248 free")
-        self.assertEqual(lines[7], "USB overlay code + .bss: 49,152 of 72,192 bytes, 23,040 free")
+        self.assertEqual(lines[7], "USB overlay code: 12,288 of 65,536 bytes, 53,248 free")
+        self.assertEqual(lines[8], "USB overlay code + .bss: 49,152 of 72,192 bytes, 23,040 free")
 
     def test_summary_flags_a_limit_that_is_over(self):
         over = MAP.replace(".code           0x03050000     0x1000",

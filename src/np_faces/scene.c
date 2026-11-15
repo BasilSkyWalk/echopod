@@ -1,5 +1,6 @@
 #include "np_faces/scene.h"
 
+#include "core/draw_profile.h"
 #include "core/resident.h"
 #include "face_text.h"
 #include "np_faces/face_shapes.h"
@@ -459,6 +460,39 @@ ECHO_NP_FACES_CODE static void draw(Machine *machine, SceneOp op)
     }
 }
 
+ECHO_NP_FACES_CODE static int part_of(SceneOp op)
+{
+    switch (op) {
+    case SCENE_OP_COVER:
+    case SCENE_OP_ROUND_COVER:
+        return DRAW_PART_COVERS;
+    case SCENE_OP_REFLECT:
+        return DRAW_PART_REFLECTIONS;
+    case SCENE_OP_TEXT:
+    case SCENE_OP_LINE:
+    case SCENE_OP_PLAIN:
+    case SCENE_OP_TIMES:
+    case SCENE_OP_FORMAT:
+    case SCENE_OP_CODEC:
+        return DRAW_PART_TEXT;
+    case SCENE_OP_MENU:
+    case SCENE_OP_BACKDROP:
+        return DRAW_PART_COUNT;
+    default:
+        return DRAW_PART_SHAPES;
+    }
+}
+
+ECHO_NP_FACES_CODE static void timed_draw(Machine *machine, SceneOp op)
+{
+    uint32_t started_us = draw_profile_now();
+    draw(machine, op);
+    int part = part_of(op);
+    if (part < DRAW_PART_COUNT) {
+        draw_profile_since((DrawPart)part, started_us);
+    }
+}
+
 ECHO_NP_FACES_CODE static void load_inputs(Machine *machine)
 {
     const NowPlayingFrame *frame = machine->frame;
@@ -520,7 +554,7 @@ ECHO_NP_FACES_CODE void scene_draw(const NowPlayingFrame *frame, Canvas *canvas)
             bool taken = op == SCENE_OP_JUMP || machine->values[0] == 0;
             at = taken ? jump_target(machine, op) : at;
         } else if (KINDS[op] == SCENE_KIND_DRAW) {
-            draw(machine, op);
+            timed_draw(machine, op);
         } else {
             store(machine, compute(machine, op));
         }

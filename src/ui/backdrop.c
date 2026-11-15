@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "core/draw_profile.h"
+
 typedef struct Run {
     int column;
     int count;
@@ -20,10 +22,10 @@ static Color *paint_tile(Color *target, const Wallpaper *wallpaper, const uint8_
     if (column % 2 != 0 && column < end) {
         *target++ = single(wallpaper, row, column++);
     }
+    const uint8_t *pair = row + column / 2;
     for (; column + 1 < end; column += 2) {
-        uint32_t both = wallpaper->pairs[row[column / 2]];
-        *target++ = (Color)both;
-        *target++ = (Color)(both >> 16);
+        __builtin_memcpy(target, &wallpaper->pairs[*pair++], sizeof(uint32_t));
+        target += 2;
     }
     if (column < end) {
         *target++ = single(wallpaper, row, column);
@@ -56,10 +58,12 @@ static void paint_wallpaper(Canvas *canvas, const Wallpaper *wallpaper, Rect are
 
 void backdrop_paint(Canvas *canvas, const Theme *theme, Rect area)
 {
+    uint32_t started_us = draw_profile_now();
     const Wallpaper *wallpaper = theme->wallpaper;
     if (wallpaper == NULL || !wallpaper->ready) {
         canvas_fill_rect(canvas, area, theme->colors->background);
     } else if (!canvas->backdrop_painted) {
         paint_wallpaper(canvas, wallpaper, area);
     }
+    draw_profile_since(DRAW_PART_BACKDROP, started_us);
 }

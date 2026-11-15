@@ -1035,7 +1035,7 @@ static void request_tick(const NowPlayingScreen *now_playing)
 {
     const PlayerStatus *status = &now_playing->status;
     if (status->state == PLAYER_PLAYING) {
-        marquee_frame_request(NP_FACE_TICK_MS - status->position_ms % NP_FACE_TICK_MS);
+        marquee_frame_pace(NP_FACE_TICK_MS - status->position_ms % NP_FACE_TICK_MS);
     }
 }
 

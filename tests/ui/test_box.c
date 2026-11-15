@@ -223,6 +223,23 @@ static void a_see_through_gradient_blends_every_row(void)
     CHECK_EQUAL(color_blend(UNTOUCHED, TEST_COLORS.danger, alpha), bottom);
 }
 
+static void a_see_through_rounded_border_does_not_tint_the_inside(void)
+{
+    BoxStyle style = {.fill_top = THEME_COLOR_DANGER,
+                      .fill_bottom = THEME_COLOR_DANGER,
+                      .border = THEME_COLOR_SUCCESS,
+                      .border_width = 1,
+                      .border_edges = BOX_EDGE_ALL,
+                      .radius = 3,
+                      .see_through = 6};
+    Canvas canvas = drawn(&style);
+    Color inside = color_blend(UNTOUCHED, TEST_COLORS.danger, COLOR_ALPHA_OPAQUE - 6);
+    Color edge = color_blend(UNTOUCHED, TEST_COLORS.success, COLOR_ALPHA_OPAQUE - 6);
+    CHECK_EQUAL(inside,
+                canvas_pixel_at(&canvas, AREA.x + AREA.width / 2, AREA.y + AREA.height / 2));
+    CHECK_EQUAL(edge, canvas_pixel_at(&canvas, AREA.x + AREA.width / 2, AREA.y));
+}
+
 static void a_fully_see_through_box_leaves_the_screen_alone(void)
 {
     BoxStyle style = {.fill_top = THEME_COLOR_DANGER,
@@ -261,6 +278,7 @@ int main(void)
         TEST_CASE(the_standard_selection_shapes_are_the_first_three_boxes),
         TEST_CASE(a_see_through_box_blends_over_what_is_beneath),
         TEST_CASE(a_see_through_gradient_blends_every_row),
+        TEST_CASE(a_see_through_rounded_border_does_not_tint_the_inside),
         TEST_CASE(a_fully_see_through_box_leaves_the_screen_alone),
         TEST_CASE(a_colour_is_found_by_its_id),
     };

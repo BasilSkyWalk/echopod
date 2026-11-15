@@ -159,6 +159,33 @@ static void blending_respects_the_clip(void)
     CHECK_EQUAL(PAINT, canvas_pixel_at(&canvas, 0, 10));
 }
 
+static void the_first_blend_of_black_at_nothing_leaves_the_pixels(void)
+{
+    Canvas canvas = make_strip_canvas();
+    canvas_blend_rect(&canvas, (Rect){CANVAS_X, CANVAS_Y, CANVAS_WIDTH, CANVAS_HEIGHT}, 0x0000, 0);
+    CHECK_EQUAL(PIXEL_COUNT, count_pixels_of(BACKGROUND));
+}
+
+static void blending_a_box_matches_blending_each_pixel(void)
+{
+    static const Color backs[] = {0x0000, 0xFFFF, 0x1234, 0xF800, 0x07E0, 0x001F, 0x8410, 0x7BEF};
+    static const Color paints[] = {0xFFFF, 0x0000, 0xC618, 0x4A69, 0xF81F};
+    for (unsigned alpha = 0; alpha <= COLOR_ALPHA_OPAQUE; alpha++) {
+        for (unsigned paint = 0; paint < sizeof paints / sizeof paints[0]; paint++) {
+            Canvas canvas = make_strip_canvas();
+            for (int index = 0; index < PIXEL_COUNT; index++) {
+                pixels[index] = backs[(unsigned)index % (sizeof backs / sizeof backs[0])];
+            }
+            canvas_blend_rect(&canvas, (Rect){CANVAS_X, CANVAS_Y, CANVAS_WIDTH, CANVAS_HEIGHT},
+                              paints[paint], (uint8_t)alpha);
+            for (int index = 0; index < PIXEL_COUNT; index++) {
+                Color back = backs[(unsigned)index % (sizeof backs / sizeof backs[0])];
+                CHECK_EQUAL(color_blend(back, paints[paint], (uint8_t)alpha), pixels[index]);
+            }
+        }
+    }
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -176,6 +203,8 @@ int main(void)
         TEST_CASE(a_gradient_keeps_its_colors_when_clipped),
         TEST_CASE(blending_a_pixel_mixes_with_what_is_there),
         TEST_CASE(blending_respects_the_clip),
+        TEST_CASE(the_first_blend_of_black_at_nothing_leaves_the_pixels),
+        TEST_CASE(blending_a_box_matches_blending_each_pixel),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
