@@ -22,4 +22,5 @@ typedef struct BoxStyle {
     uint8_t inset_across;
     uint8_t inset_down;
     uint8_t radius;
+    uint8_t see_through;
 } BoxStyle;

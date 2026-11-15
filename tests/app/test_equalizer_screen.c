@@ -8,6 +8,7 @@
 #include "hal/display.h"
 #include "screens/equalizer_screen.h"
 #include "settings/settings.h"
+#include "themes/builtin_themes.h"
 
 enum {
     START_MS = 1000
@@ -461,8 +462,11 @@ static void the_grabbed_band_and_its_knob_stay_visible_in_every_theme(void)
     for (int theme_id = 0; theme_id < THEME_COUNT; theme_id++) {
         for (int portrait = 0; portrait < 2; portrait++) {
             ThemeColors tinted;
-            Theme theme =
-                default_theme_styled(portrait != 0, (ThemeChoice){.theme = theme_id}, &tinted);
+            ThemePackage package = {0};
+            Theme theme = default_theme_for(portrait != 0);
+            CHECK(theme_package_decode(BUILTIN_THEMES[theme_id].bytes,
+                                       BUILTIN_THEMES[theme_id].size, &package));
+            default_theme_dress(&theme, &package, (ThemeChoice){0}, &tinted);
             draw_editor(&theme, true, grabbed_pixels);
             draw_editor(&theme, false, picked_pixels);
             Color knob = theme.colors->selection_text;

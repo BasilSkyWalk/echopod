@@ -145,6 +145,7 @@ typedef struct Theme {
     ThemeMetrics metrics;
     MarqueeTiming marquee;
     ThemeSelection selection;
+    bool no_menu_panel;
 } Theme;
 
 extern const ThemeBoxes THEME_STANDARD_BOXES;

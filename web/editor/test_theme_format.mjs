@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { blankRows, paintedRows, resizedRows, rowsFromPixels } from "./icon_editor.js";
+import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from "./icon_editor.js";
 import { coveredCodes } from "./font_editor.js";
-import { effectivePlaces, placeAt } from "./layout_editor.js";
+import { defaultDesign, designScript, newLayer, readDesign, LAYER_TYPES } from "./now_playing_designer.js";
+import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
 import {
   ThemeError,
@@ -13,8 +14,10 @@ import {
   defaultTheme,
   hexColor,
   lint,
+  opacityPercent,
   pack,
   rgb565,
+  seeThroughOf,
   toToml,
   unpack,
 } from "./theme_format.js";
@@ -47,6 +50,46 @@ assert.equal(ember.spacing.scrollbar_width, null);
 assert.equal(ember.boxes.toast.radius, 8);
 assert.equal(ember.boxes.selection.border_edges, 4);
 assert.equal(ember.colors.selection_top, "#ffa231");
+
+const clear = defaultTheme(schema);
+clear.boxes.selection.see_through = seeThroughOf(60);
+clear.boxes.header.see_through = seeThroughOf(0);
+const reopened = unpack(pack(clear, schema), schema);
+assert.equal(reopened.boxes.selection.see_through, 6);
+assert.equal(reopened.boxes.header.see_through, 15);
+assert.equal(reopened.boxes.toast.see_through, 0);
+assert.equal(opacityPercent(6), 60);
+assert.match(toToml(clear, schema), /opacity = 60/);
+assert.doesNotMatch(toToml(defaultTheme(schema), schema), /opacity/);
+
+const bare = { ...defaultTheme(schema), home_art: false };
+const bareBytes = pack(bare, schema);
+assert.equal(bareBytes[52] & 2, 2);
+assert.equal(unpack(bareBytes, schema).home_art, false);
+assert.equal(unpack(dark, schema).home_art, true);
+assert.match(toToml(bare, schema), /home_art = false/);
+
+const homeTheme = defaultTheme(schema);
+for (const style of ["list", "tiles", "focus"]) {
+  const design = defaultDesign("home");
+  design.layers[0].style = style;
+  design.layers.push(newLayer("text", "home"));
+  const script = designScript(design, homeTheme);
+  assert.match(script, /^backdrop\(x, y, width, height\)/, `${style} starts with the wallpaper`);
+  assert.match(script, style === "list" ? /menu\(x \+ 0, y \+ 0, 176, 146\)/ : /item\(/, `${style} draws the menu`);
+  assert.match(script, /item\(selected\(\)\)/, `${style} names the highlighted item`);
+  compileScene(script, schema.scene);
+  homeTheme.home_scene = { script, chrome: null, design: JSON.stringify(design) };
+  const homeBytes = pack(homeTheme, schema);
+  const reopened = unpack(homeBytes, schema);
+  assert.equal(reopened.home_scene.script, script);
+  assert.equal(reopened.home_scene.design, JSON.stringify(design));
+  assert.equal(reopened.now_playing_scene, null);
+  assert.deepEqual(Array.from(pack(reopened, schema)), Array.from(homeBytes));
+  assert.match(toToml(homeTheme, schema), /\[home_scene\]/);
+}
+const coverOnly = defaultDesign("home");
+assert.match(designScript(coverOnly, homeTheme), /reflect\(x \+ 192, y \+ 8, 112, 26\)/);
 
 assert.equal(checksum(new Uint8Array([])), 0x811c9dc5);
 assert.equal(checksum(new TextEncoder().encode("a")), 0xe40c292c);
@@ -106,8 +149,8 @@ assert.equal(fresh.wallpapers.wallpaper, null);
 const papered = pack({ ...fresh, wallpapers: { ...fresh.wallpapers, wallpaper: tile } }, schema);
 const paperedView = new DataView(papered.buffer);
 const checked = paperedView.getUint32(8, true);
-assert.equal(paperedView.getUint16(6, true), 52);
-assert.equal(checked, dark.length + 4 + 16);
+assert.equal(paperedView.getUint16(6, true), 56);
+assert.equal(checked, dark.length + 16);
 assert.equal(papered.length, checked + 32 + 4);
 assert.equal(papered[48], 1);
 assert.equal(paperedView.getUint32(12, true), checksum(papered.subarray(16, checked)));
@@ -169,7 +212,7 @@ for (let at = 0; at < ramp.length; at += 4) {
 const many = quantise(ramp, 64, 64);
 assert.equal(many.palette.length, 16);
 assert.ok(many.palette.every((color) => rgb565(color) === rgb565(hexColor(rgb565(color)))));
-assert.equal(pack({ ...fresh, wallpapers: { ...fresh.wallpapers, wallpaper: many } }, schema).length, dark.length + 20 + 32 + 32 * 64);
+assert.equal(pack({ ...fresh, wallpapers: { ...fresh.wallpapers, wallpaper: many } }, schema).length, dark.length + 16 + 32 + 32 * 64);
 
 const letters = {
   ascent: 3,
@@ -229,10 +272,10 @@ const arranged = {
 };
 const arrangedBytes = pack(arranged, schema);
 const arrangedView = new DataView(arrangedBytes.buffer);
-assert.equal(arrangedView.getUint16(6, true), 52);
+assert.equal(arrangedView.getUint16(6, true), 56);
 assert.deepEqual(Array.from(arrangedBytes.subarray(48, 51)), [0, 10, 10]);
-assert.equal(arrangedBytes.length, dark.length + 4 + 2 * 10 * 8);
-const placesAt = 52 + 2 * schema.colors.length + 11 * schema.boxes.length + schema.spacing.length;
+assert.equal(arrangedBytes.length, dark.length + 2 * 10 * 8);
+const placesAt = 56 + 2 * schema.colors.length + 12 * schema.boxes.length + schema.spacing.length;
 assert.equal(arrangedView.getInt16(placesAt, true), -4);
 assert.deepEqual(Array.from(arrangedBytes.subarray(placesAt + 4, placesAt + 8)), [64, 0, 0, 0]);
 assert.deepEqual(Array.from(arrangedBytes.subarray(placesAt + 14, placesAt + 16)), [22, 2]);
@@ -247,13 +290,6 @@ const titleAt = placeLines.indexOf("[now_playing.title]");
 assert.deepEqual(placeLines.slice(titleAt + 1, titleAt + 6), ["x = 10", "y = 96", "width = 300", "height = 22", 'align = "right"']);
 assert.deepEqual(placeLines.slice(placeLines.indexOf("[now_playing.cover]") + 1, placeLines.indexOf("[now_playing.cover]") + 4), ["x = -4", "y = 30", "size = 64"]);
 assert.equal(placeLines[placeLines.indexOf("[now_playing_portrait.progress]") + 1], "hide = true");
-const builtin = schema.layout.map((entry, index) => ({ x: index * 10, y: 0, width: 5, height: 5, align: 1 }));
-const effective = effectivePlaces(builtin, arranged.layouts.now_playing, schema);
-assert.deepEqual(effective[0], { entry: schema.layout[0], given: true, x: -4, y: 30, size: 64 });
-assert.deepEqual(effective[2], { entry: schema.layout[2], given: false, x: 20, y: 0, width: 5, height: 5, align: "center" });
-assert.equal(placeAt(effective, 0, 40).entry.name, "cover");
-assert.equal(placeAt(effective, 22, 2).entry.name, "artist");
-assert.equal(placeAt(effective, 400, 400), null);
 
 const source = toToml(ember, schema);
 assert.match(source, /^name = "Ember"$/m);
@@ -261,3 +297,59 @@ assert.match(source, /^row_height = 28$/m);
 assert.match(source, /^\[boxes\.toast\]$/m);
 assert.match(source, /^radius = 8$/m);
 console.log(`ok: ${packages.length} themes repack to themselves`);
+
+const accented = defaultTheme(schema);
+accented.name = "Accented";
+accented.cover_flow = "dark";
+accented.accents = [
+  { name: "Red", selection_background: "#c0262e", selection_top: "#e65458", selection_shine: "#f48080" },
+  { name: "Ruby", selection_background: "#900020", selection_top: "#b00030", selection_shine: "#e06080" },
+];
+const accentedBytes = pack(accented, schema);
+assert.equal(accentedBytes[51], 2);
+assert.equal(accentedBytes[52], 1);
+const accentedBack = unpack(accentedBytes, schema);
+assert.deepEqual(accentedBack.accents.map((accent) => accent.name), ["Red", "Ruby"]);
+assert.equal(accentedBack.cover_flow, "dark");
+assert.deepEqual(Array.from(pack(accentedBack, schema)), Array.from(accentedBytes), "accents repack to themselves");
+const accentedToml = toToml(accented, schema);
+assert.ok(accentedToml.includes('cover_flow = "dark"'));
+assert.ok(accentedToml.includes('[[accents]]\nname = "Ruby"'));
+accented.accents = Array.from({ length: 9 }, () => accented.accents[0]);
+assert.throws(() => pack(accented, schema), /at most 8 accents/);
+
+const tape = unpack(new Uint8Array(readFileSync(join(site, "themes", "cassette.echotheme"))), schema);
+assert.equal(typeof tape.now_playing_scene.script, "string");
+assert.ok(tape.now_playing_scene.script.includes("rect("));
+assert.equal(tape.now_playing_scene.chrome.header_top, "#4a454a");
+const tapeToml = toToml(tape, schema);
+assert.ok(tapeToml.includes("[now_playing_scene]\nscript = '''"));
+assert.ok(tapeToml.includes("[now_playing_scene.chrome]"));
+const broken = { ...tape, now_playing_scene: { script: "rect(1, 2)", chrome: null } };
+assert.throws(() => pack(broken, schema), /Now Playing scene: line 1: rect\(\) takes 5 values/);
+assert.equal(unpack(pack({ ...tape, now_playing_scene: null }, schema), schema).now_playing_scene, null);
+
+const designed = defaultDesign();
+for (const type of Object.keys(LAYER_TYPES)) {
+  designed.layers.push(newLayer(type));
+}
+designed.layers.push({ ...newLayer("progress"), style: "ring" }, { ...newLayer("cover"), shape: "circle", border: 2 });
+designed.layers.push({ ...newLayer("text"), source: "custom", custom: 'Say "hi"' }, { ...newLayer("shape"), kind: "ring" });
+designed.background = { style: "gradient", top: "@header_background", bottom: "#102030" };
+const script = designScript(designed, defaultTheme(schema));
+const built = compileScene(script, schema.scene);
+assert.ok(built.code.length > 100 && built.code.length < 6144, "a designed scene compiles and fits");
+const designedTheme = { ...defaultTheme(schema), now_playing_scene: { script, chrome: null, design: JSON.stringify(designed) } };
+const designedBack = unpack(pack(designedTheme, schema), schema);
+assert.deepEqual(readDesign(designedBack.now_playing_scene.design).layers.length, designed.layers.length);
+assert.equal(designedBack.now_playing_scene.script, script);
+assert.equal(readDesign("not json"), null);
+
+const outline = batteryRows("frame", 22, 10);
+const fill = batteryRows("level", 22, 10);
+assert.equal(outline.length, 10);
+assert.equal(outline[0], "ffffffffffffffffffff..");
+assert.equal(outline[4], "f..................fff");
+assert.equal(fill[4], "..ffffffffffffffff....");
+const paired = { ...defaultTheme(schema), icons: { ...defaultTheme(schema).icons, battery: outline, battery_level: fill } };
+assert.ok(pack(paired, schema).length > 0, "a drawn battery outline and fill pack together");

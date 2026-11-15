@@ -70,9 +70,9 @@ export class Preview {
     return this.turned && key in swapped ? swapped[key] : key;
   }
 
-  start(orientation, screen) {
+  start(orientation, screen, accent = 0, face = 0) {
     this.turned = orientation !== 0;
-    this.wasm.preview_start(orientation, 0);
+    this.wasm.preview_start(orientation, face, accent);
     if (this.themeBytes) {
       this.wear(this.themeBytes);
     }

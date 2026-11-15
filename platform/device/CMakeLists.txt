@@ -309,7 +309,7 @@ set(ECHO_FIRMWARE_VERSION "0.12.0" CACHE STRING "major.minor.patch written to th
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
 set(ECHO_GLYPH_FACE_ARGUMENTS "")
-foreach(face_file ${ECHO_GLYPH_FACE_FILES} ${ECHO_LANGUAGE_PACK_FILES})
+foreach(face_file ${ECHO_GLYPH_FACE_FILES} ${ECHO_LANGUAGE_PACK_FILES} ${ECHO_BUILTIN_THEME_FILES})
     list(APPEND ECHO_GLYPH_FACE_ARGUMENTS --glyph-face ${face_file})
 endforeach()
 

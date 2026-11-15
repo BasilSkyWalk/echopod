@@ -9,6 +9,7 @@
 #include "hal/power.h"
 #include "hal/storage.h"
 #include "hal/system.h"
+#include "theme_store.h"
 
 typedef enum MusicSource {
     MUSIC_COVER_FLOW,
@@ -215,6 +216,30 @@ static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, Spoke
         .shown_context = entry};
 }
 
+static bool home_scene_update(void *context, uint32_t now_ms)
+{
+    AppScreens *screens = context;
+    if (!theme_store_has_scene(THEME_SCENE_HOME)) {
+        return false;
+    }
+    now_playing_follow(&screens->now_playing, now_ms);
+    home_art_update(&screens->home_art, now_ms);
+    return true;
+}
+
+static bool home_scene_draw(void *context, Canvas *canvas, MenuScreen *menu)
+{
+    const AppScreens *screens = context;
+    const HomeArt *art = &screens->home_art;
+    SceneMenu items = {&menu->model, menu->list.selected, menu_screen_scene_list, menu};
+    NowPlayingHome stage = {.title = menu->config.title, .menu = &items};
+    if (!art->has_album ||
+        cover_cache_full(art->covers, art->album, &stage.cover) != COVER_LOADED) {
+        stage.cover = (Image){0};
+    }
+    return now_playing_draw_home(&screens->now_playing, &stage, canvas);
+}
+
 static void build_home(AppScreens *screens, AppScreensContext context)
 {
     const Theme *theme = context.theme;
@@ -232,6 +257,7 @@ static void build_home(AppScreens *screens, AppScreensContext context)
     screens->home_items[5].shown_context = context.player;
     home_art_init(&screens->home_art, context.covers, context.store, context.player, theme);
     screens->home_art.notice = hal_storage_card_ready() ? NULL : i18n_text(STR_MENU_NO_CARD);
+    screens->home_scene = (MenuScene){home_scene_update, home_scene_draw, screens, false};
     MenuConfig home = {.title = "EchoPod",
                        .items = screens->home_items,
                        .item_count = HOME_ITEM_COUNT,
@@ -240,7 +266,8 @@ static void build_home(AppScreens *screens, AppScreensContext context)
                                  .min_height = HOME_ART_MIN_HEIGHT,
                                  .update = home_art_update,
                                  .draw = home_art_draw,
-                                 .context = &screens->home_art}};
+                                 .context = &screens->home_art},
+                       .scene = &screens->home_scene};
     menu_screen_init(&screens->home, home);
 }
 

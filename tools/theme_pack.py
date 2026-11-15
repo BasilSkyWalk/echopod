@@ -6,13 +6,16 @@ import sys
 import tomllib
 from pathlib import Path
 
+import scene_compile
+
 MAGIC = b"ETHM"
 VERSION = 1
 HEADER_SIZE = 48
 CHECKED_FROM = 16
 NAME_SIZE = 24
 MAX_SIZE = 3072
-BOX_SIZE = 11
+BOX_SIZE = 12
+OPAQUE = 15
 MAX_RADIUS = 32
 HASH_START = 2166136261
 HASH_PRIME = 16777619
@@ -20,10 +23,11 @@ EDGES = {"top": 1, "bottom": 2, "left": 4, "right": 8}
 ALL_EDGES = 15
 BYTE_FIELDS = ("border_width", "shine_height")
 BOX_KEYS = {"fill", "border", "shine", "ink", "border_width", "border_edges", "shine_height", "inset",
-            "radius"}
+            "radius", "opacity"}
 THEME_KEYS = {"name", "author", "description", "selection", "colors", "boxes", "spacing", "icons",
               "wallpaper", "wallpaper_portrait", "fonts", "now_playing",
-              "now_playing_portrait"}
+              "now_playing_portrait", "accents", "cover_flow", "now_playing_scene",
+              "home_art", "home_scene"}
 LAYOUTS = ("now_playing", "now_playing_portrait")
 LAYOUT_KEYS = {"x", "y", "width", "height", "align", "hide"}
 LAYOUT_COVER_KEYS = {"x", "y", "size", "hide"}
@@ -34,7 +38,24 @@ LAYOUT_UNSET = 0xFF
 ALIGNS = ("left", "center", "right")
 WALLPAPERS = (("wallpaper", 320, 170), ("wallpaper_portrait", 170, 320))
 WALLPAPER_KEYS = {"image", "dim", "palette", "rows"}
-ASSET_HEADER_SIZE = 52
+ASSET_HEADER_SIZE = 56
+ACCENT = struct.Struct("<HHHB13s")
+ACCENT_KEYS = {"name", "selection_background", "selection_top", "selection_shine"}
+ACCENT_NAMES = ("blue", "red", "orange", "green", "teal", "purple", "pink", "graphite")
+ACCENT_NAME_SIZE = 13
+MOST_ACCENTS = 8
+CUSTOM_ACCENT = 0xFF
+COVER_FLOW_STYLES = ("theme", "dark")
+SCENE_KIND = 5
+SCENE_SOURCE_KIND = 6
+SCENE_DESIGN_KIND = 7
+SCENES = (("now_playing_scene", SCENE_KIND, SCENE_SOURCE_KIND, SCENE_DESIGN_KIND),
+          ("home_scene", 8, 9, 10))
+SCENE_KEYS = {"script", "file", "chrome", "design"}
+SCENE_MOST_BYTES = 6144
+SCENE_CHROME = 1
+FLAG_DARK_COVER_FLOW = 1
+FLAG_NO_HOME_ART = 2
 ASSET_ENTRY_SIZE = 16
 ASSET_MEMORY = 28224
 WALLPAPER_PAIR_BYTES = 1024
@@ -179,7 +200,11 @@ def box_bytes(table, colors, where):
     radius = small_number(table.get("radius", 0), where)
     if radius > MAX_RADIUS:
         raise ThemeError(f"{where}: a radius may be at most {MAX_RADIUS}")
-    return bytes([top, bottom, *named, width, edges, shine_height, across, down, radius])
+    opacity = table.get("opacity", 100)
+    if isinstance(opacity, bool) or not isinstance(opacity, int) or not 0 <= opacity <= 100:
+        raise ThemeError(f"{where}: opacity is a percentage from 0 to 100")
+    see_through = OPAQUE - (opacity * OPAQUE + 50) // 100
+    return bytes([top, bottom, *named, width, edges, shine_height, across, down, radius, see_through])
 
 
 def spacing_bytes(table, spacing, where):
@@ -400,6 +425,63 @@ def font_assets(theme, base, fonts, where):
             for index, (name, limit) in enumerate(fonts) if name in table]
 
 
+def one_scene(theme, key, kinds, colors, color_table, names, where):
+    table = own_table(theme, key, where)
+    if not table:
+        return []
+    if set(table) - SCENE_KEYS or not isinstance(table.get("script"), str):
+        raise ThemeError(f"{where}: {key} has a script (or a file) and may have chrome")
+    try:
+        code, strings = scene_compile.compile_scene(table["script"], names)
+    except scene_compile.SceneError as error:
+        raise ThemeError(f"{where}: {key}: {error}") from error
+    chrome = own_table(table, "chrome", f"{where}: {key}")
+    unknown = set(chrome) - set(colors)
+    if unknown:
+        raise ThemeError(f"{where}: {key}.chrome: {', '.join(sorted(unknown))} is not a colour name")
+    flags = SCENE_CHROME if chrome else 0
+    shades = {**color_table, **chrome}
+    section = b"".join(struct.pack("<H", rgb565(shades[name], f"{where}: chrome {name}"))
+                       for name in colors) if chrome else b""
+    section += code + strings
+    code_kind, source_kind, design_kind = kinds
+    head = struct.pack("<BBHHH", code_kind, flags, len(code), len(strings), 0)
+    source = table["script"].encode("utf-8")
+    found = [(head, section, 0), (struct.pack("<BBHHH", source_kind, 0, 0, 0, 0), source, 0)]
+    design = table.get("design")
+    if design is not None:
+        if not isinstance(design, str):
+            raise ThemeError(f"{where}: {key}.design is the editor's text")
+        found.append((struct.pack("<BBHHH", design_kind, 0, 0, 0, 0), design.encode("utf-8"), 0))
+    return found
+
+
+def scene_assets(theme, colors, color_table, names, where):
+    found = []
+    for key, *kinds in SCENES:
+        found += one_scene(theme, key, kinds, colors, color_table, names, where)
+    scenes = [section for head, section, _ in found if head[0] in (SCENE_KIND, SCENES[1][1])]
+    total = sum((len(section) + 3) // 4 * 4 for section in scenes)
+    if total > SCENE_MOST_BYTES:
+        what = "the scene is" if len(scenes) == 1 else "the Now Playing and Home scenes together are"
+        raise ThemeError(f"{where}: {what} {total:,} bytes; at most {SCENE_MOST_BYTES:,}")
+    return found
+
+
+def with_scene(theme, folder, where):
+    for key, *_ in SCENES:
+        table = theme.get(key)
+        if not isinstance(table, dict) or "file" not in table:
+            continue
+        path = folder / str(table["file"])
+        if not path.is_file():
+            raise ThemeError(f"{where}: {key} file {table['file']!r} isn't beside the theme")
+        resolved = {name: value for name, value in table.items() if name != "file"}
+        resolved["script"] = path.read_text(encoding="utf-8")
+        theme = {**theme, key: resolved}
+    return theme
+
+
 def check_memory(walls, fonts, where):
     needed = sum(memory for _, _, memory in fonts) + max((memory for _, _, memory in walls),
                                                          default=0)
@@ -548,8 +630,43 @@ def layout_bytes(theme, base, layout, key, where):
     return len(boxes), b"".join(boxes)
 
 
+def accent_bytes(accent, where):
+    if not isinstance(accent, dict) or set(accent) != ACCENT_KEYS:
+        raise ThemeError(f"{where}: an accent has a name, selection_background, selection_top "
+                         "and selection_shine")
+    name = accent["name"]
+    if not isinstance(name, str):
+        raise ThemeError(f"{where}: an accent's name is text")
+    encoded = name.encode("utf-8")
+    if not encoded or len(encoded) >= ACCENT_NAME_SIZE:
+        raise ThemeError(f"{where}: accent {name!r}: a name needs 1 to {ACCENT_NAME_SIZE - 1} "
+                         "bytes of UTF-8")
+    standard = name.lower() in ACCENT_NAMES
+    shades = [rgb565(accent[key], f"{where}: accent {name}: {key}")
+              for key in ("selection_background", "selection_top", "selection_shine")]
+    return ACCENT.pack(*shades, ACCENT_NAMES.index(name.lower()) if standard else CUSTOM_ACCENT,
+                       b"" if standard else encoded)
+
+
+def accents_of(theme, where):
+    accents = theme.get("accents", [])
+    if not isinstance(accents, list) or len(accents) > MOST_ACCENTS:
+        raise ThemeError(f"{where}: accents is a list of at most {MOST_ACCENTS} [[accents]]")
+    return [accent_bytes(accent, where) for accent in accents]
+
+
+def flags_of(theme, where):
+    style = theme.get("cover_flow", COVER_FLOW_STYLES[0])
+    if style not in COVER_FLOW_STYLES:
+        raise ThemeError(f"{where}: cover_flow is " + " or ".join(map(repr, COVER_FLOW_STYLES)))
+    home_art = theme.get("home_art", True)
+    if not isinstance(home_art, bool):
+        raise ThemeError(f"{where}: home_art is true or false")
+    return (FLAG_DARK_COVER_FLOW if style == "dark" else 0) | (0 if home_art else FLAG_NO_HOME_ART)
+
+
 def pack(theme, base, colors, boxes, where="theme", spacing=(), icons=(), fonts=(),
-         layout=()):
+         layout=(), scene_names=None):
     check_keys(theme, where)
     color_table = merged(base, theme, "colors", colors, where)
     box_table = merged(base, theme, "boxes", boxes, where)
@@ -563,17 +680,23 @@ def pack(theme, base, colors, boxes, where="theme", spacing=(), icons=(), fonts=
     walls = wallpaper_assets(theme, base, where)
     faces = font_assets(theme, base, fonts, where)
     check_memory(walls, faces, where)
-    assets = walls + faces
+    scenes = scene_assets(theme, colors, color_table, scene_names, where) if scene_names else []
+    if any(theme.get(key) for key, *_ in SCENES) and not scene_names:
+        raise ThemeError(f"{where}: this packer can't read scenes")
+    assets = walls + faces + scenes
     placed = [layout_bytes(theme, base, layout, key, where) for key in LAYOUTS]
-    long_header = bool(assets) or any(count for count, _ in placed)
+    accents = accents_of(theme, where)
+    flags = flags_of(theme, where)
+    long_header = bool(assets) or any(count for count, _ in placed) or bool(accents) or flags
     body = struct.pack("<HHBBBB", len(colors), len(boxes), BOX_SIZE, boxes.index(selection),
                        len(spaces), icon_count)
     body += name_bytes(theme.get("name"), where)
-    body += bytes([len(assets), placed[0][0], placed[1][0], 0]) if long_header else b""
+    body += bytes([len(assets), placed[0][0], placed[1][0], len(accents), flags, 0, 0, 0]
+                  if long_header else [])
     body += b"".join(struct.pack("<H", rgb565(color_table[name], f"{where}: {name}"))
                      for name in colors)
     body += b"".join(box_bytes(box_table[name], colors, f"{where}: box {name}") for name in boxes)
-    body += spaces + b"".join(boxes for _, boxes in placed)
+    body += spaces + b"".join(boxes for _, boxes in placed) + b"".join(accents)
     size = CHECKED_FROM + len(body) + ASSET_ENTRY_SIZE * len(assets) + len(icon_bytes)
     body += asset_table(assets, size) + icon_bytes
     if size > MAX_SIZE:
@@ -645,7 +768,9 @@ def package_tables(package, colors, boxes):
     rows = [package[boxes_at + index * box_size:boxes_at + (index + 1) * box_size]
             for index in range(box_count)]
     placed = package[49] + package[50] if header >= ASSET_HEADER_SIZE else 0
-    table_at = boxes_at + box_count * box_size + spaces + LAYOUT_BOX.size * placed
+    accents = package[51] if header >= ASSET_HEADER_SIZE else 0
+    table_at = (boxes_at + box_count * box_size + spaces + LAYOUT_BOX.size * placed +
+                ACCENT.size * accents)
     wallpapers = package_wallpapers(package, table_at)
     return dict(zip(colors, values)), dict(zip(boxes, rows)), boxes[selection], values, wallpapers
 
@@ -709,6 +834,8 @@ def build_all(sources, definitions, base_source=None):
     icons = icons_in(definitions / "theme_icons.def")
     fonts = fonts_in(definitions / "theme_fonts.def")
     layout = layout_in(definitions / "theme_layout.def")
+    scene_folder = definitions.resolve().parents[2] / "np_faces" / "include" / "np_faces"
+    scene_names = scene_compile.definitions(scene_folder) if scene_folder.is_dir() else None
     own_base = sources / (BASE_THEME + SOURCE_SUFFIX)
     base = read_source(base_source or own_base)
     packages = {}
@@ -716,8 +843,9 @@ def build_all(sources, definitions, base_source=None):
         under = {} if path == own_base else base
         theme = with_images(read_source(path), under, path.parent, path.name)
         theme = with_fonts(theme, fonts, path.parent, path.name)
+        theme = with_scene(theme, path.parent, path.name)
         packages[path.stem] = pack(theme, under, colors, boxes, path.name, spacing, icons, fonts,
-                                   layout)
+                                   layout, scene_names)
     return packages
 
 

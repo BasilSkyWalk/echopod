@@ -24,7 +24,12 @@ static Rect inner_area(Rect area, const BoxStyle *style)
     return (Rect){area.x + left, area.y + top, area.width - across, area.height - down};
 }
 
-static void draw_edges(Canvas *canvas, Rect area, Rect inner, Color color)
+static uint8_t opacity_of(const BoxStyle *style)
+{
+    return (uint8_t)(COLOR_ALPHA_OPAQUE - style->see_through);
+}
+
+static void draw_edges(Canvas *canvas, Rect area, Rect inner, Color color, uint8_t alpha)
 {
     int inner_bottom = inner.y + inner.height;
     int inner_right = inner.x + inner.width;
@@ -35,7 +40,7 @@ static void draw_edges(Canvas *canvas, Rect area, Rect inner, Color color)
         {inner_right, inner.y, area.x + area.width - inner_right, inner.height},
     };
     for (unsigned band = 0; band < sizeof bands / sizeof bands[0]; band++) {
-        canvas_fill_rect(canvas, bands[band], color);
+        canvas_blend_rect(canvas, bands[band], color, alpha);
     }
 }
 
@@ -45,12 +50,18 @@ static void draw_fill(Canvas *canvas, const ThemeColors *colors, const BoxStyle 
     Color bottom = theme_color(colors, style->fill_bottom);
     int shine = style->shine_height < area.height ? style->shine_height : area.height;
     Rect body = {area.x, area.y + shine, area.width, area.height - shine};
-    canvas_fill_rect(canvas, (Rect){area.x, area.y, area.width, shine},
-                     theme_color(colors, style->shine));
+    uint8_t alpha = opacity_of(style);
+    canvas_blend_rect(canvas, (Rect){area.x, area.y, area.width, shine},
+                      theme_color(colors, style->shine), alpha);
     if (top == bottom) {
-        canvas_fill_rect(canvas, body, top);
-    } else {
+        canvas_blend_rect(canvas, body, top, alpha);
+    } else if (alpha == COLOR_ALPHA_OPAQUE) {
         canvas_fill_gradient(canvas, body, top, bottom);
+    } else {
+        for (int row = 0; row < body.height; row++) {
+            Color color = color_between(top, bottom, row, body.height - 1);
+            canvas_blend_rect(canvas, (Rect){body.x, body.y + row, body.width, 1}, color, alpha);
+        }
     }
 }
 
@@ -65,6 +76,7 @@ typedef struct Shape {
     Color shine;
     int shine_height;
     int radius;
+    uint8_t alpha;
 } Shape;
 
 static uint8_t corner_coverage(Corner corner, int column)
@@ -79,16 +91,16 @@ static uint8_t corner_coverage(Corner corner, int column)
     return (uint8_t)(inside * COLOR_ALPHA_OPAQUE / (CORNER_SAMPLES * CORNER_SAMPLES));
 }
 
-static void draw_corner_row(Canvas *canvas, Rect line, Corner corner, Color color)
+static void draw_corner_row(Canvas *canvas, Rect line, Corner corner, Color color, uint8_t opacity)
 {
     for (int column = 0; column < corner.radius; column++) {
-        uint8_t alpha = corner_coverage(corner, column);
+        uint8_t alpha = (uint8_t)(corner_coverage(corner, column) * opacity / COLOR_ALPHA_OPAQUE);
         int mirrored = line.x + line.width - 1 - column;
         canvas_blend_pixel(canvas, (Point){line.x + column, line.y}, color, alpha);
         canvas_blend_pixel(canvas, (Point){mirrored, line.y}, color, alpha);
     }
     Rect middle = {line.x + corner.radius, line.y, line.width - 2 * corner.radius, 1};
-    canvas_fill_rect(canvas, middle, color);
+    canvas_blend_rect(canvas, middle, color, opacity);
 }
 
 static Color shape_row_color(const Shape *shape, int height, int row)
@@ -112,9 +124,9 @@ static void draw_shape(Canvas *canvas, Rect area, const Shape *shape)
             continue;
         }
         if (from_edge < radius) {
-            draw_corner_row(canvas, line, (Corner){radius, from_edge}, color);
+            draw_corner_row(canvas, line, (Corner){radius, from_edge}, color, shape->alpha);
         } else {
-            canvas_fill_rect(canvas, line, color);
+            canvas_blend_rect(canvas, line, color, shape->alpha);
         }
     }
 }
@@ -124,12 +136,14 @@ static void draw_rounded(Canvas *canvas, const ThemeColors *colors, const BoxSty
 {
     Color border = theme_color(colors, style->border);
     int width = style->border_width;
-    Shape rim = {.top = border, .bottom = border, .radius = style->radius};
+    Shape rim = {
+        .top = border, .bottom = border, .radius = style->radius, .alpha = opacity_of(style)};
     Shape body = {.top = theme_color(colors, style->fill_top),
                   .bottom = theme_color(colors, style->fill_bottom),
                   .shine = theme_color(colors, style->shine),
                   .shine_height = style->shine_height,
-                  .radius = style->radius > width ? style->radius - width : 0};
+                  .radius = style->radius > width ? style->radius - width : 0,
+                  .alpha = opacity_of(style)};
     if (width > 0 && style->border_edges != 0) {
         draw_shape(canvas, outer, &rim);
     }
@@ -145,7 +159,7 @@ void box_draw(Canvas *canvas, const ThemeColors *colors, const BoxStyle *style, 
     }
     Rect inner = inner_area(outer, style);
     if (style->border_width > 0) {
-        draw_edges(canvas, outer, inner, theme_color(colors, style->border));
+        draw_edges(canvas, outer, inner, theme_color(colors, style->border), opacity_of(style));
     }
     draw_fill(canvas, colors, style, inner);
 }

@@ -14,9 +14,10 @@ const LANDSCAPE = ["home", "list", "playing", "toast", "letters", "settings"];
 const PORTRAIT = ["list", "playing", "toast"];
 const COLUMNS = 3;
 const SUFFIX = ".echotheme";
+const THEME_FACE = 5;
 
 function shoot(preview, orientation, screen) {
-  preview.start(orientation, screen);
+  preview.start(orientation, screen, 0, THEME_FACE);
   if (screen === "letters") {
     preview.advance(HELD_MS);
   } else {

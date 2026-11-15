@@ -6,14 +6,16 @@ import sys
 from pathlib import Path
 
 import demo_library
+import scene_compile
 import theme_pack
 
 BOX_FIELDS = ("fill_top", "fill_bottom", "border", "shine", "ink", "border_width", "border_edges",
-              "shine_height", "inset_across", "inset_down", "radius")
+              "shine_height", "inset_across", "inset_down", "radius", "see_through")
 COLOR_FIELDS = 5
 PAGE_FILES = ("index.html", "style.css", "editor.js", "theme_format.js", "preview_host.js",
               "icon_editor.js", "wallpaper_editor.js", "font_editor.js",
-              "layout_editor.js", "gallery.html",
+              "accent_editor.js", "now_playing_designer.js", "scene_compile.js",
+              "gallery.html",
               "gallery.js")
 MODULE = "echo_preview.wasm"
 GALLERY = "index.json"
@@ -59,9 +61,13 @@ def schema(themes, definitions):
             "colors": {name: dark["colors"][name].lower() for name in colors},
             "boxes": {name: box_fields(dark["boxes"][name], colors, f"dark: box {name}")
                       for name in boxes},
+            "accents": [{key: value.lower() if key != "name" else value
+                         for key, value in accent.items()} for accent in dark.get("accents", [])],
         },
         "samples": [path.stem for path in sources_in(themes)],
         "checks": list(theme_pack.CHECKS),
+        "scene": scene_compile.definitions(definitions.parents[2] / "np_faces" / "include" /
+                                           "np_faces"),
     }
 
 
@@ -95,6 +101,7 @@ def images_of(path):
     fonts = theme.get("fonts") if isinstance(theme.get("fonts"), dict) else {}
     tables = [(theme.get(key), "image") for key, _, _ in theme_pack.WALLPAPERS]
     tables += [(table, "file") for table in fonts.values()]
+    tables.append((theme.get("now_playing_scene"), "file"))
     return [path.parent / table[key] for table, key in tables
             if isinstance(table, dict) and isinstance(table.get(key), str)]
 
@@ -107,8 +114,8 @@ def write_themes(arguments, folder):
     own = sources_in(arguments.themes)
     shared = shared_sources(arguments.community, {path.stem for path in own})
     packages = theme_pack.build_all(arguments.themes, arguments.definitions)
+    base = arguments.themes / (theme_pack.BASE_THEME + theme_pack.SOURCE_SUFFIX)
     if shared:
-        base = arguments.themes / (theme_pack.BASE_THEME + theme_pack.SOURCE_SUFFIX)
         packages |= theme_pack.build_all(arguments.community, arguments.definitions, base)
     for stem, package in packages.items():
         (folder / (stem + theme_pack.PACKAGE_SUFFIX)).write_bytes(package)

@@ -1,0 +1,129 @@
+const INK = #182410
+const GLASS = #b0c468
+const GHOST = #90a850
+const SHADOW = #889c48
+const BEZEL = #202028
+
+let wide = width >= 200
+let top = y + 3
+let align = wide ? left : center
+let gx = wide ? 5 : 4
+let gw = wide ? 310 : 162
+let gh = height - 6
+
+rect(x, y, width, height, BEZEL)
+rect(gx, top, gw, gh, GLASS)
+rect(gx, top, gw, 2, SHADOW)
+repeat corner from 0 to 4 {
+    rect(gx + (corner & 1) * (gw - 1), top + (corner >> 1) * (gh - 1), 1, 1, BEZEL)
+}
+
+icon(play, wide ? 12 : 10, top + 7, 8, 9, playing ? INK : GHOST)
+icon(pause, wide ? 25 : 23, top + 7, 8, 9, paused ? INK : GHOST)
+
+let ly = top + 4
+let ry = wide ? ly : top + 21
+plain("SHUFFLE", small, wide ? 41 : 40, ly, width("SHUFFLE", small), 15, shuffle_mode != 0 ? INK : GHOST)
+plain("ALBUM", small, wide ? 101 : 100, ly, width("ALBUM", small), 15, shuffle_mode == 2 ? INK : GHOST)
+plain("REPEAT", small, wide ? 156 : 10, ry, width("REPEAT", small), 15, repeat_mode != 0 ? INK : GHOST)
+plain("1", small, wide ? 208 : 62, ry, width("1", small), 15, repeat_mode == 1 ? INK : GHOST)
+plain("ALL", small, wide ? 219 : 73, ry, width("ALL", small), 15, repeat_mode == 2 ? INK : GHOST)
+
+let cw = width(codec, small) + 8
+codec(small, (wide ? 308 : 160) - cw, ry, cw, 15, INK)
+
+plain("TRACK", small, wide ? 12 : 37, top + (wide ? 23 : 55), width("TRACK", small), 15, INK)
+segment_style(13, 24, 3, 8, INK, GHOST)
+let number = min(track, 999)
+let tx = wide ? 12 : 85
+let ty = top + (wide ? 39 : 44)
+digit(tx, ty, number >= 100 ? segments(number / 100 % 10) : 0)
+digit(tx + 16, ty, number >= 10 ? segments(number / 10 % 10) : 0)
+digit(tx + 32, ty, segments(number % 10))
+
+let secs = min((shown >>> 3) / 125, 35999)
+let hours = secs / 3600
+let minutes = secs / 60 % 60
+let rest = secs % 60
+let level = min(volume, 99)
+let vs = volume_shown
+let bx = wide ? 68 : 16
+let by = top + (wide ? 23 : 76)
+segment_style(22, 40, 5, 8, INK, GHOST)
+digit(bx, by, vs ? 0 : hours > 0 ? segments(hours % 10) : 0)
+digit(bx + 30, by, vs ? 0 : minutes >= 10 || hours > 0 ? segments(minutes / 10 % 10) : 0)
+digit(bx + 56, by, vs ? 0 : segments(minutes % 10))
+digit(bx + 86, by, vs ? (level >= 10 ? segments(level / 10 % 10) : 0) : segments(rest / 10 % 10))
+digit(bx + 112, by, segments(vs ? level % 10 : rest % 10))
+colon(bx + 22, by, !vs && hours > 0)
+colon(bx + 78, by, !vs)
+
+if badge != none {
+    icon(badge, wide ? 255 : 76, top + (wide ? 35 : 134), 18, 18, INK)
+} else {
+    let bands = wide ? 10 : 16
+    let sx = wide ? 220 : 14
+    let sy = top + (wide ? 60 : 160)
+    repeat band from 0 to bands {
+        let lit = 0
+        if playing {
+            lit = -100
+            repeat back from 0 to 3 {
+                let f = tick - back
+                let v = f * 0x9E3779B1 + band * 0x85EBCA6B
+                v = v ^ (v >>> 15)
+                v = v * 0x2C1B3C6D
+                v = v ^ (v >>> 12)
+                let phase = (f >>> 1) % 3 * 2 + (f & 1)
+                let beat = phase == 0 ? 3 : phase == 1 ? 1 : 0
+                lit = max(lit, 5 - 4 * band / bands + (band < bands / 2 ? beat : 0) + (v >>> 30) - ((v >>> 28) & 3) / 2 - 2 * back)
+            }
+            lit = min(max(lit, 0), 8)
+        }
+        repeat cell from 0 to 8 {
+            rect(sx + 9 * band, sy - 5 * cell, 7, 3, cell < lit ? INK : GHOST)
+        }
+    }
+}
+
+let lx = wide ? 12 : 10
+let lw = wide ? 296 : 150
+let ty2 = top + (wide ? 68 : 171)
+rect(lx, ty2, lw, 20, GHOST)
+lattice(lx, ty2, lw, 20, 3, GLASS)
+line(song, title, lx, ty2, lw, 20, align, INK)
+
+let ay = top + (wide ? 90 : 194)
+if wide {
+    if present(lyric) {
+        line(lyric, body, lx, ay, lw, 20, align, INK)
+    } else {
+        line(artist, body, lx, ay, lw, 20, align, INK)
+    }
+} else {
+    line(artist, body, lx, ay, lw, 20, align, INK)
+    if present(lyric) {
+        line(lyric, body, lx, top + 214, lw, 20, align, INK)
+    } else {
+        line(album, body, lx, top + 214, lw, 20, align, INK)
+    }
+}
+
+let count = wide ? 74 : 37
+let filled = vs ? volume_width(count) : progress(count)
+let px = wide ? 12 : 11
+let py = top + (wide ? 115 : 241)
+repeat cell from 0 to count {
+    rect(px + 4 * cell, py, 3, 4, cell < filled ? INK : GHOST)
+}
+
+let iy = top + (wide ? 122 : 248)
+if present(feedback) {
+    text(feedback, small, lx, iy, lw, 15, align, INK)
+} else {
+    let rw = width(remaining, small)
+    plain(remaining, small, lx + lw - rw, iy, rw, 15, INK)
+    if present(stream) {
+        plain(stream, small, lx, iy, lw - rw - 8, 15, INK)
+    }
+}

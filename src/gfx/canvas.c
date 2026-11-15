@@ -53,6 +53,21 @@ void canvas_fill_rect(Canvas *canvas, Rect area, Color color)
     }
 }
 
+void canvas_blend_rect(Canvas *canvas, Rect area, Color color, uint8_t alpha)
+{
+    Rect visible = rect_intersection(canvas->clip, area);
+    if (alpha == COLOR_ALPHA_OPAQUE || rect_is_empty(visible)) {
+        canvas_fill_rect(canvas, visible, color);
+        return;
+    }
+    for (int y = visible.y; y < visible.y + visible.height; y++) {
+        Color *row = pixel_address(canvas, visible.x, y);
+        for (int column = 0; column < visible.width; column++) {
+            row[column] = color_blend(row[column], color, alpha);
+        }
+    }
+}
+
 void canvas_fill_gradient(Canvas *canvas, Rect area, Color top, Color bottom)
 {
     for (int row = 0; row < area.height; row++) {

@@ -21,6 +21,7 @@ extern const uint8_t device_code_end[];
 static NpFacesGate np_faces_gate;
 static bool startup_running;
 static uint32_t asset_wipes;
+static uint32_t scene_wipes;
 
 static const BoardOverlay NP_FACES_OVERLAY = {NP_FACES_IMAGE_OFFSET, NP_FACES_IMAGE_MAGIC,
                                               (uint8_t *)NP_FACES_BASE, NP_FACES_BYTES};
@@ -136,6 +137,24 @@ const void *hal_system_load_rescan_code(void)
 void board_np_faces_forget(void)
 {
     np_faces_gate_forget(&np_faces_gate);
+    scene_wipes++;
+}
+
+void *hal_system_scene_memory(uint32_t *size)
+{
+    uint32_t loaded = header_size(&NP_FACES_OVERLAY);
+    uint32_t used = (loaded + SECTOR_BYTES - 1) / SECTOR_BYTES * SECTOR_BYTES;
+    bool ready = !startup_running && np_faces_gate.state == NP_FACES_READY && loaded != 0 &&
+                 used < NP_FACES_BYTES;
+    uint8_t *memory = ready ? (uint8_t *)NP_FACES_BASE + used : NULL;
+    __asm__("" : "+r"(memory));
+    *size = ready ? NP_FACES_BYTES - used : 0;
+    return memory;
+}
+
+uint32_t hal_system_scene_wipes(void)
+{
+    return scene_wipes;
 }
 
 void board_theme_assets_forget(void)
@@ -190,6 +209,7 @@ __attribute__((noinline)) const void *hal_system_load_faces(void)
     if (np_faces_gate.state == NP_FACES_UNKNOWN &&
         np_faces_gate_should_load(&np_faces_gate, np_faces_may_load())) {
         np_faces_gate_loaded(&np_faces_gate, board_overlay_load(&NP_FACES_OVERLAY));
+        scene_wipes++;
     }
     const void *entry = (const void *)(uintptr_t)NP_FACES_ENTRY;
     __asm__("" : "+r"(entry));

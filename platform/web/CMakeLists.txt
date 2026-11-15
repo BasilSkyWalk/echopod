@@ -10,5 +10,5 @@ target_include_directories(echo_preview PRIVATE
     ${PROJECT_SOURCE_DIR}/tests/app
     ${PROJECT_SOURCE_DIR}/src/app
 )
-target_link_libraries(echo_preview PRIVATE echo_app echo_library_scan echo_options)
+target_link_libraries(echo_preview PRIVATE echo_app echo_builtin_themes echo_library_scan echo_options)
 target_link_options(echo_preview PRIVATE -Wl,-z,stack-size=262144 -Wl,--export=__heap_base)

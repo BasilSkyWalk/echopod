@@ -19,7 +19,7 @@ static int next_slot;
 static uint32_t read_fixture(const char *fixture, uint8_t *bytes)
 {
     char path[PATH_BYTES];
-    snprintf(path, sizeof path, "%s/themes/%s", ECHO_FIXTURE_DIR, fixture);
+    snprintf(path, sizeof path, "%s/%s", ECHO_THEME_PACKS, fixture);
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
         return 0;

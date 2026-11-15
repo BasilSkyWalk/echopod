@@ -68,7 +68,7 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual({"fill_top": "selection_top", "fill_bottom": "selection_background",
                           "border": "background", "shine": "selection_shine",
                           "ink": "selection_text", "border_width": 0, "border_edges": 0,
-                          "shine_height": 1, "inset_across": 0, "inset_down": 0, "radius": 0},
+                          "shine_height": 1, "inset_across": 0, "inset_down": 0, "radius": 0, "see_through": 0},
                          dark["boxes"]["selection"])
         self.assertEqual(2, dark["boxes"]["header"]["border_edges"])
         self.assertEqual([6, 1], [dark["boxes"]["selection_outline"]["inset_across"],
@@ -123,7 +123,7 @@ class SiteTest(unittest.TestCase):
 
     def test_every_page_the_site_links_is_one_it_copies(self):
         for name in ("preview_host.js", "icon_editor.js", "wallpaper_editor.js", "font_editor.js",
-                     "layout_editor.js", "gallery.html", "gallery.js"):
+                     "now_playing_designer.js", "scene_compile.js", "gallery.html", "gallery.js"):
             self.assertIn(name, web_editor.PAGE_FILES)
         for name in web_editor.PAGE_FILES:
             self.assertTrue((PAGES / name).is_file(), name)
@@ -151,11 +151,12 @@ class SharedThemesTest(unittest.TestCase):
             for name in ("murky.echotheme", "murky.toml", "dark.toml", "index.json"):
                 self.assertTrue((output / "themes" / name).is_file(), name)
             schema = json.loads((output / "theme_schema.json").read_text(encoding="utf-8"))
-            self.assertEqual(["dark", "ember", "murky"], schema["samples"])
+            samples = sorted(path.stem for path in THEMES.glob("*.toml"))
+            self.assertEqual(samples + ["murky"], schema["samples"])
             listed = json.loads((output / "themes" / "index.json").read_text(encoding="utf-8"))
-            self.assertEqual(["dark", "ember", "murky"], [entry["file"] for entry in listed])
+            self.assertEqual(samples + ["murky"], [entry["file"] for entry in listed])
             self.assertEqual({"file": "murky", "name": "Murky", "author": "Someone",
-                              "description": "Hard to read on purpose", "shared": True}, listed[2])
+                              "description": "Hard to read on purpose", "shared": True}, listed[-1])
             self.assertFalse(listed[0]["shared"])
 
     def test_a_shared_theme_is_packed_over_the_built_in_dark_theme(self):

@@ -76,13 +76,29 @@ static bool font_fits(const uint8_t *entry, uint32_t held)
 {
     uint32_t font = (uint32_t)entry[0] - THEME_ASSET_FIRST_FONT;
     uint32_t glyphs = u16_at(entry, 2);
-    return entry[0] >= THEME_ASSET_FIRST_FONT && entry[0] < THEME_ASSET_KINDS && glyphs >= 1 &&
+    return entry[0] >= THEME_ASSET_FIRST_FONT && entry[0] < THEME_ASSET_SCENE && glyphs >= 1 &&
            glyphs <= THEME_FONT_MAX_GLYPHS && entry[1] >= 1 &&
            (uint32_t)entry[1] + entry[6] <= FONT_LIMITS[font] && u32_at(entry, 8) >= held;
 }
 
+static bool scene_fits(const uint8_t *entry, uint32_t held)
+{
+    uint32_t chrome = (entry[1] & THEME_SCENE_CHROME) != 0 ? THEME_SCENE_CHROME_BYTES : 0;
+    uint32_t bytes = chrome + u16_at(entry, 2) + u16_at(entry, 4);
+    bool scene = entry[0] == THEME_ASSET_SCENE || entry[0] == THEME_ASSET_HOME_SCENE;
+    return scene && u16_at(entry, 2) >= 1 && bytes <= THEME_SCENE_MOST_BYTES &&
+           u32_at(entry, 8) >= held;
+}
+
 static void take_asset(const uint8_t *entry, uint32_t held, ThemePackage *package)
 {
+    if (scene_fits(entry, held)) {
+        ThemePackageScene *slot =
+            entry[0] == THEME_ASSET_HOME_SCENE ? &package->home_scene : &package->scene;
+        *slot = (ThemePackageScene){u32_at(entry, 8), u32_at(entry, 12), (uint16_t)u16_at(entry, 2),
+                                    (uint16_t)u16_at(entry, 4), entry[1]};
+        return;
+    }
     if (wallpaper_fits(entry, held)) {
         package->wallpapers[entry[0]] =
             (ThemePackageWallpaper){u32_at(entry, 8), u32_at(entry, 12), (uint16_t)u16_at(entry, 2),
@@ -102,6 +118,8 @@ static void take_assets(const uint8_t *table, uint32_t count, uint32_t held, The
     for (uint32_t font = 0; font < THEME_FONT_COUNT; font++) {
         package->fonts[font] = (ThemePackageFont){0};
     }
+    package->scene = (ThemePackageScene){0};
+    package->home_scene = (ThemePackageScene){0};
     for (uint32_t index = 0; index < count; index++) {
         take_asset(table + index * THEME_PACKAGE_ASSET_ENTRY_BYTES, held, package);
     }
@@ -111,7 +129,8 @@ static bool box_usable(const BoxStyle *box)
 {
     return box->fill_top < THEME_COLOR_COUNT && box->fill_bottom < THEME_COLOR_COUNT &&
            box->border < THEME_COLOR_COUNT && box->shine < THEME_COLOR_COUNT &&
-           box->ink < THEME_COLOR_COUNT && box->border_edges <= BOX_EDGE_ALL;
+           box->ink < THEME_COLOR_COUNT && box->border_edges <= BOX_EDGE_ALL &&
+           box->see_through <= COLOR_ALPHA_OPAQUE;
 }
 
 static void take_colors(const uint8_t *bytes, uint32_t count, ThemeColors *colors)
@@ -199,6 +218,17 @@ static void take_layout(const uint8_t *bytes, uint32_t count, ThemeLayout *layou
     }
 }
 
+static void take_accents(const uint8_t *bytes, uint32_t count, ThemePackage *package)
+{
+    uint32_t known = count < THEME_PACKAGE_MOST_ACCENTS ? count : THEME_PACKAGE_MOST_ACCENTS;
+    for (uint32_t index = 0; index < known; index++) {
+        const uint8_t *entry = bytes + index * THEME_PACKAGE_ACCENT_BYTES;
+        package->accents[index] = (ThemeAccent){(Color)u16_at(entry, 0), (Color)u16_at(entry, 2),
+                                                (Color)u16_at(entry, 4), entry[6]};
+    }
+    package->accent_count = (uint8_t)known;
+}
+
 static void take_name(const uint8_t *bytes, char *name)
 {
     for (uint32_t index = 0; index + 1 < THEME_PACKAGE_NAME_BYTES; index++) {
@@ -231,7 +261,12 @@ bool theme_package_decode(const uint8_t *bytes, uint32_t size, ThemePackage *pac
     if (layout_bytes > size - layouts_at) {
         return false;
     }
-    uint32_t assets_at = layouts_at + layout_bytes;
+    uint32_t accents_at = layouts_at + layout_bytes;
+    uint32_t accents = long_header ? bytes[THEME_PACKAGE_ACCENTS_FIELD] : 0;
+    if (accents * THEME_PACKAGE_ACCENT_BYTES > size - accents_at) {
+        return false;
+    }
+    uint32_t assets_at = accents_at + accents * THEME_PACKAGE_ACCENT_BYTES;
     uint32_t assets = long_header ? bytes[THEME_PACKAGE_ASSETS_FIELD] : 0;
     if (assets * THEME_PACKAGE_ASSET_ENTRY_BYTES > size - assets_at) {
         return false;
@@ -245,6 +280,10 @@ bool theme_package_decode(const uint8_t *bytes, uint32_t size, ThemePackage *pac
     take_layout(bytes + layouts_at + wide * THEME_PACKAGE_LAYOUT_BOX_BYTES, tall,
                 &package->layouts[THEME_WALLPAPER_PORTRAIT]);
     take_icons(bytes, size, icons_at, package->icons);
+    take_accents(bytes + accents_at, accents, package);
+    package->accents_at = (uint16_t)accents_at;
+    package->flags =
+        header >= THEME_PACKAGE_FLAGS_HEADER_BYTES ? bytes[THEME_PACKAGE_FLAGS_FIELD] : 0;
     take_colors(bytes + header, colors, &package->colors);
     take_boxes(bytes + boxes_at, boxes, box_bytes, &package->boxes);
     take_spacing(bytes + boxes_at + boxes * box_bytes, spacing, package->spacing);

@@ -3,84 +3,84 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EchoPod theme editor</title>
+    <title>EchoPod Themes</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header>
-      <h1>EchoPod theme editor</h1>
-      <nav><a href="gallery.html">Themes people shared</a></nav>
-      <p id="status" role="status">Loading the player…</p>
+    <header class="bar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span>EchoPod Themes</span>
+      </div>
+      <label class="theme-name">
+        <span class="visually-hidden">Theme name</span>
+        <input id="name" maxlength="23" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="bar-actions">
+        <button type="button" class="quiet" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5 4 9l4 4M4.5 9H12a4 4 0 0 1 0 8h-2" /></svg>
+        </button>
+        <button type="button" class="quiet" id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5 4 4-4 4M15.5 9H8a4 4 0 0 0 0 8h2" /></svg>
+        </button>
+        <a class="link" href="gallery.html">Gallery</a>
+        <button type="button" class="primary" id="save">Download for my player</button>
+      </div>
     </header>
-    <main>
-      <section id="stage" aria-label="Preview">
-        <div id="device">
-          <canvas id="screen" width="320" height="170" tabindex="0" aria-label="Player screen"></canvas>
-          <canvas id="overlay" aria-hidden="true"></canvas>
+    <div class="app">
+      <nav class="steps" aria-label="Steps" id="steps"></nav>
+      <main class="stage" id="stage">
+        <div class="stage-tools">
+          <div class="segmented" id="screens" role="tablist" aria-label="Screen"></div>
+          <div class="segmented" id="zoom" role="group" aria-label="Zoom">
+            <button type="button" data-zoom="out" title="Smaller" aria-label="Smaller">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10" /></svg>
+            </button>
+            <button type="button" data-zoom="fit" title="Fit the window" id="zoom-level">Fit</button>
+            <button type="button" data-zoom="in" title="Bigger" aria-label="Bigger">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10 5v10" /></svg>
+            </button>
+          </div>
+          <div class="segmented" id="turn" role="group" aria-label="How the player is held">
+            <button type="button" data-turn="0" aria-pressed="true" title="Sideways">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="5.5" width="15" height="9" rx="2" /></svg>
+            </button>
+            <button type="button" data-turn="1" aria-pressed="false" title="Upright">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5.5" y="2.5" width="9" height="15" rx="2" /></svg>
+            </button>
+          </div>
         </div>
-        <div class="row" id="keys">
-          <button type="button" data-key="1" title="Arrow up">▲</button>
-          <button type="button" data-key="0" title="Arrow down">▼</button>
-          <button type="button" data-key="2" title="Enter">Play</button>
-          <button type="button" data-key="4" title="Backspace">Back</button>
-          <button type="button" data-key="3" title="M">Menu</button>
+        <div class="device-wrap">
+          <div class="device" id="device">
+            <canvas id="screen" width="320" height="170" tabindex="0" aria-label="Player screen. Use the arrow keys, Enter and Backspace to drive it."></canvas>
+            <canvas id="overlay" aria-hidden="true"></canvas>
+          </div>
         </div>
-        <div class="row" id="screens">
-          <button type="button" data-screen="home">Home</button>
-          <button type="button" data-screen="list">List</button>
-          <button type="button" data-screen="playing">Now Playing</button>
-          <button type="button" data-screen="toast">Toast</button>
-          <button type="button" data-screen="letters">Fast scroll</button>
-          <button type="button" data-screen="settings">Settings</button>
+        <div class="stage-foot">
+          <div class="keys" id="keys" aria-label="Player buttons">
+            <button type="button" data-key="1" title="Up">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 12 5-5 5 5" /></svg>
+            </button>
+            <button type="button" data-key="0" title="Down">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5" /></svg>
+            </button>
+            <button type="button" data-key="2" title="Play / select">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path class="fill" d="M7 5v10l8-5z" /></svg>
+            </button>
+            <button type="button" data-key="4" title="Back">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9 6 5 10l4 4M5.5 10H15" /></svg>
+            </button>
+            <button type="button" data-key="3" title="Menu">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6.5h10M5 10h10M5 13.5h10" /></svg>
+            </button>
+          </div>
+          <p class="hint" id="hint">Click anything on the screen to change it.</p>
         </div>
-        <div class="row">
-          <label>Orientation
-            <select id="orientation">
-              <option value="0">Landscape</option>
-              <option value="1">Portrait</option>
-            </select>
-          </label>
-          <label>Zoom
-            <select id="zoom">
-              <option value="2">2×</option>
-              <option value="3">3×</option>
-              <option value="1">1×</option>
-            </select>
-          </label>
-        </div>
-        <p class="hint">Click the screen, then use the arrow keys, Enter and Backspace. Hold Enter for a long press.</p>
-      </section>
-      <section id="panel" aria-label="Theme">
-        <div class="row" id="file">
-          <label class="grow">Name <input id="name" maxlength="23" autocomplete="off" /></label>
-          <button type="button" id="save">Download theme</button>
-          <button type="button" id="save-source">Download source</button>
-          <button type="button" id="open">Open theme…</button>
-          <select id="samples" aria-label="Start from"></select>
-          <input type="file" id="picker" accept=".echotheme" hidden />
-        </div>
-        <ul id="warnings" aria-label="Readability warnings"></ul>
-        <h2>Colours</h2>
-        <div id="colors" class="grid"></div>
-        <h2>Spacing</h2>
-        <div id="spacing"></div>
-        <h2>Shapes</h2>
-        <label>Selected row is drawn by <select id="selection"></select></label>
-        <div id="boxes"></div>
-        <h2>Now Playing layout</h2>
-        <p class="hint">Show Now Playing, then drag a box on the screen or type its place. Each way of holding the player has its own layout; anything left unticked stays where the player puts it. Lyrics hide what they overlap, except the title.</p>
-        <details id="layout-section"><summary>Places</summary><div id="layout"></div></details>
-        <h2>Fonts</h2>
-        <p class="hint">Pick a TTF or OTF file for titles, list text or small text. Letters the font lacks come from the player's own font. Only share fonts whose licence allows it, such as the SIL Open Font License.</p>
-        <div id="fonts"></div>
-        <h2>Wallpaper</h2>
-        <p class="hint">A picture behind the lists, cut to 16 colours. Fade it until the text reads well. A small repeating picture given once is used on both screens.</p>
-        <div id="wallpapers"></div>
-        <h2>Icons</h2>
-        <p class="hint">An icon is a shape; the theme's colours tint it. Drag to draw, Shift-drag or right-drag to erase. The large ones are for the upright screen.</p>
-        <div id="icons"></div>
-      </section>
-    </main>
+      </main>
+      <aside class="inspector" id="inspector" aria-live="polite"></aside>
+    </div>
+    <p class="toast" id="status" role="status"></p>
+    <input type="file" id="picker" accept=".echotheme" hidden />
     <script type="module" src="editor.js"></script>
   </body>
 </html>

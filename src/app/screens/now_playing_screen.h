@@ -17,6 +17,12 @@ enum {
     NOW_PLAYING_TEXT_CAPACITY = 128
 };
 
+typedef struct NowPlayingHome {
+    const char *title;
+    const SceneMenu *menu;
+    Image cover;
+} NowPlayingHome;
+
 typedef enum NowPlayingCommand {
     NOW_PLAYING_NONE,
     NOW_PLAYING_TOGGLE_PAUSE,
@@ -109,5 +115,9 @@ bool now_playing_feedback_visible(NowPlayingFeedback feedback, uint32_t started_
 int now_playing_volume_width(uint8_t volume, int width);
 const char *now_playing_lyric(const NowPlayingScreen *now_playing);
 const ThemeColors *now_playing_face_colors(const NowPlayingScreen *now_playing);
+void now_playing_follow(NowPlayingScreen *now_playing, uint32_t now_ms);
+bool now_playing_draw_home(const NowPlayingScreen *now_playing, const NowPlayingHome *home,
+                           Canvas *canvas);
+const ThemeColors *now_playing_home_colors(void);
 void now_playing_builtin_layout(const NowPlayingScreen *now_playing, ThemeLayout *out);
 Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig config);

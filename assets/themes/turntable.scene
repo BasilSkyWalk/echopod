@@ -1,0 +1,73 @@
+const VINYL = #101018
+const ALU = #c8c8c0
+const ALU_DARK = #686860
+const CREAM = #f8ecd0
+const TAN = #d8b888
+const TAN_DIM = #c0a078
+const AMBER = #f8a428
+
+let cy = y + 73
+let qx = 77 * 16 + 8
+let qy = cy * 16 + 8
+
+gradient(x, y, width, height, #482c18, #281810)
+ring(qx, qy, 1072, 1024, ALU)
+ring(qx, qy, 1024, 0, VINYL)
+
+if has_cover {
+    round_cover(77, cy, 64)
+    ring(qx, qy, 1072, 1024, ALU)
+    ring(qx, qy, 80, 0, VINYL)
+} else {
+    ring(qx, qy, 448, 0, #b02420)
+    ring(qx, qy, 368, 352, CREAM)
+    repeat groove from 0 to 3 {
+        let radius = 720 + 112 * groove
+        ring(qx, qy, radius + 16, radius, ALU_DARK)
+    }
+}
+spoke(77, cy, ((tick >>> 1) % 9 * 2 + (tick & 1)) * 256 / 18, 32, 44, 58, ALU)
+ring(qx, qy, 48, 0, ALU)
+
+if badge != none {
+    ring(qx, qy, 320, 0, VINYL)
+    icon(badge, 68, cy - 9, 18, 18, CREAM)
+}
+
+let angle = 140 + progress(12)
+let head = angle + 10
+let px = 152
+let py = cy - 47
+let s = 84 * sin(angle)
+let c = 84 * cos(angle)
+let sx = px + (s + (s >= 0 ? 127 : -127)) / 255
+let sy = py - (c + (c >= 0 ? 127 : -127)) / 255
+let pqx = px * 16 + 8
+let pqy = py * 16 + 8
+spoke(px, py, angle + 128, 160, 7, 21, ALU_DARK)
+ring(pqx, pqy, 160, 0, ALU_DARK)
+ring(pqx, pqy, 112, 0, ALU)
+spoke(px, py, angle, 64, 0, 72, ALU)
+spoke(sx, sy, head, 112, -14, 3, ALU)
+spoke(sx, sy, head, 48, -11, 0, VINYL)
+ring(pqx, pqy, 48, 0, ALU_DARK)
+
+ring(157 * 16 + 8, (cy + 59) * 16 + 8, 48, 0, playing ? AMBER : ALU_DARK)
+
+let tall = height > width
+let rx = tall ? 10 : 170
+let rw = tall ? 150 : 140
+let align = tall ? center : left
+let bottom = y + height
+let sung = present(lyric)
+line(song, title, rx, y + (tall ? 144 : 4), rw, 22, align, CREAM)
+line(artist, body, rx, y + (tall ? 166 : 26), rw, 22, align, TAN)
+line(sung ? lyric : album, body, rx, y + (tall ? 188 : 46), rw, 22, align, sung ? CREAM : TAN_DIM)
+format(small, rx, y + (tall ? 212 : 73), rw, 16, align, TAN)
+if !tall {
+    text(detail, small, rx, y + 92, rw, 16, align, TAN_DIM)
+}
+let told = present(feedback)
+text(told ? feedback : modes, small, rx, tall ? bottom - 42 : y + 107, rw, 16, align, told ? CREAM : TAN_DIM)
+bar(rx, tall ? bottom - 23 : y + 124, rw, 3, ALU_DARK, CREAM, AMBER)
+times(small, rx, tall ? bottom - 18 : y + 129, rw, 16, TAN, TAN)

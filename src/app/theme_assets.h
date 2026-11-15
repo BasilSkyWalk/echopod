@@ -7,6 +7,12 @@
 #include "hal/storage.h"
 #include "ui/theme_package.h"
 
+typedef struct ThemeSource {
+    HalFile file;
+    uint32_t size;
+    int builtin;
+} ThemeSource;
+
 typedef struct ThemeAssets {
     Font fonts[THEME_FONT_COUNT];
     Wallpaper wallpaper;
@@ -22,4 +28,5 @@ const Wallpaper *theme_assets_wallpaper(ThemeAssets *assets, const ThemePackage 
                                         bool portrait);
 void theme_assets_watch(ThemeAssets *assets);
 bool theme_assets_wanted(const ThemeAssets *assets);
-bool theme_assets_tend(ThemeAssets *assets, const ThemePackage *package, HalFile file);
+bool theme_assets_tend(ThemeAssets *assets, const ThemePackage *package, const ThemeSource *source);
+bool theme_source_read(const ThemeSource *source, uint32_t offset, void *target, uint32_t length);

@@ -1,64 +1,1155 @@
-import { buildIcons } from "./icon_editor.js";
-import { KEY, Preview } from "./preview_host.js";
+import { buildAccents, shownAccent } from "./accent_editor.js";
 import { buildFonts } from "./font_editor.js";
-import { buildLayout } from "./layout_editor.js";
-import { buildWallpapers } from "./wallpaper_editor.js";
+import { buildIcons } from "./icon_editor.js";
 import {
-  BOX_COLOR_FIELDS,
-  EDGES,
+  AREAS,
+  BACKGROUNDS,
+  MENU_STYLES,
+  colorOf,
+  defaultDesign,
+  designScript,
+  layerTypes,
+  newLayer,
+  readDesign,
+  textSources,
+} from "./now_playing_designer.js";
+import { KEY, Preview } from "./preview_host.js";
+import {
   ThemeError,
   assetMemory,
   defaultTheme,
   lint,
+  opacityPercent,
   pack,
+  seeThroughOf,
   toToml,
   unpack,
 } from "./theme_format.js";
+import { buildWallpapers } from "./wallpaper_editor.js";
 
-const KEYBOARD = {
-  ArrowDown: KEY.down,
-  ArrowUp: KEY.up,
-  Enter: KEY.play,
-  " ": KEY.play,
-  Backspace: KEY.back,
-  Escape: KEY.back,
-  m: KEY.menu,
-};
-const MAX_CATCH_UP_MS = 1000;
-const BOX_NUMBERS = [
-  ["border_width", "Border width", 8],
-  ["shine_height", "Shine height", 8],
-  ["inset_across", "Inset across", 40],
-  ["inset_down", "Inset down", 12],
-  ["radius", "Corner radius", 32],
+const STEPS = [
+  { id: "start", label: "Start", icon: "M4 10h12M10 4v12" },
+  { id: "colours", label: "Colours", icon: "M10 3a7 7 0 1 0 0 14c1 0 1.5-.8 1.2-1.6-.4-1 .2-2.4 1.6-2.4H15a2 2 0 0 0 2-2 7 7 0 0 0-7-8z" },
+  { id: "shapes", label: "Lists & shapes", icon: "M4 5.5h12M4 10h12M4 14.5h8" },
+  { id: "home", label: "Home", icon: "M3.5 9.5 10 4l6.5 5.5V16h-4.5v-4h-4v4H3.5z" },
+  { id: "playing", label: "Now Playing", icon: "M4 4h12v12H4zM8 7.5v5l4-2.5z" },
+  { id: "wallpaper", label: "Wallpaper", icon: "M3.5 4.5h13v11h-13zM3.5 13l4-4 3 3 2-2 4 4" },
+  { id: "fonts", label: "Fonts", icon: "M5 15 9.5 4h1L15 15M6.8 11h6.4" },
+  { id: "icons", label: "Icons", icon: "M10 3.5l2 4.2 4.5.6-3.3 3.1.8 4.5L10 13.7 6 15.9l.8-4.5-3.3-3.1 4.5-.6z" },
+  { id: "share", label: "Save & share", icon: "M10 3v9M6 8l4 4 4-4M4 15.5h12" },
 ];
-const COLOR_LABELS = {
-  fill_top: "Fill, top",
-  fill_bottom: "Fill, bottom",
-  border: "Border",
-  shine: "Shine",
-  ink: "Text on it",
+const SCREENS = [
+  ["home", "Home"],
+  ["list", "Lists"],
+  ["playing", "Now Playing"],
+  ["settings", "Settings"],
+  ["toast", "Message"],
+];
+const DESIGNS = {
+  home: {
+    screen: "home",
+    key: "home_scene",
+    title: "Home",
+    lead: "Lay out the first screen however you like: the menu, the album art, what's playing. Drag things on the screen to move them, and drag a corner to resize. The buttons still move through the menu from top to bottom.",
+    outside: "This theme's Home screen was made outside the editor, so it can't be arranged here. Choose “My own design” to make a new one in its place.",
+  },
+  playing: {
+    screen: "playing",
+    key: "now_playing_scene",
+    title: "Now Playing",
+    lead: "Arrange the Now Playing screen however you like: drag things on the screen to move them, and drag a corner to resize.",
+    outside: "This theme's Now Playing screen was made outside the editor, so it can't be arranged here. Choose “My own design” to make a new one in its place.",
+  },
+};
+const COLOUR_GROUPS = [
+  ["Screen", [
+    ["background", "Background"], ["text", "Text"], ["text_secondary", "Secondary text"],
+    ["text_tertiary", "Faint text"], ["divider", "Lines"], ["chevron", "Row arrows"], ["scrollbar_thumb", "Scrollbar"],
+  ]],
+  ["Selected row", [
+    ["selection_background", "Fill"], ["selection_top", "Top of the fill"], ["selection_shine", "Shine"],
+    ["selection_text", "Text on it"],
+  ]],
+  ["Title bar", [["header_background", "Fill"], ["header_top", "Top of the fill"], ["header_text", "Title"]]],
+  ["Battery", [["danger", "Running low"], ["success", "Charging"]]],
+];
+const ROLE_LABELS = Object.fromEntries(COLOUR_GROUPS.flatMap(([, roles]) => roles));
+const COLOUR_NAMES = Object.fromEntries(COLOUR_GROUPS.flatMap(([title, roles]) =>
+  roles.map(([role, name]) => [role, title === "Screen" ? name : `${title}, ${name.toLowerCase()}`])));
+const SELECTION_STYLES = [
+  ["gradient", "Gradient"], ["solid", "Solid"], ["outline", "Outline"], ["underline", "Underline"], ["bar", "Side bar"],
+];
+const SPACINGS = {
+  row_height: "Row height", padding: "Side margin", scrollbar_width: "Scrollbar width",
+  scrollbar_inset: "Scrollbar gap", detail_gap: "Gap before values",
+};
+const HISTORY_LIMIT = 80;
+const SETTLE_MS = 350;
+const DRAFT = "echopod-theme-draft";
+const HANDLE = 7;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("screen");
+const overlay = $("overlay");
+const context = canvas.getContext("2d");
+const inspector = $("inspector");
+
+const state = {
+  schema: null,
+  preview: null,
+  theme: null,
+  designs: { playing: null, home: null },
+  step: "start",
+  screen: "home",
+  turn: 0,
+  accent: 0,
+  picked: null,
+  history: [],
+  future: [],
+  zoom: 2,
+  zoomChoice: null,
+  gallery: [],
+  lastFrame: null,
+  drag: null,
+  remember: null,
 };
 
-const status = document.getElementById("status");
-const canvas = document.getElementById("screen");
-const context = canvas.getContext("2d");
-const warnings = document.getElementById("warnings");
-let schema;
-let preview;
-let theme;
-let lastFrame;
-let currentScreen = "list";
-let layoutEditor;
+function el(tag, attributes = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attributes)) {
+    if (key === "class") {
+      node.className = value;
+    } else if (key.startsWith("on")) {
+      node.addEventListener(key.slice(2), value);
+    } else if (value !== undefined && value !== null && value !== false) {
+      node.setAttribute(key, value === true ? "" : value);
+    }
+  }
+  node.append(...children.flat().filter((child) => child !== null && child !== undefined));
+  return node;
+}
 
-function label(name) {
-  const words = name.replaceAll("_", " ");
+function icon(path) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 20 20");
+  svg.setAttribute("aria-hidden", "true");
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  line.setAttribute("d", path);
+  svg.append(line);
+  return svg;
+}
+
+let toastTimer;
+function say(text, bad = false) {
+  const toast = $("status");
+  toast.textContent = text;
+  toast.classList.toggle("bad", bad);
+  toast.classList.add("shown");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("shown"), bad ? 6000 : 2200);
+}
+
+function snapshot() {
+  return JSON.stringify({ theme: state.theme, designs: state.designs });
+}
+
+function restore(text) {
+  const saved = JSON.parse(text);
+  state.theme = saved.theme;
+  state.theme.home_scene ??= null;
+  state.designs = saved.designs ?? { playing: saved.design ?? null, home: null };
+  state.picked = currentDesign()?.layers?.some((item) => item.id === state.picked) ? state.picked : null;
+}
+
+function currentDesign() {
+  return DESIGNS[state.step] ? state.designs[state.step] : null;
+}
+
+function designScreen() {
+  return DESIGNS[state.step]?.screen ?? "playing";
+}
+
+function remember() {
+  clearTimeout(state.remember);
+  state.remember = setTimeout(() => {
+    const now = snapshot();
+    if (state.history[state.history.length - 1] !== now) {
+      state.history.push(now);
+      state.history.splice(0, Math.max(0, state.history.length - HISTORY_LIMIT));
+      state.future = [];
+      saveDraft(now);
+    }
+    refreshUndo();
+  }, SETTLE_MS);
+}
+
+function refreshUndo() {
+  $("undo").disabled = state.history.length < 2;
+  $("redo").disabled = state.future.length === 0;
+}
+
+function travel(back) {
+  if (back) {
+    if (state.history.length < 2) {
+      return;
+    }
+    state.future.push(state.history.pop());
+  } else {
+    if (state.future.length === 0) {
+      return;
+    }
+    state.history.push(state.future.pop());
+  }
+  restore(state.history[state.history.length - 1]);
+  saveDraft(state.history[state.history.length - 1]);
+  restart();
+  render();
+  refreshUndo();
+}
+
+function saveDraft(text) {
+  try {
+    localStorage.setItem(DRAFT, text);
+  } catch {
+    return;
+  }
+}
+
+function loadDraft() {
+  try {
+    return localStorage.getItem(DRAFT);
+  } catch {
+    return null;
+  }
+}
+
+function syncScene() {
+  for (const [step, { key }] of Object.entries(DESIGNS)) {
+    const design = state.designs[step];
+    if (design) {
+      state.theme[key] = { script: designScript(design, state.theme), chrome: null, design: JSON.stringify(design) };
+    }
+  }
+}
+
+function apply() {
+  syncScene();
+  try {
+    const bytes = pack(state.theme, state.schema);
+    if (!state.preview.wear(bytes)) {
+      say("The player couldn't read this theme", true);
+    }
+    return bytes;
+  } catch (error) {
+    if (!(error instanceof ThemeError)) {
+      throw error;
+    }
+    say(error.message, true);
+    return null;
+  }
+}
+
+function changed({ rebuild = false } = {}) {
+  apply();
+  remember();
+  if (rebuild) {
+    render();
+  } else {
+    refreshNotices();
+  }
+}
+
+function refreshNotices() {
+  const box = inspector.querySelector("[data-notice]");
+  if (box) {
+    box.replaceWith(noticeBox());
+  }
+}
+
+function noticeBox() {
+  const found = lint(state.theme, state.schema);
+  if (found.length === 0) {
+    return el("div", { "data-notice": "" });
+  }
+  return el("div", { class: "notice", "data-notice": "" },
+    found.length === 1 ? "One thing may be hard to read:" : `${found.length} things may be hard to read:`,
+    el("ul", {}, found.map((text) => el("li", {}, text))));
+}
+
+function field(label, control, note) {
+  return el("label", { class: "field" }, el("span", {}, label, note ? el("small", {}, note) : null), control);
+}
+
+function group(...fields) {
+  return el("div", { class: "group" }, ...fields);
+}
+
+function colourInput(value, set) {
+  const picker = el("input", { type: "color", value });
+  const hex = el("input", { class: "hex", value, maxlength: 7, spellcheck: "false", "aria-label": "Colour code" });
+  picker.addEventListener("input", () => {
+    hex.value = picker.value;
+    set(picker.value);
+  });
+  hex.addEventListener("change", () => {
+    const tidy = hex.value.trim().replace(/^#?/, "#").toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(tidy)) {
+      picker.value = hex.value = tidy;
+      set(tidy);
+    } else {
+      hex.value = picker.value;
+    }
+  });
+  return el("span", { class: "color-control" }, picker, hex);
+}
+
+function roleColour(role) {
+  const control = colourInput(state.theme.colors[role], (value) => {
+    state.theme.colors[role] = value;
+    changed();
+  });
+  const row = field(ROLE_LABELS[role], control);
+  row.dataset.role = role;
+  return row;
+}
+
+function choiceColour(value, set) {
+  const roles = COLOUR_GROUPS.flatMap(([, list]) => list.map(([role]) => role));
+  const select = el("select", { "aria-label": "Colour" },
+    roles.map((role) => new Option(COLOUR_NAMES[role], `@${role}`)),
+    new Option("My own colour", "custom"));
+  select.value = typeof value === "string" && value.startsWith("@") ? value : "custom";
+  const picker = el("input", { type: "color", value: colorOf(value, state.theme) });
+  picker.addEventListener("input", () => {
+    select.value = "custom";
+    set(picker.value);
+  });
+  select.addEventListener("change", () => {
+    if (select.value === "custom") {
+      set(picker.value);
+    } else {
+      picker.value = colorOf(select.value, state.theme);
+      set(select.value);
+    }
+  });
+  return el("span", { class: "color-control" }, picker, select);
+}
+
+function range(value, least, most, set, unit = "px") {
+  const input = el("input", { type: "range", min: least, max: most, value });
+  const output = el("output", {}, `${value}${unit}`);
+  input.addEventListener("input", () => {
+    output.textContent = `${input.value}${unit}`;
+    set(Number(input.value));
+  });
+  return el("span", { class: "range" }, input, output);
+}
+
+function chips(options, current, set) {
+  return el("div", { class: "chips" }, options.map(([value, label]) =>
+    el("button", { type: "button", "aria-pressed": String(value === current), onclick: () => set(value) }, label)));
+}
+
+function toggle(checked, set) {
+  const box = el("input", { type: "checkbox" });
+  box.checked = checked;
+  box.addEventListener("change", () => set(box.checked));
+  return box;
+}
+
+function selectStyle() {
+  if (state.theme.selection === "selection_flat") {
+    return "solid";
+  }
+  if (state.theme.selection === "selection_outline") {
+    return "outline";
+  }
+  const box = state.theme.boxes.selection;
+  if (box.border_width > 0 && box.border_edges === 2) {
+    return "underline";
+  }
+  if (box.border_width > 0 && box.border_edges === 4) {
+    return "bar";
+  }
+  return "gradient";
+}
+
+function setSelectStyle(style) {
+  const boxes = state.theme.boxes;
+  const radius = boxes.selection.radius ?? 0;
+  const see_through = boxes.selection.see_through ?? 0;
+  const base = { border: "background", shine: "background", border_width: 0, border_edges: 0, shine_height: 0, inset_across: 0, inset_down: 0, radius, see_through };
+  state.theme.selection = style === "solid" ? "selection_flat" : style === "outline" ? "selection_outline" : "selection";
+  if (style === "gradient") {
+    boxes.selection = { ...base, fill_top: "selection_top", fill_bottom: "selection_background", shine: "selection_shine", shine_height: 1, ink: "selection_text" };
+  } else if (style === "underline") {
+    boxes.selection = { ...base, fill_top: "background", fill_bottom: "background", border: "selection_top", border_width: 2, border_edges: 2, ink: "text" };
+  } else if (style === "bar") {
+    boxes.selection = { ...base, fill_top: "background", fill_bottom: "background", border: "selection_top", border_width: 3, border_edges: 4, ink: "text" };
+  }
+  changed({ rebuild: true });
+}
+
+function setRoundness(radius) {
+  for (const name of ["selection", "selection_flat", "selection_outline", "toast", "section"]) {
+    state.theme.boxes[name].radius = radius;
+  }
+  changed();
+}
+
+const SEE_THROUGH = {
+  row: ["selection", "selection_flat", "selection_outline"],
+  title: ["header"],
+  bubbles: ["toast", "section"],
+};
+
+function seeThrough(part) {
+  const box = state.theme.boxes[SEE_THROUGH[part][0]];
+  const control = range(100 - opacityPercent(box.see_through ?? 0), 0, 100, (shown) => {
+    for (const name of SEE_THROUGH[part]) {
+      state.theme.boxes[name].see_through = seeThroughOf(100 - shown);
+    }
+    changed();
+  }, "%");
+  return field("See-through", control, "Lets the wallpaper show through");
+}
+
+function titleStyle() {
+  const header = state.theme.boxes.header;
+  return header.fill_top === header.fill_bottom ? "flat" : "gradient";
+}
+
+function sampleName(sample) {
+  const listed = state.gallery.find((entry) => entry.file === sample);
+  if (listed?.name) {
+    return listed.name;
+  }
+  const words = sample.replaceAll("_", " ");
   return words[0].toUpperCase() + words.slice(1);
 }
 
-function say(text, bad = false) {
-  status.textContent = text;
-  status.classList.toggle("bad", bad);
+function panelStart() {
+  const name = el("input", { value: state.theme.name, maxlength: 23 });
+  name.addEventListener("input", () => {
+    state.theme.name = name.value;
+    $("name").value = name.value;
+    changed();
+  });
+  const author = el("input", { value: state.theme.author ?? "", maxlength: 40, placeholder: "Your name" });
+  author.addEventListener("input", () => {
+    state.theme.author = author.value;
+    remember();
+  });
+  const starts = el("div", { class: "starts" }, state.schema.samples.map((sample) =>
+    el("button", { type: "button", onclick: () => openSample(sample) },
+      el("span", { class: "thumb", style: `background-image: url("previews/${sample}.png")` }),
+      el("span", {}, sampleName(sample)))));
+  return [
+    el("h2", {}, "Make a theme"),
+    el("p", { class: "lead" }, "Everything you change shows on the player straight away. When you're happy, download it and copy it to the Themes folder on your card."),
+    group(field("Name", name), field("Made by", author, "Shown in the gallery if you share it")),
+    el("h3", {}, "Begin from"),
+    starts,
+    el("div", { class: "actions" },
+      el("button", { type: "button", onclick: () => $("picker").click() }, "Open a theme file…"),
+      el("button", { type: "button", onclick: startOver }, "Start over")),
+  ];
+}
+
+function panelColours() {
+  const groups = COLOUR_GROUPS.map(([title, roles]) => [el("h3", {}, title), group(...roles.map(([role]) => roleColour(role)))]);
+  const cover = toggle(state.theme.cover_flow === "dark", (dark) => {
+    state.theme.cover_flow = dark ? "dark" : "theme";
+    changed();
+  });
+  const accents = el("div", { class: "legacy" });
+  buildAccents(accents, state.theme, {
+    changed: () => changed(),
+    shown: () => state.accent,
+    show: (index) => {
+      state.accent = index;
+      restart();
+    },
+  });
+  return [
+    el("h2", {}, "Colours"),
+    el("p", { class: "lead" }, "Click something on the screen to jump to its colour."),
+    noticeBox(),
+    ...groups.flat(),
+    el("h3", {}, "Cover Flow"),
+    group(field("Keep it dark", cover, "Good for light themes: the album wall stays on black")),
+    el("h3", {}, "Accent choices"),
+    el("p", { class: "hint" }, "Colours people can pick for the selected row under Settings, Display, Accent color. Leave the list empty to keep yours."),
+    accents,
+  ];
+}
+
+function panelShapes() {
+  const header = state.theme.boxes.header;
+  const lineUnder = toggle(header.border_width > 0, (on) => {
+    header.border_width = on ? 1 : 0;
+    header.border_edges = on ? 2 : 0;
+    changed();
+  });
+  const spacing = Object.entries(SPACINGS).map(([name, label]) => {
+    const entry = state.schema.spacing.find((item) => item.name === name);
+    const current = state.theme.spacing[name];
+    const custom = toggle(current !== null, (on) => {
+      state.theme.spacing[name] = on ? entry.least + Math.round((entry.most - entry.least) / 2) : null;
+      changed({ rebuild: true });
+    });
+    const control = current === null
+      ? el("span", { class: "hint" }, "Player's own")
+      : range(current, entry.least, entry.most, (value) => {
+        state.theme.spacing[name] = value;
+        changed();
+      });
+    return field(label, el("span", { class: "color-control" }, control, custom));
+  });
+  return [
+    el("h2", {}, "Lists & shapes"),
+    el("p", { class: "lead" }, "How the selected row, the title bar and the lists are drawn."),
+    el("h3", {}, "Selected row"),
+    group(
+      el("div", { class: "field stack" }, chips(SELECTION_STYLES, selectStyle(), setSelectStyle)),
+      field("Rounded corners", range(state.theme.boxes.selection.radius ?? 0, 0, 14, setRoundness)),
+      seeThrough("row"),
+    ),
+    el("h3", {}, "Title bar"),
+    group(
+      el("div", { class: "field stack" }, chips([["gradient", "Gradient"], ["flat", "Flat"]], titleStyle(), (style) => {
+        header.fill_top = style === "flat" ? "header_background" : "header_top";
+        changed({ rebuild: true });
+      })),
+      field("Line under it", lineUnder),
+      seeThrough("title"),
+    ),
+    el("h3", {}, "Messages and the letter bubble"),
+    group(seeThrough("bubbles")),
+    el("h3", {}, "Home"),
+    state.designs.home
+      ? el("p", { class: "hint" }, "Your own Home design decides what goes on the Home screen. Change it in the Home step.")
+      : group(field("Album art beside the menu", toggle(state.theme.home_art !== false, (shown) => {
+        state.theme.home_art = shown;
+        changed();
+      }), "Turn it off to give the menu the whole screen")),
+    el("h3", {}, "Spacing"),
+    group(...spacing),
+  ];
+}
+
+function panelLegacy(title, lead, build) {
+  const host = el("div", { class: "legacy" });
+  build(host, state.theme, state.schema, () => changed());
+  return [el("h2", {}, title), el("p", { class: "lead" }, lead), host];
+}
+
+function panelShare() {
+  const bytes = apply();
+  const memory = assetMemory(state.theme, state.schema);
+  const size = bytes ? `This theme is ${bytes.length.toLocaleString("en")} bytes` : "";
+  const used = memory ? `, and uses ${memory.toLocaleString("en")} of the player's ${state.schema.asset_memory.toLocaleString("en")} bytes for pictures and fonts` : "";
+  return [
+    el("h2", {}, "Save & share"),
+    el("p", { class: "lead" }, "Put the theme on your player, or share it with everyone."),
+    noticeBox(),
+    el("h3", {}, "On your player"),
+    el("ol", { class: "hint" },
+      el("li", {}, "Download the theme file."),
+      el("li", {}, "Connect the player and copy the file into a folder called Themes on the microSD card."),
+      el("li", {}, "On the player, open Settings, Display, Theme.")),
+    el("div", { class: "actions" },
+      el("button", { type: "button", class: "primary", onclick: download }, "Download for my player"),
+      el("button", { type: "button", onclick: downloadSource }, "Download source")),
+    el("p", { class: "hint" }, bytes ? `${size}${used}.` : ""),
+    el("h3", {}, "With everyone"),
+    el("p", { class: "hint" }, "Download the source and add it to the themes folder of the EchoPod project in a pull request. Once it's merged, it appears in the gallery."),
+  ];
+}
+
+function layerName(item) {
+  if (item.type === "text") {
+    return item.source === "custom" ? `“${item.custom ?? ""}”` : textSources(designScreen())[item.source] ?? "Text";
+  }
+  if (item.type === "menu") {
+    return `Menu: ${(MENU_STYLES[item.style] ?? "List").toLowerCase()}`;
+  }
+  return layerTypes(designScreen())[item.type] ?? item.type;
+}
+
+function shape() {
+  return state.turn === 0 ? "wide" : "tall";
+}
+
+function pickedLayer() {
+  return currentDesign()?.layers.find((item) => item.id === state.picked) ?? null;
+}
+
+function eyePath(hidden) {
+  return hidden
+    ? "M3 10s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5zM4 4l12 12"
+    : "M3 10s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5zM10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4";
+}
+
+function layerList() {
+  const layers = currentDesign().layers;
+  const tool = (title, path, disabled, act) => el("button", {
+    type: "button",
+    title,
+    "aria-label": title,
+    disabled,
+    onclick: (event) => {
+      event.stopPropagation();
+      act();
+    },
+  }, icon(path));
+  return el("ul", { class: "layers group", role: "listbox", "aria-label": "Layers, back to front" },
+    layers.map((item, index) => el("li", {
+      role: "option",
+      "aria-selected": String(item.id === state.picked),
+      class: item.hidden ? "hidden-layer" : "",
+      onclick: () => {
+        state.picked = item.id;
+        render();
+      },
+    },
+    el("span", {}, layerName(item)),
+    el("span", { class: "tools" },
+      tool("Move back", "m6 8 4 4 4-4", index === 0, () => moveLayer(index, -1)),
+      tool("Move forward", "m6 12 4-4 4 4", index === layers.length - 1, () => moveLayer(index, 1)),
+      tool(item.hidden ? "Show" : "Hide", eyePath(item.hidden), false, () => {
+        item.hidden = !item.hidden;
+        changed({ rebuild: true });
+      }),
+      tool("Remove", "M5 6h10M8 6V4.5h4V6m-6 0 .7 9.5h6.6L14 6", false, () => {
+        layers.splice(index, 1);
+        state.picked = null;
+        changed({ rebuild: true });
+      })))));
+}
+
+function moveLayer(index, step) {
+  const layers = currentDesign().layers;
+  const [item] = layers.splice(index, 1);
+  layers.splice(index + step, 0, item);
+  changed({ rebuild: true });
+}
+
+function placeField(item) {
+  const box = item.frames[shape()];
+  const number = (key, label) => {
+    const input = el("input", { type: "number", value: Math.round(box[key]), style: "width:58px" });
+    input.addEventListener("change", () => {
+      box[key] = Math.max(key === "w" || key === "h" ? 1 : -400, Math.round(Number(input.value) || 0));
+      changed();
+    });
+    return el("span", { class: "color-control" }, label, input);
+  };
+  return el("div", { class: "field stack" }, el("span", {}, "Place and size"),
+    el("span", { class: "color-control" }, number("x", "Left"), number("y", "Top")),
+    el("span", { class: "color-control" }, number("w", "Width"), number("h", "Height")));
+}
+
+function layerFields(item) {
+  const set = (key) => (value) => {
+    item[key] = value;
+    changed();
+  };
+  const setAndShow = (key) => (value) => {
+    item[key] = value;
+    changed({ rebuild: true });
+  };
+  const fields = [];
+  const home = designScreen() === "home";
+  if (item.type === "menu") {
+    fields.push(...menuFields(item, set, setAndShow));
+  } else if (item.type === "cover") {
+    fields.push(field("Shape", chips([["square", "Square"], ["circle", "Round"]], item.shape, setAndShow("shape"))));
+    if (item.shape !== "circle") {
+      fields.push(field("Reflection", toggle(Boolean(item.reflection), set("reflection")), "Make the frame taller than it is wide to show more of it"));
+    }
+    fields.push(field("Frame", range(item.border ?? 0, 0, 8, set("border"))));
+    fields.push(field("Frame colour", choiceColour(item.borderColor, set("borderColor"))));
+    fields.push(field("Without a cover", choiceColour(item.placeholder, set("placeholder")),
+      home ? "Shown while there's no album art to show" : "Shown when a song has no cover"));
+  } else if (item.type === "text") {
+    const source = el("select", {}, Object.entries(textSources(designScreen())).map(([value, label]) => new Option(label, value)));
+    source.value = item.source;
+    source.addEventListener("change", () => setAndShow("source")(source.value));
+    fields.push(field("Shows", source));
+    if (item.source === "custom") {
+      const words = el("input", { value: item.custom ?? "", maxlength: 40 });
+      words.addEventListener("input", () => set("custom")(words.value));
+      fields.push(field("Words", words));
+    }
+    fields.push(field("Size", chips([["large", "Large"], ["medium", "Medium"], ["small", "Small"]], item.size, setAndShow("size"))));
+    const alignKey = shape() === "tall" ? "tallAlign" : "align";
+    fields.push(field("Line up", chips([["left", "Left"], ["center", "Centre"], ["right", "Right"]], item[alignKey] ?? item.align, setAndShow(alignKey))));
+    fields.push(field("Colour", choiceColour(item.color, set("color"))));
+    fields.push(field("Scroll long text", toggle(item.scroll, set("scroll"))));
+    if (!home) {
+      fields.push(field("Seek and volume here", toggle(item.feedback, set("feedback")), "Shows “Volume 20” and the seek hint in this place"));
+    }
+  } else if (item.type === "times") {
+    fields.push(field("Size", chips([["medium", "Medium"], ["small", "Small"]], item.size, setAndShow("size"))));
+    fields.push(field("Time played", choiceColour(item.color, set("color"))));
+    fields.push(field("Time left", choiceColour(item.color2, set("color2"))));
+  } else if (item.type === "progress") {
+    fields.push(field("Style", chips([["bar", "Bar"], ["ring", "Ring of lights"]], item.style, setAndShow("style"))));
+    if (item.style === "ring") {
+      fields.push(field("Light length", range(item.thickness ?? 6, 1, 20, set("thickness"))));
+    }
+    fields.push(field("Played", choiceColour(item.color, set("color"))));
+    fields.push(field("Still to play", choiceColour(item.track, set("track"))));
+  } else if (item.type === "shape") {
+    fields.push(field("Shape", chips([["rect", "Box"], ["rounded", "Rounded"], ["circle", "Circle"], ["ring", "Ring"], ["line", "Line"]], item.kind, setAndShow("kind"))));
+    if (item.kind === "rounded") {
+      fields.push(field("Corners", range(item.radius ?? 6, 0, 40, set("radius"))));
+    }
+    if (item.kind === "ring" || item.kind === "line") {
+      fields.push(field("Thickness", range(item.thickness ?? 2, 1, 20, set("thickness"))));
+    }
+    fields.push(field("Colour", choiceColour(item.color, set("color"))));
+  } else if (item.type === "playmark") {
+    fields.push(field("Colour", choiceColour(item.color, set("color")), "Pause while paused, and the skip and play marks"));
+  } else if (item.type === "spinner") {
+    fields.push(field("Speed", range(item.speed ?? 3, 1, 16, set("speed"), "")));
+    fields.push(field("Mark length", range(item.length ?? 4, 1, 30, set("length"))));
+    fields.push(field("Colour", choiceColour(item.color, set("color"))));
+  }
+  fields.push(placeField(item));
+  return fields;
+}
+
+function menuFields(item, set, setAndShow) {
+  const fields = [
+    field("Style", chips(Object.entries(MENU_STYLES), item.style ?? "list", setAndShow("style"))),
+  ];
+  if ((item.style ?? "list") === "list") {
+    fields.push(el("p", { class: "hint" }, "Drawn like the theme's other lists: its row height, selected row and arrows. Change those under Lists & shapes."));
+    return fields;
+  }
+  const sizes = [["large", "Large"], ["medium", "Medium"], ["small", "Small"]];
+  if (item.style === "tiles") {
+    fields.push(field("Across", range(item.columns ?? 2, 1, 6, set("columns"), "")));
+    fields.push(field("Tile height", range(item.tileHeight ?? 40, 16, 120, set("tileHeight"))));
+    fields.push(field("Gap", range(item.gap ?? 6, 0, 20, set("gap"))));
+  } else {
+    fields.push(field("Box behind it", toggle(item.boxed !== false, setAndShow("boxed"))));
+  }
+  fields.push(field("Corners", range(item.radius ?? 8, 0, 30, set("radius"))));
+  fields.push(field("Text size", chips(sizes, item.size ?? "medium", setAndShow("size"))));
+  fields.push(field("Line up", chips([["left", "Left"], ["center", "Centre"], ["right", "Right"]], item.align ?? "center", setAndShow("align"))));
+  if (item.style === "tiles" || item.boxed !== false) {
+    fields.push(field(item.style === "tiles" ? "Tiles" : "Box", choiceColour(item.tile, set("tile"))));
+    fields.push(field("Highlighted", choiceColour(item.tileSelected, set("tileSelected"))));
+  }
+  fields.push(field("Text", choiceColour(item.color, set("color")), item.style === "focus" ? "The items before and after" : null));
+  fields.push(field("Highlighted text", choiceColour(item.colorSelected, set("colorSelected"))));
+  return fields;
+}
+
+function backgroundFields() {
+  const background = currentDesign().background;
+  const colour = (key) => choiceColour(background[key], (value) => {
+    background[key] = value;
+    changed();
+  });
+  const fields = [field("Fill", chips(Object.entries(BACKGROUNDS), background.style, (style) => {
+    background.style = style;
+    changed({ rebuild: true });
+  }))];
+  if (background.style === "gradient") {
+    fields.push(field("Top", colour("top")), field("Bottom", colour("bottom")));
+  } else if (background.style === "wallpaper") {
+    fields.push(el("p", { class: "hint" }, "The theme's wallpaper, or its background colour when it has none."));
+  } else {
+    fields.push(field("Colour", colour("color")));
+  }
+  return fields;
+}
+
+function useDesign(on) {
+  const step = state.step;
+  state.designs[step] = on ? state.designs[step] ?? defaultDesign(DESIGNS[step].screen) : null;
+  if (!on) {
+    state.theme[DESIGNS[step].key] = null;
+  }
+  state.picked = null;
+  changed({ rebuild: true });
+  restart();
+}
+
+function copyOtherSide() {
+  const from = shape() === "wide" ? "tall" : "wide";
+  const [a, b] = [AREAS[from], AREAS[shape()]];
+  for (const item of currentDesign().layers) {
+    const box = item.frames[from];
+    item.frames[shape()] = {
+      x: Math.round((box.x * b.width) / a.width),
+      y: Math.round((box.y * b.height) / a.height),
+      w: Math.max(1, Math.round((box.w * b.width) / a.width)),
+      h: Math.max(1, Math.round((box.h * b.height) / a.height)),
+    };
+  }
+  changed({ rebuild: true });
+}
+
+function panelDesign(step) {
+  const config = DESIGNS[step];
+  const design = state.designs[step];
+  const handWritten = !design && typeof state.theme[config.key]?.script === "string";
+  const mode = design ? "design" : handWritten ? "" : "standard";
+  const parts = [
+    el("h2", {}, config.title),
+    el("p", { class: "lead" }, config.lead),
+    group(el("div", { class: "field stack" }, chips([["standard", "The player's own"], ["design", "My own design"]], mode, (value) => useDesign(value === "design")))),
+  ];
+  if (handWritten) {
+    parts.push(el("p", { class: "notice" }, config.outside));
+  }
+  if (!design) {
+    return parts;
+  }
+  const picked = pickedLayer();
+  const other = shape() === "wide" ? "upright" : "sideways";
+  parts.push(
+    el("p", { class: "hint" }, `You're arranging the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to arrange the ${other} one.`),
+    el("div", { class: "actions" }, el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} arrangement`)),
+    el("h3", {}, "Layers"),
+    layerList(),
+    el("div", { class: "add-menu" }, Object.entries(layerTypes(config.screen)).map(([type, label]) =>
+      el("button", { type: "button", onclick: () => {
+        const item = newLayer(type, config.screen);
+        design.layers.push(item);
+        state.picked = item.id;
+        changed({ rebuild: true });
+      } }, `+ ${label}`))),
+  );
+  if (picked) {
+    parts.push(el("h3", {}, layerName(picked)), group(...layerFields(picked)));
+  } else {
+    parts.push(el("h3", {}, "Background"), group(...backgroundFields()));
+  }
+  return parts;
+}
+
+function panelFor(step) {
+  switch (step) {
+    case "start":
+      return panelStart();
+    case "colours":
+      return panelColours();
+    case "shapes":
+      return panelShapes();
+    case "home":
+    case "playing":
+      return panelDesign(step);
+    case "wallpaper":
+      return panelLegacy("Wallpaper", "A picture behind the lists. It's cut to 16 colours; fade it until the text reads well.", buildWallpapers);
+    case "fonts":
+      return panelLegacy("Fonts", "Your own lettering for titles, lists and small text. Only share fonts whose licence allows it.", buildFonts);
+    case "icons":
+      return panelLegacy("Icons", "The small pictures in the title bar and the lists. Drag to draw and right-drag to erase; the theme's colours tint them.", buildIcons);
+    default:
+      return panelShare();
+  }
+}
+
+function renderSteps() {
+  $("steps").replaceChildren(...STEPS.map((step) => el("button", {
+    type: "button",
+    "aria-current": step.id === state.step ? "step" : null,
+    onclick: () => goTo(step.id),
+  }, icon(step.icon), el("span", {}, step.label))));
+}
+
+function renderScreens() {
+  $("screens").replaceChildren(...SCREENS.map(([id, label]) => el("button", {
+    type: "button",
+    role: "tab",
+    "aria-selected": String(id === state.screen),
+    onclick: () => {
+      state.screen = id;
+      restart();
+      render();
+    },
+  }, label)));
+  for (const button of $("turn").querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String(Number(button.dataset.turn) === state.turn));
+  }
+}
+
+function render() {
+  renderSteps();
+  renderScreens();
+  $("name").value = state.theme.name;
+  inspector.replaceChildren(...panelFor(state.step));
+  $("hint").textContent = designing()
+    ? "Drag to move, drag the corner to resize. Arrow keys nudge the picked layer."
+    : "Click anything on the screen to change its colour.";
+  overlay.classList.toggle("designing", designing());
+  drawOverlay();
+}
+
+function goTo(step) {
+  state.step = step;
+  state.picked = null;
+  const screen = DESIGNS[step]?.screen;
+  if (screen && state.screen !== screen) {
+    state.screen = screen;
+    restart();
+  }
+  render();
+  inspector.scrollTop = 0;
+}
+
+function designing() {
+  const config = DESIGNS[state.step];
+  return Boolean(config && state.designs[state.step] && state.screen === config.screen);
+}
+
+function restart() {
+  state.accent = shownAccent(state.theme, state.accent);
+  state.preview.start(state.turn, state.screen, state.accent);
+  apply();
+}
+
+function fitZoom(width, height) {
+  const stage = document.querySelector(".device-wrap");
+  const room = Math.min((stage.clientWidth - 92) / width, (stage.clientHeight - 92) / height);
+  return Math.max(1, Math.min(8, Math.floor(room)));
+}
+
+function setZoom(choice) {
+  const { width, height } = state.preview.frame();
+  const fitted = fitZoom(width, height);
+  const current = state.zoomChoice ?? fitted;
+  if (choice === "fit") {
+    state.zoomChoice = null;
+  } else {
+    state.zoomChoice = Math.max(1, Math.min(8, current + (choice === "in" ? 1 : -1)));
+  }
+  $("zoom-level").textContent = state.zoomChoice === null ? "Fit" : `${state.zoomChoice}×`;
+}
+
+function fit(width, height) {
+  state.zoom = state.zoomChoice ?? fitZoom(width, height);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  canvas.style.width = `${width * state.zoom}px`;
+  canvas.style.height = `${height * state.zoom}px`;
+}
+
+function frame(now) {
+  state.preview.advance(Math.min(Math.round(now - (state.lastFrame ?? now)), 1000));
+  state.lastFrame = now;
+  const { width, height, pixels } = state.preview.frame();
+  fit(width, height);
+  context.putImageData(new ImageData(pixels, width, height), 0, 0);
+  drawOverlay();
+  requestAnimationFrame(frame);
+}
+
+function areaBox(item) {
+  const area = AREAS[shape()];
+  const box = item.frames[shape()];
+  return { x: box.x, y: box.y + area.top, w: box.w, h: box.h };
+}
+
+function drawOverlay() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (overlay.width !== width || overlay.height !== height) {
+    overlay.width = width;
+    overlay.height = height;
+  }
+  const pen = overlay.getContext("2d");
+  pen.clearRect(0, 0, width, height);
+  if (!designing()) {
+    return;
+  }
+  const zoom = state.zoom;
+  for (const item of currentDesign().layers) {
+    if (item.hidden || !item.frames[shape()]) {
+      continue;
+    }
+    const box = areaBox(item);
+    const picked = item.id === state.picked;
+    pen.setLineDash(picked ? [] : [4, 3]);
+    pen.lineWidth = picked ? 1.5 : 1;
+    pen.strokeStyle = picked ? "#ffffff" : "rgba(255, 255, 255, 0.35)";
+    pen.strokeRect(box.x * zoom + 0.5, box.y * zoom + 0.5, box.w * zoom - 1, box.h * zoom - 1);
+    if (picked) {
+      pen.setLineDash([]);
+      const hx = (box.x + box.w) * zoom - HANDLE / 2;
+      const hy = (box.y + box.h) * zoom - HANDLE / 2;
+      pen.fillStyle = "#ffffff";
+      pen.fillRect(hx, hy, HANDLE, HANDLE);
+      pen.strokeStyle = "#1c1b19";
+      pen.strokeRect(hx + 0.5, hy + 0.5, HANDLE - 1, HANDLE - 1);
+    }
+  }
+}
+
+function pointer(event) {
+  const box = overlay.getBoundingClientRect();
+  return { x: (event.clientX - box.left) / state.zoom, y: (event.clientY - box.top) / state.zoom };
+}
+
+function layerAt(point) {
+  const layers = currentDesign().layers;
+  for (let index = layers.length - 1; index >= 0; index--) {
+    const item = layers[index];
+    if (item.hidden || !item.frames[shape()]) {
+      continue;
+    }
+    const box = areaBox(item);
+    if (point.x >= box.x && point.x < box.x + box.w && point.y >= box.y && point.y < box.y + box.h) {
+      return item;
+    }
+  }
+  return null;
+}
+
+function nearHandle(item, point) {
+  const box = areaBox(item);
+  const reach = HANDLE / state.zoom + 1;
+  return Math.abs(point.x - (box.x + box.w)) <= reach && Math.abs(point.y - (box.y + box.h)) <= reach;
+}
+
+function roleAt(point) {
+  const { width, pixels } = state.preview.frame();
+  const index = (Math.floor(point.y) * width + Math.floor(point.x)) * 4;
+  const shade = [pixels[index], pixels[index + 1], pixels[index + 2]];
+  let best = null;
+  let distance = Infinity;
+  for (const [role, value] of Object.entries(state.theme.colors)) {
+    const number = parseInt(value.slice(1), 16);
+    const gap = Math.abs((number >> 16) - shade[0]) + Math.abs(((number >> 8) & 255) - shade[1]) + Math.abs((number & 255) - shade[2]);
+    if (gap < distance) {
+      distance = gap;
+      best = role;
+    }
+  }
+  return distance <= 24 ? best : null;
+}
+
+function jumpToRole(role) {
+  state.step = "colours";
+  render();
+  const row = inspector.querySelector(`[data-role="${role}"]`);
+  if (row) {
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    row.classList.add("flash");
+  }
+}
+
+function wireOverlay() {
+  overlay.addEventListener("pointerdown", (event) => {
+    const point = pointer(event);
+    if (!designing()) {
+      const role = roleAt(point);
+      if (role) {
+        jumpToRole(role);
+      } else {
+        say("That part comes from a picture: the wallpaper or a cover");
+      }
+      canvas.focus({ preventScroll: true });
+      return;
+    }
+    const current = pickedLayer();
+    const resize = Boolean(current && nearHandle(current, point));
+    const item = resize ? current : layerAt(point);
+    if (!item) {
+      state.picked = null;
+      render();
+      return;
+    }
+    overlay.setPointerCapture(event.pointerId);
+    state.picked = item.id;
+    state.drag = { item, resize, from: point, start: { ...item.frames[shape()] } };
+    render();
+  });
+  overlay.addEventListener("pointermove", (event) => {
+    const point = pointer(event);
+    if (!state.drag) {
+      if (designing()) {
+        const current = pickedLayer();
+        overlay.style.cursor = current && nearHandle(current, point) ? "nwse-resize" : layerAt(point) ? "move" : "default";
+      }
+      return;
+    }
+    const { item, resize, from, start } = state.drag;
+    const dx = Math.round(point.x - from.x);
+    const dy = Math.round(point.y - from.y);
+    item.frames[shape()] = resize
+      ? { ...start, w: Math.max(2, start.w + dx), h: Math.max(1, start.h + dy) }
+      : { ...start, x: start.x + dx, y: start.y + dy };
+    apply();
+  });
+  overlay.addEventListener("pointerup", () => {
+    if (state.drag) {
+      state.drag = null;
+      changed({ rebuild: true });
+    }
+  });
+}
+
+function nudge(event) {
+  const item = pickedLayer();
+  const steps = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (!designing() || !item || !(event.key in steps) || event.target.closest("input, select, textarea, canvas")) {
+    return false;
+  }
+  const [dx, dy] = steps[event.key];
+  const scale = event.shiftKey ? 10 : 1;
+  const box = item.frames[shape()];
+  box.x += dx * scale;
+  box.y += dy * scale;
+  event.preventDefault();
+  changed({ rebuild: true });
+  return true;
+}
+
+function download() {
+  const bytes = apply();
+  if (bytes) {
+    save(`${state.theme.name || "theme"}.echotheme`, bytes, "application/octet-stream");
+  }
+}
+
+function downloadSource() {
+  syncScene();
+  save(`${state.theme.name || "theme"}.toml`, toToml(state.theme, state.schema), "text/plain");
+}
+
+function save(name, bytes, type) {
+  const link = el("a", { href: URL.createObjectURL(new Blob([bytes], { type })), download: name });
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function wear(bytes) {
+  try {
+    const theme = unpack(bytes, state.schema);
+    state.theme = theme;
+    state.designs = {
+      playing: theme.now_playing_scene?.design ? readDesign(theme.now_playing_scene.design) : null,
+      home: theme.home_scene?.design ? readDesign(theme.home_scene.design) : null,
+    };
+    state.picked = null;
+    restart();
+    remember();
+    render();
+  } catch (error) {
+    if (!(error instanceof ThemeError)) {
+      throw error;
+    }
+    say(error.message, true);
+  }
 }
 
 async function fetchBytes(path) {
@@ -69,312 +1160,105 @@ async function fetchBytes(path) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-function showWarnings(found) {
-  warnings.replaceChildren(...found.map((text) => {
-    const item = document.createElement("li");
-    item.textContent = text;
-    return item;
-  }));
+async function openSample(sample) {
+  wear(await fetchBytes(`themes/${sample}.echotheme`));
+  say(`Started from ${sampleName(sample)}`);
 }
 
-function applyTheme() {
-  try {
-    const bytes = pack(theme, schema);
-    const accepted = preview.wear(bytes);
-    const memory = assetMemory(theme, schema);
-    const used = memory > 0 ? `, ${memory.toLocaleString("en")} of ${schema.asset_memory.toLocaleString("en")} bytes of player memory` : "";
-    say(accepted ? `${bytes.length.toLocaleString("en")} bytes${used}` : "The player refused this theme", !accepted);
-    showWarnings(lint(theme, schema));
-    return bytes;
-  } catch (error) {
-    if (!(error instanceof ThemeError)) {
-      throw error;
-    }
-    say(error.message, true);
-    showWarnings([]);
-    return null;
-  }
+function startOver() {
+  state.theme = defaultTheme(state.schema);
+  state.designs = { playing: null, home: null };
+  state.picked = null;
+  restart();
+  changed({ rebuild: true });
 }
 
-function orientation() {
-  return Number(document.getElementById("orientation").value);
-}
-
-function restart() {
-  preview.start(orientation(), currentScreen);
-  applyTheme();
-  layoutEditor?.build();
-}
-
-function resize(width, height) {
-  const zoom = Number(document.getElementById("zoom").value);
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
-  canvas.style.width = `${width * zoom}px`;
-  canvas.style.height = `${height * zoom}px`;
-}
-
-function draw() {
-  const { width, height, pixels } = preview.frame();
-  resize(width, height);
-  context.putImageData(new ImageData(pixels, width, height), 0, 0);
-}
-
-function frame(now) {
-  preview.advance(Math.min(Math.round(now - (lastFrame ?? now)), MAX_CATCH_UP_MS));
-  lastFrame = now;
-  draw();
-  if (currentScreen === "playing") {
-    layoutEditor?.draw();
-  }
-  requestAnimationFrame(frame);
-}
-
-function field(text, control, className) {
-  const wrap = document.createElement("label");
-  wrap.append(text, control);
-  if (className) {
-    wrap.className = className;
-  }
-  return wrap;
-}
-
-function colorSelect(box, name) {
-  const select = document.createElement("select");
-  for (const color of schema.colors) {
-    select.append(new Option(label(color), color, false, color === box[name]));
-  }
-  select.addEventListener("change", () => {
-    box[name] = select.value;
-    applyTheme();
+function wireControls() {
+  $("name").addEventListener("input", (event) => {
+    state.theme.name = event.target.value;
+    changed();
   });
-  return select;
-}
-
-function numberInput(box, name, most) {
-  const input = document.createElement("input");
-  Object.assign(input, { type: "number", min: 0, max: most, value: box[name] });
-  input.addEventListener("input", () => {
-    box[name] = Math.max(0, Math.min(most, Math.round(Number(input.value) || 0)));
-    applyTheme();
-  });
-  return input;
-}
-
-function edgeBoxes(box) {
-  const wrap = document.createElement("div");
-  wrap.className = "row edges";
-  wrap.append("Border on");
-  for (const [edge, bit] of Object.entries(EDGES)) {
-    const check = document.createElement("input");
-    check.type = "checkbox";
-    check.checked = (box.border_edges & bit) !== 0;
-    check.addEventListener("change", () => {
-      box.border_edges = check.checked ? box.border_edges | bit : box.border_edges & ~bit;
-      applyTheme();
-    });
-    wrap.append(field(label(edge), check));
-  }
-  return wrap;
-}
-
-function buildBoxes() {
-  const host = document.getElementById("boxes");
-  host.replaceChildren();
-  for (const name of schema.boxes) {
-    const box = theme.boxes[name];
-    const details = document.createElement("details");
-    const summary = document.createElement("summary");
-    const grid = document.createElement("div");
-    summary.textContent = label(name);
-    grid.className = "box";
-    for (const color of BOX_COLOR_FIELDS) {
-      grid.append(field(COLOR_LABELS[color], colorSelect(box, color)));
-    }
-    for (const [number, text, most] of BOX_NUMBERS) {
-      grid.append(field(text, numberInput(box, number, most)));
-    }
-    grid.append(edgeBoxes(box));
-    details.append(summary, grid);
-    host.append(details);
-  }
-}
-
-function buildColors() {
-  const host = document.getElementById("colors");
-  host.replaceChildren();
-  for (const name of schema.colors) {
-    const input = document.createElement("input");
-    input.type = "color";
-    input.value = theme.colors[name];
-    input.addEventListener("input", () => {
-      theme.colors[name] = input.value;
-      applyTheme();
-    });
-    host.append(field(label(name), input));
-  }
-}
-
-function buildSpacing() {
-  const host = document.getElementById("spacing");
-  host.replaceChildren();
-  for (const entry of schema.spacing) {
-    const custom = document.createElement("input");
-    const slider = document.createElement("input");
-    const output = document.createElement("output");
-    custom.type = "checkbox";
-    custom.checked = theme.spacing[entry.name] !== null;
-    Object.assign(slider, { type: "range", min: entry.least, max: entry.most });
-    slider.value = theme.spacing[entry.name] ?? entry.least;
-    const update = () => {
-      theme.spacing[entry.name] = custom.checked ? Number(slider.value) : null;
-      slider.disabled = !custom.checked;
-      output.textContent = custom.checked ? `${slider.value} px` : "player's";
-      applyTheme();
-    };
-    custom.addEventListener("change", update);
-    slider.addEventListener("input", update);
-    slider.disabled = !custom.checked;
-    output.textContent = custom.checked ? `${slider.value} px` : "player's";
-    const row = field(label(entry.name), custom);
-    row.append(slider, output);
-    host.append(row);
-  }
-}
-
-function buildSelection() {
-  const select = document.getElementById("selection");
-  select.replaceChildren();
-  for (const name of schema.boxes) {
-    select.append(new Option(label(name), name, false, name === theme.selection));
-  }
-}
-
-function buildPanel() {
-  document.getElementById("name").value = theme.name;
-  buildColors();
-  buildSpacing();
-  buildSelection();
-  buildBoxes();
-  buildIcons(document.getElementById("icons"), theme, schema, applyTheme);
-  buildWallpapers(document.getElementById("wallpapers"), theme, schema, applyTheme);
-  buildFonts(document.getElementById("fonts"), theme, schema, applyTheme);
-  applyTheme();
-  const context = { schema, preview, changed: applyTheme, orientation, screen: canvas };
-  layoutEditor = buildLayout(document.getElementById("layout"), theme, context);
-}
-
-function download(name, bytes, type) {
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([bytes], { type }));
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(link.href);
-}
-
-function wear(bytes) {
-  try {
-    theme = unpack(bytes, schema);
-    buildPanel();
-  } catch (error) {
-    if (!(error instanceof ThemeError)) {
-      throw error;
-    }
-    say(error.message, true);
-  }
-}
-
-function press(key, pressed) {
-  preview.key(key, pressed);
-}
-
-function wireKeys() {
-  for (const button of document.querySelectorAll("#keys button")) {
-    const key = Number(button.dataset.key);
-    button.addEventListener("pointerdown", () => press(key, true));
-    button.addEventListener("pointerup", () => press(key, false));
-    button.addEventListener("pointerleave", () => press(key, false));
-  }
-  canvas.addEventListener("keydown", (event) => {
-    if (event.key in KEYBOARD && !event.repeat) {
-      press(KEYBOARD[event.key], true);
-    }
-    if (event.key in KEYBOARD) {
-      event.preventDefault();
-    }
-  });
-  canvas.addEventListener("keyup", (event) => {
-    if (event.key in KEYBOARD) {
-      press(KEYBOARD[event.key], false);
-    }
-  });
-}
-
-function wirePanel() {
-  document.getElementById("name").addEventListener("input", (event) => {
-    theme.name = event.target.value;
-    applyTheme();
-  });
-  document.getElementById("selection").addEventListener("change", (event) => {
-    theme.selection = event.target.value;
-    applyTheme();
-  });
-  document.getElementById("save").addEventListener("click", () => {
-    const bytes = applyTheme();
-    if (bytes) {
-      download(`${theme.name}.echotheme`, bytes, "application/octet-stream");
-    }
-  });
-  document.getElementById("save-source").addEventListener("click", () => {
-    download(`${theme.name}.toml`, toToml(theme, schema), "text/plain");
-  });
-  const picker = document.getElementById("picker");
-  document.getElementById("open").addEventListener("click", () => picker.click());
-  picker.addEventListener("change", async () => {
+  $("save").addEventListener("click", download);
+  $("undo").addEventListener("click", () => travel(true));
+  $("redo").addEventListener("click", () => travel(false));
+  $("picker").addEventListener("change", async () => {
+    const picker = $("picker");
     if (picker.files.length > 0) {
       wear(new Uint8Array(await picker.files[0].arrayBuffer()));
       picker.value = "";
     }
   });
-}
-
-function wireStage() {
-  for (const button of document.querySelectorAll("#screens button")) {
+  for (const button of $("turn").querySelectorAll("button")) {
     button.addEventListener("click", () => {
-      currentScreen = button.dataset.screen;
+      state.turn = Number(button.dataset.turn);
       restart();
+      render();
     });
   }
-  document.getElementById("orientation").addEventListener("change", restart);
-  const samples = document.getElementById("samples");
-  samples.append(new Option("Start from…", ""));
-  for (const sample of schema.samples) {
-    samples.append(new Option(label(sample), sample));
+  for (const button of $("zoom").querySelectorAll("button")) {
+    button.addEventListener("click", () => setZoom(button.dataset.zoom));
   }
-  samples.addEventListener("change", async () => {
-    if (samples.value) {
-      wear(await fetchBytes(`themes/${samples.value}.echotheme`));
-      samples.value = "";
+  for (const button of $("keys").querySelectorAll("button")) {
+    const key = Number(button.dataset.key);
+    button.addEventListener("pointerdown", () => state.preview.key(key, true));
+    button.addEventListener("pointerup", () => state.preview.key(key, false));
+    button.addEventListener("pointerleave", () => state.preview.key(key, false));
+  }
+  const keyboard = { ArrowDown: KEY.down, ArrowUp: KEY.up, Enter: KEY.play, " ": KEY.play, Backspace: KEY.back, Escape: KEY.back, m: KEY.menu };
+  canvas.addEventListener("keydown", (event) => {
+    if (event.key in keyboard) {
+      event.preventDefault();
+      if (!event.repeat) {
+        state.preview.key(keyboard[event.key], true);
+      }
     }
   });
+  canvas.addEventListener("keyup", (event) => {
+    if (event.key in keyboard) {
+      state.preview.key(keyboard[event.key], false);
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (nudge(event)) {
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.target.closest("input, textarea")) {
+      event.preventDefault();
+      travel(!event.shiftKey);
+    }
+  });
+  window.addEventListener("resize", drawOverlay);
 }
 
 async function main() {
-  schema = await (await fetch("theme_schema.json")).json();
-  preview = await Preview.load(fetchBytes, schema);
-  theme = defaultTheme(schema);
-  wireKeys();
-  wirePanel();
-  wireStage();
-  buildPanel();
-  restart();
+  state.schema = await (await fetch("theme_schema.json")).json();
+  state.preview = await Preview.load(fetchBytes, state.schema);
+  try {
+    state.gallery = await (await fetch("themes/index.json")).json();
+  } catch {
+    state.gallery = [];
+  }
+  state.theme = defaultTheme(state.schema);
   const asked = new URLSearchParams(location.search).get("theme");
-  if (schema.samples.includes(asked)) {
-    wear(await fetchBytes(`themes/${asked}.echotheme`));
+  const draft = loadDraft();
+  if (draft && !asked) {
+    try {
+      restore(draft);
+    } catch {
+      state.theme = defaultTheme(state.schema);
+      state.designs = { playing: null, home: null };
+    }
+  }
+  wireControls();
+  wireOverlay();
+  restart();
+  state.history = [snapshot()];
+  render();
+  refreshUndo();
+  if (state.schema.samples.includes(asked)) {
+    await openSample(asked);
   }
   requestAnimationFrame(frame);
 }
 
-main().catch((error) => say(`Could not start: ${error.message}`, true));
+main().catch((error) => say(`The editor couldn't start: ${error.message}`, true));

@@ -3,7 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "np_faces/scene.h"
+#include "themes/builtin_themes.h"
 #include "tiny_font.h"
+#include "ui/theme_package.h"
 #include "ui_test_theme.h"
 
 enum {
@@ -75,6 +78,32 @@ static void apply_state(NpTestScene *scene, NpTestState state)
     }
 }
 
+bool np_test_scene_code(uint8_t face, SceneCode *code, const ThemeColors **chrome)
+{
+    *code = (SceneCode){0};
+    *chrome = NULL;
+    if (face <= NP_FACE_STANDARD || face >= NP_FACE_COUNT) {
+        return false;
+    }
+    const BuiltinTheme *theme = &BUILTIN_THEMES[THEME_CASSETTE + face - NP_FACE_CASSETTE];
+    ThemePackage package = {0};
+    if (theme->bytes == NULL || !theme_package_decode(theme->bytes, theme->size, &package)) {
+        return false;
+    }
+    const uint8_t *section = theme->bytes + package.scene.offset;
+    bool tinted = (package.scene.flags & THEME_SCENE_CHROME) != 0;
+    *chrome = tinted ? (const ThemeColors *)(const void *)section : NULL;
+    section += tinted ? THEME_SCENE_CHROME_BYTES : 0;
+    static uint32_t work[SCENE_WORK_BYTES / sizeof(uint32_t)];
+    *code = (SceneCode){section,
+                        package.scene.code_bytes,
+                        (const char *)section + package.scene.code_bytes,
+                        package.scene.string_bytes,
+                        work,
+                        sizeof work};
+    return package.scene.code_bytes > 0;
+}
+
 NpTestScene np_test_scene(uint8_t face, NpTestLayout layout, NpTestState state)
 {
     NpTestScene scene = {.theme = scene_theme(), .layout = layout};
@@ -98,6 +127,8 @@ NpTestScene np_test_scene(uint8_t face, NpTestLayout layout, NpTestState state)
                                     .tick = POSITION_MS / TICK_MS,
                                     .face = face,
                                     .playing = true};
+    const ThemeColors *chrome;
+    (void)np_test_scene_code(face, &scene.frame.scene, &chrome);
     apply_state(&scene, state);
     return scene;
 }

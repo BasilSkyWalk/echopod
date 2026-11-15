@@ -201,6 +201,41 @@ static void the_standard_selection_shapes_are_the_first_three_boxes(void)
     CHECK(theme_selection_box(&theme) == &THEME_STANDARD_BOXES.selection_outline);
 }
 
+static void a_see_through_box_blends_over_what_is_beneath(void)
+{
+    BoxStyle style = {
+        .fill_top = THEME_COLOR_DANGER, .fill_bottom = THEME_COLOR_DANGER, .see_through = 8};
+    Canvas canvas = drawn(&style);
+    Color blended = color_blend(UNTOUCHED, TEST_COLORS.danger, COLOR_ALPHA_OPAQUE - 8);
+    CHECK(blended != TEST_COLORS.danger && blended != UNTOUCHED);
+    CHECK(ui_test_area_has_only(&canvas, AREA, blended));
+}
+
+static void a_see_through_gradient_blends_every_row(void)
+{
+    BoxStyle style = {
+        .fill_top = THEME_COLOR_TEXT, .fill_bottom = THEME_COLOR_DANGER, .see_through = 4};
+    Canvas canvas = drawn(&style);
+    uint8_t alpha = COLOR_ALPHA_OPAQUE - 4;
+    Color top = canvas_pixel_at(&canvas, AREA.x, AREA.y);
+    Color bottom = canvas_pixel_at(&canvas, AREA.x, AREA.y + AREA.height - 1);
+    CHECK_EQUAL(color_blend(UNTOUCHED, TEST_COLORS.text, alpha), top);
+    CHECK_EQUAL(color_blend(UNTOUCHED, TEST_COLORS.danger, alpha), bottom);
+}
+
+static void a_fully_see_through_box_leaves_the_screen_alone(void)
+{
+    BoxStyle style = {.fill_top = THEME_COLOR_DANGER,
+                      .fill_bottom = THEME_COLOR_DANGER,
+                      .border = THEME_COLOR_SUCCESS,
+                      .border_width = 1,
+                      .border_edges = BOX_EDGE_ALL,
+                      .radius = 4,
+                      .see_through = COLOR_ALPHA_OPAQUE};
+    Canvas canvas = drawn(&style);
+    CHECK(ui_test_area_has_only(&canvas, AREA, UNTOUCHED));
+}
+
 static void a_colour_is_found_by_its_id(void)
 {
     CHECK_EQUAL(TEST_COLORS.background, theme_color(&TEST_COLORS, THEME_COLOR_BACKGROUND));
@@ -224,6 +259,9 @@ int main(void)
         TEST_CASE(a_rounded_border_rings_a_rounded_fill),
         TEST_CASE(a_rounded_box_stays_inside_the_clip),
         TEST_CASE(the_standard_selection_shapes_are_the_first_three_boxes),
+        TEST_CASE(a_see_through_box_blends_over_what_is_beneath),
+        TEST_CASE(a_see_through_gradient_blends_every_row),
+        TEST_CASE(a_fully_see_through_box_leaves_the_screen_alone),
         TEST_CASE(a_colour_is_found_by_its_id),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

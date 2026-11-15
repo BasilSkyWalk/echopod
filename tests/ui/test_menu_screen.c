@@ -224,6 +224,97 @@ static void a_side_panel_takes_the_right_of_the_content(void)
     CHECK(!ui_test_area_has_color(&canvas, first_row_left, TEST_THEME.colors->danger));
 }
 
+static void a_theme_without_the_panel_gives_the_list_the_whole_content(void)
+{
+    Theme plain = TEST_THEME;
+    plain.no_menu_panel = true;
+    panel_updates = 0;
+    panel_area_seen = (Rect){0};
+    MenuConfig config = {
+        .title = "Menu",
+        .items = ITEMS,
+        .item_count = 5,
+        .theme = &plain,
+        .panel = {
+            .width = 12, .update = record_panel_update, .draw = paint_panel, .context = NULL}};
+    Screen *screen = menu_screen_init(&menu, config);
+    screen->enter(screen->context, 0);
+    screen->update(screen->context, 100);
+    Canvas canvas = ui_test_canvas();
+    screen->draw(screen->context, &canvas);
+    CHECK_EQUAL(0, panel_updates);
+    CHECK_EQUAL(0, panel_area_seen.width);
+    CHECK(!ui_test_area_has_color(&canvas, theme_content_area(&plain), TEST_THEME.colors->danger));
+}
+
+static int scene_updates;
+static bool scene_wanted;
+static Rect scene_list_area;
+
+static bool update_scene(void *context, uint32_t now_ms)
+{
+    (void)context;
+    (void)now_ms;
+    scene_updates++;
+    return scene_wanted;
+}
+
+static bool draw_scene(void *context, Canvas *canvas, MenuScreen *shown)
+{
+    (void)context;
+    scene_list_area = (Rect){0, TEST_HEADER_HEIGHT, 40, 2 * TEST_THEME.metrics.row_height};
+    menu_screen_scene_list(shown, canvas, scene_list_area);
+    return true;
+}
+
+static Screen *scene_menu(MenuScene *scene)
+{
+    MenuConfig config = {
+        .title = "Menu",
+        .items = ITEMS,
+        .item_count = 5,
+        .theme = &TEST_THEME,
+        .panel = {.width = 12, .update = record_panel_update, .draw = paint_panel, .context = NULL},
+        .scene = scene};
+    return menu_screen_init(&menu, config);
+}
+
+static void a_scene_draws_the_menu_in_its_own_place(void)
+{
+    MenuScene scene = {update_scene, draw_scene, NULL, false};
+    scene_wanted = true;
+    scene_updates = 0;
+    panel_updates = 0;
+    panel_area_seen = (Rect){0};
+    Screen *screen = scene_menu(&scene);
+    screen->enter(screen->context, 0);
+    screen->update(screen->context, 100);
+    Canvas canvas = ui_test_canvas();
+    screen->draw(screen->context, &canvas);
+    CHECK_EQUAL(1, scene_updates);
+    CHECK_EQUAL(0, panel_updates);
+    CHECK_EQUAL(0, panel_area_seen.width);
+    CHECK_EQUAL(2, list_view_rows(&menu.list));
+    next(screen, 2);
+    CHECK_EQUAL(2, list_view_rows(&menu.list));
+    CHECK_EQUAL(1, list_view_top(&menu.list));
+}
+
+static void without_its_scene_the_menu_draws_as_usual(void)
+{
+    MenuScene scene = {update_scene, draw_scene, NULL, false};
+    scene_wanted = false;
+    panel_updates = 0;
+    Screen *screen = scene_menu(&scene);
+    screen->enter(screen->context, 0);
+    screen->update(screen->context, 100);
+    Canvas canvas = ui_test_canvas();
+    screen->draw(screen->context, &canvas);
+    CHECK_EQUAL(1, panel_updates);
+    CHECK_EQUAL(TEST_SCREEN_WIDTH - 12, panel_area_seen.x);
+    CHECK(list_view_rows(&menu.list) != 2);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -231,6 +322,9 @@ int main(void)
         TEST_CASE(items_that_open_a_screen_show_a_chevron),
         TEST_CASE(a_hidden_item_is_skipped),
         TEST_CASE(a_side_panel_takes_the_right_of_the_content),
+        TEST_CASE(a_theme_without_the_panel_gives_the_list_the_whole_content),
+        TEST_CASE(a_scene_draws_the_menu_in_its_own_place),
+        TEST_CASE(without_its_scene_the_menu_draws_as_usual),
         TEST_CASE(an_item_appears_once_it_is_shown),
         TEST_CASE(selecting_the_first_item_opens_its_screen),
         TEST_CASE(moving_next_then_selecting_opens_the_second_screen),

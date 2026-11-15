@@ -147,18 +147,22 @@ static bool glyphs_sound(const Glyph *glyphs, uint32_t count, uint32_t bitmap_by
     return true;
 }
 
-static bool read_section(HalFile file, uint32_t offset, uint8_t *target, uint32_t length)
+bool theme_source_read(const ThemeSource *source, uint32_t offset, void *target, uint32_t length)
 {
-    return offset <= file.size && length <= file.size - offset &&
-           hal_file_read(file, offset, target, length);
+    if (offset > source->size || length > source->size - offset) {
+        return false;
+    }
+    return source->builtin >= 0
+               ? hal_system_builtin_theme_read((uint32_t)source->builtin, offset, target, length)
+               : hal_file_read(source->file, offset, target, length);
 }
 
-static bool read_font(HalFile file, ThemePackageFont entry, uint8_t *place, Font *font)
+static bool read_font(const ThemeSource *file, ThemePackageFont entry, uint8_t *place, Font *font)
 {
     uint32_t table = entry.glyph_count * (uint32_t)sizeof(Glyph);
     uint8_t *bitmap = place + aligned(table);
-    if (!read_section(file, entry.offset, place, table) ||
-        !read_section(file, entry.offset + table, bitmap, entry.bitmap_bytes) ||
+    if (!theme_source_read(file, entry.offset, place, table) ||
+        !theme_source_read(file, entry.offset + table, bitmap, entry.bitmap_bytes) ||
         hash_update(hash_update(HASH_START, place, table), bitmap, entry.bitmap_bytes) !=
             entry.checksum ||
         !glyphs_sound((const Glyph *)(void *)place, entry.glyph_count, entry.bitmap_bytes)) {
@@ -173,7 +177,8 @@ static bool read_font(HalFile file, ThemePackageFont entry, uint8_t *place, Font
     return true;
 }
 
-static void load_fonts(ThemeAssets *assets, const ThemePackage *package, HalFile file, Arena arena)
+static void load_fonts(ThemeAssets *assets, const ThemePackage *package, const ThemeSource *file,
+                       Arena arena)
 {
     for (int id = 0; id < THEME_FONT_COUNT; id++) {
         ThemePackageFont entry = package->fonts[id];
@@ -197,16 +202,16 @@ static void fill_pairs(uint32_t *pairs, const uint8_t *palette)
     }
 }
 
-static bool read_wallpaper(ThemeAssets *assets, ThemePackageWallpaper entry, HalFile file,
-                           Arena arena)
+static bool read_wallpaper(ThemeAssets *assets, ThemePackageWallpaper entry,
+                           const ThemeSource *file, Arena arena)
 {
     uint8_t palette[THEME_PACKAGE_PALETTE_BYTES];
     uint32_t bytes = entry.width / 2u * entry.height;
     uint32_t *pairs = (uint32_t *)(void *)arena.bytes;
     uint8_t *rows = arena.bytes + WALLPAPER_PAIR_BYTES;
     if (WALLPAPER_PAIR_BYTES + bytes > arena.size ||
-        !read_section(file, entry.offset, palette, sizeof palette) ||
-        !read_section(file, entry.offset + (uint32_t)sizeof palette, rows, bytes) ||
+        !theme_source_read(file, entry.offset, palette, sizeof palette) ||
+        !theme_source_read(file, entry.offset + (uint32_t)sizeof palette, rows, bytes) ||
         hash_update(hash_update(HASH_START, palette, sizeof palette), rows, bytes) !=
             entry.checksum) {
         return false;
@@ -216,8 +221,8 @@ static bool read_wallpaper(ThemeAssets *assets, ThemePackageWallpaper entry, Hal
     return true;
 }
 
-static void load_wallpaper(ThemeAssets *assets, const ThemePackage *package, HalFile file,
-                           Arena arena)
+static void load_wallpaper(ThemeAssets *assets, const ThemePackage *package,
+                           const ThemeSource *file, Arena arena)
 {
     uint32_t start = fonts_end(package, THEME_FONT_COUNT);
     Arena rest = {arena.bytes + start, start <= arena.size ? arena.size - start : 0};
@@ -226,7 +231,7 @@ static void load_wallpaper(ThemeAssets *assets, const ThemePackage *package, Hal
     assets->wallpaper_state = loaded ? ASSET_READY : ASSET_FAILED;
 }
 
-bool theme_assets_tend(ThemeAssets *assets, const ThemePackage *package, HalFile file)
+bool theme_assets_tend(ThemeAssets *assets, const ThemePackage *package, const ThemeSource *file)
 {
     uint32_t size = 0;
     void *memory = hal_system_theme_assets(&size);

@@ -29,6 +29,16 @@ def header(package):
     return HEADER.unpack_from(package)
 
 
+def scene_names():
+    folder = TOOLS_DIRECTORY.parent / "src" / "np_faces" / "include" / "np_faces"
+    return theme_pack.scene_compile.definitions(folder)
+
+
+def asset_entries(package):
+    table_at = theme_pack.ASSET_HEADER_SIZE + 2 * len(COLORS) + theme_pack.BOX_SIZE * len(BOXES)
+    return [struct.unpack_from("<BBHHHII", package, table_at + 16 * index) for index in range(package[48])]
+
+
 def colors_of(package):
     return struct.unpack_from("<3H", package, theme_pack.HEADER_SIZE)
 
@@ -46,9 +56,9 @@ class PackTest(unittest.TestCase):
         self.assertEqual((b"ETHM", 1, 48), (magic, version, header_size))
         self.assertEqual(len(package), size)
         self.assertEqual(theme_pack.checksum(package[16:]), check)
-        self.assertEqual((3, 2, 11, 0, 0, 0), (colors, boxes, box_size, selection, spaces, zero))
+        self.assertEqual((3, 2, 12, 0, 0, 0), (colors, boxes, box_size, selection, spaces, zero))
         self.assertEqual(b"Mine" + bytes(20), name)
-        self.assertEqual(48 + 6 + 22, len(package))
+        self.assertEqual(48 + 6 + 24, len(package))
 
     def test_the_checksum_is_the_fnv_hash_the_player_computes(self):
         self.assertEqual(0x811C9DC5, theme_pack.checksum(b""))
@@ -61,14 +71,43 @@ class PackTest(unittest.TestCase):
     def test_what_a_theme_leaves_out_comes_from_the_base(self):
         package = packed({"name": "Mine", "colors": {"accent": "#0000ff"}})
         self.assertEqual((0x0000, 0xFFFF, 0x001F), colors_of(package))
-        self.assertEqual((2, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0), box(package, 0))
+        self.assertEqual((2, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0), box(package, 0))
 
     def test_a_box_holds_colour_ids_and_its_measures(self):
         package = packed({"name": "Mine", "boxes": {"header": {
             "fill": ["accent", "background"], "border": "text", "border_width": 2,
             "border_edges": ["bottom", "left"], "shine": "accent", "shine_height": 1,
             "ink": "text", "inset": [6, 1], "radius": 5}}})
-        self.assertEqual((2, 0, 1, 2, 1, 2, 2 | 4, 1, 6, 1, 5), box(package, 1))
+        self.assertEqual((2, 0, 1, 2, 1, 2, 2 | 4, 1, 6, 1, 5, 0), box(package, 1))
+
+    def test_a_theme_can_leave_out_the_home_art(self):
+        self.assertEqual(2, packed({"name": "Mine", "home_art": False})[52])
+        self.assertEqual(3, packed({"name": "Mine", "home_art": False, "cover_flow": "dark"})[52])
+        self.assertEqual(packed({"name": "Mine"}), packed({"name": "Mine", "home_art": True}))
+        with self.assertRaises(theme_pack.ThemeError):
+            packed({"name": "Mine", "home_art": "no"})
+
+    def test_a_home_scene_packs_beside_the_now_playing_one(self):
+        names = scene_names()
+        theme = {"name": "Mine", "now_playing_scene": {"script": "rect(0, 0, 4, 4, 0)"},
+                 "home_scene": {"script": "menu(x, y, width, height)", "design": "{}"}}
+        package = theme_pack.pack(theme, BASE, COLORS, BOXES, scene_names=names)
+        kinds = [entry[0] for entry in asset_entries(package)]
+        self.assertEqual([5, 6, 8, 9, 10], kinds)
+
+    def test_the_two_scenes_share_one_limit(self):
+        names = scene_names()
+        script = "\n".join(f"rect({index}, {index}, 1000, 1000, 70000)" for index in range(260))
+        half = {"name": "Mine", "now_playing_scene": {"script": script}}
+        theme_pack.pack(half, BASE, COLORS, BOXES, scene_names=names)
+        both = {**half, "home_scene": {"script": script}}
+        with self.assertRaises(theme_pack.ThemeError):
+            theme_pack.pack(both, BASE, COLORS, BOXES, scene_names=names)
+
+    def test_opacity_is_stored_as_how_far_the_box_is_see_through(self):
+        def see_through(opacity):
+            return box(packed({"name": "Mine", "boxes": {"header": {"opacity": opacity}}}), 1)[11]
+        self.assertEqual([0, 15, 7, 5], [see_through(100), see_through(0), see_through(50), see_through(66)])
 
     def test_a_border_with_a_width_goes_all_round_unless_edges_are_named(self):
         package = packed({"name": "Mine", "boxes": {"header": {"border": "text", "border_width": 1}}})
@@ -93,6 +132,8 @@ class PackTest(unittest.TestCase):
                       {"name": "Mine", "boxes": {"header": {"border_width": 256}}},
                       {"name": "Mine", "boxes": {"header": {"border_edges": ["middle"]}}},
                       {"name": "Mine", "boxes": {"header": {"inset": [1]}}},
+                      {"name": "Mine", "boxes": {"header": {"opacity": 101}}},
+                      {"name": "Mine", "boxes": {"header": {"opacity": 0.5}}},
                       {"name": "Mine", "wallpaper": "sky.png"}):
             with self.assertRaises(theme_pack.ThemeError):
                 packed(theme)
@@ -141,7 +182,7 @@ def papered(theme):
 
 
 def wall_entries(package):
-    table_at = 52 + 6 + 22
+    table_at = 56 + 6 + 24
     return [WALL_ENTRY.unpack_from(package, table_at + 16 * index) for index in range(package[48])]
 
 
@@ -152,8 +193,8 @@ class WallpaperTest(unittest.TestCase):
     def test_a_wallpaper_follows_the_checked_part_and_the_table_says_where(self):
         package = papered({"wallpaper": TILE})
         size = header(package)[3]
-        self.assertEqual(52, header(package)[2])
-        self.assertEqual(52 + 6 + 22 + 16, size)
+        self.assertEqual(56, header(package)[2])
+        self.assertEqual(56 + 6 + 24 + 16, size)
         self.assertEqual(theme_pack.checksum(package[16:size]), header(package)[4])
         self.assertEqual([(0, 0, 4, 2, 0, size, theme_pack.checksum(TILE_SECTION))],
                          wall_entries(package))
@@ -161,7 +202,7 @@ class WallpaperTest(unittest.TestCase):
 
     def test_the_colours_and_boxes_start_after_the_longer_header(self):
         package = papered({"wallpaper": TILE, "colors": {"accent": "#0000ff"}})
-        self.assertEqual((0x0000, 0xFFFF, 0x001F), struct.unpack_from("<3H", package, 52))
+        self.assertEqual((0x0000, 0xFFFF, 0x001F), struct.unpack_from("<3H", package, 56))
         self.assertEqual([], theme_pack.lint(papered({"wallpaper": TILE, "boxes": {
             "header": {"fill": "background", "ink": "text"}}}), COLORS, BOXES)[1:])
 
@@ -236,7 +277,7 @@ class WallpaperImageTest(unittest.TestCase):
     def entry_of(self, root, wallpaper, size):
         folder, definitions = self.write_theme(root, wallpaper, size)
         package = theme_pack.build_all(folder, definitions)["dark"]
-        entry = WALL_ENTRY.unpack_from(package, 52 + 4 + 11)
+        entry = WALL_ENTRY.unpack_from(package, 56 + 4 + 12)
         return package, entry
 
     def test_a_big_picture_is_fitted_to_the_screen_and_cut_to_sixteen_colours(self):
@@ -293,7 +334,8 @@ def lettered(fonts, base=None):
 
 def asset_entries(package):
     colors, boxes, box_size, _, spaces = struct.unpack_from("<HHBBB", package, 16)
-    table_at = 52 + 2 * colors + boxes * box_size + spaces
+    table_at = (56 + 2 * colors + boxes * box_size + spaces + 8 * (package[49] + package[50]) +
+                20 * package[51])
     return [struct.unpack_from("<BBHHBBII", package, table_at + 16 * index)
             for index in range(package[48])]
 
@@ -404,7 +446,53 @@ def placed(theme, base=None):
 
 def places(package):
     count = package[49] + package[50]
-    return [PLACE.unpack_from(package, 52 + 6 + 22 + PLACE.size * index) for index in range(count)]
+    return [PLACE.unpack_from(package, 56 + 6 + 24 + PLACE.size * index) for index in range(count)]
+
+
+ACCENT = struct.Struct("<HHHB13s")
+RED = {"name": "Red", "selection_background": "#ff0000", "selection_top": "#ff8000",
+       "selection_shine": "#ffffff"}
+
+
+def accents_of(package):
+    count = package[51]
+    return [ACCENT.unpack_from(package, 56 + 6 + 24 + ACCENT.size * index) for index in range(count)]
+
+
+class AccentTest(unittest.TestCase):
+    def test_a_theme_without_accents_keeps_the_short_header(self):
+        self.assertEqual(48, header(packed({"name": "Mine"}))[2])
+
+    def test_accents_follow_the_places_with_three_shades_and_a_name(self):
+        ruby = {**RED, "name": "Ruby"}
+        package = packed({"name": "Mine", "accents": [RED, ruby]})
+        self.assertEqual(56, header(package)[2])
+        self.assertEqual((2, 0), (package[51], package[52]))
+        self.assertEqual([(0xF800, 0xFC00, 0xFFFF, 1, bytes(13)),
+                          (0xF800, 0xFC00, 0xFFFF, 255, b"Ruby" + bytes(9))], accents_of(package))
+        self.assertEqual(len(package), header(package)[3])
+
+    def test_a_standard_colour_name_is_stored_as_its_number_in_any_case(self):
+        package = packed({"name": "Mine", "accents": [{**RED, "name": "GRAPHITE"}]})
+        self.assertEqual(7, accents_of(package)[0][3])
+
+    def test_accents_are_the_themes_own_and_never_come_from_the_base(self):
+        base = {**BASE, "accents": [RED]}
+        self.assertEqual(48, header(packed({"name": "Mine"}, base))[2])
+
+    def test_bad_accents_are_refused(self):
+        for accents in ([{"name": "Red"}], [{**RED, "name": ""}], [{**RED, "name": "A" * 13}],
+                        [{**RED, "glow": "#000000"}], [RED] * 9, RED):
+            with self.assertRaises(theme_pack.ThemeError):
+                packed({"name": "Mine", "accents": accents})
+
+    def test_cover_flow_can_ask_for_the_dark_look(self):
+        package = packed({"name": "Mine", "cover_flow": "dark"})
+        self.assertEqual(56, header(package)[2])
+        self.assertEqual((0, 1), (package[51], package[52]))
+        self.assertEqual(48, header(packed({"name": "Mine", "cover_flow": "theme"}))[2])
+        with self.assertRaises(theme_pack.ThemeError):
+            packed({"name": "Mine", "cover_flow": "light"})
 
 
 class LayoutTest(unittest.TestCase):
@@ -416,7 +504,7 @@ class LayoutTest(unittest.TestCase):
                                           "title": {"x": 10, "y": 96, "width": 300,
                                                     "align": "right"}},
                           "now_playing_portrait": {"progress": {"hide": True}}})
-        self.assertEqual(52, header(package)[2])
+        self.assertEqual(56, header(package)[2])
         self.assertEqual((0, 3, 3), (package[48], package[49], package[50]))
         self.assertEqual([(-4, 30, 64, 0, 0), (10, 96, 300, 22, 2), (0, 0, 0, 0, 255),
                           (0, 0, 0, 0, 255), (0, 0, 0, 0, 255), (0, 0, 0, 3, 0)], places(package))
@@ -460,7 +548,7 @@ class LayoutTest(unittest.TestCase):
 
 
 ICONS = [("play", 4, 3), ("pause", 4, 3), ("battery", 6, 2), ("battery_level", 6, 2)]
-ICONS_AT = 48 + 6 + 22
+ICONS_AT = 48 + 6 + 24
 
 
 def packed_with_icons(icons, base=None):

@@ -10,9 +10,13 @@ A theme file changes EchoPod's colours, the shape of its bars and boxes, and a f
 
 - The player lists up to 8 theme files. A file name (without `.echotheme`) may be 1 to 23 bytes long; longer ones are skipped.
 - The name in the list is the file's name, so rename the file to rename the theme.
-- While a theme file is worn, Accent color and Highlight are hidden: the file decides those.
+- Accent color lists the accents the theme offers, and is hidden for a theme that offers none. Dark and Light offer eight; a theme file can offer up to eight of its own.
+- Highlight (gradient or flat) shows for any theme whose selected row is drawn as a gradient.
 - If the file is deleted or damaged, the player goes back to the built-in theme you used last.
-- Cover Flow's backdrop, the cover panel on Home and the Now Playing faces (Cassette, VU meters and so on) keep their own colours.
+- Cover Flow is drawn in the theme's colours, unless the theme asks for the dark look as Light, Paper and Olive do.
+- The cover panel on Home and the Now Playing faces (Cassette, VU meters and so on) keep their own colours.
+
+The built-in themes are theme files too, kept inside the firmware: their sources are in `assets/themes`, and the editor's **Start from** list opens any of them.
 
 ## What a theme can change
 
@@ -28,16 +32,23 @@ A theme file changes EchoPod's colours, the shape of its bars and boxes, and a f
 
 - **The Now Playing layout:** where the cover, text, progress bar and times sit, for each way the player is held.
 
-Other screens' layouts can't be changed by a theme yet.
+- **A Now Playing scene:** its own drawing of the whole Now Playing screen, from a short script.
+
+- **A Home scene:** its own Home screen: the menu as a list, tiles or one item at a time, the album art, what's playing, anywhere on the screen. The buttons still move through the menu from top to bottom.
+
+The other screens are the theme's lists, drawn in its colours, boxes, spacing, wallpaper, fonts and icons.
 
 ## Making a theme in the editor
 
-The editor is a web page that runs the player's own interface, so what it shows is what the player draws.
+The editor is a web page that runs the player's own interface, so the screen in the middle is exactly what the player draws. Nothing to install and no code to write.
 
-- Pick a starting point under **Start from…**, or **Open theme…** to load an `.echotheme` file.
-- Change colours, spacing and shapes on the right. The screen on the left updates as you go; the buttons under it jump to Home, a list, Now Playing, a toast, the fast-scroll letter and Settings, in landscape or portrait. Click the screen to drive it with the arrow keys, Enter and Backspace.
-- A yellow note appears when something would be hard to read (see Readability below).
-- **Download theme** saves the `.echotheme` file for the player. **Download source** saves the same theme as a `.toml` text file, which is what you share in this repository.
+- **Steps** down the left take you through it: Start, Colours, Lists & shapes, Home, Now Playing, Wallpaper, Fonts, Icons, and Save & share. You can visit them in any order.
+- **Click anything on the screen** to jump to what colours it. The tabs above the screen switch between Home, the lists, Now Playing, Settings and a message, and the two buttons beside them turn the player sideways or upright. The buttons under the screen (or the arrow keys, Enter and Backspace once you click the screen) drive it.
+- **Start** begins from any built-in or shared theme, or opens an `.echotheme` file.
+- **Now Playing** is yours to arrange. Choose "My own design" and the screen gets layers you can drag and resize on the preview: the album cover (square or round, with a frame), text (song, artist, album, lyrics, the audio format, your own words), the times, a progress bar or a ring of lights, shapes, the play and pause mark, and a turning mark that spins while a song plays. Each takes the theme's colours or your own. The sideways and upright screens are arranged separately; "Copy the … arrangement" starts one from the other.
+- **Home** is arranged the same way. Its layers are the menu (a list drawn like the theme's other lists, tiles, or one item at a time with the ones before and after it), the album cover (with a reflection if you like), text (the highlighted menu item, the song, artist or album playing, or your own words), the progress bar, the times, shapes and the play and pause mark. The background can be the wallpaper, one colour or a gradient.
+- A note appears when something would be hard to read (see Readability below). Undo and redo are at the top, and your work is kept in the browser until you start over.
+- **Download for my player** saves the `.echotheme` file. **Download source** saves the same theme as a `.toml` text file, which is what you share in this repository.
 
 The gallery page next to it lists the built-in samples and every theme in this repository's `themes` folder, with a picture of each, a download and an "Open in the editor" link.
 
@@ -86,7 +97,7 @@ Pack it into a file for the player:
 python tools/theme_pack.py --themes my-themes --base assets/themes/dark.toml --definitions src/ui/include/ui --output my-themes/packed
 ```
 
-This packs every `.toml` in `my-themes` to `my-themes/packed/<file>.echotheme` and prints a warning for anything hard to read. A packed theme is 195 bytes without icons and about 2,000 with all of them (the player takes up to 3,072), plus about 27,000 for each full-screen wallpaper and about 5,000 for each font.
+This packs every `.toml` in `my-themes` to `my-themes/packed/<file>.echotheme` and prints a warning for anything hard to read. A packed theme is 205 bytes without icons and about 2,000 with all of them (the player takes up to 3,072), plus about 27,000 for each full-screen wallpaper and about 5,000 for each font.
 
 ### Top level
 
@@ -96,6 +107,8 @@ This packs every `.toml` in `my-themes` to `my-themes/packed/<file>.echotheme` a
 | `author` | Who made it, one line of at most 40 characters. Shown in the gallery. |
 | `description` | One line of at most 120 characters. Shown in the gallery. |
 | `selection` | Which box draws the selected row: `selection`, `selection_flat`, `selection_outline` or any other box name. |
+| `cover_flow` | `"theme"` (the default) draws Cover Flow in the theme's colours; `"dark"` draws it in the player's dark look, which suits light themes. |
+| `home_art` | `true` (the default) shows album art beside the Home menu, or below it when the player is upright; `false` gives the menu the whole screen. |
 
 ### `[colors]`
 
@@ -116,6 +129,29 @@ Colours are written `"#rrggbb"`. The screen shows 65,536 colours, so the last bi
 | `chevron` | The arrow at the end of a row that opens something. |
 
 The names are only defaults for the boxes: a box can use any colour for any of its parts.
+
+### `[[accents]]`
+
+A theme can offer up to eight accents. Each replaces the selected row's three colours, and the player lists them under Settings → Display → Accent color:
+
+```toml
+[[accents]]
+name = "Red"
+selection_background = "#c0262e"
+selection_top = "#e65458"
+selection_shine = "#f48080"
+
+[[accents]]
+name = "Ruby"
+selection_background = "#900020"
+selection_top = "#b00030"
+selection_shine = "#e06080"
+```
+
+- `name` is 1 to 12 bytes. Blue, Red, Orange, Green, Teal, Purple, Pink and Graphite are shown in the player's language; any other name is shown as written.
+- `selection_background` fills the row (and the whole row with the flat Highlight), `selection_top` is the top of the gradient and `selection_shine` the shine line.
+- The first accent is the one a player uses until someone picks another. A theme without accents keeps its own selection colours.
+- Accents are never taken from `dark.toml`: a theme offers only the ones it lists.
 
 ### `[boxes.<name>]`
 
@@ -143,6 +179,7 @@ Only the box the top-level `selection` names draws the selected row; the other t
 | `shine`, `shine_height` | A highlight line along the top: its colour name and height in pixels. |
 | `inset` | `[across, down]`: how far the box sits inside the area it's given, in pixels. |
 | `radius` | Corner radius in pixels, up to 32. It is cut to half the box's shorter side, so a large value makes a pill. |
+| `opacity` | How solid the box is, from 0 to 100 percent. 100, the default, is fully solid; lower values let the wallpaper or whatever is underneath show through. The player has 16 steps, so the value is rounded to the nearest one. |
 
 Colours in a box are names from `[colors]`, never `#rrggbb`.
 
@@ -196,6 +233,133 @@ hide = true
 - The faces (Cassette, VU meters, Turntable, LCD deck) have their own layouts.
 
 In the editor, show Now Playing, open **Now Playing layout → Places**, and drag a box on the screen, or tick a place and type its numbers. **Start from the player's layout** fills every place with where the player puts it now.
+
+### `[now_playing_scene]`
+
+A scene draws the whole Now Playing screen, below the header, from a short script: shapes, text, the cover and the progress, moving with the music. The built-in Cassette, VU meters, Turntable and LCD deck themes are made this way; their scripts are in `assets/themes`.
+
+```toml
+[now_playing_scene]
+file = "orbit.scene"
+
+[now_playing_scene.chrome]
+header_top = "#1b2140"
+header_background = "#10142a"
+header_text = "#eef1fa"
+```
+
+- `file` names a script beside the source (or `script` holds it in the source, as a multi-line string).
+- `chrome` is optional: the colours the header and status bar take while the scene shows. Any colour it leaves out is the theme's own.
+- On the player, wearing the theme shows its scene on Now Playing; a theme without one shows the standard Now Playing in its colours.
+- A scene takes at most 6,144 bytes once packed, and a theme with a Home scene too shares those 6,144 bytes between them. The packer and the editor say when it's too big, and where a script has a mistake.
+
+### `[home_scene]`
+
+The same for the Home screen, with the same keys: `file` or `script`, and an optional `chrome`.
+
+```toml
+[home_scene]
+file = "my-home.scene"
+```
+
+A Home scene draws everything below the title bar, so it decides where the menu goes and what sits beside it. The player still owns the menu itself: the buttons move the highlight from one item to the next in order, and Play opens it. A theme without a Home scene shows the standard Home: the list, with the album art beside it unless `home_art = false`.
+
+## Writing a scene
+
+`themes/orbit.scene` is a complete example in 40 lines; `assets/themes/cassette.scene` is a longer one. A script runs from top to bottom every time the screen is drawn, about ten times a second while a track plays.
+
+### The language
+
+```
+const DEEP = #181418
+let wide = width > height
+let cx = wide ? 84 : width / 2
+rect(x, y, width, height, DEEP)
+if playing {
+    spoke(cx, y + 80, (tick * 3) & 255, 24, 60, 66, #c8eeff)
+} else if paused {
+    icon(pause, cx - 9, y + 71, 18, 18, #c8eeff)
+}
+repeat mark from 0 to 48 {
+    spoke(cx, y + 80, mark * 16 / 3, 40, 60, 68, mark < progress(48) ? #7fd3ff : #232a42)
+}
+```
+
+- **Numbers** are whole, from about −2 billion to 2 billion, and work as in C: `/` drops the remainder and `%` keeps the sign of the left side. `0x` starts a hex number, and `#rrggbb` is a colour.
+- **Names:** `const NAME = ...` must be known before playing; `let name = ...` is worked out as the scene runs, and `name = ...` changes it later. A name made inside `{ }` ends with the block, so both sides of an `if` can make their own.
+- **Operators,** from loosest to tightest: `? :`, `||`, `&&`, `|`, `^`, `&`, `== !=`, `< <= > >=`, `<< >> >>>` (`>>>` shifts in zeros), `+ -`, `* / %`, and `-` and `!` in front. A comparison gives 1 or 0.
+- **`if`** with `else if` and `else`, and **`repeat name from a to b { }`**, which runs with `name` from `a` up to `b − 1`.
+- Words in `"quotes"` are text to show. Statements need no separators.
+
+### What a scene knows
+
+| Name | Meaning |
+| --- | --- |
+| `x`, `y`, `width`, `height` | The area below the header: 320 × 146 from y 24 held sideways, 170 wide upright |
+| `playing`, `paused`, `scrubbing`, `volume_shown` | 1 when true |
+| `tick` | Tenths of a second into the track; it moves only while playing |
+| `now` | Milliseconds since the player started |
+| `shown`, `duration` | Where the track is (the seek target while seeking) and how long it is, in milliseconds |
+| `volume` | 0 to 32 |
+| `badge` | The skip, play or pause mark to show: `none`, `play`, `pause`, `next` or `previous` |
+| `shuffle_mode`, `repeat_mode` | 0 when off, then the player's shuffle and repeat modes in Settings order |
+| `track` | The track's place in the queue |
+| `has_cover` | 1 when the track has a cover; on Home, when there is album art to show |
+
+### Functions
+
+| Function | Gives |
+| --- | --- |
+| `min(a, b)`, `max(a, b)`, `abs(a)` | The smaller, the larger, the size |
+| `sin(angle)`, `cos(angle)` | −255 to 255, for an angle of 0 to 255 per turn |
+| `isqrt(a)` | The whole square root |
+| `progress(w)` | How much of `w` the track has played, 0 to `w` |
+| `volume_width(w)` | How much of `w` the volume fills |
+| `present(text)` | 1 when that text is there, such as `present(lyric)` |
+| `width(text, font)` | How wide that text is, in pixels |
+| `segments(digit)` | The seven-segment pattern of a digit, for `digit()` |
+| `items()` | On Home, how many menu items there are; 0 on Now Playing |
+| `selected()` | On Home, which item is highlighted, from 0 |
+| `item(n)` | Menu item `n`, to show with `text()` or `line()`: `line(item(selected()), title, ...)` |
+
+### Drawing
+
+Places and sizes are pixels on the screen. `ring` takes sixteenths of a pixel for its smooth edges (`x * 16 + 8` is the middle of pixel `x`), and so does the width of a `spoke`.
+
+| Command | Draws |
+| --- | --- |
+| `rect(x, y, w, h, colour)` | A filled box |
+| `rounded(x, y, w, h, radius, colour)` | A box with rounded corners |
+| `ring(x16, y16, outer16, inner16, colour)` | A disc, or a ring when `inner16` is above 0 |
+| `spoke(x, y, angle, width16, from, to, colour)` | A bar turned to `angle` around (`x`, `y`), from `from` to `to` pixels out |
+| `trapezoid(x, y, w, h, inset, colour)` | A box narrowing by `inset` on each side toward the bottom |
+| `gradient(x, y, w, h, top, bottom)` | A box shading from `top` to `bottom` |
+| `lattice(x, y, w, h, pitch, colour)` | Grid lines every `pitch` pixels |
+| `segment_style(w, h, thickness, lean, lit, unlit)`, `digit(x, y, segments)`, `colon(x, y, lit)` | Seven-segment digits, as on an LCD |
+| `clip(x, y, w, h)`, `unclip()` | Draw only inside a box until `unclip()`, up to 4 deep |
+| `cover(x, y, size)` | The cover, square |
+| `round_cover(x, y, radius)` | The cover cut to a circle around (`x`, `y`) |
+| `icon(kind, x, y, w, h, colour)` | `play`, `pause`, `next` or `previous` |
+| `bar(x, y, w, h, track, fill, hot)` | The progress bar; it shows the volume while that changes, in `hot` |
+| `outline(x, y, w, h, colour)` | A one-pixel frame |
+| `backdrop(x, y, w, h)` | The theme's wallpaper, or its background colour when it has none |
+| `reflect(x, y, size, rows)` | A fading reflection of the cover drawn at (`x`, `y`), `rows` tall, below it |
+| `menu(x, y, w, h)` | On Home, the menu as a list, in the theme's rows, selected row and arrows |
+
+On Home, the cover is the album art Home shows: the album playing, or a different album every few seconds. Song, artist and album are the track playing, and empty when nothing is.
+
+Text takes what to show: `song`, `artist`, `album`, `lyric`, `codec`, `stream` (such as "24-bit · 96 kHz"), `detail` (the bit rate and the track's place), `modes`, `feedback` (the seek hint or "Volume 20"), `elapsed`, `remaining`, or your own words in quotes. It also takes a font (`title`, `body` or `small`) and, where it says `align`, one of `left`, `center` or `right`:
+
+| Command | Draws |
+| --- | --- |
+| `text(what, font, x, y, w, h, align, colour)` | The text, cut to fit the box |
+| `line(what, font, x, y, w, h, align, colour)` | The text, scrolling while playing when it is wider than the box |
+| `plain(what, font, x, y, w, h, colour)` | The text from the box's left edge |
+| `times(font, x, y, w, h, left, right)` | The time played at the left of the box and the time left at the right |
+| `format(font, x, y, w, h, align, colour)` | The codec in a box, then the stream |
+| `codec(font, x, y, w, h, colour)` | The codec in a box |
+
+A scene can't run away: it stops after 20,000 steps, a mistake in a file stops only that scene, and a scene the player can't read leaves Now Playing as Standard.
 
 ### `[fonts.title]`, `[fonts.body]` and `[fonts.small]`
 
@@ -337,9 +501,9 @@ For a gradient, the ink is measured against the end it reads worse on. A warning
 
 **In the gallery.** Open a pull request that adds one file, `themes/<file>.toml`:
 
-- Name the file with 1 to 23 of `a-z`, `0-9`, `-` and `_`, and not `dark` or `ember`.
+- Name the file with 1 to 23 of `a-z`, `0-9`, `-` and `_`, and not the name of a file in `assets/themes`.
 - Give it a `name`, an `author` and a `description`.
-- A picture the theme names for its wallpaper goes in `themes` beside it, as a PNG, and a font file as a TTF or OTF with its licence.
+- A picture the theme names for its wallpaper goes in `themes` beside it, as a PNG, a font file as a TTF or OTF with its licence, and a scene script as `<file>.scene`.
 - It must pack and pass the readability checks:
 
   ```sh

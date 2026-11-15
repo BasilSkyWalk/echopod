@@ -61,7 +61,7 @@ PREVIEW_EXPORT(preview_add_file)
 void preview_add_file(const char *path, const uint8_t *bytes, uint32_t size);
 PREVIEW_EXPORT(preview_add_face)
 void preview_add_face(int face, const uint8_t *bytes, uint32_t size);
-PREVIEW_EXPORT(preview_start) void preview_start(int orientation, int face);
+PREVIEW_EXPORT(preview_start) void preview_start(int orientation, int face, int accent);
 PREVIEW_EXPORT(preview_step) void preview_step(uint32_t elapsed_ms);
 PREVIEW_EXPORT(preview_key) void preview_key(int key, int pressed);
 PREVIEW_EXPORT(preview_theme) int preview_theme(const uint8_t *bytes, uint32_t size);
@@ -109,11 +109,14 @@ static void wear_theme(void)
     }
 }
 
-void preview_start(int orientation, int face)
+void preview_start(int orientation, int face, int accent)
 {
     Settings settings = settings_defaults();
     settings.orientation = (Orientation)orientation;
-    settings.options[OPTION_NOW_PLAYING_FACE] = (uint8_t)face;
+    (void)face;
+    settings.options[OPTION_ACCENT] = (uint8_t)accent;
+    settings.screen_timeout = SCREEN_TIMEOUT_OPTION_COUNT - 1;
+    settings.auto_off = 0;
     settings_encode(&settings, settings_bytes);
     fake_hal_reset();
     fake_hal_set_battery(

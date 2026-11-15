@@ -263,28 +263,42 @@ static void wear_theme_file(Theme *theme, Theme *stage)
     if (package != NULL) {
         wear_fonts(&theme->fonts);
         wear_fonts(&stage->fonts);
-        theme->colors = &package->colors;
-        theme->boxes = &package->boxes;
         theme->icons = theme_store_icons();
         theme->wallpaper = theme_store_wallpaper(theme_is_portrait(theme));
         theme->layout = &package->layouts[theme_is_portrait(theme) ? THEME_WALLPAPER_PORTRAIT
                                                                    : THEME_WALLPAPER_LANDSCAPE];
-        theme->selection = (ThemeSelection)package->selection;
         wear_spacing(&theme->metrics, package->spacing);
     }
+}
+
+static void adopt_face_theme(void)
+{
+    uint8_t *options = app.settings.settings.options;
+    uint8_t face = options[OPTION_NOW_PLAYING_FACE];
+    if (face == NP_FACE_STANDARD) {
+        return;
+    }
+    if (face < NP_FACE_COUNT) {
+        options[OPTION_THEME] = (uint8_t)(THEME_CASSETTE + face - NP_FACE_CASSETTE);
+    }
+    options[OPTION_NOW_PLAYING_FACE] = NP_FACE_STANDARD;
+    (void)settings_store_save(&app.settings);
 }
 
 static void apply_orientation(void)
 {
     const Settings *settings = &app.settings.settings;
     Orientation orientation = settings->orientation;
+    theme_store_follow(settings->options[OPTION_THEME]);
     app.shown_theme = theme_key(settings);
     bool portrait = orientation != ORIENTATION_LANDSCAPE;
-    ThemeChoice choice = {.theme = settings->options[OPTION_THEME],
-                          .accent = settings->options[OPTION_ACCENT],
+    ThemeChoice choice = {.accent = settings->options[OPTION_ACCENT],
                           .flat = settings->options[OPTION_HIGHLIGHT] != 0};
-    app.theme = default_theme_styled(portrait, choice, &app.colors);
-    app.stage_theme = default_theme_stage(portrait, choice, &app.colors);
+    const ThemePackage *package = theme_store_package();
+    app.theme = default_theme_for(portrait);
+    app.stage_theme = app.theme;
+    default_theme_dress(&app.theme, package, choice, &app.colors);
+    default_theme_stage(&app.stage_theme, package, choice, &app.colors);
     if (settings->options[OPTION_STATUS_BAR] == STATUS_BAR_LARGE) {
         default_theme_enlarge_status(&app.theme);
         default_theme_enlarge_status(&app.stage_theme);
@@ -298,6 +312,7 @@ static void follow_orientation(void)
 {
     if (theme_key(&app.settings.settings) != app.shown_theme) {
         apply_orientation();
+        app.frame_stable = false;
     }
     if (theme_store_tend_assets()) {
         app.frame_stable = false;
@@ -700,7 +715,8 @@ __attribute__((noinline)) static Theme dressed_theme(const Screen *screen)
     Theme theme = *current_theme();
     const ThemeColors *face = screen == &app.screens.now_playing.screen
                                   ? now_playing_face_colors(&app.screens.now_playing)
-                                  : NULL;
+                              : screen == &app.screens.home.screen ? now_playing_home_colors()
+                                                                   : NULL;
     if (face != NULL) {
         theme.colors = face;
     }
@@ -1006,7 +1022,8 @@ ECHO_STARTUP_CODE static void start_up(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
-    theme_store_start();
+    adopt_face_theme();
+    theme_store_start(app.settings.settings.options[OPTION_THEME]);
     hal_power_confirm_start(app.settings.settings.options[OPTION_POWER_ON] == POWER_ON_HOLD);
     clock_store_start(&app.clock, &app.settings.settings, now_ms);
     app.history.clock = &app.clock.clock;

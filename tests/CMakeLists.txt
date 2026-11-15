@@ -8,7 +8,8 @@ function(echo_add_unit_test)
     if(WIN32)
         target_sources(${TEST_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/cmake/windows_utf8.rc)
     endif()
-    target_link_libraries(${TEST_NAME} PRIVATE echo_check echo_options ${TEST_LIBRARIES})
+    target_link_libraries(${TEST_NAME} PRIVATE echo_check echo_options echo_builtin_themes
+        ${TEST_LIBRARIES})
     target_include_directories(${TEST_NAME} PRIVATE ${TEST_PRIVATE_INCLUDES})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
@@ -128,7 +129,7 @@ echo_add_unit_test(NAME test_theme_package
     LIBRARIES echo_ui_fixtures
 )
 target_compile_definitions(test_theme_package PRIVATE
-    ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+    ECHO_THEME_PACKS="${PROJECT_SOURCE_DIR}/src/themes/packs")
 
 foreach(ui_test theme theme_layout backdrop box list_view list_navigation fast_scroll header menu_screen message_screen
         choice_screen toast status_bar)
@@ -140,7 +141,8 @@ endforeach()
 
 add_library(echo_np_faces_fixtures STATIC np_faces/np_faces_test.c)
 target_include_directories(echo_np_faces_fixtures PUBLIC np_faces)
-target_link_libraries(echo_np_faces_fixtures PUBLIC echo_np_faces echo_ui_fixtures PRIVATE echo_options)
+target_link_libraries(echo_np_faces_fixtures PUBLIC echo_np_faces echo_ui_fixtures echo_builtin_themes
+    PRIVATE echo_options)
 
 foreach(np_faces_test np_faces face_cassette face_vu face_turntable face_lcd)
     echo_add_unit_test(NAME test_${np_faces_test}
@@ -151,6 +153,10 @@ endforeach()
 echo_add_unit_test(NAME test_face_contrast
     SOURCES np_faces/test_face_contrast.c
     LIBRARIES echo_np_faces_fixtures echo_fonts m
+)
+echo_add_unit_test(NAME test_scene
+    SOURCES np_faces/test_scene.c
+    LIBRARIES echo_np_faces_fixtures
 )
 echo_add_unit_test(NAME test_face_shapes
     SOURCES np_faces/test_face_shapes.c
@@ -166,7 +172,8 @@ echo_add_unit_test(NAME test_app
     LIBRARIES echo_app echo_library_fixtures m
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
-target_compile_definitions(test_app PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+target_compile_definitions(test_app PRIVATE ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    ECHO_THEME_PACKS="${PROJECT_SOURCE_DIR}/src/themes/packs")
 echo_add_unit_test(NAME test_release_diagnostics
     SOURCES app/test_release_diagnostics.c ${PROJECT_SOURCE_DIR}/src/app/diagnostics_menu_release.c
         app/fake_hal.c
@@ -285,7 +292,7 @@ echo_add_unit_test(NAME test_settings_screens
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
 target_compile_definitions(test_settings_screens PRIVATE
-    ECHO_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+    ECHO_THEME_PACKS="${PROJECT_SOURCE_DIR}/src/themes/packs")
 echo_add_unit_test(NAME test_folders_screen
     SOURCES app/test_folders_screen.c app/fake_hal.c
     LIBRARIES echo_app echo_library_scan
@@ -536,11 +543,11 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
             --output ${PROJECT_SOURCE_DIR}/src/lang/packs
             --check
     )
-    add_test(NAME theme_fixtures_up_to_date
+    add_test(NAME theme_packs_up_to_date
         COMMAND ${ECHO_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/theme_pack.py
             --themes ${PROJECT_SOURCE_DIR}/assets/themes
             --definitions ${PROJECT_SOURCE_DIR}/src/ui/include/ui
-            --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/themes
+            --output ${PROJECT_SOURCE_DIR}/src/themes/packs
             --check
     )
     add_test(NAME cover_fixture_up_to_date

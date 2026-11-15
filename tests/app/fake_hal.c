@@ -14,6 +14,7 @@
 #include "hal/time.h"
 #include "library/library_scan.h"
 #include "np_faces/now_playing_face.h"
+#include "themes/builtin_themes.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -159,6 +160,8 @@ typedef struct FakeHal {
     int opens[FILE_CAPACITY];
     int open_file_limit;
     bool np_faces_missing;
+    bool builtin_themes_missing;
+    bool scene_memory_missing;
     bool startup_missing;
     int startup_loads;
     int startup_releases;
@@ -168,6 +171,7 @@ static FakeHal fake;
 static uint32_t theme_memory[FAKE_THEME_MEMORY_WORDS];
 static uint32_t asset_memory[HAL_THEME_ASSET_BYTES / sizeof(uint32_t)];
 static uint32_t asset_wipes;
+static uint32_t scene_wipes;
 
 void fake_hal_reset(void)
 {
@@ -1227,6 +1231,27 @@ void *hal_system_theme_memory(uint32_t *size)
     return theme_memory;
 }
 
+void fake_hal_set_builtin_themes(bool present)
+{
+    fake.builtin_themes_missing = !present;
+}
+
+uint32_t hal_system_builtin_theme_size(uint32_t theme)
+{
+    bool held = !fake.builtin_themes_missing && theme < BUILTIN_THEME_COUNT;
+    return held ? BUILTIN_THEMES[theme].size : 0;
+}
+
+bool hal_system_builtin_theme_read(uint32_t theme, uint32_t offset, void *target, uint32_t length)
+{
+    uint32_t size = hal_system_builtin_theme_size(theme);
+    if (offset > size || length > size - offset) {
+        return false;
+    }
+    memcpy(target, BUILTIN_THEMES[theme].bytes + offset, length);
+    return true;
+}
+
 void *hal_system_theme_assets(uint32_t *size)
 {
     *size = sizeof asset_memory;
@@ -1236,6 +1261,31 @@ void *hal_system_theme_assets(uint32_t *size)
 uint32_t hal_system_theme_asset_wipes(void)
 {
     return asset_wipes;
+}
+
+void *hal_system_scene_memory(uint32_t *size)
+{
+    static uint32_t memory[HAL_SCENE_MEMORY_BYTES / sizeof(uint32_t)];
+    *size = fake.scene_memory_missing ? 0 : sizeof memory;
+    return fake.scene_memory_missing ? NULL : memory;
+}
+
+uint32_t hal_system_scene_wipes(void)
+{
+    return scene_wipes;
+}
+
+void fake_hal_wipe_scene_memory(void)
+{
+    uint32_t size = 0;
+    uint8_t *memory = hal_system_scene_memory(&size);
+    memset(memory, 0, size);
+    scene_wipes++;
+}
+
+void fake_hal_set_scene_memory(bool present)
+{
+    fake.scene_memory_missing = !present;
 }
 
 void fake_hal_wipe_theme_assets(void)

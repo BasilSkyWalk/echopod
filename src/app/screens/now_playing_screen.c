@@ -10,6 +10,7 @@
 #include "hal/storage.h"
 #include "hal/system.h"
 #include "settings/settings.h"
+#include "theme_store.h"
 #include "ui/backdrop.h"
 #include "ui/box.h"
 #include "ui/header.h"
@@ -955,24 +956,29 @@ static void draw_nothing_playing(const Theme *theme, Canvas *canvas)
     label_draw(canvas, style, (Label){.area = area, .text = message});
 }
 
-static uint8_t face_of(const NowPlayingScreen *now_playing)
-{
-    return now_playing->config.options[OPTION_NOW_PLAYING_FACE];
-}
-
 static const NowPlayingFaces *face_code(const NowPlayingScreen *now_playing)
 {
-    if (now_playing->config.options == NULL || !now_playing->status.has_track ||
-        face_of(now_playing) == NP_FACE_STANDARD || face_of(now_playing) >= NP_FACE_COUNT) {
+    if (!now_playing->status.has_track || !theme_store_has_scene(THEME_SCENE_NOW_PLAYING)) {
         return NULL;
     }
     return hal_system_load_faces();
 }
 
-const ThemeColors *now_playing_face_colors(const NowPlayingScreen *now_playing)
+static const NowPlayingFaces *scene_of(const NowPlayingScreen *now_playing, SceneCode *scene,
+                                       const ThemeColors **chrome)
 {
     const NowPlayingFaces *faces = face_code(now_playing);
-    return faces != NULL ? faces->chrome[face_of(now_playing)] : NULL;
+    *chrome = NULL;
+    *scene = (SceneCode){0};
+    return faces != NULL && theme_store_scene(THEME_SCENE_NOW_PLAYING, scene, chrome) ? faces
+                                                                                      : NULL;
+}
+
+const ThemeColors *now_playing_face_colors(const NowPlayingScreen *now_playing)
+{
+    SceneCode scene;
+    const ThemeColors *chrome = NULL;
+    return scene_of(now_playing, &scene, &chrome) != NULL ? chrome : NULL;
 }
 
 static NowPlayingFeedback badge_of(const NowPlayingScreen *now_playing)
@@ -1002,7 +1008,6 @@ static void frame_state(const NowPlayingScreen *now_playing, NowPlayingFrame *fr
     frame->shown_ms = shown_position(now_playing);
     frame->tick = now_playing->status.position_ms / NP_FACE_TICK_MS;
     frame->feedback = badge_of(now_playing);
-    frame->face = face_of(now_playing);
     frame->playing = now_playing->status.state == PLAYER_PLAYING;
     frame->scrubbing = now_playing->scrubbing;
     frame->volume_shown = showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME);
@@ -1022,6 +1027,7 @@ static void frame_of(const NowPlayingScreen *now_playing, NowPlayingFrame *frame
     frame_state(now_playing, frame);
     frame->cover = (Image){0};
     current_cover(now_playing, &frame->cover);
+    frame->menu = NULL;
     face_texts(now_playing, frame, texts);
 }
 
@@ -1033,25 +1039,77 @@ static void request_tick(const NowPlayingScreen *now_playing)
     }
 }
 
+static void home_frame(const NowPlayingScreen *now_playing, const NowPlayingHome *home,
+                       NowPlayingFrame *frame)
+{
+    frame->menu = home->menu;
+    frame->cover = home->cover;
+    if (!now_playing->status.has_track) {
+        frame->song = NULL;
+        frame->artist = NULL;
+        frame->album = NULL;
+    }
+}
+
 static void draw_face(const NowPlayingScreen *now_playing, const NowPlayingFaces *faces,
-                      Canvas *canvas)
+                      SceneCode scene, const ThemeColors *chrome, Canvas *canvas,
+                      const NowPlayingHome *home)
 {
     char texts[FACE_TEXTS_CAPACITY];
     Theme dressed = *now_playing->config.theme;
-    dressed.colors = faces->chrome[face_of(now_playing)];
-    header_draw(canvas, &dressed, now_playing->screen.title);
+    dressed.colors = chrome != NULL ? chrome : dressed.colors;
+    header_draw(canvas, &dressed, home != NULL ? home->title : now_playing->screen.title);
     NowPlayingFrame frame;
     frame_of(now_playing, &frame, texts);
+    frame.scene = scene;
+    if (home != NULL) {
+        home_frame(now_playing, home, &frame);
+    }
     request_tick(now_playing);
     faces->draw(&frame, canvas);
+}
+
+void now_playing_follow(NowPlayingScreen *now_playing, uint32_t now_ms)
+{
+    refresh(now_playing, now_ms);
+}
+
+static const NowPlayingFaces *home_scene(SceneCode *scene, const ThemeColors **chrome)
+{
+    const NowPlayingFaces *faces =
+        theme_store_has_scene(THEME_SCENE_HOME) ? hal_system_load_faces() : NULL;
+    *chrome = NULL;
+    return faces != NULL && theme_store_scene(THEME_SCENE_HOME, scene, chrome) ? faces : NULL;
+}
+
+bool now_playing_draw_home(const NowPlayingScreen *now_playing, const NowPlayingHome *home,
+                           Canvas *canvas)
+{
+    SceneCode scene;
+    const ThemeColors *chrome;
+    const NowPlayingFaces *faces = home_scene(&scene, &chrome);
+    if (faces == NULL) {
+        return false;
+    }
+    draw_face(now_playing, faces, scene, chrome, canvas, home);
+    return true;
+}
+
+const ThemeColors *now_playing_home_colors(void)
+{
+    SceneCode scene;
+    const ThemeColors *chrome;
+    return home_scene(&scene, &chrome) != NULL ? chrome : NULL;
 }
 
 static void draw(void *context, Canvas *canvas)
 {
     const NowPlayingScreen *now_playing = context;
-    const NowPlayingFaces *faces = face_code(now_playing);
+    SceneCode scene;
+    const ThemeColors *chrome;
+    const NowPlayingFaces *faces = scene_of(now_playing, &scene, &chrome);
     if (faces != NULL) {
-        draw_face(now_playing, faces, canvas);
+        draw_face(now_playing, faces, scene, chrome, canvas, NULL);
         return;
     }
     const Theme *theme = now_playing->config.theme;

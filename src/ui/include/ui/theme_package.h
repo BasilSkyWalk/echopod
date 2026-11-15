@@ -19,6 +19,19 @@ enum {
     THEME_PACKAGE_ICON_ENTRY_BYTES = 4,
     THEME_PACKAGE_ASSETS_FIELD = 48,
     THEME_PACKAGE_LAYOUTS_FIELD = 49,
+    THEME_PACKAGE_ACCENTS_FIELD = 51,
+    THEME_PACKAGE_FLAGS_FIELD = 52,
+    THEME_PACKAGE_FLAGS_HEADER_BYTES = 56,
+    THEME_PACKAGE_ACCENT_BYTES = 20,
+    THEME_PACKAGE_MOST_ACCENTS = 8,
+    THEME_ACCENT_NAME_BYTES = 13,
+    THEME_ACCENT_NAME_FIELD = 7,
+    THEME_ACCENT_CUSTOM = 0xFF,
+    THEME_FLAG_DARK_COVER_FLOW = 1,
+    THEME_FLAG_NO_HOME_ART = 2,
+    THEME_SCENE_MOST_BYTES = 6144,
+    THEME_SCENE_CHROME = 1,
+    THEME_SCENE_CHROME_BYTES = 2 * THEME_COLOR_COUNT,
     THEME_PACKAGE_LAYOUT_BOX_BYTES = 8,
     THEME_LAYOUT_REACH = 320,
     THEME_LAYOUT_MOST_COVER = 170,
@@ -41,8 +54,16 @@ typedef enum ThemeWallpaperKind {
 
 enum {
     THEME_ASSET_FIRST_FONT = THEME_WALLPAPER_COUNT,
-    THEME_ASSET_KINDS = THEME_ASSET_FIRST_FONT + THEME_FONT_COUNT
+    THEME_ASSET_SCENE = THEME_ASSET_FIRST_FONT + THEME_FONT_COUNT,
+    THEME_ASSET_KINDS = THEME_ASSET_SCENE + 1,
+    THEME_ASSET_HOME_SCENE = 8
 };
+
+typedef enum ThemeSceneId {
+    THEME_SCENE_NOW_PLAYING,
+    THEME_SCENE_HOME,
+    THEME_SCENE_COUNT
+} ThemeSceneId;
 
 typedef struct ThemePackageFont {
     uint32_t offset;
@@ -66,6 +87,21 @@ typedef struct ThemePackageIcon {
     uint8_t height;
 } ThemePackageIcon;
 
+typedef struct ThemePackageScene {
+    uint32_t offset;
+    uint32_t checksum;
+    uint16_t code_bytes;
+    uint16_t string_bytes;
+    uint8_t flags;
+} ThemePackageScene;
+
+typedef struct ThemeAccent {
+    Color background;
+    Color top;
+    Color shine;
+    uint8_t name;
+} ThemeAccent;
+
 typedef struct ThemePackage {
     ThemeColors colors;
     ThemeBoxes boxes;
@@ -76,6 +112,12 @@ typedef struct ThemePackage {
     ThemePackageWallpaper wallpapers[THEME_WALLPAPER_COUNT];
     ThemePackageFont fonts[THEME_FONT_COUNT];
     ThemeLayout layouts[THEME_WALLPAPER_COUNT];
+    ThemePackageScene scene;
+    ThemePackageScene home_scene;
+    ThemeAccent accents[THEME_PACKAGE_MOST_ACCENTS];
+    uint16_t accents_at;
+    uint8_t accent_count;
+    uint8_t flags;
 } ThemePackage;
 
 enum {

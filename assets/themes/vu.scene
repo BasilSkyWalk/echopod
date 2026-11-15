@@ -1,0 +1,131 @@
+const PLATE = #201c18
+const BEZEL = #080808
+const FACE_TOP = #f8ecc0
+const FACE_BOTTOM = #f0c878
+const INK = #281c10
+const RED = #a01810
+const CREAM = #f0e8d8
+const MUTED = #a89880
+const AMBER = #f8a830
+const TRACK = #484038
+
+let land = width > height
+let n0 = 0
+let n1 = 0
+if playing {
+    repeat ch from 0 to 2 {
+        let sum = 7680 + 11 * sin(tick * (ch == 0 ? 3 : 4) + (ch == 0 ? 0 : 96))
+        sum = sum + 7 * sin(tick * (ch == 0 ? 7 : 6) + (ch == 0 ? 64 : 160))
+        sum = sum + 3 * sin(tick * (ch == 0 ? 17 : 13) + (ch == 0 ? 0 : 48))
+        let t = tick + 29 * ch
+        let kick = ((t >>> 1) % 53 * 2 + (t & 1)) % 53 < 2 ? 10 : 0
+        let v = min(sum / 256 + kick, 62)
+        if ch == 0 {
+            n0 = v
+        } else {
+            n1 = v
+        }
+    }
+}
+
+rect(x, y, width, height, PLATE)
+
+repeat d from 0 to (land ? 2 : 1) {
+    let ox = land ? (d == 0 ? 10 : 164) : 12
+    let oy = land ? 28 : y + 31
+    let px = ox + 73
+    let py = oy + 112
+    let cx = px * 16 + 8
+    let cy = py * 16 + 8
+    rounded(ox, oy, 146, 72, 4, BEZEL)
+    gradient(ox + 3, oy + 3, 140, 54, FACE_TOP, FACE_BOTTOM)
+    clip(ox + 3, oy + 3, 140, 54)
+    clip(px - 48, oy, 74, 72)
+    ring(cx, cy, 1408, 1376, INK)
+    unclip()
+    clip(px + 26, oy, 28, 72)
+    ring(cx, cy, 1456, 1376, RED)
+    unclip()
+
+    spoke(px, py, 233, 20, 88, 93, INK)
+    let w = width("20", small)
+    plain("20", small, px - 53 - w / 2, py - 91, w, 15, INK)
+    spoke(px, py, 243, 20, 88, 93, INK)
+    w = width("10", small)
+    plain("10", small, px - 31 - w / 2, py - 102, w, 15, INK)
+    spoke(px, py, 247, 20, 88, 91, INK)
+    spoke(px, py, 250, 20, 88, 93, INK)
+    w = width("5", small)
+    plain("5", small, px - 15 - w / 2, py - 106, w, 15, INK)
+    spoke(px, py, 0, 20, 88, 93, INK)
+    w = width("3", small)
+    plain("3", small, px - w / 2, py - 107, w, 15, INK)
+    spoke(px, py, 3, 20, 88, 91, INK)
+    spoke(px, py, 7, 20, 88, 91, INK)
+    spoke(px, py, 12, 20, 88, 93, INK)
+    w = width("0", small)
+    plain("0", small, px + 29 - w / 2, py - 103, w, 15, INK)
+    spoke(px, py, 17, 20, 88, 91, RED)
+    spoke(px, py, 21, 20, 88, 91, RED)
+    spoke(px, py, 25, 20, 88, 93, RED)
+    w = width("+3", small)
+    plain("+3", small, px + 58 - w / 2, py - 89, w, 15, RED)
+    line("VU", title, ox + 3, oy + 38, 140, 18, center, INK)
+
+    if land {
+        let value = d == 0 ? n0 : n1
+        unclip()
+        line(d == 0 ? "L" : "R", small, ox + 8, oy + 57, 12, 12, left, MUTED)
+        clip(ox + 3, oy + 3, 140, 54)
+        ring((ox + 131) * 16 + 8, (oy + 49) * 16 + 8, 48, 0, value >= 46 ? AMBER : TRACK)
+        spoke(px, py, (value * 7 / 8 - 28) & 255, 24, 0, 95, INK)
+    } else {
+        line("L", small, ox + 10, oy + 40, 10, 16, left, INK)
+        line("R", small, ox + 126, oy + 40, 10, 16, right, RED)
+        unclip()
+        ring(cx, (oy + 63) * 16 + 8, 48, 0, n0 >= 46 || n1 >= 46 ? AMBER : TRACK)
+        clip(ox + 3, oy + 3, 140, 54)
+        spoke(px, py, (n0 * 7 / 8 - 28) & 255, 24, 0, 95, INK)
+        spoke(px, py, (n1 * 7 / 8 - 28) & 255, 24, 0, 95, RED)
+    }
+    unclip()
+}
+
+if badge != none {
+    let bx = land ? 140 : 65
+    let by = land ? 44 : y + 47
+    rect(bx, by, 40, 40, BEZEL)
+    outline(bx, by, 40, 40, TRACK)
+    icon(badge, bx + 11, by + 11, 18, 18, CREAM)
+}
+
+if land {
+    line(song, title, 10, 102, 300, 20, center, CREAM)
+    if present(feedback) {
+        text(feedback, body, 10, 121, 300, 20, center, CREAM)
+    } else if present(lyric) {
+        line(lyric, body, 10, 121, 300, 20, center, CREAM)
+    } else {
+        line(artist, body, 10, 121, 300, 20, center, MUTED)
+    }
+    bar(84, 154, 170, 3, TRACK, AMBER, CREAM)
+    icon(playing ? play : pause, 66, 150, 10, 10, playing ? AMBER : MUTED)
+    times(small, 10, 147, 300, 16, CREAM, MUTED)
+} else {
+    line(song, title, 10, 174, 150, 22, center, CREAM)
+    line(artist, body, 10, 196, 150, 22, center, MUTED)
+    if present(lyric) {
+        line(lyric, body, 10, 218, 150, 22, center, CREAM)
+    } else {
+        line(album, body, 10, 218, 150, 22, center, MUTED)
+    }
+    if present(feedback) {
+        text(feedback, small, 10, 244, 150, 16, center, CREAM)
+    } else {
+        format(small, 10, 244, 150, 16, center, MUTED)
+    }
+    text(modes, small, 10, 278, 150, 16, center, MUTED)
+    bar(10, 297, 150, 3, TRACK, AMBER, CREAM)
+    icon(playing ? play : pause, 80, 305, 10, 10, playing ? AMBER : MUTED)
+    times(small, 10, 302, 150, 16, CREAM, MUTED)
+}

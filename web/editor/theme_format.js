@@ -1,14 +1,34 @@
+import { SceneError, compileScene } from "./scene_compile.js";
 const MAGIC = [0x45, 0x54, 0x48, 0x4d];
 const VERSION = 1;
 const HEADER_SIZE = 48;
 const CHECKED_FROM = 16;
 const NAME_SIZE = 24;
-const BOX_SIZE = 11;
+const BOX_SIZE = 12;
+export const OPAQUE = 15;
 const MAX_SIZE = 3072;
 const ICON_ENTRY_SIZE = 4;
 const ICON_FIELD = 23;
 export const ICON_MARKS = ".123456789abcdef";
-const ASSET_HEADER_SIZE = 52;
+const LONG_HEADER_SIZE = 52;
+const ASSET_HEADER_SIZE = 56;
+const ACCENT_SIZE = 20;
+const ACCENT_NAME_SIZE = 13;
+const CUSTOM_ACCENT = 0xff;
+const FLAG_DARK_COVER_FLOW = 1;
+const FLAG_NO_HOME_ART = 2;
+export const MOST_ACCENTS = 8;
+const SCENE_KIND = 5;
+const SCENE_SOURCE_KIND = 6;
+const SCENE_DESIGN_KIND = 7;
+const SCENE_CHROME = 1;
+const SCENE_MOST_BYTES = 6144;
+export const SCENES = [
+  { key: "now_playing_scene", title: "Now Playing scene", kinds: [SCENE_KIND, SCENE_SOURCE_KIND, SCENE_DESIGN_KIND] },
+  { key: "home_scene", title: "Home scene", kinds: [8, 9, 10] },
+];
+export const ACCENT_NAMES = ["blue", "red", "orange", "green", "teal", "purple", "pink", "graphite"];
+export const ACCENT_SHADES = ["selection_background", "selection_top", "selection_shine"];
 const ASSET_ENTRY_SIZE = 16;
 export const PALETTE_COLORS = 16;
 export const HEX_DIGITS = "0123456789abcdef";
@@ -23,6 +43,7 @@ export const BOX_NUMBER_FIELDS = [
   "inset_across",
   "inset_down",
   "radius",
+  "see_through",
 ];
 export const EDGES = { top: 1, bottom: 2, left: 4, right: 8 };
 
@@ -144,6 +165,11 @@ export function defaultTheme(schema) {
     layouts: Object.fromEntries(
       schema.layouts.map((key) => [key, Object.fromEntries(schema.layout.map((entry) => [entry.name, null]))]),
     ),
+    accents: (schema.dark.accents ?? []).map((accent) => ({ ...accent })),
+    now_playing_scene: null,
+    home_scene: null,
+    cover_flow: "theme",
+    home_art: true,
   };
 }
 
@@ -197,6 +223,33 @@ function iconSection(theme, schema) {
   return { count, bytes: [...table, ...data] };
 }
 
+function accentBytes(accent) {
+  const name = typeof accent.name === "string" ? accent.name : "";
+  const encoded = new TextEncoder().encode(name);
+  if (encoded.length === 0 || encoded.length >= ACCENT_NAME_SIZE) {
+    throw new ThemeError(`an accent's name needs 1 to ${ACCENT_NAME_SIZE - 1} bytes`);
+  }
+  const bytes = new Uint8Array(ACCENT_SIZE);
+  const view = new DataView(bytes.buffer);
+  ACCENT_SHADES.forEach((key, index) => view.setUint16(2 * index, rgb565(accent[key]), true));
+  const standard = ACCENT_NAMES.indexOf(name.toLowerCase());
+  bytes[6] = standard >= 0 ? standard : CUSTOM_ACCENT;
+  if (standard < 0) {
+    bytes.set(encoded, 7);
+  }
+  return bytes;
+}
+
+function accentSection(theme) {
+  const accents = theme.accents ?? [];
+  if (accents.length > MOST_ACCENTS) {
+    throw new ThemeError(`a theme offers at most ${MOST_ACCENTS} accents`);
+  }
+  const bytes = new Uint8Array(ACCENT_SIZE * accents.length);
+  accents.forEach((accent, index) => bytes.set(accentBytes(accent), ACCENT_SIZE * index));
+  return { count: accents.length, bytes };
+}
+
 function nameBytes(name) {
   const encoded = new TextEncoder().encode(name);
   if (encoded.length === 0 || encoded.length >= NAME_SIZE) {
@@ -215,7 +268,7 @@ function boxBytes(box, schema) {
     }
     return id;
   });
-  return [...ids, ...BOX_NUMBER_FIELDS.map((field) => box[field] & 0xff)];
+  return [...ids, ...BOX_NUMBER_FIELDS.map((field) => (box[field] ?? 0) & 0xff)];
 }
 
 function spacingBytes(theme, schema) {
@@ -368,6 +421,59 @@ function fontAssets(theme, schema) {
     .map(([entry, index, font]) => fontAsset(font, entry, FIRST_FONT_KIND + index));
 }
 
+function oneScene(theme, schema, { key, title, kinds }) {
+  const scene = theme[key];
+  if (!scene || typeof scene.script !== "string") {
+    return [];
+  }
+  let compiled;
+  try {
+    compiled = compileScene(scene.script, schema.scene);
+  } catch (error) {
+    if (error instanceof SceneError) {
+      throw new ThemeError(`${title}: ${error.message}`);
+    }
+    throw error;
+  }
+  const [codeKind, sourceKind, designKind] = kinds;
+  const chrome = scene.chrome && Object.keys(scene.chrome).length > 0 ? scene.chrome : null;
+  const shades = chrome ? schema.colors.map((name) => rgb565(chrome[name] ?? theme.colors[name])) : [];
+  const size = 2 * shades.length + compiled.code.length + compiled.strings.length;
+  const bytes = new Uint8Array(size);
+  const view = new DataView(bytes.buffer);
+  shades.forEach((shade, index) => view.setUint16(2 * index, shade, true));
+  bytes.set(compiled.code, 2 * shades.length);
+  bytes.set(compiled.strings, 2 * shades.length + compiled.code.length);
+  const [code, strings] = [compiled.code.length, compiled.strings.length];
+  const head = [codeKind, chrome ? SCENE_CHROME : 0, code & 0xff, code >> 8, strings & 0xff, strings >> 8, 0, 0];
+  const source = new TextEncoder().encode(scene.script);
+  const found = [
+    { head, bytes, memory: 0 },
+    { head: [sourceKind, 0, 0, 0, 0, 0, 0, 0], bytes: source, memory: 0 },
+  ];
+  if (typeof scene.design === "string") {
+    found.push({ head: [designKind, 0, 0, 0, 0, 0, 0, 0], bytes: new TextEncoder().encode(scene.design), memory: 0 });
+  }
+  return found;
+}
+
+export function sceneBytes(theme, schema) {
+  return SCENES.flatMap((scene) => oneScene(theme, schema, scene))
+    .filter((asset) => SCENES.some((scene) => scene.kinds[0] === asset.head[0]))
+    .reduce((sum, asset) => sum + Math.ceil(asset.bytes.length / 4) * 4, 0);
+}
+
+function sceneAssets(theme, schema) {
+  const found = SCENES.flatMap((scene) => oneScene(theme, schema, scene));
+  const sections = found.filter((asset) => SCENES.some((scene) => scene.kinds[0] === asset.head[0]));
+  const total = sections.reduce((sum, asset) => sum + Math.ceil(asset.bytes.length / 4) * 4, 0);
+  if (total > SCENE_MOST_BYTES) {
+    const what = sections.length === 1 ? "the scene is" : "the Now Playing and Home designs together are";
+    throw new ThemeError(`${what} ${total.toLocaleString("en")} bytes; at most ${SCENE_MOST_BYTES.toLocaleString("en")}`);
+  }
+  return found;
+}
+
 function checkMemory(walls, fonts, schema) {
   const needed = fonts.reduce((sum, font) => sum + font.memory, 0) + Math.max(0, ...walls.map((wall) => wall.memory));
   if (needed > schema.asset_memory) {
@@ -439,8 +545,31 @@ function placeFrom(view, at, entry) {
   return entry.name === "cover" ? { x, y, size: width } : { x, y, width, height, align: ALIGNS[align] };
 }
 
+function unpackAccents(bytes, view, at, theme) {
+  const header = view.getUint16(6, true);
+  const count = header >= LONG_HEADER_SIZE ? bytes[51] : 0;
+  if (at + ACCENT_SIZE * count > bytes.length) {
+    throw new ThemeError("the theme file is cut short");
+  }
+  theme.accents = [];
+  for (let index = 0; index < Math.min(count, MOST_ACCENTS); index++) {
+    const field = at + ACCENT_SIZE * index;
+    const text = new TextDecoder().decode(bytes.subarray(field + 7, field + 7 + ACCENT_NAME_SIZE));
+    const standard = ACCENT_NAMES[bytes[field + 6]];
+    const name = standard ? standard[0].toUpperCase() + standard.slice(1) : text.replace(/\0.*$/s, "");
+    const accent = { name };
+    ACCENT_SHADES.forEach((key, shade) => {
+      accent[key] = hexColor(view.getUint16(field + 2 * shade, true));
+    });
+    theme.accents.push(accent);
+  }
+  theme.cover_flow = header >= ASSET_HEADER_SIZE && (bytes[52] & FLAG_DARK_COVER_FLOW) ? "dark" : "theme";
+  theme.home_art = !(header >= ASSET_HEADER_SIZE && (bytes[52] & FLAG_NO_HOME_ART));
+  return ACCENT_SIZE * count;
+}
+
 function unpackLayouts(bytes, view, at, theme, schema) {
-  const counts = view.getUint16(6, true) >= ASSET_HEADER_SIZE ? [bytes[49], bytes[50]] : [0, 0];
+  const counts = view.getUint16(6, true) >= LONG_HEADER_SIZE ? [bytes[49], bytes[50]] : [0, 0];
   let offset = at;
   schema.layouts.forEach((key, side) => {
     schema.layout.slice(0, counts[side]).forEach((entry, index) => {
@@ -473,7 +602,7 @@ function putHeader(bytes, counts) {
   view.setUint16(18, counts.boxes, true);
   bytes.set([BOX_SIZE, counts.selection, counts.spaces, counts.icons], 20);
   if (counts.header === ASSET_HEADER_SIZE) {
-    bytes.set([counts.walls, counts.wide, counts.tall], HEADER_SIZE);
+    bytes.set([counts.walls, counts.wide, counts.tall, counts.accents, counts.flags], HEADER_SIZE);
   }
 }
 
@@ -487,10 +616,14 @@ export function pack(theme, schema) {
   const walls = wallpaperSections(theme, schema);
   const fonts = fontAssets(theme, schema);
   checkMemory(walls, fonts, schema);
-  const assets = [...walls, ...fonts];
+  const assets = [...walls, ...fonts, ...sceneAssets(theme, schema)];
   const [wide, tall] = schema.layouts.map((key) => layoutBytes(theme, schema, key));
-  const header = assets.length > 0 || wide.length + tall.length > 0 ? ASSET_HEADER_SIZE : HEADER_SIZE;
-  const tables = 2 * schema.colors.length + BOX_SIZE * schema.boxes.length + spaces.length + wide.length + tall.length;
+  const accents = accentSection(theme);
+  const flags = (theme.cover_flow === "dark" ? FLAG_DARK_COVER_FLOW : 0) | (theme.home_art === false ? FLAG_NO_HOME_ART : 0);
+  const long = assets.length > 0 || wide.length + tall.length > 0 || accents.count > 0 || flags !== 0;
+  const header = long ? ASSET_HEADER_SIZE : HEADER_SIZE;
+  const tables = 2 * schema.colors.length + BOX_SIZE * schema.boxes.length + spaces.length + wide.length +
+    tall.length + accents.bytes.length;
   const core = header + tables + ASSET_ENTRY_SIZE * assets.length + icons.bytes.length;
   if (core > MAX_SIZE) {
     throw new ThemeError(`${core} bytes; a theme may be at most ${MAX_SIZE}`);
@@ -508,6 +641,8 @@ export function pack(theme, schema) {
     walls: assets.length,
     wide: wide.length / LAYOUT_BOX_SIZE,
     tall: tall.length / LAYOUT_BOX_SIZE,
+    accents: accents.count,
+    flags,
   });
   bytes.set(nameBytes(theme.name), 24);
   let offset = header;
@@ -519,7 +654,8 @@ export function pack(theme, schema) {
     bytes.set(boxBytes(theme.boxes[name], schema), offset);
     offset += BOX_SIZE;
   }
-  const parts = [spaces, wide, tall, assetTable(assets, core), icons.bytes, ...assets.map((asset) => asset.bytes)];
+  const parts = [spaces, wide, tall, accents.bytes, assetTable(assets, core), icons.bytes,
+    ...assets.map((asset) => asset.bytes)];
   for (const part of parts) {
     bytes.set(part, offset);
     offset += part.length;
@@ -651,10 +787,44 @@ function unpackFont(bytes, view, field, theme, schema) {
   }
 }
 
+function sectionEnd(bytes, view, tableAt, count, at) {
+  let end = bytes.length;
+  for (let index = 0; index < count; index++) {
+    const offset = view.getUint32(tableAt + ASSET_ENTRY_SIZE * index + 8, true);
+    end = offset > at && offset < end ? offset : end;
+  }
+  return end;
+}
+
+function sceneOf(kind) {
+  return SCENES.find((scene) => scene.kinds.includes(kind)) ?? null;
+}
+
+function unpackScene(bytes, view, field, theme, schema, end) {
+  const at = view.getUint32(field + 8, true);
+  const { key, kinds } = sceneOf(bytes[field]);
+  const scene = theme[key] ?? { script: null, chrome: null };
+  if (bytes[field] === kinds[1]) {
+    scene.script = new TextDecoder().decode(bytes.subarray(at, end));
+  } else if (bytes[field] === kinds[2]) {
+    scene.design = new TextDecoder().decode(bytes.subarray(at, end));
+  } else if (bytes[field + 1] & SCENE_CHROME) {
+    scene.chrome = Object.fromEntries(
+      schema.colors.map((name, index) => [name, hexColor(view.getUint16(at + 2 * index, true))]),
+    );
+  }
+  theme[key] = scene;
+}
+
 function unpackWallpapers(bytes, view, tableAt, theme, schema) {
-  const count = view.getUint16(6, true) >= ASSET_HEADER_SIZE ? bytes[HEADER_SIZE] : 0;
+  const count = view.getUint16(6, true) >= LONG_HEADER_SIZE ? bytes[HEADER_SIZE] : 0;
   for (let index = 0; index < count; index++) {
     const field = tableAt + ASSET_ENTRY_SIZE * index;
+    if (sceneOf(bytes[field])) {
+      const end = sectionEnd(bytes, view, tableAt, count, view.getUint32(field + 8, true));
+      unpackScene(bytes, view, field, theme, schema, end);
+      continue;
+    }
     if (bytes[field] >= FIRST_FONT_KIND) {
       unpackFont(bytes, view, field, theme, schema);
       continue;
@@ -698,9 +868,23 @@ export function unpack(bytes, schema) {
   });
   theme.selection = schema.boxes[bytes[21]] ?? schema.dark.selection;
   const layoutsAt = spacingAt + bytes[22];
-  const wallsAt = layoutsAt + unpackLayouts(bytes, view, layoutsAt, theme, schema);
+  const accentsAt = layoutsAt + unpackLayouts(bytes, view, layoutsAt, theme, schema);
+  const wallsAt = accentsAt + unpackAccents(bytes, view, accentsAt, theme);
   unpackIcons(bytes, wallsAt + unpackWallpapers(bytes, view, wallsAt, theme, schema), theme, schema);
+  for (const { key } of SCENES) {
+    if (theme[key] && typeof theme[key].script !== "string") {
+      theme[key] = null;
+    }
+  }
   return theme;
+}
+
+export function opacityPercent(seeThrough) {
+  return Math.round(((OPAQUE - seeThrough) * 100) / OPAQUE);
+}
+
+export function seeThroughOf(percent) {
+  return OPAQUE - Math.floor((percent * OPAQUE + 50) / 100);
 }
 
 function tomlBox(box) {
@@ -724,11 +908,21 @@ function tomlBox(box) {
   if (box.radius > 0) {
     lines.push(`radius = ${box.radius}`);
   }
+  if (box.see_through > 0) {
+    lines.push(`opacity = ${opacityPercent(box.see_through)}`);
+  }
   return lines.join("\n");
 }
 
 export function toToml(theme, schema) {
-  const parts = [`name = ${JSON.stringify(theme.name)}`, `selection = "${theme.selection}"`, ""];
+  const parts = [`name = ${JSON.stringify(theme.name)}`, `selection = "${theme.selection}"`];
+  if (theme.home_art === false) {
+    parts.push("home_art = false");
+  }
+  if (theme.cover_flow === "dark") {
+    parts.push('cover_flow = "dark"');
+  }
+  parts.push("");
   const spacing = schema.spacing.filter((entry) => theme.spacing[entry.name] !== null);
   if (spacing.length > 0) {
     parts.push("[spacing]", ...spacing.map((entry) => `${entry.name} = ${theme.spacing[entry.name]}`), "");
@@ -757,6 +951,26 @@ export function toToml(theme, schema) {
       parts.push(`    { char = ${JSON.stringify(glyph.char)}, ${where}, rows = [${rows}] },`);
     }
     parts.push("]", "");
+  }
+  for (const { key } of SCENES) {
+    const scene = theme[key];
+    if (!scene || typeof scene.script !== "string") {
+      continue;
+    }
+    const script = scene.script.includes("'''") ? JSON.stringify(scene.script) : `'''
+${scene.script}'''`;
+    parts.push(`[${key}]`, `script = ${script}`, "");
+    if (typeof scene.design === "string") {
+      parts.splice(parts.length - 1, 0, `design = ${JSON.stringify(scene.design)}`);
+    }
+    if (scene.chrome) {
+      parts.push(`[${key}.chrome]`,
+        ...schema.colors.map((name) => `${name} = "${scene.chrome[name]}"`), "");
+    }
+  }
+  for (const accent of theme.accents ?? []) {
+    parts.push("[[accents]]", `name = ${JSON.stringify(accent.name)}`,
+      ...ACCENT_SHADES.map((key) => `${key} = "${accent[key]}"`), "");
   }
   const icons = schema.icons.filter((entry) => theme.icons?.[entry.name]);
   if (icons.length > 0) {

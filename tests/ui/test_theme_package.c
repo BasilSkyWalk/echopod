@@ -61,7 +61,7 @@ static Built fixture(const char *name)
 {
     Built built = {0};
     char path[512];
-    snprintf(path, sizeof path, "%s/themes/%s", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/%s", ECHO_THEME_PACKS, name);
     FILE *file = fopen(path, "rb");
     if (file != NULL) {
         built.size = (uint32_t)fread(built.bytes, 1, sizeof built.bytes, file);
@@ -257,6 +257,26 @@ static void spacing_that_passes_the_end_of_the_file_is_refused(void)
     built.size += 1;
     seal(&built);
     CHECK(!decodes(&built));
+}
+
+static void a_box_brings_how_see_through_it_is(void)
+{
+    Built built = built_with(0, 1, sizeof(BoxStyle));
+    built.bytes[THEME_PACKAGE_HEADER_BYTES + 11] = 9;
+    seal(&built);
+    ThemePackage package = defaults();
+    CHECK(theme_package_decode(built.bytes, built.size, &package));
+    CHECK_EQUAL(9, package.boxes.selection.see_through);
+}
+
+static void a_box_more_than_fully_see_through_is_ignored(void)
+{
+    Built built = built_with(0, 1, sizeof(BoxStyle));
+    built.bytes[THEME_PACKAGE_HEADER_BYTES + 11] = COLOR_ALPHA_OPAQUE + 1;
+    seal(&built);
+    ThemePackage package = defaults();
+    CHECK(theme_package_decode(built.bytes, built.size, &package));
+    CHECK_EQUAL(0, package.boxes.selection.see_through);
 }
 
 static void a_box_brings_its_corner_radius(void)
@@ -493,6 +513,47 @@ static void the_packed_sample_brings_a_small_wallpaper_to_repeat(void)
     CHECK_EQUAL(22, package.icons[THEME_ICON_BATTERY].width);
 }
 
+static Built built_with_scene(uint8_t kind, uint16_t code_bytes)
+{
+    Built built = built_with_wallpapers();
+    uint8_t *field = built.bytes + WALL_TABLE + THEME_PACKAGE_ASSET_ENTRY_BYTES;
+    field[0] = kind;
+    field[1] = 0;
+    put_u16(field, 2, code_bytes);
+    put_u16(field, 4, 12);
+    put_u32(field, 8, WALL_CORE + 8);
+    put_u32(field, 12, 0xA5A5A5A5u);
+    seal_core(&built, WALL_CORE);
+    return built;
+}
+
+static void a_file_brings_a_home_scene_beside_now_playing(void)
+{
+    Built built = built_with_scene(THEME_ASSET_HOME_SCENE, 40);
+    ThemePackage package = defaults();
+    CHECK(theme_package_decode(built.bytes, built.size, &package));
+    CHECK_EQUAL(40, package.home_scene.code_bytes);
+    CHECK_EQUAL(12, package.home_scene.string_bytes);
+    CHECK_EQUAL(WALL_CORE + 8, package.home_scene.offset);
+    CHECK_EQUAL(0xA5A5A5A5u, package.home_scene.checksum);
+    CHECK_EQUAL(0, package.scene.code_bytes);
+    Built playing = built_with_scene(THEME_ASSET_SCENE, 40);
+    CHECK(theme_package_decode(playing.bytes, playing.size, &package));
+    CHECK_EQUAL(40, package.scene.code_bytes);
+    CHECK_EQUAL(0, package.home_scene.code_bytes);
+}
+
+static void a_home_scene_too_big_or_empty_is_left_out(void)
+{
+    const uint16_t sizes[] = {0, THEME_SCENE_MOST_BYTES};
+    for (uint32_t index = 0; index < 2; index++) {
+        Built built = built_with_scene(THEME_ASSET_HOME_SCENE, sizes[index]);
+        ThemePackage package = defaults();
+        CHECK(theme_package_decode(built.bytes, built.size, &package));
+        CHECK_EQUAL(0, package.home_scene.code_bytes);
+    }
+}
+
 typedef struct FontEntry {
     uint8_t kind;
     uint8_t ascent;
@@ -659,6 +720,93 @@ static void a_file_without_places_leaves_every_place_to_the_player(void)
     }
 }
 
+enum {
+    ACCENTS_AT = THEME_PACKAGE_FLAGS_HEADER_BYTES,
+    RED_NAME = 1
+};
+
+static Built built_with_accents(uint8_t count, uint32_t room, uint8_t flags)
+{
+    Built built = built_with(0, 0, BOX_BYTES);
+    put_u16(built.bytes, 6, THEME_PACKAGE_FLAGS_HEADER_BYTES);
+    built.bytes[THEME_PACKAGE_ACCENTS_FIELD] = count;
+    built.bytes[THEME_PACKAGE_FLAGS_FIELD] = flags;
+    built.size = ACCENTS_AT + room * THEME_PACKAGE_ACCENT_BYTES;
+    for (uint32_t index = 0; index < room; index++) {
+        uint8_t *entry = built.bytes + ACCENTS_AT + index * THEME_PACKAGE_ACCENT_BYTES;
+        put_u16(entry, 0, 0x1000 + index);
+        put_u16(entry, 2, 0x2000 + index);
+        put_u16(entry, 4, 0x3000 + index);
+        entry[6] = index == 0 ? RED_NAME : THEME_ACCENT_CUSTOM;
+        memcpy(entry + THEME_ACCENT_NAME_FIELD, "Ruby", 5);
+    }
+    seal(&built);
+    return built;
+}
+
+static void a_file_offers_its_accents_each_with_three_shades_and_a_name(void)
+{
+    Built built = built_with_accents(2, 2, 0);
+    ThemePackage package = defaults();
+    CHECK(theme_package_decode(built.bytes, built.size, &package));
+    CHECK_EQUAL(2, package.accent_count);
+    CHECK_EQUAL(ACCENTS_AT, package.accents_at);
+    CHECK_EQUAL(0x1001, package.accents[1].background);
+    CHECK_EQUAL(0x2001, package.accents[1].top);
+    CHECK_EQUAL(0x3001, package.accents[1].shine);
+    CHECK_EQUAL(RED_NAME, package.accents[0].name);
+    CHECK_EQUAL(THEME_ACCENT_CUSTOM, package.accents[1].name);
+    CHECK_EQUAL(0, package.flags);
+}
+
+static void accents_past_the_eighth_are_left_out(void)
+{
+    Built built = built_with_accents(10, 10, 0);
+    ThemePackage package = defaults();
+    CHECK(theme_package_decode(built.bytes, built.size, &package));
+    CHECK_EQUAL(THEME_PACKAGE_MOST_ACCENTS, package.accent_count);
+}
+
+static void accents_that_pass_the_end_of_the_file_are_refused(void)
+{
+    Built built = built_with_accents(3, 2, 0);
+    ThemePackage package = defaults();
+    CHECK(!theme_package_decode(built.bytes, built.size, &package));
+}
+
+static void a_file_can_ask_for_a_dark_cover_flow(void)
+{
+    Built built = built_with_accents(0, 0, THEME_FLAG_DARK_COVER_FLOW);
+    ThemePackage package = defaults();
+    CHECK(theme_package_decode(built.bytes, built.size, &package));
+    CHECK_EQUAL(THEME_FLAG_DARK_COVER_FLOW, package.flags);
+    CHECK_EQUAL(0, package.accent_count);
+    Built older = built_with_places(1, 0);
+    older.bytes[THEME_PACKAGE_FLAGS_FIELD] = THEME_FLAG_DARK_COVER_FLOW;
+    seal(&older);
+    CHECK(theme_package_decode(older.bytes, older.size, &package));
+    CHECK_EQUAL(0, package.flags);
+}
+
+static void the_packed_built_in_themes_bring_their_accents_and_cover_flow(void)
+{
+    ThemePackage package = defaults();
+    Built dark = fixture("dark.echotheme");
+    CHECK(theme_package_decode(dark.bytes, dark.size, &package));
+    CHECK_EQUAL(8, package.accent_count);
+    CHECK_EQUAL(0, package.flags);
+    CHECK_EQUAL(package.colors.selection_background, package.accents[0].background);
+    CHECK_EQUAL(7, package.accents[7].name);
+    Built light = fixture("light.echotheme");
+    CHECK(theme_package_decode(light.bytes, light.size, &package));
+    CHECK_EQUAL(8, package.accent_count);
+    CHECK_EQUAL(THEME_FLAG_DARK_COVER_FLOW, package.flags);
+    Built fjord = fixture("fjord.echotheme");
+    CHECK(theme_package_decode(fjord.bytes, fjord.size, &package));
+    CHECK_EQUAL(0, package.accent_count);
+    CHECK_EQUAL(0, package.flags);
+}
+
 static void a_file_bigger_than_a_theme_may_be_is_refused(void)
 {
     Built big = built_with(THEME_COLOR_COUNT, THEME_BOX_COUNT, BOX_BYTES);
@@ -684,6 +832,8 @@ int main(void)
         TEST_CASE(the_ends_of_a_spacing_range_are_inside_it),
         TEST_CASE(spacing_that_passes_the_end_of_the_file_is_refused),
         TEST_CASE(a_box_brings_its_corner_radius),
+        TEST_CASE(a_box_brings_how_see_through_it_is),
+        TEST_CASE(a_box_more_than_fully_see_through_is_ignored),
         TEST_CASE(a_file_brings_icons_with_their_sizes_and_where_their_levels_lie),
         TEST_CASE(a_file_without_icons_clears_the_ones_a_package_held),
         TEST_CASE(an_icon_too_big_for_its_place_or_past_the_end_is_left_out),
@@ -697,12 +847,19 @@ int main(void)
         TEST_CASE(a_file_with_the_short_header_has_no_wallpapers),
         TEST_CASE(the_packed_sample_brings_a_small_wallpaper_to_repeat),
         TEST_CASE(a_file_says_where_its_fonts_lie_and_how_they_measure),
+        TEST_CASE(a_file_brings_a_home_scene_beside_now_playing),
+        TEST_CASE(a_home_scene_too_big_or_empty_is_left_out),
         TEST_CASE(a_font_too_tall_for_its_text_or_misshapen_is_left_out),
         TEST_CASE(a_file_without_fonts_clears_the_ones_a_package_held),
         TEST_CASE(a_file_places_now_playing_for_each_way_the_screen_is_held),
         TEST_CASE(a_place_out_of_reach_or_oddly_aligned_is_left_to_the_player),
         TEST_CASE(places_that_pass_the_end_of_the_file_are_refused),
         TEST_CASE(a_file_without_places_leaves_every_place_to_the_player),
+        TEST_CASE(a_file_offers_its_accents_each_with_three_shades_and_a_name),
+        TEST_CASE(accents_past_the_eighth_are_left_out),
+        TEST_CASE(accents_that_pass_the_end_of_the_file_are_refused),
+        TEST_CASE(a_file_can_ask_for_a_dark_cover_flow),
+        TEST_CASE(the_packed_built_in_themes_bring_their_accents_and_cover_flow),
         TEST_CASE(a_file_bigger_than_a_theme_may_be_is_refused),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
