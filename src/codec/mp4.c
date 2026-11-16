@@ -235,13 +235,28 @@ static bool read_audio_config(Mp4Track *track)
     if (object == AOT_ESCAPE) {
         object = AOT_ESCAPE_BASE + config_read(&bits, 6);
     }
+    uint32_t rate_index = config_read(&bits, 4);
+    bits.position -= 4;
     track->sample_rate = config_rate(&bits);
     track->channels = (uint8_t)config_read(&bits, 4);
     track->frame_samples = AAC_FRAME_SAMPLES;
     if (object == AOT_SBR || object == AOT_PS) {
-        track->sample_rate = config_rate(&bits);
-    } else if (config_read(&bits, 1) != 0) {
+        config_rate(&bits);
+        object = config_read(&bits, 5);
+        if (rate_index >= RATE_INDEXES) {
+            object = 0;
+        }
+    }
+    if (config_read(&bits, 1) != 0) {
         track->frame_samples = AAC_SHORT_FRAME_SAMPLES;
+    }
+    if (track->config[0] >> 3 == AOT_SBR || track->config[0] >> 3 == AOT_PS) {
+        uint32_t short_frames = track->frame_samples == AAC_SHORT_FRAME_SAMPLES ? 1 : 0;
+        uint32_t plain =
+            2u << 11 | rate_index << 7 | (uint32_t)track->channels << 3 | short_frames << 2;
+        track->config[0] = (uint8_t)(plain >> 8);
+        track->config[1] = (uint8_t)plain;
+        track->config_bytes = 2;
     }
     track->object_type = (uint8_t)object;
     track->bits_per_sample = 0;

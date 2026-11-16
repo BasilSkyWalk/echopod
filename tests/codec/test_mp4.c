@@ -443,6 +443,29 @@ static void aac_tracks_report_their_config(void)
     free(file.bytes);
 }
 
+static void explicit_he_aac_plays_as_its_lc_core(void)
+{
+    static const uint8_t PLAIN[] = {0x05, 0x80, 0x80, 0x80, 0x05, 0x12, 0x10};
+    static const uint8_t EXPLICIT[] = {0x2B, 0x92, 0x08, 0x00, 0x00};
+    Buffer file = load_fixture("aac.m4a");
+    uint32_t at = 0;
+    while (at + sizeof PLAIN <= file.size && memcmp(file.bytes + at, PLAIN, sizeof PLAIN) != 0) {
+        at++;
+    }
+    CHECK(at + sizeof PLAIN <= file.size);
+    memcpy(file.bytes + at + 5, EXPLICIT, sizeof EXPLICIT);
+    Mp4Track track;
+    CHECK(mp4_probe(input_of(&file), &track));
+    CHECK_EQUAL(MP4_CODEC_AAC, track.codec);
+    CHECK_EQUAL(22050, track.sample_rate);
+    CHECK_EQUAL(2, track.channels);
+    CHECK_EQUAL(2, track.object_type);
+    CHECK_EQUAL(2, track.config_bytes);
+    CHECK_EQUAL(0x13, track.config[0]);
+    CHECK_EQUAL(0x90, track.config[1]);
+    free(file.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -454,6 +477,7 @@ int main(void)
         TEST_CASE(reads_must_follow_on),
         TEST_CASE(a_file_without_sound_is_refused),
         TEST_CASE(aac_tracks_report_their_config),
+        TEST_CASE(explicit_he_aac_plays_as_its_lc_core),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
