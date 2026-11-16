@@ -14,7 +14,7 @@ BOX_FIELDS = ("fill_top", "fill_bottom", "border", "shine", "ink", "border_width
 COLOR_FIELDS = 5
 PAGE_FILES = ("index.html", "style.css", "editor.js", "theme_format.js", "preview_host.js",
               "icon_editor.js", "wallpaper_editor.js", "font_editor.js",
-              "accent_editor.js", "now_playing_designer.js", "face_parts.js", "scene_compile.js",
+              "accent_editor.js", "drawing.js", "drawings.js", "drawing_editor.js", "scene_compile.js",
               "gallery.html",
               "gallery.js")
 MODULE = "echo_preview.wasm"

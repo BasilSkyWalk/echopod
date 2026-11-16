@@ -3,7 +3,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from "./icon_editor.js";
 import { coveredCodes } from "./font_editor.js";
-import { defaultDesign, designFromScript, designScript, isPart, newLayer, readDesign, LAYER_TYPES } from "./now_playing_designer.js";
+import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawing.js";
+import { STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
 import {
@@ -75,48 +76,105 @@ assert.match(creditedToml, /^description = "Blue and calm"$/m);
 assert.doesNotMatch(toToml(defaultTheme(schema), schema), /^(author|description) =/m);
 
 const homeTheme = defaultTheme(schema);
-for (const style of ["list", "tiles", "focus"]) {
-  const design = defaultDesign("home");
-  design.layers[0].style = style;
-  design.layers.push(newLayer("text", "home"));
-  const script = designScript(design, homeTheme);
-  assert.match(script, /^backdrop\(x, y, width, height\)/, `${style} starts with the wallpaper`);
-  assert.match(script, style === "list" ? /menu\(x \+ 0, y \+ 0, 176, 146\)/ : /item\(/, `${style} draws the menu`);
-  assert.match(script, /item\(selected\(\)\)/, `${style} names the highlighted item`);
-  compileScene(script, schema.scene);
-  homeTheme.home_scene = { script, chrome: null, design: JSON.stringify(design) };
-  const homeBytes = pack(homeTheme, schema);
-  const reopened = unpack(homeBytes, schema);
-  assert.equal(reopened.home_scene.script, script);
-  assert.equal(reopened.home_scene.design, JSON.stringify(design));
-  assert.equal(reopened.now_playing_scene, null);
-  assert.deepEqual(Array.from(pack(reopened, schema)), Array.from(homeBytes));
-  assert.match(toToml(homeTheme, schema), /\[home_scene\]/);
+const SCENE_ROOM = 6144;
+const sceneSize = (drawing) => {
+  const built = compileScene(drawingScript(drawing, homeTheme), schema.scene);
+  return built.code.length + built.strings.length;
+};
+for (const screen of ["home", "playing"]) {
+  for (const [name] of STARTS[screen]) {
+    const drawing = startDrawing(name, screen);
+    const script = drawingScript(drawing, homeTheme);
+    compileScene(script, schema.scene);
+    assert.ok(sceneSize(drawing) < SCENE_ROOM - 1200, `${screen} ${name} leaves room to add to it`);
+    const key = screen === "home" ? "home_scene" : "now_playing_scene";
+    const worn = { ...homeTheme, [key]: { script, chrome: null, design: JSON.stringify(drawing) } };
+    const bytes = pack(worn, schema);
+    const back = unpack(bytes, schema);
+    assert.equal(back[key].script, script);
+    assert.equal(readDrawing(back[key].design).elements.length, drawing.elements.length);
+    assert.deepEqual(Array.from(pack(back, schema)), Array.from(bytes), `${screen} ${name} repacks`);
+  }
 }
+const plainHome = drawingScript(startDrawing("standard", "home"), homeTheme);
+assert.match(plainHome, /^backdrop\(x, y, width, height\)$/m, "Home starts on the wallpaper, written once for both ways");
+assert.match(plainHome, /menu\(x, y, 176, 146\)/);
+assert.match(plainHome, /reflect\(/);
 for (const face of ["vu", "cassette", "turntable", "lcd"]) {
   const worn = unpack(new Uint8Array(readFileSync(join(site, "themes", `${face}.echotheme`))), schema);
-  const script = worn.now_playing_scene.script;
-  const consts = Object.fromEntries([...script.matchAll(/^const ([A-Z][A-Z0-9_]*) = (#[0-9a-fA-F]{6})/gm)].map((found) => [found[1], found[2]]));
-  const design = designFromScript(script, consts);
-  assert.ok(design && design.layers.length > 5, `${face} becomes a design`);
-  worn.now_playing_scene = { script: designScript(design, worn), chrome: worn.now_playing_scene.chrome, design: JSON.stringify(design) };
-  const repacked = pack(worn, schema);
-  assert.deepEqual(Array.from(pack(unpack(repacked, schema), schema)), Array.from(repacked), `${face} design repacks`);
+  const consts = Object.fromEntries([...worn.now_playing_scene.script.matchAll(/^const ([A-Z][A-Z0-9_]*) = (#[0-9a-fA-F]{6})/gm)].map((found) => [found[1], found[2]]));
+  const drawing = startDrawing(face, "playing", consts);
+  assert.ok(drawing.elements.length > 3, `${face} becomes a drawing`);
+  assert.ok(JSON.stringify(drawing).includes(Object.values(consts)[1]), `${face} keeps the face's colours`);
 }
-assert.equal(designFromScript(["const SPACE = #000000", "rect(x, y, 1, 1, SPACE)"].join(String.fromCharCode(10)), { SPACE: "#000000" }), null);
-for (const type of Object.keys(LAYER_TYPES)) {
-  const design = { version: 1, background: { style: "solid", color: "@background" }, layers: [newLayer(type, "playing")] };
-  compileScene(designScript(design, homeTheme), schema.scene);
+for (const kind of Object.keys(KINDS)) {
+  compileScene(drawingScript({ version: 2, screen: "home", elements: [newElement(kind, "home")] }, homeTheme), schema.scene);
 }
-const meter = newLayer("vu", "playing");
-const meterOnce = designScript({ version: 1, background: { style: "solid", color: "@background" }, layers: [meter] }, homeTheme);
-assert.equal(meterOnce.match(/rounded\(ox, oy, 146, 72/g).length, 1, "a part placed alike both ways is written once");
-assert.match(meterOnce, /let at_x = width > height \? x \+ \d+ : x \+ \d+/);
-meter.tallChannel = "both";
-const meterTwice = designScript({ version: 1, background: { style: "solid", color: "@background" }, layers: [meter] }, homeTheme);
-assert.equal(meterTwice.match(/rounded\(ox, oy, 146, 72/g).length, 2, "a part drawn differently each way is written twice");
-const coverOnly = defaultDesign("home");
-assert.match(designScript(coverOnly, homeTheme), /reflect\(x \+ 192, y \+ 8, 112, 26\)/);
+const at = (x, y, w, h) => ({ x, y, w, h });
+const box = element("box", at(10, 20, 30, 4), at(10, 20, 30, 4), { color: "#ff0000" });
+assert.equal(drawingScript({ version: 2, elements: [box] }, homeTheme).trim(), "rect(x + 10, y + 20, 30, 4, #ff0000)", "a part placed alike both ways is written once");
+const moved = element("box", at(10, 20, 30, 4), at(12, 50, 30, 4), { color: "#ff0000" });
+assert.match(drawingScript({ version: 2, elements: [moved] }, homeTheme), /^if width > height \{\n {4}rect\(x \+ 10, y \+ 20, 30, 4, #ff0000\)\n\} else \{\n {4}rect\(x \+ 12, y \+ 50/);
+const filled = element("box", at(0, 0, 200, 3), at(0, 0, 150, 3), { bind: { w: { source: "progress", from: 0, to: 100 } } });
+const filledScript = drawingScript({ version: 2, elements: [filled] }, homeTheme);
+assert.match(filledScript, /rect\(x, y, \(200 \* progress\(1000\) \/ 1000\), 3/, "a width that follows the song fills its own width");
+assert.match(filledScript, /\(150 \* progress\(1000\) \/ 1000\)/);
+const needle = element("line", at(50, 60, 40, 0), at(50, 60, 40, 0), { angle: -45, bind: { angle: { source: "left", from: -45, to: 45 } } });
+assert.match(drawingScript({ version: 2, elements: [needle] }, homeTheme), /^let level_l = 0$/m, "a needle that follows the left level measures it");
+const ring = element("group", at(0, 0, 40, 40), at(0, 0, 40, 40), { repeat: { count: 8, columns: 1, dx: 0, dy: 0, turn: 45, start: 0, spin: 0 }, children: [
+  element("box", at(19, 0, 2, 6), at(19, 0, 2, 6), { color: "#00ff00", bind: { color: { when: { on: "lit", source: "progress" }, color: "#ffffff" } } }),
+] });
+const ringScript = drawingScript({ version: 2, elements: [ring] }, homeTheme);
+assert.match(ringScript, /repeat copy_1 from 0 to 8/);
+assert.match(ringScript, /let lit_1_progress = progress\(1000\) \* 8 \/ 1000\n *repeat copy_1/, "the song's position is read once, before the copies");
+assert.match(ringScript, /copy_1 < lit_1_progress/, "a copy lights while the song has passed it");
+assert.match(ringScript, /let turn_1 = \(copy_1 \* 32000 \/ 1000\) & 255/);
+const spokes = element("group", at(0, 0, 40, 40), at(0, 0, 40, 40), { repeat: { count: 12, columns: 1, dx: 0, dy: 0, turn: 30, start: 0, spin: 0 }, children: [
+  element("line", at(20, 20, 6, 0), at(20, 20, 6, 0), { start: 12 }),
+] });
+const spokesScript = drawingScript({ version: 2, elements: [spokes] }, homeTheme);
+assert.doesNotMatch(spokesScript, /cos|sin/, "a line turning about the middle doesn't move its pivot");
+assert.match(spokesScript, /spoke\(x \+ 20, y \+ 20, turn_1, 32, 12, 18, /);
+const tiles = element("group", at(0, 0, 200, 100), null, { repeat: { count: "items", columns: 2, dx: 100, dy: 40, turn: 0, start: 0, spin: 0 }, children: [
+  element("text", at(0, 0, 90, 30), null, { source: "item", color: "#ffffff", bind: { color: { when: { on: "highlighted" }, color: "#000000" } } }),
+] });
+const tilesScript = drawingScript({ version: 2, screen: "home", elements: [tiles] }, homeTheme);
+assert.match(tilesScript, /item\(copy_1\)/);
+assert.match(tilesScript, /copy_1 == chosen_1/);
+assert.match(tilesScript, /^if width > height \{/m, "a part drawn only sideways stays sideways");
+const bars = element("group", at(0, 0, 50, 40), at(0, 0, 50, 40), { repeat: { count: 5, columns: 5, dx: 9, dy: 0, turn: 0, start: 0, spin: 0 }, children: [
+  element("group", at(0, 35, 7, 3), at(0, 35, 7, 3), { repeat: { count: 8, columns: 1, dx: 0, dy: -5, turn: 0, start: 0, spin: 0 }, children: [
+    element("box", at(0, 0, 7, 3), at(0, 0, 7, 3), { color: "#333333", bind: { color: { when: { on: "lit", source: "beat" }, color: "#ffffff" } } }),
+  ] }),
+] });
+const barsScript = drawingScript({ version: 2, elements: [bars] }, homeTheme);
+assert.equal(barsScript.match(/let beat_/g).length, 1, "bars inside bars share the outer beat");
+assert.match(barsScript, /copy_2 < \(beat_copy_1 \* 125\) \* 8 \/ 1000/);
+compileScene(barsScript, schema.scene);
+const hidden = { ...box, hidden: true };
+assert.equal(drawingScript({ version: 2, elements: [hidden] }, homeTheme).trim(), "");
+assert.equal(readDrawing("not json"), null);
+assert.equal(readDrawing(JSON.stringify({ version: 1, layers: [] })), null);
+const older = {
+  version: 1,
+  background: { style: "gradient", top: "@header_background", bottom: "#102030" },
+  layers: [
+    { id: 1, type: "cover", frames: { wide: at(10, 8, 112, 112), tall: at(29, 8, 112, 112) }, shape: "square" },
+    { id: 2, type: "text", frames: { wide: at(132, 8, 180, 22), tall: at(8, 128, 154, 22) }, source: "song", size: "large", color: "@text", feedback: true },
+    { id: 3, type: "progress", style: "ring", frames: { wide: at(10, 8, 112, 112), tall: at(29, 8, 112, 112) }, color: "@text", track: "@divider" },
+    { id: 4, type: "vu", frames: { wide: at(170, 40, 146, 72), tall: null }, channel: "right", colours: { ink: "#112233" } },
+    { id: 5, type: "levels", frames: { wide: at(170, 120, 60, 20), tall: at(10, 200, 80, 30) } },
+    { id: 6, type: "cassette", frames: { wide: null, tall: at(8, 160, 153, 100) } },
+  ],
+};
+const converted = drawingFrom(JSON.stringify(older), "playing");
+assert.equal(converted.version, 2);
+assert.equal(converted.elements[0].fill, "gradient", "the old background becomes a box");
+assert.ok(converted.elements.some((item) => item.name === "Messages"), "the old seek and volume spot becomes its own text");
+assert.ok(converted.elements.some((item) => item.name === "VU meter" && item.at.tall === null), "an old part becomes a group");
+assert.ok(JSON.stringify(converted).includes("#112233"), "an old part keeps its colours");
+assert.ok(sceneSize(converted) < SCENE_ROOM);
+assert.deepEqual(fromDesign(older, "playing").elements.length, converted.elements.length);
 
 assert.equal(checksum(new Uint8Array([])), 0x811c9dc5);
 assert.equal(checksum(new TextEncoder().encode("a")), 0xe40c292c);
@@ -355,22 +413,6 @@ assert.ok(tapeToml.includes("[now_playing_scene.chrome]"));
 const broken = { ...tape, now_playing_scene: { script: "rect(1, 2)", chrome: null } };
 assert.throws(() => pack(broken, schema), /Now Playing scene: line 1: rect\(\) takes 5 values/);
 assert.equal(unpack(pack({ ...tape, now_playing_scene: null }, schema), schema).now_playing_scene, null);
-
-const designed = defaultDesign();
-for (const type of Object.keys(LAYER_TYPES).filter((name) => !isPart(name))) {
-  designed.layers.push(newLayer(type));
-}
-designed.layers.push({ ...newLayer("progress"), style: "ring" }, { ...newLayer("cover"), shape: "circle", border: 2 });
-designed.layers.push({ ...newLayer("text"), source: "custom", custom: 'Say "hi"' }, { ...newLayer("shape"), kind: "ring" });
-designed.background = { style: "gradient", top: "@header_background", bottom: "#102030" };
-const script = designScript(designed, defaultTheme(schema));
-const built = compileScene(script, schema.scene);
-assert.ok(built.code.length > 100 && built.code.length < 6144, "a designed scene compiles and fits");
-const designedTheme = { ...defaultTheme(schema), now_playing_scene: { script, chrome: null, design: JSON.stringify(designed) } };
-const designedBack = unpack(pack(designedTheme, schema), schema);
-assert.deepEqual(readDesign(designedBack.now_playing_scene.design).layers.length, designed.layers.length);
-assert.equal(designedBack.now_playing_scene.script, script);
-assert.equal(readDesign("not json"), null);
 
 const outline = batteryRows("frame", 22, 10);
 const fill = batteryRows("level", 22, 10);

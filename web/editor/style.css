@@ -746,3 +746,66 @@ details.more summary {
     display: none;
   }
 }
+
+.layers li.elsewhere span {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.color-control.wrap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.stack-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+details.moves {
+  margin-top: 16px;
+}
+
+details.moves summary {
+  cursor: pointer;
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.layers .fold {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0 4px 0 -6px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+}
+
+.layers .fold svg {
+  width: 14px;
+  height: 14px;
+}
+
+.layers.scroller {
+  position: relative;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.swatch {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+}

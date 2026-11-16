@@ -101,170 +101,140 @@ selection_shine = "#9fdcff"
 script = '''
 backdrop(x, y, width, height)
 if width > height {
+    let p0_0 = x + 222
+    let p0_1 = y + 14
+    let p0_2 = x + 214
+    let p0_3 = x + 220
+    let p0_4 = y + 134
     if 1 {
-        let chosen = selected()
-        let first = max(0, chosen / 2 - 2) * 2
-        repeat k from first to min(items(), first + 6) {
-            let spot = k - first
-            let tx = x + 6 + spot % 2 * 102
-            let ty = y + 8 + spot / 2 * 44
-            rounded(tx, ty, 96, 38, 10, k == chosen ? #12806e : #16233f)
-            if k == chosen {
-                line(item(k), small, tx + 4, ty + 11, 88, 16, center, #ffffff)
-            } else {
-                text(item(k), small, tx + 4, ty + 11, 88, 16, center, #eef4ff)
-            }
+        let gx_1 = x + 6
+        let gy_1 = y + 8
+        let chosen_1 = selected()
+        let first_1 = max(0, chosen_1 / 2 - 1) * 2
+        repeat copy_1 from first_1 to min(items(), first_1 + 4) {
+            let cx_1 = gx_1 + (copy_1 - first_1) % 2 * 102
+            let cy_1 = gy_1 + (copy_1 - first_1) / 2 * 44
+            rounded(cx_1, cy_1, 96, 38, 10, (copy_1 == chosen_1 ? #10826b : #102039))
+            line(item(copy_1), small, cx_1 + 4, cy_1, 88, 38, center, (copy_1 == chosen_1 ? #ffffff : #eff7ff))
         }
     }
-    if 1 {
-        rounded(x + 210, y + 8, 104, 130, 12, #0c1428)
+    rounded(x + 210, y + 8, 104, 130, 12, #081429)
+    if has_cover {
+        cover(p0_0, p0_1, 80)
+        reflect(p0_0, p0_1, 80, 10)
+    } else {
+        rect(p0_0, p0_1, 80, 80, #21305a)
     }
-    if 1 {
-        if has_cover {
-            cover(x + 222, y + 14, 80)
-            reflect(x + 222, y + 14, 80, 10)
-        } else {
-            rect(x + 222, y + 14, 80, 80, #25335a)
-        }
-    }
-    if 1 {
-        line(song, small, x + 214, y + 104, 96, 16, center, #eef4ff)
-    }
-    if 1 {
-        line(artist, small, x + 214, y + 118, 96, 14, center, #9fb4d8)
-    }
-    if 1 {
-        bar(x + 220, y + 134, 84, 2, #25335a, #6ff0c4, #6ff0c4)
-    }
+    line(song, small, p0_2, y + 104, 96, 16, center, #eff7ff)
+    line(artist, small, p0_2, y + 118, 96, 14, center, #9cb6de)
+    rect(p0_3, p0_4, 84, 2, #21305a)
+    rect(p0_3, p0_4, (84 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 2, #6bf3c6)
 } else {
+    let p0_0 = x + 49
+    let p0_1 = y + 150
+    let p0_2 = x + 12
+    let p0_3 = x + 20
+    let p0_4 = y + 268
     if 1 {
-        let chosen = selected()
-        let first = max(0, chosen / 2 - 2) * 2
-        repeat k from first to min(items(), first + 6) {
-            let spot = k - first
-            let tx = x + 4 + spot % 2 * 84
-            let ty = y + 8 + spot / 2 * 44
-            rounded(tx, ty, 78, 38, 10, k == chosen ? #12806e : #16233f)
-            if k == chosen {
-                line(item(k), small, tx + 4, ty + 11, 70, 16, center, #ffffff)
-            } else {
-                text(item(k), small, tx + 4, ty + 11, 70, 16, center, #eef4ff)
-            }
+        let gx_1 = x + 4
+        let gy_1 = y + 8
+        let chosen_1 = selected()
+        let first_1 = max(0, chosen_1 / 2 - 1) * 2
+        repeat copy_1 from first_1 to min(items(), first_1 + 4) {
+            let cx_1 = gx_1 + (copy_1 - first_1) % 2 * 84
+            let cy_1 = gy_1 + (copy_1 - first_1) / 2 * 44
+            rounded(cx_1, cy_1, 78, 38, 10, (copy_1 == chosen_1 ? #10826b : #102039))
+            line(item(copy_1), small, cx_1 + 4, cy_1, 70, 38, center, (copy_1 == chosen_1 ? #ffffff : #eff7ff))
         }
     }
-    if 1 {
-        rounded(x + 8, y + 144, 154, 130, 12, #0c1428)
+    rounded(x + 8, y + 144, 154, 130, 12, #081429)
+    if has_cover {
+        cover(p0_0, p0_1, 72)
+        reflect(p0_0, p0_1, 72, 12)
+    } else {
+        rect(p0_0, p0_1, 72, 72, #21305a)
     }
-    if 1 {
-        if has_cover {
-            cover(x + 49, y + 150, 72)
-            reflect(x + 49, y + 150, 72, 12)
-        } else {
-            rect(x + 49, y + 150, 72, 72, #25335a)
-        }
-    }
-    if 1 {
-        line(song, small, x + 12, y + 234, 146, 16, center, #eef4ff)
-    }
-    if 1 {
-        line(artist, small, x + 12, y + 250, 146, 14, center, #9fb4d8)
-    }
-    if 1 {
-        bar(x + 20, y + 268, 130, 2, #25335a, #6ff0c4, #6ff0c4)
-    }
+    line(song, small, p0_2, y + 234, 146, 16, center, #eff7ff)
+    line(artist, small, p0_2, y + 250, 146, 14, center, #9cb6de)
+    rect(p0_3, p0_4, 130, 2, #21305a)
+    rect(p0_3, p0_4, (130 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 2, #6bf3c6)
 }
 '''
-design = "{\"version\":1,\"screen\":\"home\",\"background\":{\"style\":\"wallpaper\",\"color\":\"@background\",\"top\":\"@header_background\",\"bottom\":\"@background\"},\"layers\":[{\"id\":1,\"type\":\"menu\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":6,\"y\":8,\"w\":198,\"h\":130},\"tall\":{\"x\":4,\"y\":8,\"w\":162,\"h\":128}},\"style\":\"tiles\",\"columns\":2,\"tileHeight\":38,\"gap\":6,\"radius\":10,\"size\":\"small\",\"align\":\"center\",\"tile\":\"@header_top\",\"tileSelected\":\"@selection_background\",\"color\":\"@text\",\"colorSelected\":\"@selection_text\",\"boxed\":true},{\"id\":2,\"type\":\"shape\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":210,\"y\":8,\"w\":104,\"h\":130},\"tall\":{\"x\":8,\"y\":144,\"w\":154,\"h\":130}},\"kind\":\"rounded\",\"color\":\"@header_background\",\"radius\":12,\"thickness\":3},{\"id\":3,\"type\":\"cover\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":222,\"y\":14,\"w\":80,\"h\":90},\"tall\":{\"x\":49,\"y\":150,\"w\":72,\"h\":84}},\"shape\":\"square\",\"border\":0,\"borderColor\":\"@divider\",\"placeholder\":\"@divider\",\"reflection\":true},{\"id\":4,\"type\":\"text\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":214,\"y\":104,\"w\":96,\"h\":16},\"tall\":{\"x\":12,\"y\":234,\"w\":146,\"h\":16}},\"source\":\"song\",\"size\":\"small\",\"align\":\"center\",\"tallAlign\":\"center\",\"color\":\"@text\",\"scroll\":true,\"feedback\":false},{\"id\":5,\"type\":\"text\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":214,\"y\":118,\"w\":96,\"h\":14},\"tall\":{\"x\":12,\"y\":250,\"w\":146,\"h\":14}},\"source\":\"artist\",\"size\":\"small\",\"align\":\"center\",\"tallAlign\":\"center\",\"color\":\"@text_secondary\",\"scroll\":true,\"feedback\":false},{\"id\":6,\"type\":\"progress\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":220,\"y\":134,\"w\":84,\"h\":2},\"tall\":{\"x\":20,\"y\":268,\"w\":130,\"h\":2}},\"style\":\"bar\",\"color\":\"@selection_shine\",\"track\":\"@divider\",\"thickness\":3}]}"
-
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":1,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@background\",\"top\":\"@header_background\",\"bottom\":\"@background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":4,\"kind\":\"group\",\"name\":\"Menu tiles\",\"hidden\":false,\"at\":{\"wide\":{\"x\":6,\"y\":8,\"w\":198,\"h\":130},\"tall\":null},\"bind\":{},\"children\":[{\"id\":2,\"kind\":\"box\",\"name\":\"Tile\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":96,\"h\":38},\"tall\":null},\"bind\":{\"color\":{\"when\":{\"on\":\"highlighted\"},\"color\":\"@selection_background\"}},\"fill\":\"solid\",\"color\":\"@header_top\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":10,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":3,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":4,\"y\":0,\"w\":88,\"h\":38,\"align\":\"center\"},\"tall\":null},\"bind\":{\"color\":{\"when\":{\"on\":\"highlighted\"},\"color\":\"@selection_text\"}},\"source\":\"item\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true}],\"clip\":false,\"repeat\":{\"count\":\"items\",\"columns\":2,\"dx\":102,\"dy\":44}},{\"id\":7,\"kind\":\"group\",\"name\":\"Menu tiles\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":4,\"y\":8,\"w\":162,\"h\":128}},\"bind\":{},\"children\":[{\"id\":5,\"kind\":\"box\",\"name\":\"Tile\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":0,\"w\":78,\"h\":38}},\"bind\":{\"color\":{\"when\":{\"on\":\"highlighted\"},\"color\":\"@selection_background\"}},\"fill\":\"solid\",\"color\":\"@header_top\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":10,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":6,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":4,\"y\":0,\"w\":70,\"h\":38,\"align\":\"center\"}},\"bind\":{\"color\":{\"when\":{\"on\":\"highlighted\"},\"color\":\"@selection_text\"}},\"source\":\"item\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true}],\"clip\":false,\"repeat\":{\"count\":\"items\",\"columns\":2,\"dx\":84,\"dy\":44}},{\"id\":8,\"kind\":\"box\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":210,\"y\":8,\"w\":104,\"h\":130},\"tall\":{\"x\":8,\"y\":144,\"w\":154,\"h\":130}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@header_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":12,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":9,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":222,\"y\":14,\"w\":80,\"h\":90},\"tall\":{\"x\":49,\"y\":150,\"w\":72,\"h\":84}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"@divider\",\"reflection\":true},{\"id\":10,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":214,\"y\":104,\"w\":96,\"h\":16,\"align\":\"center\"},\"tall\":{\"x\":12,\"y\":234,\"w\":146,\"h\":16,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":11,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":214,\"y\":118,\"w\":96,\"h\":14,\"align\":\"center\"},\"tall\":{\"x\":12,\"y\":250,\"w\":146,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"artist\",\"custom\":\"\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":12,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":220,\"y\":134,\"w\":84,\"h\":2},\"tall\":{\"x\":20,\"y\":268,\"w\":130,\"h\":2}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":13,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":{\"x\":220,\"y\":134,\"w\":84,\"h\":2},\"tall\":{\"x\":20,\"y\":268,\"w\":130,\"h\":2}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"@selection_shine\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}]}"
 [now_playing_scene]
 script = '''
 backdrop(x, y, width, height)
 if width > height {
+    let p0_0 = x + 152
+    let p0_1 = x + 76
+    let p0_2 = y + 73
+    let p0_3 = y + 42
+    let p0_4 = x + 176
+    let p0_5 = y + 114
     if 1 {
-        let lit = progress(48)
-        repeat tick_mark from 0 to 48 {
-            spoke(x + 76, y + 73, tick_mark * 16 / 3, 32, 60, 66, tick_mark < lit ? #6ff0c4 : #25335a)
+        let lit_1_progress = progress(1000) * 48 / 1000
+        repeat copy_1 from 0 to 48 {
+            let turn_1 = (copy_1 * 5333 / 1000) & 255
+            spoke(p0_1, p0_2, turn_1, 32, 60, 66, (copy_1 < lit_1_progress ? #6bf3c6 : #21305a))
         }
     }
-    if 1 {
-        if has_cover {
-            round_cover(x + 76, y + 73, 56)
+    if has_cover {
+        round_cover(p0_1, p0_2, 56)
+    } else {
+        ring((p0_1) * 16 + 8, (p0_2) * 16 + 8, 896, 0, #102039)
+    }
+    spoke(p0_1, p0_2, ((0 + tick * 3)) & 255, 32, 14, 20, #ffffff)
+    line(song, title, p0_0, y + 18, 160, 22, left, #eff7ff)
+    if present(feedback) {
+        line(feedback, body, p0_0, p0_3, 160, 20, left, #9cb6de)
+    }
+    if !(present(feedback)) {
+        if present(lyric) {
+            line(lyric, body, p0_0, p0_3, 160, 20, left, #9cb6de)
         } else {
-            ring((x + 20) * 16 + 896, (y + 17) * 16 + 896, 896, 0, #16233f)
+            line(artist, body, p0_0, p0_3, 160, 20, left, #9cb6de)
         }
     }
-    if 1 {
-        spoke(x + 76, y + 73, (tick * 3) & 255, 32, 14, 20, #ffffff)
-    }
-    if 1 {
-        line(song, title, x + 152, y + 18, 160, 22, left, #eef4ff)
-    }
-    if 1 {
-        if present(feedback) {
-            text(feedback, body, x + 152, y + 42, 160, 20, left, #9fb4d8)
-        } else {
-            if present(lyric) {
-                line(lyric, body, x + 152, y + 42, 160, 20, left, #9fb4d8)
-            } else {
-                line(artist, body, x + 152, y + 42, 160, 20, left, #9fb4d8)
-            }
-        }
-    }
-    if 1 {
-        line(album, body, x + 152, y + 64, 160, 20, left, #7488ae)
-    }
-    if 1 {
-        format(small, x + 152, y + 90, 160, 16, left, #9fb4d8)
-    }
-    if 1 {
-        icon(badge != none ? badge : (playing ? none : pause), x + 152, y + 112, 18, 18, #6ff0c4)
-    }
-    if 1 {
-        times(small, x + 176, y + 114, 136, 14, #9fb4d8, #7488ae)
-    }
+    line(album, body, p0_0, y + 64, 160, 20, left, #738aad)
+    format(small, p0_0, y + 90, 160, 16, left, #9cb6de)
+    icon(badge != none ? badge : (playing ? none : pause), p0_0, y + 112, 18, 18, #6bf3c6)
+    text(elapsed, small, p0_4, p0_5, 136, 14, left, #9cb6de)
+    text(remaining, small, p0_4, p0_5, 136, 14, right, #738aad)
 } else {
+    let p0_0 = x + 8
+    let p0_1 = x + 85
+    let p0_2 = y + 62
+    let p0_3 = y + 152
+    let p0_4 = y + 250
     if 1 {
-        let lit = progress(48)
-        repeat tick_mark from 0 to 48 {
-            spoke(x + 85, y + 62, tick_mark * 16 / 3, 32, 50, 56, tick_mark < lit ? #6ff0c4 : #25335a)
+        let lit_1_progress = progress(1000) * 48 / 1000
+        repeat copy_1 from 0 to 48 {
+            let turn_1 = (copy_1 * 5333 / 1000) & 255
+            spoke(p0_1, p0_2, turn_1, 32, 50, 56, (copy_1 < lit_1_progress ? #6bf3c6 : #21305a))
         }
     }
-    if 1 {
-        if has_cover {
-            round_cover(x + 85, y + 62, 48)
+    if has_cover {
+        round_cover(p0_1, p0_2, 48)
+    } else {
+        ring((p0_1) * 16 + 8, (p0_2) * 16 + 8, 768, 0, #102039)
+    }
+    spoke(p0_1, p0_2, ((0 + tick * 3)) & 255, 32, 14, 20, #ffffff)
+    line(song, title, p0_0, y + 128, 154, 22, center, #eff7ff)
+    if present(feedback) {
+        line(feedback, body, p0_0, p0_3, 154, 20, center, #9cb6de)
+    }
+    if !(present(feedback)) {
+        if present(lyric) {
+            line(lyric, body, p0_0, p0_3, 154, 20, center, #9cb6de)
         } else {
-            ring((x + 37) * 16 + 768, (y + 14) * 16 + 768, 768, 0, #16233f)
+            line(artist, body, p0_0, p0_3, 154, 20, center, #9cb6de)
         }
     }
-    if 1 {
-        spoke(x + 85, y + 62, (tick * 3) & 255, 32, 14, 20, #ffffff)
-    }
-    if 1 {
-        line(song, title, x + 8, y + 128, 154, 22, center, #eef4ff)
-    }
-    if 1 {
-        if present(feedback) {
-            text(feedback, body, x + 8, y + 152, 154, 20, center, #9fb4d8)
-        } else {
-            if present(lyric) {
-                line(lyric, body, x + 8, y + 152, 154, 20, center, #9fb4d8)
-            } else {
-                line(artist, body, x + 8, y + 152, 154, 20, center, #9fb4d8)
-            }
-        }
-    }
-    if 1 {
-        line(album, body, x + 8, y + 174, 154, 20, center, #7488ae)
-    }
-    if 1 {
-        format(small, x + 8, y + 200, 154, 16, center, #9fb4d8)
-    }
-    if 1 {
-        icon(badge != none ? badge : (playing ? none : pause), x + 76, y + 222, 18, 18, #6ff0c4)
-    }
-    if 1 {
-        times(small, x + 8, y + 250, 154, 14, #9fb4d8, #7488ae)
-    }
+    line(album, body, p0_0, y + 174, 154, 20, center, #738aad)
+    format(small, p0_0, y + 200, 154, 16, center, #9cb6de)
+    icon(badge != none ? badge : (playing ? none : pause), x + 76, y + 222, 18, 18, #6bf3c6)
+    text(elapsed, small, p0_0, p0_4, 154, 14, left, #9cb6de)
+    text(remaining, small, p0_0, p0_4, 154, 14, right, #738aad)
 }
 '''
-design = "{\"version\":1,\"background\":{\"style\":\"wallpaper\",\"color\":\"@background\",\"top\":\"@header_background\",\"bottom\":\"@background\"},\"layers\":[{\"id\":7,\"type\":\"progress\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":10,\"y\":7,\"w\":132,\"h\":132},\"tall\":{\"x\":29,\"y\":6,\"w\":112,\"h\":112}},\"style\":\"ring\",\"color\":\"@selection_shine\",\"track\":\"@divider\",\"thickness\":6},{\"id\":8,\"type\":\"cover\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":20,\"y\":17,\"w\":112,\"h\":112},\"tall\":{\"x\":37,\"y\":14,\"w\":96,\"h\":96}},\"shape\":\"circle\",\"border\":0,\"borderColor\":\"@divider\",\"placeholder\":\"@header_top\"},{\"id\":9,\"type\":\"spinner\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":56,\"y\":53,\"w\":40,\"h\":40},\"tall\":{\"x\":65,\"y\":42,\"w\":40,\"h\":40}},\"color\":\"@selection_text\",\"speed\":3,\"length\":6},{\"id\":10,\"type\":\"text\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":152,\"y\":18,\"w\":160,\"h\":22},\"tall\":{\"x\":8,\"y\":128,\"w\":154,\"h\":22}},\"source\":\"song\",\"size\":\"large\",\"align\":\"left\",\"tallAlign\":\"center\",\"color\":\"@text\",\"scroll\":true,\"feedback\":false},{\"id\":11,\"type\":\"text\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":152,\"y\":42,\"w\":160,\"h\":20},\"tall\":{\"x\":8,\"y\":152,\"w\":154,\"h\":20}},\"source\":\"lyric\",\"size\":\"medium\",\"align\":\"left\",\"tallAlign\":\"center\",\"color\":\"@text_secondary\",\"scroll\":true,\"feedback\":true},{\"id\":12,\"type\":\"text\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":152,\"y\":64,\"w\":160,\"h\":20},\"tall\":{\"x\":8,\"y\":174,\"w\":154,\"h\":20}},\"source\":\"album\",\"size\":\"medium\",\"align\":\"left\",\"tallAlign\":\"center\",\"color\":\"@text_tertiary\",\"scroll\":true,\"feedback\":false},{\"id\":13,\"type\":\"text\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":152,\"y\":90,\"w\":160,\"h\":16},\"tall\":{\"x\":8,\"y\":200,\"w\":154,\"h\":16}},\"source\":\"format\",\"size\":\"small\",\"align\":\"left\",\"tallAlign\":\"center\",\"color\":\"@text_secondary\",\"scroll\":false,\"feedback\":false},{\"id\":14,\"type\":\"playmark\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":152,\"y\":112,\"w\":18,\"h\":18},\"tall\":{\"x\":76,\"y\":222,\"w\":18,\"h\":18}},\"color\":\"@selection_shine\"},{\"id\":15,\"type\":\"times\",\"hidden\":false,\"frames\":{\"wide\":{\"x\":176,\"y\":114,\"w\":136,\"h\":14},\"tall\":{\"x\":8,\"y\":250,\"w\":154,\"h\":14}},\"size\":\"small\",\"color\":\"@text_secondary\",\"color2\":\"@text_tertiary\"}]}"
+design = "{\"version\":2,\"screen\":\"playing\",\"elements\":[{\"id\":14,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@background\",\"top\":\"@header_background\",\"bottom\":\"@background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":16,\"kind\":\"group\",\"name\":\"Ring of lights\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":7,\"w\":132,\"h\":132},\"tall\":null},\"bind\":{},\"children\":[{\"id\":15,\"kind\":\"line\",\"name\":\"Light\",\"hidden\":false,\"at\":{\"wide\":{\"x\":66,\"y\":66,\"w\":6,\"h\":0},\"tall\":null},\"bind\":{\"color\":{\"when\":{\"on\":\"lit\",\"source\":\"progress\"},\"color\":\"@selection_shine\"}},\"color\":\"@divider\",\"angle\":0,\"start\":60,\"thickness\":2}],\"clip\":false,\"repeat\":{\"count\":48,\"columns\":1,\"dx\":0,\"dy\":0,\"turn\":7.5}},{\"id\":18,\"kind\":\"group\",\"name\":\"Ring of lights\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":29,\"y\":6,\"w\":112,\"h\":112}},\"bind\":{},\"children\":[{\"id\":17,\"kind\":\"line\",\"name\":\"Light\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":56,\"y\":56,\"w\":6,\"h\":0}},\"bind\":{\"color\":{\"when\":{\"on\":\"lit\",\"source\":\"progress\"},\"color\":\"@selection_shine\"}},\"color\":\"@divider\",\"angle\":0,\"start\":50,\"thickness\":2}],\"clip\":false,\"repeat\":{\"count\":48,\"columns\":1,\"dx\":0,\"dy\":0,\"turn\":7.5}},{\"id\":19,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":20,\"y\":17,\"w\":112,\"h\":112},\"tall\":{\"x\":37,\"y\":14,\"w\":96,\"h\":96}},\"bind\":{},\"shape\":\"circle\",\"placeholder\":\"@header_top\",\"reflection\":false},{\"id\":20,\"kind\":\"line\",\"name\":\"Turning mark\",\"hidden\":false,\"at\":{\"wide\":{\"x\":76,\"y\":73,\"w\":6,\"h\":0},\"tall\":{\"x\":85,\"y\":62,\"w\":6,\"h\":0}},\"bind\":{\"angle\":{\"source\":\"spin\",\"speed\":3}},\"color\":\"@selection_text\",\"angle\":0,\"start\":14,\"thickness\":2},{\"id\":21,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":152,\"y\":18,\"w\":160,\"h\":22,\"align\":\"left\"},\"tall\":{\"x\":8,\"y\":128,\"w\":154,\"h\":22,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"\",\"size\":\"large\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":23,\"kind\":\"text\",\"name\":\"Messages\",\"hidden\":false,\"at\":{\"wide\":{\"x\":152,\"y\":42,\"w\":160,\"h\":20,\"align\":\"left\"},\"tall\":{\"x\":8,\"y\":152,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\"}}},\"source\":\"feedback\",\"custom\":\"\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":22,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":152,\"y\":42,\"w\":160,\"h\":20,\"align\":\"left\"},\"tall\":{\"x\":8,\"y\":152,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\",\"not\":true}}},\"source\":\"lyric\",\"custom\":\"\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":24,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":152,\"y\":64,\"w\":160,\"h\":20,\"align\":\"left\"},\"tall\":{\"x\":8,\"y\":174,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"album\",\"custom\":\"\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":true},{\"id\":25,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":152,\"y\":90,\"w\":160,\"h\":16,\"align\":\"left\"},\"tall\":{\"x\":8,\"y\":200,\"w\":154,\"h\":16,\"align\":\"center\"}},\"bind\":{},\"source\":\"format\",\"custom\":\"\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":false},{\"id\":26,\"kind\":\"symbol\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":152,\"y\":112,\"w\":18,\"h\":18},\"tall\":{\"x\":76,\"y\":222,\"w\":18,\"h\":18}},\"bind\":{},\"mark\":\"state\",\"color\":\"@selection_shine\"},{\"id\":27,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":114,\"w\":136,\"h\":14},\"tall\":{\"x\":8,\"y\":250,\"w\":154,\"h\":14}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":false},{\"id\":28,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":114,\"w\":136,\"h\":14,\"align\":\"right\"},\"tall\":{\"x\":8,\"y\":250,\"w\":154,\"h\":14,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false}]}"

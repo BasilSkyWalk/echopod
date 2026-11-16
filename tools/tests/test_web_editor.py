@@ -123,7 +123,8 @@ class SiteTest(unittest.TestCase):
 
     def test_every_page_the_site_links_is_one_it_copies(self):
         for name in ("preview_host.js", "icon_editor.js", "wallpaper_editor.js", "font_editor.js",
-                     "now_playing_designer.js", "scene_compile.js", "gallery.html", "gallery.js"):
+                     "drawing.js", "drawings.js", "drawing_editor.js", "scene_compile.js", "gallery.html",
+                     "gallery.js"):
             self.assertIn(name, web_editor.PAGE_FILES)
         for name in web_editor.PAGE_FILES:
             self.assertTrue((PAGES / name).is_file(), name)
