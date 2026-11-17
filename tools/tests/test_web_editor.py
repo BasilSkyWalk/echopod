@@ -240,6 +240,10 @@ class PageTest(unittest.TestCase):
             result = self.run_node("test_preview_states.mjs", output)
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_the_drawing_tools_snap_group_line_up_and_copy_between_screens(self):
+        result = self.run_node("test_drawing_editor.mjs")
+        self.assertEqual(0, result.returncode, result.stderr)
+
     def test_drawing_needs_a_site_folder(self):
         self.assertEqual(2, self.run_node("render_theme.mjs").returncode)
 

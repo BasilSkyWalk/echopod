@@ -1139,3 +1139,58 @@ details.moves summary {
 .playback-pick select {
   max-width: 180px;
 }
+
+.align-tools {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+}
+
+.align-tools button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.align-tools button:hover {
+  color: var(--ink);
+  background: var(--sunken);
+}
+
+.align-tools svg {
+  width: 18px;
+  height: 18px;
+}
+
+.layers .layer-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layers .rename {
+  min-width: 0;
+  width: 100%;
+  padding: 3px 6px;
+}
+
+.layers li.locked-layer .layer-name {
+  color: var(--ink-soft);
+}
+
+.layers li.locked-layer .tools button:first-child {
+  color: var(--ink);
+}
+
+.hint.shortcuts {
+  margin-top: 10px;
+  font-size: 12px;
+}

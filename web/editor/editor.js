@@ -1178,12 +1178,13 @@ function drawOverlay() {
   if (!designing()) {
     return;
   }
-  drawer.overlay(pen, state.zoom);
+  drawer.overlay(pen, width / canvas.width || state.zoom);
 }
 
 function pointer(event) {
-  const box = overlay.getBoundingClientRect();
-  return { x: (event.clientX - box.left) / state.zoom, y: (event.clientY - box.top) / state.zoom };
+  const box = canvas.getBoundingClientRect();
+  const scale = box.width / canvas.width || state.zoom;
+  return { x: (event.clientX - box.left) / scale, y: (event.clientY - box.top) / scale };
 }
 
 function shownScript() {
@@ -1269,6 +1270,10 @@ function jumpToRole(role) {
 function wireOverlay() {
   overlay.addEventListener("pointerdown", (event) => {
     const point = pointer(event);
+    const drawn = Object.keys(DESIGNS).find((step) => DESIGNS[step].screen === state.screen && state.designs[step]);
+    if (!designing() && drawn) {
+      goTo(drawn);
+    }
     if (!designing()) {
       event.preventDefault();
       const role = roleAt(point);
@@ -1280,7 +1285,7 @@ function wireOverlay() {
       canvas.focus({ preventScroll: true });
       return;
     }
-    if (drawer.down(point)) {
+    if (drawer.down(point, { add: event.shiftKey || event.ctrlKey || event.metaKey })) {
       overlay.setPointerCapture(event.pointerId);
     }
   });
@@ -1291,7 +1296,7 @@ function wireOverlay() {
   });
   overlay.addEventListener("pointermove", (event) => {
     if (designing()) {
-      const cursor = drawer.move(pointer(event));
+      const cursor = drawer.move(pointer(event), { free: event.altKey });
       if (cursor) {
         overlay.style.cursor = cursor;
       }
@@ -1438,6 +1443,10 @@ function wireControls() {
   });
   document.addEventListener("keydown", (event) => {
     if (nudge(event)) {
+      return;
+    }
+    if (designing() && !event.target.closest("input, select, textarea, canvas") && drawer.key(event)) {
+      event.preventDefault();
       return;
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.target.closest("input, textarea")) {

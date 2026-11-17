@@ -25,7 +25,7 @@ export function standardDrawing(screen) {
       version: 2,
       screen,
       elements: [
-        element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", fill: "wallpaper" }),
+        element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", locked: true, fill: "wallpaper" }),
         element("menu", at(0, 0, 176, 146), at(0, 0, 170, 152), { name: "Menu" }),
         element("box", at(176, 0, 144, 146), at(0, 152, 170, 128), { name: "Art panel", color: "#08080a" }),
         element("box", at(176, 0, 1, 146), at(0, 152, 170, 1), { name: "Divider", color: "@divider" }),
@@ -37,7 +37,7 @@ export function standardDrawing(screen) {
     version: 2,
     screen,
     elements: [
-      element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", color: "@background" }),
+      element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", locked: true, color: "@background" }),
       element("cover", at(10, 8, 112, 112), at(29, 8, 112, 112), { placeholder: "@divider" }),
       element("text", at(132, 8, 180, 22), at(8, 128, 154, 22, "center"), { source: "song", size: "large", color: "@text" }),
       element("text", at(132, 32, 180, 20), at(8, 152, 154, 20, "center"), { name: "Messages", source: "feedback", color: "@text_secondary", bind: { show: when("feedback") } }),
@@ -121,7 +121,7 @@ export function vuDrawing(c) {
     version: 2,
     screen: "playing",
     elements: [
-      element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", color: c.PLATE }),
+      element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", locked: true, color: c.PLATE }),
       meter(c, at(10, 4, 146, 72), at(12, 31, 146, 72), { wide: "left", tall: "both" }),
       meter(c, at(164, 4, 146, 72), null, { wide: "right", tall: null }),
       element("text", at(10, 78, 300, 20, "center"), at(10, 134, 150, 22, "center"), { source: "song", size: "large", color: c.CREAM }),
@@ -326,7 +326,7 @@ export function cassetteDrawing(c) {
     version: 2,
     screen: "playing",
     elements: [
-      element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", color: c.DEEP }),
+      element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", locked: true, color: c.DEEP }),
       cassetteLarge(c, oneWay("wide"), 11, 3),
       cassetteSmall(c, oneWay("tall"), 8, 31),
       cassetteCard(c, oneWay("tall"), 8, 139),
@@ -520,7 +520,7 @@ export function fromDesign(design, screen) {
   const background = design.background ?? {};
   const fillOf = background.style === "wallpaper" ? "wallpaper" : background.style === "gradient" ? "gradient" : "solid";
   const elements = [element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), {
-    name: "Background", fill: fillOf, color: background.color ?? "@background", top: background.top ?? "@header_background", bottom: background.bottom ?? "@background",
+    name: "Background", locked: true, fill: fillOf, color: background.color ?? "@background", top: background.top ?? "@header_background", bottom: background.bottom ?? "@background",
   })];
   for (const layer of design.layers ?? []) {
     if (!layer.hidden) {

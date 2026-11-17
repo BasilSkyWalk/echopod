@@ -15,7 +15,26 @@ import {
 
 const HANDLE = 7;
 const HIT = 4;
+const SNAP = 3;
+const GUIDE = "#ff4fd8";
+const PASTE_STEP = 6;
+const CLIPBOARD = "echopod-parts-clipboard";
 const DEGREES = 180 / Math.PI;
+const LOCK = "M6.5 9V7a3.5 3.5 0 0 1 7 0v2M5 9h10v7.5H5z";
+const UNLOCK = "M6.5 9V7a3.5 3.5 0 0 1 6.6-1.6M5 9h10v7.5H5z";
+const ALIGN = [
+  ["left", "Line up the left edges", "M4 3v14M7 6h9v3H7zM7 11h5v3H7z"],
+  ["centre", "Line up the middles, across", "M10 3v14M5 6h10v3H5zM7 11h6v3H7z"],
+  ["right", "Line up the right edges", "M16 3v14M4 6h9v3H4zM8 11h5v3H8z"],
+  ["top", "Line up the tops", "M3 4h14M6 7h3v9H6zM11 7h3v5h-3z"],
+  ["middle", "Line up the middles, down", "M3 10h14M6 5h3v10H6zM11 7h3v6h-3z"],
+  ["bottom", "Line up the bottoms", "M3 16h14M6 4h3v9H6zM11 8h3v5h-3z"],
+];
+const SPREAD = [
+  ["across", "Space evenly across", "M3 4v12M17 4v12M7 7h2v6H7zM11 7h2v6h-2z"],
+  ["down", "Space evenly down", "M4 3h12M4 17h12M7 7h6v2H7zM7 11h6v2H7z"],
+];
+let clipboard = null;
 const BINDABLE = {
   box: [["w", "Width"], ["h", "Height"], ["x", "Left"], ["y", "Top"]],
   circle: [["w", "Size"], ["x", "Left"], ["y", "Top"]],
@@ -47,6 +66,38 @@ export function drawingEditor(ctx) {
   const drawing = () => ctx.drawing();
   const shape = () => ctx.shape();
   const picked = () => (drawing() ? findElement(drawing(), ctx.state.picked)?.item ?? null : null);
+
+  function chosen() {
+    const first = picked();
+    if (!first) {
+      return [];
+    }
+    const more = ctx.state.also?.anchor === first.id ? ctx.state.also.ids : [];
+    return [first, ...more.map((id) => findElement(drawing(), id)?.item).filter(Boolean)];
+  }
+
+  function setChosen(ids) {
+    ctx.state.picked = ids[0] ?? null;
+    ctx.state.also = ids.length > 1 ? { anchor: ids[0], ids: ids.slice(1) } : null;
+  }
+
+  function choose(id, add) {
+    const current = chosen().map((item) => item.id);
+    const parentOf = (one) => findElement(drawing(), one)?.parent ?? null;
+    if (!add || current.length === 0 || parentOf(id) !== parentOf(current[0])) {
+      setChosen([id]);
+      return;
+    }
+    setChosen(current.includes(id) ? current.filter((one) => one !== id) : [...current, id]);
+  }
+
+  function clear() {
+    setChosen([]);
+  }
+
+  function locked(place) {
+    return Boolean(place.item.locked || place.chain.some((parent) => parent.locked));
+  }
 
   function nameOf(item) {
     if (item.name) {
@@ -127,17 +178,76 @@ export function drawingEditor(ctx) {
     return { x: place.x + place.w, y: place.y + place.h };
   }
 
+  function boxOf(place) {
+    if (place.item.kind === "line") {
+      const { from, to } = lineEnds(place);
+      return { x: Math.min(from.x, to.x), y: Math.min(from.y, to.y), w: Math.abs(to.x - from.x), h: Math.abs(to.y - from.y) };
+    }
+    return { x: place.x, y: place.y, w: place.w, h: place.h };
+  }
+
+  function union(boxes) {
+    const left = Math.min(...boxes.map((box) => box.x));
+    const top = Math.min(...boxes.map((box) => box.y));
+    const right = Math.max(...boxes.map((box) => box.x + box.w));
+    const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+    return { x: left, y: top, w: right - left, h: bottom - top };
+  }
+
+  function frameOf(place) {
+    const parent = place.chain.at(-1);
+    if (parent) {
+      const outer = placements().find((one) => one.item === parent);
+      if (outer) {
+        return { x: outer.x, y: outer.y, w: outer.w, h: outer.h };
+      }
+    }
+    const area = AREAS[shape()];
+    return { x: 0, y: area.top, w: area.width, h: area.height };
+  }
+
+  function snapTargets(moving) {
+    const area = AREAS[shape()];
+    const xs = [0, area.width / 2, area.width];
+    const ys = [area.top, area.top + area.height / 2, area.top + area.height];
+    const skip = new Set(moving.map(({ place }) => place.item));
+    for (const place of placements()) {
+      if (skip.has(place.item) || place.chain.some((parent) => skip.has(parent)) || place.item.kind === "group") {
+        continue;
+      }
+      const box = boxOf(place);
+      xs.push(box.x, box.x + box.w / 2, box.x + box.w);
+      ys.push(box.y, box.y + box.h / 2, box.y + box.h);
+    }
+    return { xs, ys };
+  }
+
+  function snapped(lines, targets) {
+    let best = null;
+    for (const line of lines) {
+      for (const target of targets) {
+        const gap = target - line;
+        if (Math.abs(gap) <= SNAP && (!best || Math.abs(gap) < Math.abs(best.shift))) {
+          best = { shift: gap, at: target };
+        }
+      }
+    }
+    return best ? { shift: Math.round(best.shift), at: best.at } : null;
+  }
+
   function overlay(pen, zoom) {
     const places = placements();
     const shown = shownLevel(places);
+    const picks = new Set(chosen().map((item) => item.id));
     for (const place of places) {
-      if (!shown(place)) {
+      if (!shown(place) && !picks.has(place.item.id)) {
         continue;
       }
-      const chosen = place.item.id === ctx.state.picked;
-      pen.setLineDash(chosen ? [] : [4, 3]);
-      pen.lineWidth = chosen ? 1.5 : 1;
-      pen.strokeStyle = chosen ? "#ffffff" : "rgba(255, 255, 255, 0.3)";
+      const isPicked = picks.has(place.item.id);
+      const chosen = isPicked && picks.size === 1 && !locked(place);
+      pen.setLineDash(isPicked ? [] : [4, 3]);
+      pen.lineWidth = isPicked ? 1.5 : 1;
+      pen.strokeStyle = isPicked ? "#ffffff" : locked(place) ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.3)";
       if (place.item.kind === "line") {
         const { from, to } = lineEnds(place);
         pen.beginPath();
@@ -157,6 +267,37 @@ export function drawingEditor(ctx) {
         pen.strokeRect(handle.x * zoom - HANDLE / 2 + 0.5, handle.y * zoom - HANDLE / 2 + 0.5, HANDLE - 1, HANDLE - 1);
       }
     }
+    pen.setLineDash([]);
+    pen.lineWidth = 1;
+    pen.strokeStyle = GUIDE;
+    for (const guide of drag?.guides ?? []) {
+      pen.beginPath();
+      if ("x" in guide) {
+        pen.moveTo(Math.round(guide.x * zoom) + 0.5, 0);
+        pen.lineTo(Math.round(guide.x * zoom) + 0.5, pen.canvas.height);
+      } else {
+        pen.moveTo(0, Math.round(guide.y * zoom) + 0.5);
+        pen.lineTo(pen.canvas.width, Math.round(guide.y * zoom) + 0.5);
+      }
+      pen.stroke();
+    }
+    if (drag?.marquee) {
+      const box = marqueeBox(drag.marquee);
+      pen.setLineDash([3, 3]);
+      pen.fillStyle = "rgba(255, 79, 216, 0.08)";
+      pen.fillRect(box.x * zoom, box.y * zoom, box.w * zoom, box.h * zoom);
+      pen.strokeRect(box.x * zoom + 0.5, box.y * zoom + 0.5, box.w * zoom, box.h * zoom);
+      pen.setLineDash([]);
+    }
+  }
+
+  function marqueeBox(marquee) {
+    return {
+      x: Math.min(marquee.x0, marquee.x1),
+      y: Math.min(marquee.y0, marquee.y1),
+      w: Math.abs(marquee.x1 - marquee.x0),
+      h: Math.abs(marquee.y1 - marquee.y0),
+    };
   }
 
   function nearHandle(place, point) {
@@ -164,26 +305,44 @@ export function drawingEditor(ctx) {
     return Math.abs(point.x - handle.x) <= HANDLE / ctx.state.zoom + 1 && Math.abs(point.y - handle.y) <= HANDLE / ctx.state.zoom + 1;
   }
 
-  function down(point) {
+  function startDrag(primary, resize, point) {
     const places = placements();
+    const moving = resize ? [primary] : chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place));
+    const held = moving.map((place) => ({ place, start: { ...place.item.at[shape()] } }));
+    drag = { primary, resize, from: point, moving: held, targets: snapTargets(held), guides: [] };
+  }
+
+  function down(point, { add = false } = {}) {
+    const places = placements();
+    const picks = chosen();
     const current = places.find((place) => place.item.id === ctx.state.picked);
-    if (current && nearHandle(current, point)) {
-      drag = { place: current, resize: true, from: point, start: { ...current.item.at[shape()] } };
+    if (!add && picks.length === 1 && current && !locked(current) && nearHandle(current, point)) {
+      startDrag(current, true, point);
       return true;
     }
-    const path = pathAt(places, point);
+    const path = pathAt(places.filter((place) => !locked(place)), point);
     if (!path) {
-      ctx.state.picked = null;
+      if (!add) {
+        clear();
+      }
+      drag = { marquee: { x0: point.x, y0: point.y, x1: point.x, y1: point.y }, parent: current?.chain.at(-1) ?? null };
       ctx.render();
-      return false;
+      return true;
     }
     const index = path.findIndex((item) => item.id === ctx.state.picked);
     const parent = current?.chain.at(-1);
     const level = index >= 0 ? index : Math.max(0, path.indexOf(parent) + 1);
     const target = places.find((place) => place.item === path[level]);
-    ctx.state.picked = target.item.id;
+    if (add) {
+      choose(target.item.id, true);
+      ctx.render();
+      return false;
+    }
+    if (!picks.includes(target.item)) {
+      choose(target.item.id, false);
+    }
     reveal(target.item.id);
-    drag = { place: target, resize: false, from: point, start: { ...target.item.at[shape()] } };
+    startDrag(target, false, point);
     ctx.render();
     return true;
   }
@@ -206,29 +365,68 @@ export function drawingEditor(ctx) {
     ctx.render();
   }
 
-  function move(point) {
+  function move(point, { free = false } = {}) {
     if (!drag) {
       const places = placements();
       const current = places.find((place) => place.item.id === ctx.state.picked);
-      if (current && nearHandle(current, point)) {
+      if (current && !locked(current) && chosen().length === 1 && nearHandle(current, point)) {
         return current.item.kind === "line" ? "crosshair" : "nwse-resize";
       }
-      return places.some((place) => hit(place, point)) ? "move" : "default";
+      return places.some((place) => !locked(place) && hit(place, point)) ? "move" : "default";
     }
-    const { place, resize, from, start } = drag;
-    const at = place.item.at[shape()];
-    const dx = Math.round(point.x - from.x);
-    const dy = Math.round(point.y - from.y);
-    if (resize && place.item.kind === "line") {
-      const ax = point.x - place.x;
-      const ay = point.y - place.y;
-      const angle = Math.round((Math.atan2(ax, -ay) * DEGREES + 360) % 360);
-      place.item.angle = angle;
-      at.w = Math.max(1, Math.round(Math.hypot(ax, ay) - (Number(place.item.start) || 0)));
-    } else if (resize) {
+    if (drag.marquee) {
+      drag.marquee.x1 = point.x;
+      drag.marquee.y1 = point.y;
+      return null;
+    }
+    const { primary, resize, from, moving, targets } = drag;
+    let dx = Math.round(point.x - from.x);
+    let dy = Math.round(point.y - from.y);
+    drag.guides = [];
+    if (resize && primary.item.kind === "line") {
+      const at = primary.item.at[shape()];
+      const ax = point.x - primary.x;
+      const ay = point.y - primary.y;
+      primary.item.angle = Math.round((Math.atan2(ax, -ay) * DEGREES + 360) % 360);
+      at.w = Math.max(1, Math.round(Math.hypot(ax, ay) - (Number(primary.item.start) || 0)));
+      ctx.apply();
+      return null;
+    }
+    if (resize) {
+      const { start } = moving[0];
+      if (!free) {
+        const across = snapped([primary.x + start.w + dx], targets.xs);
+        const down = snapped([primary.y + start.h + dy], targets.ys);
+        if (across) {
+          dx += across.shift;
+          drag.guides.push({ x: across.at });
+        }
+        if (down) {
+          dy += down.shift;
+          drag.guides.push({ y: down.at });
+        }
+      }
+      const at = primary.item.at[shape()];
       at.w = Math.max(1, start.w + dx);
-      at.h = Math.max(place.item.kind === "line" ? 0 : 1, start.h + dy);
-    } else {
+      at.h = Math.max(primary.item.kind === "line" ? 0 : 1, start.h + dy);
+      ctx.apply();
+      return null;
+    }
+    if (!free && moving.length) {
+      const box = union(moving.map(({ place }) => boxOf(place)));
+      const across = snapped([box.x + dx, box.x + box.w / 2 + dx, box.x + box.w + dx], targets.xs);
+      const down = snapped([box.y + dy, box.y + box.h / 2 + dy, box.y + box.h + dy], targets.ys);
+      if (across) {
+        dx += across.shift;
+        drag.guides.push({ x: across.at });
+      }
+      if (down) {
+        dy += down.shift;
+        drag.guides.push({ y: down.at });
+      }
+    }
+    for (const { place, start } of moving) {
+      const at = place.item.at[shape()];
       at.x = start.x + dx;
       at.y = start.y + dy;
     }
@@ -237,20 +435,44 @@ export function drawingEditor(ctx) {
   }
 
   function up() {
-    if (drag) {
-      drag = null;
-      ctx.changed({ rebuild: true });
+    if (!drag) {
+      return;
     }
+    if (drag.marquee) {
+      const box = marqueeBox(drag.marquee);
+      const parent = drag.parent;
+      drag = null;
+      if (box.w < 2 && box.h < 2) {
+        ctx.render();
+        return;
+      }
+      const inside = placements().filter((place) => (place.chain.at(-1) ?? null) === parent && !locked(place)).filter((place) => {
+        const own = boxOf(place);
+        return own.x < box.x + box.w && own.x + own.w > box.x && own.y < box.y + box.h && own.y + own.h > box.y;
+      });
+      const before = chosen().map((item) => item.id);
+      const ids = [...before, ...inside.map((place) => place.item.id).filter((id) => !before.includes(id))];
+      setChosen(ids);
+      ctx.render();
+      return;
+    }
+    drag = null;
+    ctx.changed({ rebuild: true });
   }
 
   function nudge(dx, dy) {
-    const item = picked();
-    const at = item?.at?.[shape()];
-    if (!at) {
+    const items = chosen().filter((item) => item.at?.[shape()]);
+    if (!items.length) {
       return false;
     }
-    at.x += dx;
-    at.y += dy;
+    if (items.some((item) => item.locked)) {
+      ctx.say("That part is locked. Unlock it in the list to move it.", true);
+      return true;
+    }
+    for (const item of items) {
+      item.at[shape()].x += dx;
+      item.at[shape()].y += dy;
+    }
     ctx.changed({ rebuild: true });
     return true;
   }
@@ -320,15 +542,334 @@ export function drawingEditor(ctx) {
     ctx.changed({ rebuild: true });
   }
 
+  function renumber(node) {
+    node.id = element(node.kind, null, null).id;
+    for (const child of node.children ?? []) {
+      renumber(child);
+    }
+  }
+
+  function removeChosen() {
+    const items = chosen();
+    if (!items.length) {
+      return false;
+    }
+    if (items.some((item) => item.locked)) {
+      ctx.say("That part is locked. Unlock it in the list to remove it.", true);
+      return true;
+    }
+    for (const item of items) {
+      const list = siblingsOf(item);
+      list.splice(list.indexOf(item), 1);
+    }
+    clear();
+    ctx.changed({ rebuild: true });
+    return true;
+  }
+
+  function duplicateChosen() {
+    const items = chosen();
+    if (!items.length) {
+      return false;
+    }
+    const made = items.map((item) => {
+      const copy = JSON.parse(JSON.stringify(item));
+      renumber(copy);
+      copy.locked = false;
+      const at = copy.at[shape()];
+      if (at) {
+        at.x += PASTE_STEP;
+        at.y += PASTE_STEP;
+      }
+      const list = siblingsOf(item);
+      list.splice(list.indexOf(item) + 1, 0, copy);
+      return copy;
+    });
+    if (!ctx.fits()) {
+      for (const copy of made) {
+        const list = siblingsOf(copy);
+        list.splice(list.indexOf(copy), 1);
+      }
+      ctx.fits();
+      ctx.say("There's no room for more on this screen. Remove something first.", true);
+      return true;
+    }
+    setChosen(made.map((copy) => copy.id));
+    ctx.changed({ rebuild: true });
+    return true;
+  }
+
+  function lineBox(item, shapeName) {
+    const at = item.at[shapeName];
+    if (item.kind !== "line") {
+      return { x: Number(at.x), y: Number(at.y), w: Number(at.w), h: Number(at.h) };
+    }
+    const ends = lineEnds({ item, x: Number(at.x), y: Number(at.y), w: Number(at.w) });
+    return union([{ ...ends.from, w: 0, h: 0 }, { ...ends.to, w: 0, h: 0 }]);
+  }
+
+  function groupChosen() {
+    const items = chosen();
+    if (items.length < 2) {
+      ctx.say("Pick two or more parts first: hold Shift and click them.", true);
+      return true;
+    }
+    const list = siblingsOf(items[0]);
+    const ordered = list.filter((item) => items.includes(item));
+    const places = {};
+    for (const shapeName of Object.keys(AREAS)) {
+      const boxes = ordered.filter((item) => item.at[shapeName]).map((item) => lineBox(item, shapeName));
+      if (boxes.length) {
+        const box = union(boxes);
+        places[shapeName] = { x: Math.floor(box.x), y: Math.floor(box.y), w: Math.max(1, Math.ceil(box.w)), h: Math.max(1, Math.ceil(box.h)) };
+      } else {
+        places[shapeName] = null;
+      }
+    }
+    const made = element("group", places.wide, places.tall);
+    const first = list.indexOf(ordered[0]);
+    for (const item of ordered) {
+      list.splice(list.indexOf(item), 1);
+      for (const shapeName of Object.keys(AREAS)) {
+        if (item.at[shapeName] && places[shapeName]) {
+          item.at[shapeName].x -= places[shapeName].x;
+          item.at[shapeName].y -= places[shapeName].y;
+        }
+      }
+    }
+    made.children = ordered;
+    list.splice(first, 0, made);
+    if (!ctx.fits()) {
+      ungroup(made, false);
+      ctx.fits();
+      ctx.say("There's no room to group these on this screen.", true);
+      return true;
+    }
+    expanded.add(made.id);
+    setChosen([made.id]);
+    ctx.changed({ rebuild: true });
+    return true;
+  }
+
+  function ungroup(host, record = true) {
+    const list = siblingsOf(host);
+    const children = host.children ?? [];
+    for (const item of children) {
+      for (const shapeName of Object.keys(AREAS)) {
+        if (item.at[shapeName] && host.at[shapeName]) {
+          item.at[shapeName].x += host.at[shapeName].x;
+          item.at[shapeName].y += host.at[shapeName].y;
+        }
+      }
+    }
+    list.splice(list.indexOf(host), 1, ...children);
+    if (record) {
+      setChosen(children.map((item) => item.id));
+      ctx.changed({ rebuild: true });
+    }
+  }
+
+  function lineUp(edge) {
+    const places = placements();
+    const mine = chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place));
+    if (!mine.length) {
+      return;
+    }
+    const frame = mine.length === 1 ? frameOf(mine[0]) : union(mine.map(boxOf));
+    for (const place of mine) {
+      const box = boxOf(place);
+      const at = place.item.at[shape()];
+      const shift = {
+        left: [frame.x - box.x, 0],
+        centre: [frame.x + (frame.w - box.w) / 2 - box.x, 0],
+        right: [frame.x + frame.w - box.x - box.w, 0],
+        top: [0, frame.y - box.y],
+        middle: [0, frame.y + (frame.h - box.h) / 2 - box.y],
+        bottom: [0, frame.y + frame.h - box.y - box.h],
+      }[edge];
+      at.x += Math.round(shift[0]);
+      at.y += Math.round(shift[1]);
+    }
+    ctx.changed({ rebuild: true });
+  }
+
+  function spread(axis) {
+    const places = placements();
+    const mine = chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place));
+    if (mine.length < 3) {
+      return;
+    }
+    const [start, size, key] = axis === "across" ? ["x", "w", "x"] : ["y", "h", "y"];
+    const sorted = mine.map((place) => ({ place, box: boxOf(place) })).sort((a, b) => a.box[start] - b.box[start]);
+    const first = sorted[0].box[start];
+    const last = sorted.at(-1).box[start] + sorted.at(-1).box[size];
+    const gap = (last - first - sorted.reduce((sum, one) => sum + one.box[size], 0)) / (sorted.length - 1);
+    let next = first;
+    for (const { place, box } of sorted) {
+      place.item.at[shape()][key] += Math.round(next) - Math.round(box[start]);
+      next += box[size] + gap;
+    }
+    ctx.changed({ rebuild: true });
+  }
+
+  function heldParts() {
+    if (clipboard) {
+      return clipboard;
+    }
+    try {
+      return localStorage.getItem(CLIPBOARD);
+    } catch {
+      return null;
+    }
+  }
+
+  function keepParts(text) {
+    try {
+      localStorage.setItem(CLIPBOARD, text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function copyChosen() {
+    const items = chosen();
+    if (!items.length) {
+      return false;
+    }
+    clipboard = JSON.stringify({ screen: drawing().screen, items });
+    keepParts(clipboard);
+    const other = drawing().screen === "home" ? "Now Playing" : "Home";
+    ctx.say(`Copied ${items.length === 1 ? nameOf(items[0]) : `${items.length} parts`}. Paste here or on ${other}.`);
+    ctx.render();
+    return true;
+  }
+
+  function suitedTo(item, screen) {
+    if (screen === "home") {
+      return true;
+    }
+    if (item.kind === "menu") {
+      return false;
+    }
+    if (item.kind === "text" && item.source === "item") {
+      item.source = "song";
+    }
+    if (item.repeat?.count === "items") {
+      item.repeat.count = 6;
+    }
+    for (const [key, rule] of Object.entries(item.bind ?? {})) {
+      if (rule?.when?.on === "highlighted" || rule?.source === "copy") {
+        delete item.bind[key];
+      }
+    }
+    if (item.children) {
+      item.children = item.children.filter((child) => suitedTo(child, screen));
+    }
+    return true;
+  }
+
+  function paste() {
+    const text = heldParts();
+    if (!text || !drawing()) {
+      return false;
+    }
+    const held = JSON.parse(text);
+    const screen = drawing().screen;
+    const host = picked()?.kind === "group" && chosen().length === 1 ? picked() : null;
+    const list = host ? host.children : drawing().elements;
+    const made = [];
+    let left = 0;
+    for (const original of held.items) {
+      const copy = JSON.parse(JSON.stringify(original));
+      if (!suitedTo(copy, screen)) {
+        left++;
+        continue;
+      }
+      renumber(copy);
+      copy.locked = false;
+      const at = copy.at?.[shape()];
+      if (at && held.screen === screen && !host) {
+        at.x += PASTE_STEP;
+        at.y += PASTE_STEP;
+      }
+      list.push(copy);
+      made.push(copy);
+    }
+    if (!made.length) {
+      ctx.say("The menu only goes on Home, so there was nothing to paste here.", true);
+      return true;
+    }
+    if (!ctx.fits()) {
+      list.splice(list.length - made.length, made.length);
+      ctx.fits();
+      ctx.say("There's no room for those on this screen. Remove something first.", true);
+      return true;
+    }
+    if (host) {
+      expanded.add(host.id);
+    }
+    setChosen(made.map((item) => item.id));
+    ctx.changed({ rebuild: true });
+    if (left) {
+      ctx.say("The menu only goes on Home, so it wasn't pasted.", true);
+    }
+    return true;
+  }
+
+  function pickEverything() {
+    const parent = findElement(drawing(), ctx.state.picked)?.parent ?? null;
+    const list = parent ? parent.children : drawing().elements;
+    setChosen(list.filter((item) => !item.locked && !item.hidden).map((item) => item.id));
+    ctx.render();
+    return true;
+  }
+
+  function key(event) {
+    if (!drawing()) {
+      return false;
+    }
+    const command = event.ctrlKey || event.metaKey;
+    const name = event.key.toLowerCase();
+    if (command && name === "c") {
+      return copyChosen();
+    }
+    if (command && name === "x") {
+      return copyChosen() && removeChosen();
+    }
+    if (command && name === "v") {
+      return paste();
+    }
+    if (command && name === "d") {
+      return duplicateChosen();
+    }
+    if (command && name === "a") {
+      return pickEverything();
+    }
+    if (command && name === "g") {
+      const item = picked();
+      if (event.shiftKey) {
+        if (item?.kind === "group" && chosen().length === 1) {
+          ungroup(item);
+          return true;
+        }
+        return false;
+      }
+      return groupChosen();
+    }
+    if (name === "delete" || name === "backspace") {
+      return removeChosen();
+    }
+    if (name === "escape" && picked()) {
+      clear();
+      ctx.render();
+      return true;
+    }
+    return false;
+  }
+
   function duplicate(item) {
     const copy = JSON.parse(JSON.stringify(item));
-    const renumber = (node) => {
-      const fresh = element(node.kind, null, null);
-      node.id = fresh.id;
-      for (const child of node.children ?? []) {
-        renumber(child);
-      }
-    };
     renumber(copy);
     const at = copy.at[shape()];
     if (at) {
@@ -348,20 +889,60 @@ export function drawingEditor(ctx) {
     } }, icon(path));
   }
 
+  function renameInPlace(item, label) {
+    const input = el("input", { class: "rename", value: item.name ?? "", placeholder: nameOf({ ...item, name: "" }), maxlength: 30, "aria-label": "Name" });
+    let done = false;
+    const finish = (keep) => {
+      if (done) {
+        return;
+      }
+      done = true;
+      if (keep && input.value !== (item.name ?? "")) {
+        item.name = input.value.trim();
+        ctx.changed({ rebuild: true });
+      } else {
+        ctx.render();
+      }
+    };
+    input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key === "Enter") {
+        finish(true);
+      } else if (event.key === "Escape") {
+        finish(false);
+      }
+    });
+    input.addEventListener("blur", () => finish(true));
+    label.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
   function tree(items, depth) {
+    const picks = new Set(chosen().map((item) => item.id));
     return items.flatMap((item) => {
+      const label = el("span", { class: "layer-name", title: "Double-click to rename" }, nameOf(item));
+      label.addEventListener("dblclick", (event) => {
+        event.stopPropagation();
+        renameInPlace(item, label);
+      });
       const row = el("li", {
         role: "option",
-        "aria-selected": String(item.id === ctx.state.picked),
-        class: [item.hidden ? "hidden-layer" : "", item.at?.[shape()] ? "" : "elsewhere"].join(" ").trim(),
+        "aria-selected": String(picks.has(item.id)),
+        class: [item.hidden ? "hidden-layer" : "", item.at?.[shape()] ? "" : "elsewhere", item.locked ? "locked-layer" : ""].join(" ").trim(),
         style: `padding-left: ${10 + depth * 16}px`,
-        onclick: () => {
-          ctx.state.picked = item.id;
+        onclick: (event) => {
+          choose(item.id, event.shiftKey || event.ctrlKey || event.metaKey);
           ctx.render();
         },
       },
-      el("span", {}, nameOf(item)),
+      label,
       el("span", { class: "tools" },
+        tool(item.locked ? "Unlock" : "Lock so it can't be moved on the screen", item.locked ? LOCK : UNLOCK, () => {
+          item.locked = !item.locked;
+          ctx.changed({ rebuild: true });
+        }),
         tool("Move back", "m6 8 4 4 4-4", () => moveWithin(item, -1)),
         tool("Move forward", "m6 12 4-4 4 4", () => moveWithin(item, 1)),
         tool(item.hidden ? "Show" : "Hide", item.hidden
@@ -376,7 +957,7 @@ export function drawingEditor(ctx) {
         return [row];
       }
       const open = expanded.has(item.id);
-      row.firstChild.prepend(el("button", { type: "button", class: "fold", title: open ? "Fold away" : "Show what's inside", "aria-expanded": String(open), onclick: (event) => {
+      label.prepend(el("button", { type: "button", class: "fold", title: open ? "Fold away" : "Show what's inside", "aria-expanded": String(open), onclick: (event) => {
         event.stopPropagation();
         if (open) {
           expanded.delete(item.id);
@@ -727,6 +1308,33 @@ export function drawingEditor(ctx) {
     }, insideCopies(item)));
   }
 
+  function lineUpRow(count) {
+    const row = [el("span", { class: "align-tools", role: "group", "aria-label": "Line up" },
+      ALIGN.map(([edge, title, path]) => tool(count === 1 ? `${title} with the ${findElement(drawing(), picked().id)?.parent ? "group" : "screen"}` : title, path, () => lineUp(edge))))];
+    if (count >= 3) {
+      row.push(el("span", { class: "align-tools", role: "group", "aria-label": "Space evenly" },
+        SPREAD.map(([axis, title, path]) => tool(title, path, () => spread(axis)))));
+    }
+    return stacked(count === 1 ? "Line up" : "Line up and space", el("span", { class: "color-control wrap" }, ...row));
+  }
+
+  function selectionPanel(items) {
+    return [
+      el("h3", {}, `${items.length} parts picked`),
+      el("p", { class: "hint" }, "Drag any of them to move them together. Shift-click to add or take away parts."),
+      group(lineUpRow(items.length)),
+      el("div", { class: "actions" },
+        el("button", { type: "button", onclick: () => groupChosen() }, "Group them"),
+        el("button", { type: "button", onclick: () => copyChosen() }, "Copy"),
+        el("button", { type: "button", onclick: () => duplicateChosen() }, "Duplicate"),
+        el("button", { type: "button", onclick: () => removeChosen() }, "Remove"),
+        el("button", { type: "button", onclick: () => {
+          clear();
+          ctx.render();
+        } }, "Done")),
+    ];
+  }
+
   function itemPanel(item, screen) {
     const name = el("input", { value: item.name ?? "", placeholder: nameOf({ ...item, name: "" }), maxlength: 30 });
     name.addEventListener("input", () => {
@@ -737,7 +1345,10 @@ export function drawingEditor(ctx) {
     const actions = [el("button", { type: "button", onclick: () => {
       ctx.state.picked = null;
       ctx.render();
-    } }, "Done")];
+    } }, "Done"), el("button", { type: "button", onclick: () => copyChosen() }, "Copy")];
+    if (item.kind === "group") {
+      actions.push(el("button", { type: "button", onclick: () => ungroup(item) }, "Ungroup"));
+    }
     if (found?.parent) {
       actions.push(el("button", { type: "button", onclick: () => outOfGroup(item) }, "Take out of the group"));
     } else {
@@ -751,7 +1362,7 @@ export function drawingEditor(ctx) {
     const bound = Object.keys(item.bind ?? {}).length > 0;
     const sections = [
       el("h3", {}, nameOf(item)),
-      group(field("Name", name), ...kindFields(item, screen), ...placeFields(item)),
+      group(field("Name", name), ...kindFields(item, screen), ...placeFields(item), ...(item.at[shape()] ? [lineUpRow(1)] : [])),
       el("div", { class: "actions" }, ...actions),
     ];
     const live = [...moves, ...colours, showField(item)];
@@ -806,8 +1417,9 @@ export function drawingEditor(ctx) {
 
   function panel(screen) {
     const item = picked();
+    const items = chosen();
     const other = shape() === "wide" ? "upright" : "sideways";
-    const settings = item ? itemPanel(item, screen) : [];
+    const settings = items.length > 1 ? selectionPanel(items) : item ? itemPanel(item, screen) : [];
     if (item && settingsShown !== item.id) {
       requestAnimationFrame(() => settings[0]?.scrollIntoView({ block: "nearest" }));
     }
@@ -819,9 +1431,12 @@ export function drawingEditor(ctx) {
       partList(),
       el("p", { class: "hint" }, item?.kind === "group" ? "New parts go inside the picked group." : "Pick a group first to add parts inside it."),
       addMenu(screen),
-      el("div", { class: "actions" }, el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} drawing`)),
+      el("div", { class: "actions" },
+        heldParts() ? el("button", { type: "button", onclick: () => paste() }, "Paste") : null,
+        el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} drawing`)),
+      el("p", { class: "hint shortcuts" }, "Shift-click, or drag across an empty or locked part, to pick several parts. Ctrl+C and Ctrl+V copy parts, also between Home and Now Playing; Ctrl+G groups, Ctrl+D duplicates, Delete removes. Hold Alt while dragging to place freely, without lining up."),
     ];
   }
 
-  return { panel, overlay, down, deeper, move, up, nudge, nameOf, colorOf, walk };
+  return { panel, overlay, down, deeper, move, up, nudge, key, lineUp, spread, nameOf, colorOf, walk };
 }
