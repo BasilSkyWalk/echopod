@@ -6,6 +6,7 @@ import { coveredCodes } from "./font_editor.js";
 import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawing.js";
 import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
 import { mix, paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
+import { LIBRARY, VERSION_EVERY_MS, VERSION_LIMIT, addVersion, copyTheme, keep, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 import { READY, STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
@@ -129,6 +130,48 @@ for (const dark of [true, false]) {
 assert.ok(contrast(readableShade("#777777", "#808080", 4.5), "#808080") >= 4.5, "a hard-to-read colour is made readable");
 assert.equal(readableShade("#ffffff", "#000000", 4.5), "#ffffff", "a readable colour is left alone");
 assert.equal(mix("#000000", "#ffffff", 0.5), "#808080");
+function shelf(room) {
+  const kept = new Map();
+  return {
+    getItem: (key) => kept.get(key) ?? null,
+    setItem: (key, value) => {
+      if (value.length > room) {
+        throw new Error("full");
+      }
+      kept.set(key, value);
+    },
+    kept,
+  };
+}
+const stored = (name, colour) => JSON.stringify({ theme: { name, colors: { background: colour } }, designs: {} });
+const library = readLibrary(shelf(1e9));
+assert.deepEqual(library, { current: null, themes: [] }, "an empty browser has no themes");
+keep(library, "a", stored("Night", "#000000"), "Night", 1000);
+assert.equal(library.current, "a");
+assert.ok(versionDue(library, "a", 1000), "a new theme keeps its first version straight away");
+assert.ok(addVersion(library, "a", 1000));
+assert.equal(addVersion(library, "a", 2000), false, "an unchanged theme isn't kept twice");
+keep(library, "a", stored("Night", "#111111"), "Night", 2000);
+assert.equal(versionDue(library, "a", 2000), false);
+assert.ok(versionDue(library, "a", 1000 + VERSION_EVERY_MS), "another version is due ten minutes later");
+for (let step = 0; step < VERSION_LIMIT + 5; step++) {
+  keep(library, "a", stored("Night", `#0000${String(step).padStart(2, "0")}`), "Night", 3000 + step);
+  addVersion(library, "a", 3000 + step);
+}
+assert.equal(library.themes[0].versions.length, VERSION_LIMIT, "only the latest versions are kept");
+const copy = copyTheme(library, "a", 9000, "Night copy");
+assert.equal(JSON.parse(copy.snapshot).theme.name, "Night copy", "a copy carries its own name");
+assert.equal(library.themes.length, 2);
+const tight = shelf(JSON.stringify(library).length - 200);
+assert.ok(writeLibrary(tight, library), "when the browser is full the oldest versions make room");
+assert.ok(library.themes[0].versions.length + library.themes[1].versions.length < VERSION_LIMIT);
+assert.deepEqual(readLibrary(tight).themes.map((entry) => entry.name), ["Night copy", "Night"]);
+assert.equal(writeLibrary(shelf(10), library), false, "and it says so when nothing fits");
+removeTheme(library, library.current);
+assert.equal(library.current, copy.id, "removing the open theme opens the next");
+const garbled = shelf(1e9);
+garbled.setItem(LIBRARY, "{not json");
+assert.deepEqual(readLibrary(garbled).themes, []);
 const plainHome = drawingScript(startDrawing("standard", "home"), homeTheme);
 assert.match(plainHome, /^backdrop\(x, y, width, height\)$/m, "Home starts on the wallpaper, written once for both ways");
 assert.match(plainHome, /menu\(x, y, 176, 146\)/);

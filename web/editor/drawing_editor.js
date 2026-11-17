@@ -303,7 +303,8 @@ export function drawingEditor(ctx) {
 
   function nearHandle(place, point) {
     const handle = handleOf(place);
-    return Math.abs(point.x - handle.x) <= HANDLE / ctx.state.zoom + 1 && Math.abs(point.y - handle.y) <= HANDLE / ctx.state.zoom + 1;
+    const reach = (ctx.coarse?.() ? 2 * HANDLE : HANDLE) / ctx.state.zoom + 1;
+    return Math.abs(point.x - handle.x) <= reach && Math.abs(point.y - handle.y) <= reach;
   }
 
   function startDrag(primary, resize, point) {
@@ -1339,7 +1340,7 @@ export function drawingEditor(ctx) {
 
   function selectionPanel(items) {
     return [
-      el("h3", {}, `${items.length} parts picked`),
+      el("h3", { class: "keep" }, `${items.length} parts picked`),
       el("p", { class: "hint" }, "Drag any of them to move them together. Shift-click to add or take away parts."),
       group(lineUpRow(items.length)),
       el("div", { class: "actions" },
@@ -1380,7 +1381,7 @@ export function drawingEditor(ctx) {
     const colours = colourChangeFields(item);
     const bound = Object.keys(item.bind ?? {}).length > 0;
     const sections = [
-      el("h3", {}, nameOf(item)),
+      el("h3", { class: "keep" }, nameOf(item)),
       group(field("Name", name), ...kindFields(item, screen), ...placeFields(item), ...(item.at[shape()] ? [lineUpRow(1)] : [])),
       el("div", { class: "actions" }, ...actions),
     ];
@@ -1445,7 +1446,7 @@ export function drawingEditor(ctx) {
     settingsShown = item?.id ?? null;
     return [
       ...settings,
-      el("h3", {}, "On the screen, back to front"),
+      el("h3", { class: "keep" }, "On the screen, back to front"),
       el("p", { class: "hint" }, `You're drawing the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to draw the ${other} one.`),
       partList(),
       el("p", { class: "hint" }, item?.kind === "group" ? "New parts go inside the picked group." : "Pick a group first to add parts inside it."),

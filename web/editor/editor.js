@@ -20,6 +20,7 @@ import {
 } from "./theme_format.js";
 import { buildWallpapers } from "./wallpaper_editor.js";
 import { paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
+import { addVersion, copyTheme, emptyLibrary, entryOf, keep, newId, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 
 const STEPS = [
   { id: "start", label: "Start", icon: "M4 10h12M10 4v12" },
@@ -92,6 +93,22 @@ const SKIP_LIMIT_MS = 20000;
 const SKIP_SETTLE_MS = 700;
 const SCRIPT_COLOUR = /^const ([A-Z][A-Z0-9_]*) = (#[0-9a-fA-F]{6})[ \t]*$/gm;
 const SCRIPT_WORDS = { HI: "highlight", ALU: "metal", DIM: "dim", BG: "background", SOFT: "soft" };
+const PANEL = "echopod-panel-width";
+const FOLDED = "echopod-folded";
+const WELCOMED = "echopod-welcomed";
+const PANEL_DEFAULT = 420;
+const PANEL_LEAST = 320;
+const PANEL_MOST = 760;
+const STAGE_LEAST = 360;
+const LIBRARY_SETTLE_MS = 1500;
+const MINUTE = 60 * 1000;
+const TOUR = [
+  ["steps", "Work through these steps in any order: colours, the Home and Now Playing screens, the wallpaper, fonts and icons."],
+  ["device", "This is the player, running for real. Click anything on it to change it. Ctrl and the mouse wheel, or two fingers, zoom in; drag the space around it to move about."],
+  ["playback", "Try your theme playing or paused, part way through a song, with lyrics or a long title."],
+  ["inspector", "The settings for the step you're on. Drag its left edge to make it wider, and click a heading to fold a section away."],
+  ["save", "When you're happy, download the theme and copy it to the Themes folder on your card. Your themes are also kept in this browser, under Start."],
+];
 const CHROME_ROLES = [["header_top", "Title bar, top"], ["header_background", "Title bar"], ["header_text", "Title"]];
 
 const $ = (id) => document.getElementById(id);
@@ -124,6 +141,11 @@ const state = {
   recent: [],
   picture: null,
   dark: true,
+  library: emptyLibrary(),
+  themeId: null,
+  libraryTimer: null,
+  folded: new Set(),
+  confirming: null,
   statusAt: 0,
   scrubbing: false,
 };
@@ -208,8 +230,181 @@ function record() {
     state.history.splice(0, Math.max(0, state.history.length - HISTORY_LIMIT));
     state.future = [];
     saveDraft(now);
+    keepLater();
   }
   refreshUndo();
+}
+
+const store = {
+  getItem: (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key, value) => localStorage.setItem(key, value),
+};
+
+function keepNow(label = null) {
+  clearTimeout(state.libraryTimer);
+  state.libraryTimer = null;
+  const now = Date.now();
+  keep(state.library, state.themeId, snapshot(), state.theme.name, now);
+  const added = (label !== null || versionDue(state.library, state.themeId, now))
+    && addVersion(state.library, state.themeId, now, label ?? "Kept as you worked");
+  if (!writeLibrary(store, state.library) && !state.draftFailed) {
+    state.draftFailed = true;
+    say("This browser has no room left to keep your themes. Download the ones you want to keep.", true);
+  }
+  return added;
+}
+
+function keepLater() {
+  clearTimeout(state.libraryTimer);
+  state.libraryTimer = setTimeout(() => keepNow(), LIBRARY_SETTLE_MS);
+}
+
+function freshHistory() {
+  state.history = [snapshot()];
+  state.future = [];
+  saveDraft(state.history[0]);
+  refreshUndo();
+}
+
+function openKept(id) {
+  settleHistory();
+  keepNow();
+  const entry = entryOf(state.library, id);
+  if (!entry) {
+    return;
+  }
+  state.themeId = id;
+  restore(entry.snapshot);
+  state.stash = {};
+  state.picked = null;
+  freshHistory();
+  keepNow();
+  restart();
+  render();
+  say(`Opened ${entry.name}`);
+}
+
+function newKept() {
+  settleHistory();
+  keepNow();
+  state.themeId = newId(Date.now());
+  state.theme = defaultTheme(state.schema);
+  state.designs = { playing: null, home: null };
+  state.stash = {};
+  state.picked = null;
+  freshHistory();
+  keepNow();
+  restart();
+  render();
+  say("A new theme. Your other themes are under My themes.");
+}
+
+function ago(time) {
+  const gone = Date.now() - time;
+  if (gone < MINUTE) {
+    return "just now";
+  }
+  if (gone < 60 * MINUTE) {
+    const minutes = Math.round(gone / MINUTE);
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+  if (gone < 24 * 60 * MINUTE) {
+    const hours = Math.round(gone / (60 * MINUTE));
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+  return new Date(time).toLocaleDateString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function swatchesOf(snapshotText) {
+  try {
+    const colours = JSON.parse(snapshotText).theme?.colors ?? {};
+    return el("span", { class: "kept-swatches", "aria-hidden": "true" },
+      ["background", "selection_background", "text", "header_background"].map((role) => el("span", { style: `background: ${colours[role] ?? "transparent"}` })));
+  } catch {
+    return null;
+  }
+}
+
+function confirmButton(key, label, sure, act) {
+  const asking = state.confirming === key;
+  return el("button", { type: "button", class: asking ? "danger" : "", onclick: () => {
+    if (asking) {
+      state.confirming = null;
+      act();
+    } else {
+      state.confirming = key;
+      render();
+    }
+  } }, asking ? sure : label);
+}
+
+function keptThemes() {
+  const rows = state.library.themes.map((entry) => {
+    const current = entry.id === state.themeId;
+    return el("li", { class: current ? "kept current" : "kept" },
+      swatchesOf(entry.snapshot),
+      el("span", { class: "kept-name" }, el("strong", {}, entry.name || "Untitled"), el("small", {}, current ? "Open now" : `Changed ${ago(entry.updated)}`)),
+      el("span", { class: "kept-tools" },
+        current ? null : el("button", { type: "button", onclick: () => openKept(entry.id) }, "Open"),
+        el("button", { type: "button", onclick: () => {
+          keepNow();
+          const copy = copyTheme(state.library, entry.id, Date.now(), `${entry.name} copy`.slice(0, NAME_BYTES));
+          writeLibrary(store, state.library);
+          if (copy) {
+            openKept(copy.id);
+          }
+        } }, "Copy"),
+        confirmButton(`delete:${entry.id}`, "Delete", "Delete it?", () => {
+          const wasOpen = entry.id === state.themeId;
+          removeTheme(state.library, entry.id);
+          writeLibrary(store, state.library);
+          if (!wasOpen) {
+            render();
+          } else if (state.library.current) {
+            state.themeId = null;
+            openKept(state.library.current);
+          } else {
+            newKept();
+          }
+        })));
+  });
+  const entry = entryOf(state.library, state.themeId);
+  const versions = [...(entry?.versions ?? [])].reverse().map((version) =>
+    el("li", { class: "kept version" },
+      swatchesOf(version.snapshot),
+      el("span", { class: "kept-name" }, el("strong", {}, ago(version.at)), el("small", {}, version.label)),
+      el("span", { class: "kept-tools" }, el("button", { type: "button", onclick: () => {
+        settleHistory();
+        keepNow("Before going back");
+        restore(version.snapshot);
+        state.stash = {};
+        state.picked = null;
+        restart();
+        changed({ rebuild: true });
+        say(`Back to how it was ${ago(version.at)}. Undo or the list below brings the newer one back.`);
+      } }, "Go back to this"))));
+  return [
+    el("h3", {}, "My themes"),
+    el("p", { class: "hint" }, "Kept in this browser as you work. Download a theme to keep it for good."),
+    el("ul", { class: "kept-list" }, rows),
+    el("div", { class: "actions" }, el("button", { type: "button", onclick: newKept }, "New theme")),
+    el("h3", {}, "Earlier versions"),
+    versions.length
+      ? el("ul", { class: "kept-list" }, versions)
+      : el("p", { class: "hint" }, "A version is kept every ten minutes while you work, and before you open another theme over this one."),
+    el("div", { class: "actions" }, el("button", { type: "button", onclick: () => {
+      settleHistory();
+      const added = keepNow("Kept by you");
+      render();
+      say(added ? "Kept this version." : "This version is already kept.");
+    } }, "Keep this version now")),
+  ];
 }
 
 function remember() {
@@ -248,6 +443,7 @@ function travel(back) {
   }
   restore(state.history[state.history.length - 1]);
   saveDraft(state.history[state.history.length - 1]);
+  keepLater();
   restart();
   render();
   refreshUndo();
@@ -553,6 +749,7 @@ const drawer = drawingEditor({
   fits: () => fits(),
   say: (text, bad) => say(text, bad),
   remember: () => remember(),
+  coarse: () => window.matchMedia?.("(pointer: coarse)").matches ?? false,
 });
 
 function roleSelect(role, set) {
@@ -684,7 +881,9 @@ function panelStart() {
     starts,
     el("div", { class: "actions" },
       el("button", { type: "button", onclick: () => $("picker").click() }, "Open a theme file…"),
-      el("button", { type: "button", onclick: startOver }, "Start over")),
+      el("button", { type: "button", onclick: startOver }, "Start over"),
+      el("button", { type: "button", onclick: () => startTour() }, "Show me around")),
+    ...keptThemes(),
   ];
 }
 
@@ -1129,12 +1328,60 @@ function renderScreens() {
   }
 }
 
+function foldSections() {
+  let body = null;
+  for (const node of [...inspector.children]) {
+    if (node.tagName === "H3" && !node.classList.contains("keep")) {
+      const key = `${state.step}:${node.textContent}`;
+      const shut = state.folded.has(key);
+      body = el("div", { class: "fold-body", hidden: shut });
+      const head = el("button", { type: "button", class: "fold-head", "aria-expanded": String(!shut) }, node.textContent);
+      const section = body;
+      head.addEventListener("click", () => {
+        const open = section.hidden;
+        section.hidden = !open;
+        head.setAttribute("aria-expanded", String(open));
+        if (open) {
+          state.folded.delete(key);
+        } else {
+          state.folded.add(key);
+        }
+        try {
+          localStorage.setItem(FOLDED, JSON.stringify([...state.folded]));
+        } catch {
+          return;
+        }
+      });
+      node.replaceChildren(head);
+      node.classList.add("fold-title");
+      node.after(body);
+      continue;
+    }
+    if (node.tagName === "H2" || node.tagName === "H3") {
+      body = null;
+      continue;
+    }
+    if (body && node !== body) {
+      body.append(node);
+    }
+  }
+}
+
+function unfoldTo(node) {
+  const body = node?.closest(".fold-body");
+  if (body?.hidden) {
+    body.hidden = false;
+    body.previousElementSibling?.querySelector(".fold-head")?.setAttribute("aria-expanded", "true");
+  }
+}
+
 function render() {
   refreshSwatches();
   renderSteps();
   renderScreens();
   $("name").value = state.theme.name;
   inspector.replaceChildren(...panelFor(state.step));
+  foldSections();
   $("hint").textContent = designing()
     ? "Drag to move, drag the corner to resize. Arrow keys nudge the picked part."
     : "Click anything on the screen to change its colour.";
@@ -1420,9 +1667,210 @@ function jumpToRole(role) {
     ? inspector.querySelector(`[data-${kind}="${name}"]`)
     : inspector.querySelector(`[data-role="${role}"]`);
   if (row) {
+    unfoldTo(row);
     row.scrollIntoView({ block: "center", behavior: "smooth" });
     row.classList.add("flash");
   }
+}
+
+function setPanel(width, keepIt = true) {
+  const room = document.querySelector(".app").clientWidth - STAGE_LEAST - 64;
+  const shown = Math.round(Math.max(PANEL_LEAST, Math.min(PANEL_MOST, room, width)));
+  document.documentElement.style.setProperty("--panel", `${shown}px`);
+  $("resizer").setAttribute("aria-valuenow", String(shown));
+  if (keepIt) {
+    try {
+      localStorage.setItem(PANEL, String(shown));
+    } catch {
+      return shown;
+    }
+  }
+  return shown;
+}
+
+function panelWidth() {
+  return inspector.getBoundingClientRect().width;
+}
+
+function wirePanel() {
+  const handle = $("resizer");
+  let saved = PANEL_DEFAULT;
+  try {
+    saved = Number(localStorage.getItem(PANEL)) || PANEL_DEFAULT;
+    state.folded = new Set(JSON.parse(localStorage.getItem(FOLDED) ?? "[]"));
+  } catch {
+    saved = PANEL_DEFAULT;
+  }
+  setPanel(saved, false);
+  let dragging = null;
+  handle.addEventListener("pointerdown", (event) => {
+    dragging = { from: event.clientX, width: panelWidth() };
+    handle.setPointerCapture(event.pointerId);
+    handle.classList.add("dragging");
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (dragging) {
+      setPanel(dragging.width + dragging.from - event.clientX, false);
+    }
+  });
+  const stop = () => {
+    if (dragging) {
+      dragging = null;
+      handle.classList.remove("dragging");
+      setPanel(panelWidth());
+    }
+  };
+  handle.addEventListener("pointerup", stop);
+  handle.addEventListener("pointercancel", stop);
+  handle.addEventListener("dblclick", () => setPanel(PANEL_DEFAULT));
+  handle.addEventListener("keydown", (event) => {
+    const step = event.shiftKey ? 64 : 16;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      setPanel(panelWidth() + (event.key === "ArrowLeft" ? step : -step));
+    }
+  });
+  window.addEventListener("resize", () => setPanel(panelWidth(), false));
+}
+
+function zoomTo(value, anchor = null) {
+  const wrap = document.querySelector(".device-wrap");
+  const before = canvas.getBoundingClientRect();
+  const old = before.width / canvas.width || state.zoom;
+  state.zoomChoice = Math.max(1, Math.min(8, Math.round(value * ZOOM_STEPS) / ZOOM_STEPS));
+  $("zoom-level").textContent = `${state.zoomChoice}×`;
+  fit(canvas.width, canvas.height);
+  if (anchor) {
+    const spotX = (anchor.x - before.left) / old;
+    const spotY = (anchor.y - before.top) / old;
+    const after = canvas.getBoundingClientRect();
+    wrap.scrollLeft += after.left + spotX * state.zoom - anchor.x;
+    wrap.scrollTop += after.top + spotY * state.zoom - anchor.y;
+  }
+}
+
+function wireZoom() {
+  const wrap = document.querySelector(".device-wrap");
+  wrap.addEventListener("wheel", (event) => {
+    if (!event.ctrlKey && !event.metaKey) {
+      return;
+    }
+    event.preventDefault();
+    zoomTo(state.zoom * Math.exp(-event.deltaY * 0.004), { x: event.clientX, y: event.clientY });
+  }, { passive: false });
+  let pan = null;
+  wrap.addEventListener("pointerdown", (event) => {
+    const onScreen = event.target === overlay || event.target === canvas;
+    if (event.pointerType === "touch" || (onScreen && event.button !== 1)) {
+      return;
+    }
+    pan = { x: event.clientX, y: event.clientY, left: wrap.scrollLeft, top: wrap.scrollTop };
+    wrap.setPointerCapture(event.pointerId);
+    wrap.classList.add("panning");
+    event.preventDefault();
+  });
+  wrap.addEventListener("pointermove", (event) => {
+    if (pan) {
+      wrap.scrollLeft = pan.left - (event.clientX - pan.x);
+      wrap.scrollTop = pan.top - (event.clientY - pan.y);
+    }
+  });
+  const stop = () => {
+    pan = null;
+    wrap.classList.remove("panning");
+  };
+  wrap.addEventListener("pointerup", stop);
+  wrap.addEventListener("pointercancel", stop);
+  let pinch = null;
+  const spread = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  wrap.addEventListener("touchstart", (event) => {
+    if (event.touches.length === 2) {
+      pinch = { gap: spread(event.touches), zoom: state.zoom };
+    }
+  }, { passive: true });
+  wrap.addEventListener("touchmove", (event) => {
+    if (pinch && event.touches.length === 2) {
+      event.preventDefault();
+      const middle = { x: (event.touches[0].clientX + event.touches[1].clientX) / 2, y: (event.touches[0].clientY + event.touches[1].clientY) / 2 };
+      zoomTo(pinch.zoom * spread(event.touches) / pinch.gap, middle);
+    }
+  }, { passive: false });
+  wrap.addEventListener("touchend", (event) => {
+    if (event.touches.length < 2) {
+      pinch = null;
+    }
+  });
+}
+
+function startTour(at = 0) {
+  document.querySelector(".tour")?.remove();
+  document.querySelector(".tour-target")?.classList.remove("tour-target");
+  if (at >= TOUR.length) {
+    try {
+      localStorage.setItem(WELCOMED, "1");
+    } catch {
+      return;
+    }
+    return;
+  }
+  if (at === 2 && $("playback").hidden) {
+    state.screen = "home";
+    restart();
+    render();
+  }
+  const [id, words] = TOUR[at];
+  const target = $(id);
+  target.classList.add("tour-target");
+  const finish = () => startTour(TOUR.length);
+  const bubble = el("div", { class: "tour", role: "dialog", "aria-label": "Getting started" },
+    el("p", {}, words),
+    el("div", { class: "tour-foot" },
+      el("span", { class: "hint" }, `${at + 1} of ${TOUR.length}`),
+      el("span", { class: "actions" },
+        at < TOUR.length - 1 ? el("button", { type: "button", onclick: finish }, "Skip") : null,
+        el("button", { type: "button", class: "primary", onclick: () => startTour(at + 1) }, at < TOUR.length - 1 ? "Next" : "Done"))));
+  document.body.append(bubble);
+  const spot = target.getBoundingClientRect();
+  const box = bubble.getBoundingClientRect();
+  const below = spot.bottom + 12 + box.height < window.innerHeight;
+  const left = Math.max(12, Math.min(window.innerWidth - box.width - 12, spot.left + spot.width / 2 - box.width / 2));
+  const top = below ? spot.bottom + 12 : Math.max(12, spot.top + Math.min(spot.height / 2, 120) - box.height / 2);
+  const beside = !below && spot.left > box.width + 24 ? spot.left - box.width - 12 : left;
+  bubble.style.left = `${below ? left : beside}px`;
+  bubble.style.top = `${top}px`;
+  bubble.querySelector(".primary").focus();
+}
+
+function welcome(returning) {
+  let welcomed = true;
+  try {
+    welcomed = returning || Boolean(localStorage.getItem(WELCOMED));
+    if (returning) {
+      localStorage.setItem(WELCOMED, "1");
+    }
+  } catch {
+    welcomed = true;
+  }
+  if (welcomed) {
+    return;
+  }
+  const card = el("div", { class: "welcome", role: "dialog", "aria-label": "Welcome" },
+    el("h2", {}, "Make your own EchoPod theme"),
+    el("ol", {},
+      el("li", {}, "Begin from one of the themes, or from scratch."),
+      el("li", {}, "Change its colours, draw Home and Now Playing, add a wallpaper, fonts and icons."),
+      el("li", {}, "Download it and copy it to the Themes folder on your card.")),
+    el("p", { class: "hint" }, "Nothing to install, and your work is kept in this browser."),
+    el("div", { class: "actions" },
+      el("button", { type: "button", class: "primary", onclick: () => {
+        card.remove();
+        startTour(0);
+      } }, "Show me around"),
+      el("button", { type: "button", onclick: () => {
+        card.remove();
+        startTour(TOUR.length);
+      } }, "I'll find my way")));
+  document.querySelector(".stage").append(card);
 }
 
 function wireOverlay() {
@@ -1502,6 +1950,7 @@ function save(name, bytes, type) {
 
 function wear(bytes) {
   settleHistory();
+  keepNow("Before opening another theme over it");
   try {
     const theme = unpack(bytes, state.schema);
     state.theme = theme;
@@ -1546,6 +1995,8 @@ async function openSample(sample, kept = false) {
 }
 
 function startOver() {
+  settleHistory();
+  keepNow("Before starting over");
   state.theme = defaultTheme(state.schema);
   state.designs = { playing: null, home: null };
   state.stash = {};
@@ -1639,10 +2090,20 @@ async function main() {
   }
   wireControls();
   wireOverlay();
+  wirePanel();
+  wireZoom();
   restart();
   state.history = [snapshot()];
+  state.library = readLibrary(store);
+  state.themeId = entryOf(state.library, state.library.current) ? state.library.current : newId(Date.now());
+  keepNow();
+  window.addEventListener("pagehide", () => {
+    settleHistory();
+    keepNow();
+  });
   render();
   refreshUndo();
+  welcome(Boolean(draft));
   if (asked !== null) {
     history.replaceState(null, "", location.pathname);
     if (state.schema.samples.includes(asked)) {
