@@ -8,7 +8,7 @@ import { KEY, Preview } from "./preview_host.js";
 import {
   ACCENT_SHADES,
   ThemeError,
-  assetMemory,
+  memoryParts,
   defaultTheme,
   lint,
   opacityPercent,
@@ -325,6 +325,10 @@ function refreshNotices() {
   const box = inspector.querySelector("[data-notice]");
   if (box) {
     box.replaceWith(noticeBox());
+  }
+  const memory = inspector.querySelector("[data-memory]");
+  if (memory) {
+    memory.replaceWith(memoryBar());
   }
 }
 
@@ -682,9 +686,92 @@ function panelLegacy(title, lead, build) {
   return [el("h2", {}, title), el("p", { class: "lead" }, lead), host];
 }
 
+const FONT_NAMES = { title: "Titles font", body: "List text font", small: "Small text font" };
+const LICENCES = [
+  ["", "Choose one"],
+  ["mine", "I drew them, or they came with EchoPod"],
+  ["open", "From a font with an open licence, like the SIL Open Font License"],
+  ["unsure", "I'm not sure"],
+];
+
+function kilobytes(bytes) {
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function memoryBar() {
+  const parts = memoryParts(state.theme, state.schema);
+  const pieces = [
+    ...Object.entries(parts.fonts).map(([name, bytes]) => [FONT_NAMES[name], bytes, () => {
+      state.theme.fonts[name] = null;
+      delete state.theme.font_sources?.[name];
+    }]),
+    ["Wallpaper", parts.wallpaper, () => {
+      for (const key of Object.keys(state.theme.wallpapers ?? {})) {
+        state.theme.wallpapers[key] = null;
+      }
+    }],
+  ].filter(([, bytes]) => bytes > 0);
+  const over = parts.used > parts.limit;
+  const scale = Math.max(parts.limit, parts.used);
+  const bar = el("div", { class: "memory-track", role: "img", "aria-label": `${kilobytes(parts.used)} of ${kilobytes(parts.limit)} used` },
+    pieces.map(([label, bytes], index) => el("span", {
+      class: `memory-part memory-part-${index}`,
+      style: `width: ${(bytes * 100) / scale}%`,
+      title: `${label}: ${kilobytes(bytes)}`,
+    })));
+  const legend = el("ul", { class: "memory-legend" }, pieces.map(([label, bytes], index) =>
+    el("li", {}, el("span", { class: `memory-dot memory-part-${index}` }), `${label} ${kilobytes(bytes)}`)));
+  const box = el("div", { class: over ? "memory over" : "memory", "data-memory": "" },
+    el("p", { class: "memory-total" }, over
+      ? `Too much: ${kilobytes(parts.used)} of the player's ${kilobytes(parts.limit)} for pictures and fonts`
+      : `${kilobytes(parts.used)} of the player's ${kilobytes(parts.limit)} for pictures and fonts`),
+    bar, pieces.length ? legend : null);
+  if (over) {
+    const short = parts.used - parts.limit;
+    box.append(
+      el("p", { class: "hint" }, `Free up ${kilobytes(short)}: make a font smaller, use a smaller or repeating wallpaper, or remove one of these.`),
+      el("div", { class: "actions" }, pieces.map(([label, bytes, drop]) => el("button", { type: "button", onclick: () => {
+        drop();
+        changed({ rebuild: true });
+        say(`Removed the ${label.toLowerCase()}. Undo brings it back.`);
+      } }, `Remove the ${label.toLowerCase()} (${kilobytes(bytes)})`))),
+    );
+  }
+  return box;
+}
+
+function licenceField() {
+  const fonts = Object.values(state.theme.fonts ?? {}).some(Boolean);
+  if (!fonts) {
+    return null;
+  }
+  const select = el("select", {}, LICENCES.map(([value, label]) => new Option(label, value)));
+  select.value = state.theme.font_licence ?? "";
+  const advice = el("p", { class: "hint" });
+  const explain = () => {
+    advice.textContent = select.value === "unsure"
+      ? "Keep this theme to yourself until you know the font may be passed on. Most free fonts say so in a licence file that comes with them."
+      : select.value === "open"
+        ? "Include the font's licence when you share the theme."
+        : "";
+  };
+  select.addEventListener("change", () => {
+    state.theme.font_licence = select.value;
+    remember();
+    explain();
+  });
+  explain();
+  return [el("h3", {}, "The fonts in this theme"), group(field("Where they're from", select)), advice];
+}
+
+function withMemory(parts) {
+  const [title, lead, ...rest] = parts;
+  return [title, lead, memoryBar(), ...rest];
+}
+
 function panelShare() {
   const bytes = apply();
-  const memory = assetMemory(state.theme, state.schema);
+  const memory = memoryParts(state.theme, state.schema).used;
   const size = bytes ? `This theme is ${bytes.length.toLocaleString("en")} bytes` : "";
   const used = memory ? `, and uses ${memory.toLocaleString("en")} of the player's ${state.schema.asset_memory.toLocaleString("en")} bytes for pictures and fonts` : "";
   return [
@@ -698,8 +785,9 @@ function panelShare() {
       el("li", {}, "On the player, open Settings, Display, Theme.")),
     el("div", { class: "actions" },
       el("button", { type: "button", class: "primary", onclick: download }, "Download for my player"),
-      el("button", { type: "button", onclick: downloadSource }, "Download source")),
+      el("button", { type: "button", onclick: downloadSource }, "Save an editable copy")),
     el("p", { class: "hint" }, bytes ? `${size}${used}.` : ""),
+    licenceField(),
     el("h3", {}, "With everyone"),
     el("p", { class: "hint" }, "Download the source and add it to the themes folder of the EchoPod project in a pull request. Once it's merged, it appears in the gallery."),
   ];
@@ -846,9 +934,9 @@ function panelFor(step) {
     case "playing":
       return panelDesign(step);
     case "wallpaper":
-      return panelLegacy("Wallpaper", "A picture behind the lists. It's cut to 16 colours; fade it until the text reads well.", buildWallpapers);
+      return withMemory(panelLegacy("Wallpaper", "A picture behind the lists. It's cut to 16 colours; fade it until the text reads well.", buildWallpapers));
     case "fonts":
-      return panelLegacy("Fonts", "Your own lettering for titles, lists and small text. Only share fonts whose licence allows it.", buildFonts);
+      return withMemory(panelLegacy("Fonts", "Lettering for titles, lists and small text: draw your own, or use a font file.", buildFonts));
     case "icons":
       return panelLegacy("Icons", "The small pictures in the title bar and the lists. Drag to draw and right-drag to erase; the theme's colours tint them.", buildIcons);
     default:
@@ -1119,7 +1207,9 @@ function download() {
 
 function downloadSource() {
   syncScene();
-  save(`${slug(state.theme.name)}.toml`, toToml(state.theme, state.schema), "text/plain");
+  const licence = LICENCES.find(([value]) => value && value === state.theme.font_licence);
+  const note = licence ? `# Fonts: ${licence[1]}\n` : "";
+  save(`${slug(state.theme.name)}.toml`, note + toToml(state.theme, state.schema), "text/plain");
 }
 
 function save(name, bytes, type) {

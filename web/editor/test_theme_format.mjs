@@ -4,12 +4,14 @@ import { join } from "node:path";
 import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from "./icon_editor.js";
 import { coveredCodes } from "./font_editor.js";
 import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawing.js";
+import { LETTERS, LETTER_STYLES, letterFont, letterHeight } from "./pixel_letters.js";
 import { STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
 import {
   ThemeError,
   assetMemory,
+  memoryParts,
   checksum,
   contrast,
   defaultTheme,
@@ -177,6 +179,28 @@ assert.ok(converted.elements.some((item) => item.name === "VU meter" && item.at.
 assert.ok(JSON.stringify(converted).includes("#112233"), "an old part keeps its colours");
 assert.ok(sceneSize(converted) < SCENE_ROOM);
 assert.deepEqual(fromDesign(older, "playing").elements.length, converted.elements.length);
+
+for (const [name, style] of Object.entries(LETTER_STYLES)) {
+  for (const entry of schema.fonts) {
+    if (letterHeight(style) > entry.height) {
+      assert.throws(() => letterFont(style, entry.height), RangeError, `${name} is refused where it doesn't fit`);
+      continue;
+    }
+    const font = letterFont(style, entry.height);
+    assert.ok(font.ascent + font.descent <= entry.height, `${name} fits ${entry.name}`);
+    assert.equal(font.glyphs.length, Object.keys(LETTERS).length + 26, `${name} has capitals for lowercase`);
+    const lettered = { ...defaultTheme(schema), fonts: { ...defaultTheme(schema).fonts, [entry.name]: font }, font_sources: { [entry.name]: { kind: "drawn" } }, font_edits: {} };
+    const back = unpack(pack(lettered, schema), schema);
+    assert.equal(back.fonts[entry.name].glyphs.length, font.glyphs.length, `${name} packs as the ${entry.name} font`);
+  }
+}
+const everyChar = schema.font_ranges.flatMap(([first, last]) => Array.from({ length: last - first + 1 }, (_, index) => String.fromCharCode(first + index)));
+const dotted = letterFont(LETTER_STYLES.dots, 20);
+assert.deepEqual(everyChar.filter((char) => !dotted.glyphs.some((glyph) => glyph.char === char)), [], "the letter set covers every character a theme font may have");
+const memoryTheme = { ...defaultTheme(schema), fonts: { ...defaultTheme(schema).fonts, title: dotted } };
+const memory = memoryParts(memoryTheme, schema);
+assert.ok(memory.fonts.title > 0 && memory.wallpaper === 0 && memory.used === memory.fonts.title && memory.limit === schema.asset_memory);
+assert.equal(memoryParts(defaultTheme(schema), schema).used, 0);
 
 assert.equal(checksum(new Uint8Array([])), 0x811c9dc5);
 assert.equal(checksum(new TextEncoder().encode("a")), 0xe40c292c);

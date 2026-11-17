@@ -52,8 +52,10 @@ The editor is a web page that runs the player's own interface, so the screen in 
 - The sideways and upright screens are drawn separately; "Copy the … drawing" starts one from the other. A part drawn the same way both ways is stored once.
 - **A theme's own screen.** When a theme draws Home or Now Playing from its own script, that step offers "This theme's own": every colour the script names, and the title bar's colours on that screen, ready to change. Clicking the screen jumps to them too. "My own drawing" on one of the four faces starts from that face drawn in parts, in its current colours.
 - Designs made with earlier versions of the editor open as drawings.
+- **Fonts** has a card for titles, list text and small text. Each can stay the player's own, use a font file (drop a `.ttf`, `.otf`, `.woff` or `.woff2` on the card, pick one of three sizes, and tick **Crisp edges** for a sharp pixel look), or be drawn: **Draw my own** starts from a set of capitals, digits and marks in a dot-matrix, block or fine style, with sliders for the dot size, the space between dots, the glow, boldness and the space between letters. Click any letter to change it on a grid with its baseline and width marked; letters the font lacks are shown dashed.
+- A bar on the Wallpaper and Fonts steps shows how much of the player's memory for pictures and fonts each one uses. When it is too much, the bar says how much to free and offers to remove a font or the wallpaper.
 - A note appears when something would be hard to read (see Readability below). Undo and redo are at the top, and your work is kept in the browser until you start over.
-- **Download for my player** saves the `.echotheme` file. **Download source** saves the same theme as a `.toml` text file, which is what you share in this repository.
+- **Download for my player** saves the `.echotheme` file. **Save an editable copy** saves the same theme as a `.toml` text file, which is what you share in this repository. When the theme has its own fonts, Save & share asks where they're from.
 
 The gallery page next to it lists the built-in samples and every theme in this repository's `themes` folder, with a picture of each, a download and an "Open in the editor" link.
 
@@ -389,10 +391,10 @@ size = 11
 
 - Without `size`, the packer picks the largest pixel size whose line fits. A size whose line is too tall is refused.
 - The font is drawn for the basic Latin letters, digits and punctuation, plus a few marks (curly quotes, dashes, the ellipsis, the euro sign, ★ and ✓) when the font has them. Any character a theme font lacks, such as accented letters, Cyrillic, Chinese, Japanese and Korean, is drawn in the player's own font on the same line.
-- The editor's **Download source** writes a font out as its glyphs (each `{char, left, top, advance, rows}`, the rows like an icon's), so a source from the editor needs no font file.
+- The editor's **Save an editable copy** writes a font out as its glyphs (each `{char, left, top, advance, rows}`, the rows like an icon's), so a source from the editor needs no font file.
 - Only share a font whose licence allows it to be passed on, such as the SIL Open Font License. Put the licence in the pull request.
 
-Fonts and the wallpaper share 28,224 bytes of the player's memory. A 16 px font takes about 5 KB and a whole-screen wallpaper 28 KB, so a theme with fonts needs a repeating or smaller wallpaper. The packer says how much a theme needs when it is too much, and the editor's status line shows how much of the memory a theme uses.
+Fonts and the wallpaper share 28,224 bytes of the player's memory. A 16 px font takes about 5 KB and a whole-screen wallpaper 28 KB, so a theme with fonts needs a repeating or smaller wallpaper. The packer says how much a theme needs when it is too much, and the editor's memory bar shows what each font and the wallpaper use.
 
 ### `[wallpaper]` and `[wallpaper_portrait]`
 

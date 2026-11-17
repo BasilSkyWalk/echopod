@@ -489,6 +489,34 @@ export function assetMemory(theme, schema) {
   return checkMemory(wallpaperSections(theme, schema), fontAssets(theme, schema), schema);
 }
 
+export function memoryParts(theme, schema) {
+  const fonts = {};
+  schema.fonts.forEach((entry, index) => {
+    const font = theme.fonts?.[entry.name];
+    if (!font) {
+      return;
+    }
+    try {
+      fonts[entry.name] = fontAsset(font, entry, FIRST_FONT_KIND + index).memory;
+    } catch (error) {
+      if (!(error instanceof ThemeError)) {
+        throw error;
+      }
+      fonts[entry.name] = 0;
+    }
+  });
+  let wallpaper = 0;
+  try {
+    wallpaper = Math.max(0, ...wallpaperSections(theme, schema).map((wall) => wall.memory));
+  } catch (error) {
+    if (!(error instanceof ThemeError)) {
+      throw error;
+    }
+  }
+  const used = Object.values(fonts).reduce((sum, bytes) => sum + bytes, wallpaper);
+  return { fonts, wallpaper, used, limit: schema.asset_memory };
+}
+
 
 const LAYOUT_BOX_SIZE = 8;
 const LAYOUT_REACH = 320;
