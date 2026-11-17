@@ -42,6 +42,7 @@ export function drawingEditor(ctx) {
   const expanded = new Set();
   let listScroll = 0;
   let shownPick = null;
+  let settingsShown = null;
 
   const drawing = () => ctx.drawing();
   const shape = () => ctx.shape();
@@ -733,7 +734,10 @@ export function drawingEditor(ctx) {
       ctx.remember();
     });
     const found = findElement(drawing(), item.id);
-    const actions = [];
+    const actions = [el("button", { type: "button", onclick: () => {
+      ctx.state.picked = null;
+      ctx.render();
+    } }, "Done")];
     if (found?.parent) {
       actions.push(el("button", { type: "button", onclick: () => outOfGroup(item) }, "Take out of the group"));
     } else {
@@ -803,18 +807,20 @@ export function drawingEditor(ctx) {
   function panel(screen) {
     const item = picked();
     const other = shape() === "wide" ? "upright" : "sideways";
-    const parts = [
-      el("p", { class: "hint" }, `You're drawing the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to draw the ${other} one.`),
-      el("div", { class: "actions" }, el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} drawing`)),
+    const settings = item ? itemPanel(item, screen) : [];
+    if (item && settingsShown !== item.id) {
+      requestAnimationFrame(() => settings[0]?.scrollIntoView({ block: "nearest" }));
+    }
+    settingsShown = item?.id ?? null;
+    return [
+      ...settings,
       el("h3", {}, "On the screen, back to front"),
+      el("p", { class: "hint" }, `You're drawing the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to draw the ${other} one.`),
       partList(),
       el("p", { class: "hint" }, item?.kind === "group" ? "New parts go inside the picked group." : "Pick a group first to add parts inside it."),
       addMenu(screen),
+      el("div", { class: "actions" }, el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} drawing`)),
     ];
-    if (item) {
-      parts.push(...itemPanel(item, screen));
-    }
-    return parts;
   }
 
   return { panel, overlay, down, deeper, move, up, nudge, nameOf, colorOf, walk };

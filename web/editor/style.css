@@ -419,7 +419,7 @@ input[type="radio"] {
 
 .field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(84px, 1fr) minmax(0, auto);
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
@@ -808,4 +808,9 @@ details.moves summary {
   height: 22px;
   border: 1px solid var(--line-strong);
   border-radius: 5px;
+}
+
+.field select {
+  min-width: 0;
+  max-width: 100%;
 }

@@ -82,6 +82,7 @@ const NAME_BYTES = 23;
 const SLUG_LETTERS = 23;
 const MERGED_PARTS = ["colors", "boxes", "spacing", "icons", "wallpapers", "fonts"];
 const SKIP_STEP_MS = 100;
+const ZOOM_STEPS = 4;
 const COLOUR_SLACK = 24;
 const GRADIENT_SLACK = 12;
 const GRADIENT_LEAST = 30;
@@ -740,12 +741,14 @@ function designFrom(step) {
   return face && STARTS[DESIGNS[step].screen].some(([name]) => name === face) ? startDrawing(face, DESIGNS[step].screen, consts) : null;
 }
 
-function startFrom(step, name) {
+function startFrom(step, name, label) {
   const consts = stashColours(step);
   state.designs[step] = startDrawing(name, DESIGNS[step].screen, faceOf(consts) === name ? consts : {});
   state.picked = null;
   if (!fits()) {
     say("That drawing doesn't fit with the rest of this theme. Make room by removing a picture or a font.", true);
+  } else {
+    say(`Started again from ${label}. Undo brings back your drawing.`);
   }
   changed({ rebuild: true });
   restart();
@@ -822,10 +825,11 @@ function panelDesign(step) {
     parts.push(el("p", { class: "notice" }, "This Home screen shows no menu. The buttons still move through Music, Settings and the rest, so add a Menu."));
   }
   parts.push(
-    el("h3", {}, "Start again from"),
-    el("div", { class: "actions" }, STARTS[config.screen].map(([name, label]) =>
-      el("button", { type: "button", onclick: () => startFrom(step, name) }, label))),
     ...drawer.panel(config.screen),
+    el("h3", {}, "Start again from"),
+    el("p", { class: "hint" }, "Replaces this drawing. Undo brings it back."),
+    el("div", { class: "actions" }, STARTS[config.screen].map(([name, label]) =>
+      el("button", { type: "button", onclick: () => startFrom(step, name, label) }, label))),
   );
   return parts;
 }
@@ -856,6 +860,7 @@ function renderSteps() {
   $("steps").replaceChildren(...STEPS.map((step) => el("button", {
     type: "button",
     "aria-current": step.id === state.step ? "step" : null,
+    title: step.label,
     onclick: () => goTo(step.id),
   }, icon(step.icon), el("span", {}, step.label))));
 }
@@ -919,7 +924,7 @@ function restart() {
 function fitZoom(width, height) {
   const stage = document.querySelector(".device-wrap");
   const room = Math.min((stage.clientWidth - 92) / width, (stage.clientHeight - 92) / height);
-  return Math.max(1, Math.min(8, Math.floor(room)));
+  return Math.max(1, Math.min(8, Math.floor(room * ZOOM_STEPS) / ZOOM_STEPS));
 }
 
 function setZoom(choice) {
@@ -929,7 +934,7 @@ function setZoom(choice) {
   if (choice === "fit") {
     state.zoomChoice = null;
   } else {
-    state.zoomChoice = Math.max(1, Math.min(8, current + (choice === "in" ? 1 : -1)));
+    state.zoomChoice = Math.max(1, Math.min(8, choice === "in" ? Math.floor(current) + 1 : Math.ceil(current) - 1));
   }
   $("zoom-level").textContent = state.zoomChoice === null ? "Fit" : `${state.zoomChoice}×`;
 }
