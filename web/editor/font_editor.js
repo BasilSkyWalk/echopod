@@ -1,4 +1,4 @@
-import { LETTERS, LETTER_STYLES, inked, letterFont, letterHeight } from "./pixel_letters.js";
+import { LETTERS, LETTER_STYLES, inked, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
 import { ICON_MARKS } from "./theme_format.js";
 
 const LABELS = { title: "Titles", body: "List text", small: "Small text" };
@@ -286,11 +286,64 @@ function shrunk(grid, font, char, advance) {
   return { char, left: made.left, top: font.ascent - made.top, advance, rows: made.rows };
 }
 
+function number(label, value, least, most, set, note) {
+  const input = h("input", { type: "number", min: least, max: most, value, inputmode: "numeric" });
+  input.addEventListener("change", () => {
+    const wanted = Math.max(least, Math.min(most, Math.round(Number(input.value) || least)));
+    input.value = wanted;
+    set(wanted);
+  });
+  return h("label", { class: "field" }, h("span", {}, label, note ? h("small", {}, note) : null), input);
+}
+
+function downloadPicture(image, name) {
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width;
+  canvas.height = image.height;
+  canvas.getContext("2d").putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+  canvas.toBlob((blob) => {
+    const link = h("a", { href: URL.createObjectURL(blob), download: name });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }, "image/png");
+}
+
+async function pixelsOf(file) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(bitmap, 0, 0);
+  return context.getImageData(0, 0, bitmap.width, bitmap.height);
+}
+
+function shifted(grid, across, down) {
+  return grid.map((row, y) => row.map((_, x) => grid[y - down]?.[x - across] ?? 0));
+}
+
+function mirrored(grid, advance) {
+  const reach = Math.min(grid[0].length, Math.max(advance, ...grid.map((row) => row.findLastIndex((value) => value > 0) + 1)));
+  return grid.map((row) => row.map((value, x) => (x < reach ? row[reach - 1 - x] : value)));
+}
+
+function upsideDown(grid) {
+  const inkedRows = grid.map((row, y) => (row.some((value) => value > 0) ? y : -1)).filter((y) => y >= 0);
+  if (!inkedRows.length) {
+    return grid;
+  }
+  const [top, bottom] = [inkedRows[0], inkedRows.at(-1)];
+  return grid.map((row, y) => (y >= top && y <= bottom ? [...grid[top + bottom - y]] : row));
+}
+
 function letterChars(ranges) {
   return everyCode(ranges).map((code) => String.fromCharCode(code));
 }
 
 const buffers = new Map();
+const pictures = new Map();
 const opened = new Set();
 
 export function buildFonts(host, theme, schema, changed) {
@@ -350,6 +403,91 @@ export function buildFonts(host, theme, schema, changed) {
       }
     }
   };
+
+  const makePicture = (entry, note) => {
+    const source = theme.font_sources[entry.name];
+    const held = pictures.get(entry.name);
+    if (!held) {
+      return;
+    }
+    try {
+      settle(entry, sheetFont(held.image, { ...source, limit: entry.height }), note);
+    } catch (error) {
+      if (!(error instanceof RangeError)) {
+        throw error;
+      }
+      if (note) {
+        note.textContent = `${error.message[0].toUpperCase()}${error.message.slice(1)}. Check the letter boxes below.`;
+      }
+    }
+  };
+
+  function pictureArea(entry, note) {
+    const source = theme.font_sources[entry.name];
+    const held = pictures.get(entry.name);
+    const picker = h("input", { type: "file", accept: ".png,.gif,.webp,.bmp", hidden: true });
+    const take = async (file) => {
+      if (!file) {
+        return;
+      }
+      try {
+        const image = await pixelsOf(file);
+        pictures.set(entry.name, { image, name: file.name });
+        source.name = file.name;
+        makePicture(entry, note);
+        render();
+      } catch {
+        note.textContent = `${file.name} couldn't be opened as a picture. Try a PNG.`;
+      }
+    };
+    picker.addEventListener("change", () => take(picker.files[0]));
+    const drop = h("div", { class: "drop-zone", tabindex: "0", role: "button",
+      onclick: () => picker.click(),
+      onkeydown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          picker.click();
+        }
+      },
+      ondragover: (event) => {
+        event.preventDefault();
+        drop.classList.add("over");
+      },
+      ondragleave: () => drop.classList.remove("over"),
+      ondrop: (event) => {
+        event.preventDefault();
+        drop.classList.remove("over");
+        take(event.dataTransfer.files[0]);
+      },
+    }, h("strong", {}, held?.name ?? source.name ?? "Drop your letters picture here"),
+    h("span", {}, held ? "or click to choose another" : "or click to choose a PNG"), picker);
+    const relayout = (change) => {
+      change();
+      if (pictures.get(entry.name)) {
+        makePicture(entry, note);
+        refreshSample(entry);
+      }
+    };
+    const rows = Math.ceil(Array.from(source.order).length / 16);
+    return [
+      h("ol", { class: "steps-list" },
+        h("li", {}, "Download the template: one box per letter, 16 to a row, in the order the player expects."),
+        h("li", {}, "Draw your letters over the pink hints in any paint program, sitting on the dotted pink line. Pink is ignored, so there's no need to erase it."),
+        h("li", {}, "Drop the picture back here. Dark on light, light on dark and a see-through background all work."),
+      ),
+      h("div", { class: "actions" }, h("button", { type: "button", onclick: () =>
+        downloadPicture(sheetTemplate(source, source.order), `${entry.name}-letters-${source.cell[0]}x${source.cell[1]}.png`) }, "Download the template")),
+      drop,
+      h("details", { class: "fine-print" }, h("summary", {}, "Letter boxes"),
+        h("p", { class: "hint" }, `Your own picture works too: ${rows} rows of 16 equal boxes, starting with a space, then ! " # and on through the keyboard's characters.`),
+        h("div", { class: "group" },
+          number("Box width", source.cell[0], 3, 40, (value) => relayout(() => { source.cell[0] = value; }), "pixels"),
+          number("Box height", source.cell[1], 4, 48, (value) => relayout(() => { source.cell[1] = value; }), "pixels"),
+          number("Baseline", source.baseline, 1, 48, (value) => relayout(() => { source.baseline = value; }), "rows down from the top of a box"),
+        )),
+      slider("Space between letters", source.gap, 0, 6, (value) => relayout(() => { source.gap = value; })),
+    ];
+  }
 
   function sizeChoices(entry, note, list) {
     const source = theme.font_sources[entry.name];
@@ -576,7 +714,7 @@ export function buildFonts(host, theme, schema, changed) {
         return;
       }
       pending = true;
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         pending = false;
         const base = theme.fonts[entry.name];
         const glyphs = base.glyphs.filter((one) => one.char !== char);
@@ -589,7 +727,7 @@ export function buildFonts(host, theme, schema, changed) {
           cell.className = "edited";
           cell.replaceChildren(paintText(h("canvas"), { ...theme.fonts[entry.name], glyphs: [drawnGlyph] }, char, 2));
         }
-      });
+      }, 30);
     };
     let painting = null;
     const paintAt = (event) => {
@@ -625,6 +763,26 @@ export function buildFonts(host, theme, schema, changed) {
       draw();
       save();
     };
+    const reshape = (change) => {
+      grid = change(grid);
+      draw();
+      save();
+    };
+    const others = font.glyphs.filter((one) => one.char !== char && one.rows.length);
+    const copyFrom = h("select", { "aria-label": "Start from another letter" },
+      new Option("Copy another letter…", ""), others.map((one) => new Option(one.char, one.char)));
+    copyFrom.addEventListener("change", () => {
+      const other = theme.fonts[entry.name].glyphs.find((one) => one.char === copyFrom.value);
+      if (other) {
+        const copied = grown(other, font);
+        const width = Math.max(copied[0].length, grid[0].length);
+        grid = copied.map((row) => row.concat(new Array(width - row.length).fill(0)));
+        advance = other.advance;
+        draw();
+        save();
+      }
+      copyFrom.value = "";
+    });
     editor.replaceChildren(
       h("div", { class: "glyph-head" }, h("strong", {}, `Drawing “${char}”`),
         h("button", { type: "button", onclick: () => editor.replaceChildren() }, "Done")),
@@ -646,6 +804,16 @@ export function buildFonts(host, theme, schema, changed) {
           draw();
           save();
         } }, "Clear"),
+      ),
+      h("div", { class: "glyph-tools" },
+        copyFrom,
+        h("button", { type: "button", title: "Flip left to right", onclick: () => reshape((rows) => mirrored(rows, advance)) }, "Mirror"),
+        h("button", { type: "button", title: "Flip top to bottom", onclick: () => reshape(upsideDown) }, "Upside down"),
+        h("span", { class: "nudge", role: "group", "aria-label": "Move the letter" },
+          h("button", { type: "button", title: "Move left", "aria-label": "Move left", onclick: () => reshape((rows) => shifted(rows, -1, 0)) }, "←"),
+          h("button", { type: "button", title: "Move up", "aria-label": "Move up", onclick: () => reshape((rows) => shifted(rows, 0, -1)) }, "↑"),
+          h("button", { type: "button", title: "Move down", "aria-label": "Move down", onclick: () => reshape((rows) => shifted(rows, 0, 1)) }, "↓"),
+          h("button", { type: "button", title: "Move right", "aria-label": "Move right", onclick: () => reshape((rows) => shifted(rows, 1, 0)) }, "→")),
         theme.font_edits[entry.name]?.[char] ? h("button", { type: "button", onclick: () => {
           delete theme.font_edits[entry.name][char];
           rebuildBase(entry);
@@ -661,6 +829,8 @@ export function buildFonts(host, theme, schema, changed) {
     const source = theme.font_sources[entry.name];
     if (source?.kind === "drawn") {
       makeDrawn(entry);
+    } else if (source?.kind === "picture" && pictures.get(entry.name)) {
+      makePicture(entry);
     } else if (source?.kind === "file" && buffers.get(entry.name)) {
       makeFromFile(entry).then(render);
       return;
@@ -682,7 +852,7 @@ export function buildFonts(host, theme, schema, changed) {
     if (font) {
       paintText(sample, font, SAMPLE, 2);
     }
-    const modes = [["own", "The player's own"], ["file", "From a font file"], ["drawn", "Draw my own"]];
+    const modes = [["own", "The player's own"], ["file", "From a font file"], ["picture", "From a picture"], ["drawn", "Draw my own"]];
     if (kind === "kept") {
       modes.splice(1, 0, ["kept", "This theme's"]);
     }
@@ -691,6 +861,8 @@ export function buildFonts(host, theme, schema, changed) {
       body.push(...fileArea(entry, note));
     } else if (kind === "drawn") {
       body.push(...drawnArea(entry, note));
+    } else if (kind === "picture") {
+      body.push(...pictureArea(entry, note));
     }
     if (font) {
       body.push(...letterGrid(entry));
@@ -709,6 +881,11 @@ export function buildFonts(host, theme, schema, changed) {
             theme.font_sources[entry.name] = { kind: "drawn", base: "fine", style: structuredClone(LETTER_STYLES.fine) };
           }
           makeDrawn(entry, note);
+        } else if (mode === "picture") {
+          theme.font_sources[entry.name] = { kind: "picture", name: null, ...sheetLayout(entry.height), gap: 1, order: sheetOrder(schema.font_ranges) };
+          if (pictures.get(entry.name)) {
+            makePicture(entry, note);
+          }
         } else if (mode === "file") {
           theme.font_sources[entry.name] = { kind: "file", name: null, size: 0, crisp: false };
           if (buffers.get(entry.name)) {

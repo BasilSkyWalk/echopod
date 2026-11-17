@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from "./icon_editor.js";
 import { coveredCodes } from "./font_editor.js";
 import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawing.js";
-import { LETTERS, LETTER_STYLES, letterFont, letterHeight } from "./pixel_letters.js";
+import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
 import { STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
@@ -197,6 +197,31 @@ for (const [name, style] of Object.entries(LETTER_STYLES)) {
 const everyChar = schema.font_ranges.flatMap(([first, last]) => Array.from({ length: last - first + 1 }, (_, index) => String.fromCharCode(first + index)));
 const dotted = letterFont(LETTER_STYLES.dots, 20);
 assert.deepEqual(everyChar.filter((char) => !dotted.glyphs.some((glyph) => glyph.char === char)), [], "the letter set covers every character a theme font may have");
+const order = sheetOrder(schema.font_ranges);
+assert.equal(Array.from(order).length, everyChar.length, "the template has a box for every character a theme font may have");
+for (const entry of schema.fonts) {
+  const layout = sheetLayout(entry.height);
+  const sheet = sheetTemplate(layout, order);
+  assert.equal(sheet.width, layout.cell[0] * 16);
+  assert.throws(() => sheetFont(sheet, { ...layout, order, gap: 1, limit: entry.height }), RangeError, "guides and hints alone are no letters");
+  const ink = (image, colour) => {
+    const at = Array.from(order).indexOf("I");
+    const [left, top] = [(at % 16) * layout.cell[0], Math.floor(at / 16) * layout.cell[1]];
+    for (let y = 2; y < layout.baseline + 1; y++) {
+      for (let x = 2; x < 4; x++) {
+        image.data.set(colour, ((top + y) * image.width + left + x) * 4);
+      }
+    }
+  };
+  ink(sheet, [0, 0, 0, 255]);
+  const font = sheetFont(sheet, { ...layout, order, gap: 1, limit: entry.height });
+  const letter = font.glyphs.find((glyph) => glyph.char === "I");
+  assert.deepEqual([letter.left, letter.top, letter.advance, letter.rows.length, letter.rows[0]], [2, layout.baseline - 2, 5, layout.baseline - 1, "ff"], `an I drawn on the ${entry.name} template`);
+  assert.equal(font.ascent + font.descent, layout.baseline - 1, "the guide line under the letter is not ink");
+  const clear = { width: sheet.width, height: sheet.height, data: new Uint8ClampedArray(sheet.data.length) };
+  ink(clear, [255, 255, 255, 255]);
+  assert.deepEqual(sheetFont(clear, { ...layout, order, gap: 1, limit: entry.height }).glyphs.find((glyph) => glyph.char === "I").rows, letter.rows, "white on see-through reads the same");
+}
 const memoryTheme = { ...defaultTheme(schema), fonts: { ...defaultTheme(schema).fonts, title: dotted } };
 const memory = memoryParts(memoryTheme, schema);
 assert.ok(memory.fonts.title > 0 && memory.wallpaper === 0 && memory.used === memory.fonts.title && memory.limit === schema.asset_memory);

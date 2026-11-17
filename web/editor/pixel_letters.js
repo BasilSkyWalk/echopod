@@ -184,3 +184,151 @@ export function letterFont(style, limit) {
   }
   return { ascent, descent, glyphs };
 }
+
+export const GUIDE = [255, 0, 255];
+export const HINT = [255, 204, 255];
+const SHEET_COLUMNS = 16;
+
+export function sheetOrder(ranges) {
+  return ranges.flatMap(([first, last]) => Array.from({ length: last - first + 1 }, (_, index) => String.fromCodePoint(first + index))).join("");
+}
+
+export function sheetLayout(height) {
+  const baseline = height - Math.max(1, Math.round(height / 5));
+  return { cell: [Math.max(5, Math.round(height * 0.75)), height], baseline };
+}
+
+function isColour(data, at, colour) {
+  return data[at + 3] === 255 && data[at] === colour[0] && data[at + 1] === colour[1] && data[at + 2] === colour[2];
+}
+
+export function sheetTemplate(layout, order) {
+  const [width, height] = layout.cell;
+  const chars = Array.from(order);
+  const rows = Math.ceil(chars.length / SHEET_COLUMNS);
+  const image = { width: width * SHEET_COLUMNS, height: height * rows, data: new Uint8ClampedArray(width * SHEET_COLUMNS * height * rows * 4).fill(255) };
+  const put = (x, y, colour) => {
+    const at = (y * image.width + x) * 4;
+    image.data.set(colour, at);
+  };
+  chars.forEach((char, index) => {
+    const left = (index % SHEET_COLUMNS) * width;
+    const top = Math.floor(index / SHEET_COLUMNS) * height;
+    const shape = LETTERS[char.toUpperCase()];
+    if (shape) {
+      const rise = Math.min(ROWS, layout.baseline);
+      shape.slice(ROWS - rise).forEach((bits, y) => {
+        for (let x = 0; x < Math.min(COLUMNS, width - 1); x++) {
+          if (bits & (1 << (COLUMNS - 1 - x))) {
+            put(left + x + 1, top + layout.baseline - rise + y, HINT);
+          }
+        }
+      });
+    }
+    for (let x = 0; x < width; x++) {
+      if (x % 2 === 0) {
+        put(left + x, top + layout.baseline, GUIDE);
+      }
+    }
+    for (let y = 0; y < height; y++) {
+      if ((y + index) % 2 === 0 && (index % SHEET_COLUMNS) > 0) {
+        put(left, top + y, GUIDE);
+      }
+    }
+  });
+  return image;
+}
+
+function background(image) {
+  const counts = new Map();
+  let clear = 0;
+  for (let at = 0; at < image.data.length; at += 4) {
+    if (image.data[at + 3] < 128) {
+      clear++;
+      continue;
+    }
+    if (isColour(image.data, at, GUIDE) || isColour(image.data, at, HINT)) {
+      continue;
+    }
+    const key = (image.data[at] << 16) | (image.data[at + 1] << 8) | image.data[at + 2];
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let [best, most] = [0xffffff, -1];
+  for (const [key, count] of counts) {
+    if (count > most) {
+      [best, most] = [key, count];
+    }
+  }
+  return clear > most ? null : [best >> 16, (best >> 8) & 255, best & 255];
+}
+
+function coverage(image, back) {
+  const pixels = image.width * image.height;
+  const ink = new Float32Array(pixels);
+  const distance = (at) => Math.hypot(image.data[at] - back[0], image.data[at + 1] - back[1], image.data[at + 2] - back[2]);
+  let far = 0;
+  if (back) {
+    for (let index = 0; index < pixels; index++) {
+      const at = index * 4;
+      if (!isColour(image.data, at, GUIDE) && !isColour(image.data, at, HINT)) {
+        far = Math.max(far, distance(at));
+      }
+    }
+  }
+  for (let index = 0; index < pixels; index++) {
+    const at = index * 4;
+    if (isColour(image.data, at, GUIDE) || isColour(image.data, at, HINT)) {
+      continue;
+    }
+    ink[index] = back ? (far > 0 ? distance(at) / far : 0) * (image.data[at + 3] / 255) : image.data[at + 3] / 255;
+  }
+  return ink;
+}
+
+export function sheetFont(image, options) {
+  const [width, height] = options.cell;
+  const columns = Math.floor(image.width / width);
+  if (columns < 1 || image.height < height) {
+    throw new RangeError(`the picture is smaller than one ${width} × ${height} letter box`);
+  }
+  const ink = coverage(image, background(image));
+  const chars = Array.from(options.order);
+  const grids = [];
+  chars.forEach((char, index) => {
+    const left = (index % columns) * width;
+    const top = Math.floor(index / columns) * height;
+    if (top + height > image.height) {
+      return;
+    }
+    const grid = Array.from({ length: height }, (_, y) => Array.from({ length: width }, (_, x) =>
+      Math.min(15, Math.round(ink[(top + y) * image.width + left + x] * 15))));
+    grids.push([char, grid]);
+  });
+  let [first, last] = [height, -1];
+  for (const [, grid] of grids) {
+    grid.forEach((row, y) => {
+      if (row.some((level) => level > 0)) {
+        [first, last] = [Math.min(first, y), Math.max(last, y)];
+      }
+    });
+  }
+  if (last < 0) {
+    throw new RangeError("no letters were found in the picture");
+  }
+  const ascent = Math.max(options.baseline - first, 1);
+  const descent = Math.max(last + 1 - options.baseline, 0);
+  if (ascent + descent > options.limit) {
+    throw new RangeError(`these letters are ${ascent + descent} px tall; this text has room for ${options.limit}`);
+  }
+  const gap = options.gap ?? 1;
+  const glyphs = [];
+  for (const [char, grid] of grids) {
+    const made = inked(grid);
+    if (!made.rows.length && char !== " ") {
+      continue;
+    }
+    const advance = made.rows.length ? made.left + made.rows[0].length + gap : Math.max(2, Math.round(width / 2));
+    glyphs.push({ char, left: made.left, top: options.baseline - made.top, advance, rows: made.rows });
+  }
+  return { ascent, descent, glyphs };
+}

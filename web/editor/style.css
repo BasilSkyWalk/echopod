@@ -511,10 +511,18 @@ input[type="radio"] {
 
 .range {
   display: grid;
-  grid-template-columns: 1fr 44px;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
-  width: 190px;
+  min-width: 0;
+}
+
+.range output {
+  min-width: 2ch;
+}
+
+.field:has(> .range) {
+  grid-template-columns: minmax(72px, 1fr) minmax(120px, 190px);
 }
 
 .range output {
@@ -1041,4 +1049,40 @@ details.moves summary {
 
 .glyph-tools .chips {
   margin: 0;
+}
+
+.steps-list {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.steps-list li + li {
+  margin-top: 4px;
+}
+
+.fine-print {
+  margin: 10px 0;
+}
+
+.fine-print > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.glyph-tools select {
+  max-width: 180px;
+}
+
+.nudge {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.nudge button {
+  min-width: 32px;
+  padding-inline: 6px;
 }
