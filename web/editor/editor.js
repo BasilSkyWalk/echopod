@@ -4,7 +4,7 @@ import { buildIcons } from "./icon_editor.js";
 import { AREAS, colorOf, drawingScript, findElement, walk } from "./drawing.js";
 import { drawingEditor } from "./drawing_editor.js";
 import { STARTS, drawingFrom, faceOf, standardDrawing, startDrawing } from "./drawings.js";
-import { KEY, Preview } from "./preview_host.js";
+import { KEY, PLAYBACK, PLAYER, Preview, SONGS } from "./preview_host.js";
 import {
   ACCENT_SHADES,
   ThemeError,
@@ -118,6 +118,9 @@ const state = {
   gallery: [],
   lastFrame: null,
   remember: null,
+  playback: { ...PLAYBACK },
+  statusAt: 0,
+  scrubbing: false,
 };
 
 function el(tag, attributes = {}, ...children) {
@@ -1000,13 +1003,128 @@ function designing() {
 
 function restart() {
   state.accent = shownAccent(state.theme, state.accent);
-  state.preview.start(state.turn, state.screen, state.accent);
+  state.preview.start(state.turn, state.screen, state.accent, 0, state.playback);
   apply();
   for (let spent = 0; state.preview.busy && spent < SKIP_LIMIT_MS; spent += SKIP_STEP_MS) {
     state.preview.advance(SKIP_STEP_MS);
   }
   state.preview.advance(SKIP_SETTLE_MS);
   state.lastFrame = null;
+  renderPlayback();
+}
+
+const SHUFFLES = [[0, "Off"], [1, "Songs"], [2, "Albums"]];
+const REPEATS = [[0, "Off"], [1, "One song"], [2, "All"]];
+const VOLUME_MAX = 50;
+
+function clock(milliseconds) {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function pickList(label, options, value, set) {
+  const select = el("select", { "aria-label": label }, options.map(([key, text]) => new Option(text, key)));
+  select.value = String(value);
+  select.addEventListener("change", () => set(select.value));
+  return el("label", { class: "playback-pick" }, el("span", {}, label), select);
+}
+
+function renderPlayback() {
+  const host = $("playback");
+  const playing = state.screen === "playing";
+  if (!playing && state.screen !== "home") {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  const playback = state.playback;
+  const songs = Object.entries(SONGS).map(([key, song]) => [key, song.label]);
+  if (!playing) {
+    songs.unshift(["none", "Nothing playing"]);
+  }
+  const songNow = playback.song ?? (playing ? "usual" : "none");
+  const live = playing || playback.song;
+  const toggle = el("button", { type: "button", class: "playback-toggle", "data-toggle": "", onclick: () => {
+    playback.paused = state.preview.status().state !== PLAYER.paused;
+    if (playing) {
+      state.preview.press(KEY.play);
+      refreshPlayback(true);
+    } else {
+      restart();
+    }
+  } });
+  const scrub = el("input", { type: "range", min: 0, max: 1000, value: 0, "aria-label": "How far into the song", "data-scrub": "" });
+  scrub.addEventListener("pointerdown", () => {
+    state.scrubbing = true;
+  });
+  scrub.addEventListener("input", () => {
+    playback.at = Number(scrub.value) / 1000;
+    if (playing) {
+      state.preview.seek(playback.at);
+    }
+    refreshPlayback(true);
+  });
+  scrub.addEventListener("change", () => {
+    state.scrubbing = false;
+    if (!playing) {
+      restart();
+    }
+  });
+  const volume = el("input", { type: "range", min: 0, max: VOLUME_MAX, value: playback.volume ?? state.preview.status().volume, "aria-label": "Volume" });
+  volume.addEventListener("change", () => {
+    playback.volume = Number(volume.value);
+    restart();
+  });
+  host.replaceChildren(...[
+    live ? el("div", { class: "playback-row" },
+      toggle,
+      scrub,
+      el("span", { class: "playback-time", "data-time": "" }),
+    ) : null,
+    el("div", { class: "playback-row playback-options" },
+      pickList("Song", songs, songNow, (value) => {
+        playback.song = value === "none" ? null : value;
+        playback.at = null;
+        restart();
+      }),
+      live ? el("label", { class: "playback-pick" }, el("span", {}, "Volume"), volume) : null,
+      live ? pickList("Shuffle", SHUFFLES, playback.shuffle, (value) => {
+        playback.shuffle = Number(value);
+        restart();
+      }) : null,
+      live ? pickList("Repeat", REPEATS, playback.repeat, (value) => {
+        playback.repeat = Number(value);
+        restart();
+      }) : null,
+      playing ? el("button", { type: "button", title: "Shows what the screen looks like while the volume changes", onclick: () => {
+        state.preview.nudgeVolume();
+      } }, "Show the volume change") : null,
+    ),
+  ].filter(Boolean));
+  refreshPlayback(true);
+}
+
+function refreshPlayback(now = false, time = performance.now()) {
+  const host = $("playback");
+  if (host.hidden || (!now && time - state.statusAt < 250)) {
+    return;
+  }
+  state.statusAt = time;
+  const status = state.preview.status();
+  const toggle = host.querySelector("[data-toggle]");
+  if (toggle) {
+    const paused = status.state !== PLAYER.playing;
+    toggle.replaceChildren(paused ? "▶ Play" : "❚❚ Pause");
+    toggle.setAttribute("aria-label", paused ? "Play" : "Pause");
+  }
+  const scrub = host.querySelector("[data-scrub]");
+  if (scrub && !state.scrubbing && status.duration > 0) {
+    scrub.value = String(Math.round((status.position * 1000) / status.duration));
+  }
+  const shown = host.querySelector("[data-time]");
+  if (shown) {
+    shown.textContent = status.duration > 0 ? `${clock(status.position)} / ${clock(status.duration)}` : "";
+  }
 }
 
 function fitZoom(width, height) {
@@ -1044,6 +1162,7 @@ function frame(now) {
   fit(width, height);
   context.putImageData(new ImageData(pixels, width, height), 0, 0);
   drawOverlay();
+  refreshPlayback(false, now);
   requestAnimationFrame(frame);
 }
 

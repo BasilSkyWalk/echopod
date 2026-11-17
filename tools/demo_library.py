@@ -1,4 +1,5 @@
 import argparse
+import json
 import math
 import sys
 from pathlib import Path
@@ -29,6 +30,24 @@ ALBUMS = (
     ("Saltwater Radio", "Tape Season", 2008, "Rock", "stripes", ((40, 40, 44), (232, 88, 56)),
      ("Rewind", "Tape Season", "Dial Tone Summer", "Static on the Pier", "Boardwalk", "Hiss",
       "Side B", "Fade Out")),
+    ("Marisol and the Overnight Cartographers", "Everything We Meant to Say Before the Last Train",
+     2023, "Indie", None, None,
+     ("The Long Way Home Through Every Town We Never Stopped In", "Platform Nine", "Window Seat")),
+)
+LYRICS_TRACK = ("Juno Vale", "Afterglow Motel", 2)
+LYRICS = (
+    (0, "Neon in the window, nobody home"),
+    (9, "Pool lights hum a song of their own"),
+    (18, "Keys on a ring with a plastic tag"),
+    (27, "Everything I own in a paper bag"),
+    (38, "Stay till the sign says vacancy"),
+    (47, "Stay till the morning comes for me"),
+    (58, "Afterglow, afterglow"),
+    (66, "Leave the light on low"),
+    (76, "Ice machine rattles down the hall"),
+    (85, "Your name in pencil on the wall"),
+    (96, "Afterglow, afterglow"),
+    (104, "Leave the light on low"),
 )
 
 
@@ -63,13 +82,29 @@ def cover_image(pattern, colors):
     return image
 
 
+def track_path(artist, album, index, title):
+    return f"{artist}/{album}/{index:02d} {title}.flac"
+
+
+def lyrics_file():
+    lines = [f"[{seconds // 60:02d}:{seconds % 60:02d}.00]{text}" for seconds, text in LYRICS]
+    return "".join(f"{line}\n" for line in lines).encode("utf-8")
+
+
+def lyrics_card_path():
+    artist, album, index = LYRICS_TRACK
+    titles = next(entry[6] for entry in ALBUMS if entry[0] == artist and entry[1] == album)
+    return "/" + track_path(artist, album, index, titles[index - 1]).rsplit(".", 1)[0] + ".lrc"
+
+
 def tracks_and_covers():
     tracks, covers = [], {}
     for number, (artist, album, year, genre, pattern, colors, titles) in enumerate(ALBUMS):
-        covers[cover_export.album_key(artist, album)] = cover_image(pattern, colors)
+        if pattern:
+            covers[cover_export.album_key(artist, album)] = cover_image(pattern, colors)
         for index, title in enumerate(titles, 1):
             tracks.append(library_index.TrackInfo(
-                path=f"{artist}/{album}/{index:02d} {title}.flac", title=title, artist=artist,
+                path=track_path(artist, album, index, title), title=title, artist=artist,
                 album_artist=artist, album=album, genre=genre, year=year, disc=1, number=index,
                 duration_ms=seconds_of(number, index) * 1000))
     return tracks, covers
@@ -81,6 +116,13 @@ def build(output):
     library = library_index.encode_library(library_index.build_library(tracks, []))
     (output / "library.db").write_bytes(library)
     (output / "covers.bin").write_bytes(cover_export.encode_covers(covers))
+    (output / "lyrics.lrc").write_bytes(lyrics_file())
+    files = [
+        {"path": "/.echo/library.db", "file": "library.db"},
+        {"path": "/.echo/covers.bin", "file": "covers.bin"},
+        {"path": lyrics_card_path(), "file": "lyrics.lrc"},
+    ]
+    (output / "demo_files.json").write_text(json.dumps(files, indent=1), encoding="utf-8")
 
 
 def main(argv=None):

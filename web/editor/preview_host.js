@@ -1,5 +1,12 @@
 export const KEY = { down: 0, up: 1, play: 2, menu: 3, back: 4 };
 export const STEP_MS = 16;
+export const PLAYER = { idle: 0, playing: 1, paused: 2 };
+export const SONGS = {
+  usual: { label: "A usual song", album: 0, track: 0 },
+  long: { label: "A long title, no cover", album: 2, track: 0 },
+  lyrics: { label: "A song with lyrics", album: 0, track: 1 },
+};
+export const PLAYBACK = { song: null, paused: false, at: null, volume: null, shuffle: 0, repeat: 0 };
 
 const TAP_MS = 60;
 const SETTLE_MS = 380;
@@ -17,6 +24,40 @@ export const SCREENS = {
   letters: [...TO_ALL_SONGS, hold(KEY.down, HELD_MS, 0)],
   settings: [tap(KEY.down), tap(KEY.play)],
 };
+
+const BACK_TO_HOME = Array(4).fill(tap(KEY.back));
+
+function songScript(song) {
+  return [
+    ...TO_ALBUMS,
+    ...Array(song.album).fill(tap(KEY.down)),
+    tap(KEY.play),
+    ...Array(song.track).fill(tap(KEY.down)),
+    tap(KEY.play),
+  ];
+}
+
+function posed(playback) {
+  const steps = [];
+  if (playback.at !== null) {
+    steps.push({ run: (preview) => preview.jump(playback.at), after: SETTLE_MS });
+  }
+  if (playback.paused) {
+    steps.push(tap(KEY.play));
+  }
+  return steps;
+}
+
+export function screenScript(screen, playback = PLAYBACK) {
+  const song = SONGS[playback.song];
+  if (screen === "playing") {
+    return [...songScript(song ?? SONGS.usual), ...posed(playback)];
+  }
+  if (screen === "home" && song) {
+    return [...songScript(song), ...posed(playback), ...BACK_TO_HOME];
+  }
+  return SCREENS[screen];
+}
 
 function tap(key) {
   return { key, down: TAP_MS, after: SETTLE_MS };
@@ -39,8 +80,10 @@ export class Preview {
   static async load(read, schema) {
     const module = await WebAssembly.instantiate(await read("echo_preview.wasm"), {});
     const preview = new Preview(module.instance.exports);
-    await preview.addFile("/.echo/library.db", await read("library.db"));
-    await preview.addFile("/.echo/covers.bin", await read("covers.bin"));
+    const files = JSON.parse(new TextDecoder().decode(await read("demo_files.json")));
+    for (const { path, file } of files) {
+      preview.addFile(path, await read(file));
+    }
     for (const face of schema.faces) {
       const bytes = await read(face.file);
       preview.wasm.preview_add_face(face.index, preview.put(bytes), bytes.length);
@@ -70,14 +113,62 @@ export class Preview {
     return this.turned && key in swapped ? swapped[key] : key;
   }
 
-  start(orientation, screen, accent = 0, face = 0) {
+  start(orientation, screen, accent = 0, face = 0, playback = PLAYBACK) {
     this.turned = orientation !== 0;
+    this.wasm.preview_modes(playback.volume ?? -1, playback.shuffle, playback.repeat);
     this.wasm.preview_start(orientation, face, accent);
     if (this.themeBytes) {
       this.wear(this.themeBytes);
     }
-    this.script = SCREENS[screen].map((step) => ({ ...step, key: this.rocker(step.key), pressed: false }));
+    this.script = screenScript(screen, playback).map((step) => ({ ...step, key: this.rocker(step.key), pressed: false }));
     this.waitMs = SETTLE_MS;
+  }
+
+  status() {
+    this.statusPointer ??= this.wasm.preview_alloc(4 * 6);
+    this.wasm.preview_status(this.statusPointer);
+    const [state, position, duration, volume, shuffle, repeat] = new Int32Array(this.wasm.memory.buffer, this.statusPointer, 6);
+    return { state, position, duration, volume, shuffle, repeat };
+  }
+
+  press(key) {
+    this.wasm.preview_key(this.rocker(key), 1);
+    this.advance(TAP_MS);
+    this.wasm.preview_key(this.rocker(key), 0);
+    this.advance(SETTLE_MS);
+  }
+
+  jump(fraction) {
+    const { duration } = this.status();
+    if (duration > 0) {
+      this.wasm.preview_seek(Math.round(Math.max(0, Math.min(0.999, fraction)) * duration));
+    }
+  }
+
+  seek(fraction) {
+    const status = this.status();
+    if (status.state === PLAYER.idle || status.duration <= 0) {
+      return;
+    }
+    const paused = status.state === PLAYER.paused;
+    if (paused) {
+      this.press(KEY.play);
+    }
+    this.jump(fraction);
+    this.advance(2 * STEP_MS);
+    if (paused) {
+      this.press(KEY.play);
+    }
+  }
+
+  nudgeVolume() {
+    const before = this.status().volume;
+    this.press(KEY.up);
+    const stuck = this.status().volume === before;
+    this.press(KEY.down);
+    if (stuck) {
+      this.press(KEY.up);
+    }
   }
 
   key(key, pressed) {
@@ -95,6 +186,12 @@ export class Preview {
       return;
     }
     const step = this.script[0];
+    if (step.run) {
+      step.run(this);
+      this.script.shift();
+      this.waitMs = step.after;
+      return;
+    }
     if (!step.pressed) {
       this.wasm.preview_key(step.key, 1);
       step.pressed = true;

@@ -1086,3 +1086,56 @@ details.moves summary {
   min-width: 32px;
   padding-inline: 6px;
 }
+
+.playback {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 560px);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.playback[hidden] {
+  display: none;
+}
+
+.playback-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.playback-row input[type="range"] {
+  flex: 1 1 140px;
+  min-width: 0;
+  width: auto;
+}
+
+.playback-toggle {
+  min-width: 84px;
+}
+
+.playback-time {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.playback-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.playback-pick input[type="range"] {
+  width: 90px;
+}
+
+.playback-pick select {
+  max-width: 180px;
+}

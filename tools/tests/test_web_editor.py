@@ -112,7 +112,8 @@ class SiteTest(unittest.TestCase):
             status, output = build_site(root)
             self.assertEqual(0, status)
             for name in (*web_editor.PAGE_FILES, "echo_preview.wasm", "library.db", "covers.bin",
-                         "theme_schema.json", "themes/dark.echotheme", "themes/ember.echotheme"):
+                         "lyrics.lrc", "demo_files.json", "theme_schema.json",
+                         "themes/dark.echotheme", "themes/ember.echotheme"):
                 self.assertTrue((output / name).is_file(), name)
             schema = json.loads((output / "theme_schema.json").read_text(encoding="utf-8"))
             faces = schema.pop("faces")
@@ -231,6 +232,13 @@ class PageTest(unittest.TestCase):
                 self.assertEqual(PNG_MAGIC, picture[:8], stem)
                 self.assertEqual((992, 692), (int.from_bytes(picture[16:20], "big"),
                                               int.from_bytes(picture[20:24], "big")), stem)
+
+    @unittest.skipUnless(BUILT_MODULE.is_file(), "the preview module is not built")
+    def test_the_preview_plays_pauses_moves_and_changes_song_as_asked(self):
+        with tempfile.TemporaryDirectory() as root:
+            _, output = build_site(root, None, BUILT_MODULE)
+            result = self.run_node("test_preview_states.mjs", output)
+            self.assertEqual(0, result.returncode, result.stderr)
 
     def test_drawing_needs_a_site_folder(self):
         self.assertEqual(2, self.run_node("render_theme.mjs").returncode)

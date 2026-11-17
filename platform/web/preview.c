@@ -55,6 +55,9 @@ static uint32_t now_ms = START_MS;
 static uint32_t position_ms;
 static int plays_seen;
 static bool started;
+static int chosen_volume = -1;
+static int chosen_shuffle;
+static int chosen_repeat;
 
 PREVIEW_EXPORT(preview_alloc) void *preview_alloc(uint32_t size);
 PREVIEW_EXPORT(preview_add_file)
@@ -69,6 +72,9 @@ PREVIEW_EXPORT(preview_width) int preview_width(void);
 PREVIEW_EXPORT(preview_height) int preview_height(void);
 PREVIEW_EXPORT(preview_pixels) const uint32_t *preview_pixels(void);
 PREVIEW_EXPORT(preview_layout) int preview_layout(int16_t *out);
+PREVIEW_EXPORT(preview_modes) void preview_modes(int volume, int shuffle, int repeat);
+PREVIEW_EXPORT(preview_status) int preview_status(int32_t *out);
+PREVIEW_EXPORT(preview_seek) void preview_seek(uint32_t position);
 
 void *preview_alloc(uint32_t size)
 {
@@ -117,6 +123,11 @@ void preview_start(int orientation, int face, int accent)
     settings.options[OPTION_ACCENT] = (uint8_t)accent;
     settings.screen_timeout = SCREEN_TIMEOUT_OPTION_COUNT - 1;
     settings.auto_off = 0;
+    if (chosen_volume >= 0) {
+        settings.volume = (uint8_t)chosen_volume;
+    }
+    settings.shuffle = (ShuffleMode)chosen_shuffle;
+    settings.repeat = (RepeatMode)chosen_repeat;
     settings_encode(&settings, settings_bytes);
     fake_hal_reset();
     fake_hal_set_battery(
@@ -242,4 +253,29 @@ int preview_layout(int16_t *out)
         place[4] = box.align;
     }
     return THEME_LAYOUT_COUNT;
+}
+
+void preview_modes(int volume, int shuffle, int repeat)
+{
+    chosen_volume = volume < 0 ? -1 : volume > SETTINGS_VOLUME_MAX ? SETTINGS_VOLUME_MAX : volume;
+    chosen_shuffle = shuffle >= 0 && shuffle < SHUFFLE_MODE_COUNT ? shuffle : SHUFFLE_OFF;
+    chosen_repeat = repeat >= 0 && repeat < REPEAT_MODE_COUNT ? repeat : REPEAT_OFF;
+}
+
+int preview_status(int32_t *out)
+{
+    PlayerStatus status = app_player_status();
+    out[0] = (int32_t)status.state;
+    out[1] = (int32_t)status.position_ms;
+    out[2] = (int32_t)status.duration_ms;
+    out[3] = (int32_t)status.volume;
+    out[4] = (int32_t)status.shuffle;
+    out[5] = (int32_t)status.repeat;
+    return 6;
+}
+
+void preview_seek(uint32_t position)
+{
+    position_ms = position;
+    fake_hal_audio_set_position(position_ms);
 }
