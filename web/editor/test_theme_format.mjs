@@ -5,7 +5,8 @@ import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from
 import { coveredCodes } from "./font_editor.js";
 import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawing.js";
 import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
-import { STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
+import { mix, paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
+import { READY, STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
 import {
@@ -98,6 +99,36 @@ for (const screen of ["home", "playing"]) {
     assert.deepEqual(Array.from(pack(back, schema)), Array.from(bytes), `${screen} ${name} repacks`);
   }
 }
+for (const screen of ["home", "playing"]) {
+  for (const [key, [label, make]] of Object.entries(READY)) {
+    const drawing = startDrawing("standard", screen);
+    drawing.elements.push(make());
+    const script = drawingScript(drawing, homeTheme);
+    compileScene(script, schema.scene);
+    assert.ok(sceneSize(drawing) < SCENE_ROOM, `the ready-made ${label} fits on ${screen}`);
+    for (const shape of ["wide", "tall"]) {
+      assert.ok(drawing.elements.at(-1).at[shape], `${key} is placed ${shape}`);
+    }
+  }
+}
+const picture = new Uint8ClampedArray(80 * 80 * 4);
+for (let index = 0; index < 80 * 80; index++) {
+  const shade = index < 3800 ? [18, 28, 58] : index < 5400 ? [232, 120, 40] : [240, 228, 200];
+  picture.set([...shade, 255], index * 4);
+}
+const palette = paletteOf(picture, 6);
+assert.equal(palette[0].color, "#121c3a", "the most common colour comes first");
+assert.ok(palette.some((entry) => entry.color === "#e87828"));
+assert.ok(Math.abs(palette.reduce((sum, entry) => sum + entry.share, 0) - 1) < 1e-9);
+for (const dark of [true, false]) {
+  const coloured = defaultTheme(schema);
+  Object.assign(coloured.colors, schemeFrom(palette, dark));
+  assert.deepEqual(lint(coloured, schema), [], `colours from a picture read well when ${dark ? "dark" : "light"}`);
+  assert.equal(coloured.colors.selection_background, "#e87828", "the liveliest colour fills the selected row");
+}
+assert.ok(contrast(readableShade("#777777", "#808080", 4.5), "#808080") >= 4.5, "a hard-to-read colour is made readable");
+assert.equal(readableShade("#ffffff", "#000000", 4.5), "#ffffff", "a readable colour is left alone");
+assert.equal(mix("#000000", "#ffffff", 0.5), "#808080");
 const plainHome = drawingScript(startDrawing("standard", "home"), homeTheme);
 assert.match(plainHome, /^backdrop\(x, y, width, height\)$/m, "Home starts on the wallpaper, written once for both ways");
 assert.match(plainHome, /menu\(x, y, 176, 146\)/);

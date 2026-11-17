@@ -11,6 +11,8 @@
   --focus-soft: rgba(47, 111, 219, 0.12);
   --warn: #a8530b;
   --warn-soft: #fbf1e6;
+  --good: #2f7a4b;
+  --good-soft: #e8f4ec;
   --device: #1d1f22;
   --device-edge: #2c2f33;
   --radius: 10px;
@@ -38,6 +40,8 @@
     --focus-soft: rgba(107, 156, 240, 0.16);
     --warn: #e9a05a;
     --warn-soft: #2a2117;
+    --good: #7cc495;
+    --good-soft: #17251c;
     --device: #0d0e0f;
     --device-edge: #26282b;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
@@ -1193,4 +1197,85 @@ details.moves summary {
 .hint.shortcuts {
   margin-top: 10px;
   font-size: 12px;
+}
+
+.role-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.reads {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.reads.good {
+  color: var(--good);
+  background: var(--good-soft);
+}
+
+.reads.poor {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.reads button {
+  padding: 0 6px;
+  min-height: 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.dropper {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
+.dropper svg {
+  width: 16px;
+  height: 16px;
+}
+
+.notice button {
+  margin-top: 8px;
+}
+
+.palette-block {
+  padding: 10px 12px;
+}
+
+.palette {
+  display: flex;
+  height: 28px;
+  border-radius: var(--radius-small);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.palette-swatch {
+  flex-basis: 0;
+  min-width: 8px;
+}
+
+.palette-block .hint {
+  margin-top: 6px;
+}
+
+.add-menu.ready {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.add-menu.ready button {
+  text-align: left;
 }

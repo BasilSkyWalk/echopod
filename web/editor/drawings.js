@@ -637,3 +637,38 @@ export function drawingFrom(text, screen) {
     return null;
   }
 }
+
+const THEMED = { GHOST: "@divider", INK: "@text" };
+
+function lightWord(custom, x, w, on) {
+  return element("text", ...same(x, 0, w, 15), { source: "custom", custom, size: "small", color: THEMED.GHOST, scroll: false, bind: lit(THEMED.INK, on) });
+}
+
+export const READY = {
+  song: ["Song, artist and album", () => element("group", ...same(10, 8, 150, 64), { name: "Song details", children: [
+    element("text", ...same(0, 0, 150, 22), { source: "song", size: "large", color: "@text" }),
+    element("text", ...same(0, 22, 150, 20), { source: "artist", color: "@text_secondary" }),
+    element("text", ...same(0, 44, 150, 20), { source: "album", color: "@text_tertiary" }),
+  ] })],
+  progress: ["Progress bar and times", () => element("group", ...same(10, 110, 150, 20), { name: "Progress and times", children: [
+    element("box", ...same(0, 0, 150, 3), { name: "Progress track", color: "@divider" }),
+    element("box", ...same(0, 0, 150, 3), { name: "Progress", color: "@selection_background", bind: fill("progress_volume") }),
+    element("text", ...same(0, 5, 150, 14), { source: "elapsed", size: "small", color: "@text_secondary", scroll: false }),
+    element("text", ...same(0, 5, 150, 14, "right"), { source: "remaining", size: "small", color: "@text_tertiary", scroll: false }),
+  ] })],
+  play: ["Play button", () => element("group", ...same(10, 10, 28, 28), { name: "Play button", children: [
+    element("circle", ...same(0, 0, 28, 28), { color: "@selection_background" }),
+    element("symbol", ...same(9, 9, 10, 10), { mark: "playpause", color: "@selection_text" }),
+  ] })],
+  clock: ["Big time and volume", () => element("number", ...same(10, 10, 134, 40), { name: "Big time", show: "time_volume", lit: "@text", dim: "@divider", lean: 8 })],
+  modes: ["Shuffle and repeat lights", () => element("group", ...same(10, 10, 150, 15), { name: "Shuffle and repeat", children: [
+    lightWord("SHUFFLE", 0, 52, "shuffle"),
+    lightWord("REPEAT", 58, 46, "repeat"),
+    lightWord("1", 108, 8, "repeat_one"),
+    lightWord("ALL", 120, 30, "repeat_all"),
+  ] })],
+  levels: ["Level bars", () => levelBars(same, 10, 48, 10, { GHOST: "@divider", INK: "@selection_background" }, 8, false)],
+  vu: ["VU meter", () => meter(FACE_COLOURS.vu, ...same(10, 4, 146, 72), { wide: "both", tall: "both" })],
+  record: ["Record player", () => recordPlayer(FACE_COLOURS.turntable, ...same(10, 6, 153, 135))],
+  cassette: ["Cassette", () => cassetteSmall(FACE_COLOURS.cassette, same, 8, 8)],
+};

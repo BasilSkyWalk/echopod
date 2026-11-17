@@ -12,6 +12,7 @@ import {
   newElement,
   walk,
 } from "./drawing.js";
+import { READY } from "./drawings.js";
 
 const HANDLE = 7;
 const HIT = 4;
@@ -972,27 +973,45 @@ export function drawingEditor(ctx) {
 
   function addMenu(screen) {
     const kinds = Object.entries(KINDS).filter(([kind]) => kind !== "menu" || screen === "home");
-    return el("div", { class: "add-menu" }, kinds.map(([kind, label]) => el("button", { type: "button", onclick: () => {
-      const made = newElement(kind, screen);
-      const host = picked()?.kind === "group" ? picked() : null;
-      if (host) {
-        for (const shapeName of Object.keys(AREAS)) {
-          made.at[shapeName] = host.at[shapeName] ? { ...made.at[shapeName], x: 4, y: 4 } : null;
+    return [
+      el("div", { class: "add-menu" }, kinds.map(([kind, label]) => el("button", { type: "button", onclick: () => insert(newElement(kind, screen)) }, `+ ${label}`))),
+      el("h4", {}, "Ready-made"),
+      el("p", { class: "hint" }, "Groups of parts you can change like any other: open them in the list."),
+      el("div", { class: "add-menu ready" }, Object.entries(READY).map(([key, [label, make]]) => el("button", { type: "button", onclick: () => insert(make(), true) }, label))),
+    ];
+  }
+
+  function insert(made, open = false) {
+    const host = picked()?.kind === "group" && chosen().length === 1 ? picked() : null;
+    if (host) {
+      for (const shapeName of Object.keys(AREAS)) {
+        made.at[shapeName] = host.at[shapeName] ? { ...made.at[shapeName], x: 4, y: 4 } : null;
+      }
+      host.children.push(made);
+      expanded.add(host.id);
+    } else {
+      if (open) {
+        for (const [shapeName, area] of Object.entries(AREAS)) {
+          const at = made.at[shapeName];
+          if (at) {
+            at.x = Math.round((area.width - at.w) / 2);
+            at.y = Math.round((area.height - at.h) / 2);
+          }
         }
-        host.children.push(made);
-        expanded.add(host.id);
-      } else {
-        drawing().elements.push(made);
       }
-      if (!ctx.fits()) {
-        (host ? host.children : drawing().elements).pop();
-        ctx.fits();
-        ctx.say("There's no room for more on this screen. Remove something first.", true);
-        return;
-      }
-      ctx.state.picked = made.id;
-      ctx.changed({ rebuild: true });
-    } }, `+ ${label}`)));
+      drawing().elements.push(made);
+    }
+    if (!ctx.fits()) {
+      (host ? host.children : drawing().elements).pop();
+      ctx.fits();
+      ctx.say("There's no room for more on this screen. Remove something first.", true);
+      return;
+    }
+    if (open) {
+      expanded.add(made.id);
+    }
+    setChosen([made.id]);
+    ctx.changed({ rebuild: true });
   }
 
   function numberInput(value, set, { least = -400, most = 400, step = 1, width = 64 } = {}) {
@@ -1430,7 +1449,7 @@ export function drawingEditor(ctx) {
       el("p", { class: "hint" }, `You're drawing the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to draw the ${other} one.`),
       partList(),
       el("p", { class: "hint" }, item?.kind === "group" ? "New parts go inside the picked group." : "Pick a group first to add parts inside it."),
-      addMenu(screen),
+      ...addMenu(screen),
       el("div", { class: "actions" },
         heldParts() ? el("button", { type: "button", onclick: () => paste() }, "Paste") : null,
         el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} drawing`)),

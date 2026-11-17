@@ -8,6 +8,7 @@ import { KEY, PLAYBACK, PLAYER, Preview, SONGS } from "./preview_host.js";
 import {
   ACCENT_SHADES,
   ThemeError,
+  contrast,
   memoryParts,
   defaultTheme,
   lint,
@@ -18,6 +19,7 @@ import {
   unpack,
 } from "./theme_format.js";
 import { buildWallpapers } from "./wallpaper_editor.js";
+import { paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
 
 const STEPS = [
   { id: "start", label: "Start", icon: "M4 10h12M10 4v12" },
@@ -119,6 +121,9 @@ const state = {
   lastFrame: null,
   remember: null,
   playback: { ...PLAYBACK },
+  recent: [],
+  picture: null,
+  dark: true,
   statusAt: 0,
   scrubbing: false,
 };
@@ -333,6 +338,18 @@ function refreshNotices() {
   if (memory) {
     memory.replaceWith(memoryBar());
   }
+  for (const badge of inspector.querySelectorAll("[data-reads]")) {
+    const fresh = readingBadge(badge.dataset.reads);
+    if (fresh && !badge.contains(document.activeElement)) {
+      badge.replaceWith(fresh);
+    }
+  }
+  refreshSwatches();
+}
+
+function plainNotice(text) {
+  const match = /^(.*): contrast ([\d.]+), below ([\d.]+)$/.exec(text);
+  return match ? el("li", { title: `Contrast ${match[2]}; it should be at least ${match[3]}` }, `${match[1]} is hard to read against what's behind it`) : el("li", {}, text);
 }
 
 function noticeBox() {
@@ -342,7 +359,89 @@ function noticeBox() {
   }
   return el("div", { class: "notice", "data-notice": "" },
     found.length === 1 ? "One thing may be hard to read:" : `${found.length} things may be hard to read:`,
-    el("ul", {}, found.map((text) => el("li", {}, text))));
+    el("ul", {}, found.map(plainNotice)),
+    state.step === "colours" ? null : el("button", { type: "button", onclick: () => goTo("colours") }, "Fix it in Colours"));
+}
+
+function readingChecks(role) {
+  const colours = { ...state.theme.colors, [role]: shownColour(role) };
+  return state.schema.checks.flatMap((check) => {
+    if (check.kind === "pair" && check.color === role) {
+      return [{ check, backs: [colours[check.on]] }];
+    }
+    if (check.kind === "ink") {
+      const box = state.theme.boxes[check.box || state.theme.selection];
+      if (box?.ink === role) {
+        return [{ check, backs: [colours[box.fill_top], colours[box.fill_bottom]] }];
+      }
+    }
+    return [];
+  });
+}
+
+function readingBadge(role) {
+  const checks = readingChecks(role);
+  if (!checks.length) {
+    return null;
+  }
+  const colour = shownColour(role);
+  const worst = checks
+    .map(({ check, backs }) => ({ check, backs, ratio: Math.min(...backs.map((back) => contrast(colour, back))) }))
+    .sort((a, b) => a.ratio / a.check.floor - b.ratio / b.check.floor)[0];
+  const good = worst.ratio >= worst.check.floor;
+  const badge = el("span", {
+    class: good ? "reads good" : "reads poor",
+    "data-reads": role,
+    title: `Contrast ${worst.ratio.toFixed(1)}; ${worst.check.what.toLowerCase()} needs at least ${worst.check.floor.toFixed(1)}`,
+  }, good ? "Easy to read" : "Hard to read");
+  if (!good) {
+    badge.append(el("button", { type: "button", onclick: (event) => {
+      event.preventDefault();
+      setRole(role, readableShade(colour, worst.backs, worst.check.floor + 0.1));
+      say("Made it easier to read. Undo puts it back.");
+      render();
+    } }, "Fix"));
+  }
+  return badge;
+}
+
+function setRole(role, value) {
+  const accent = shownAccentOf(role);
+  if (accent) {
+    accent[role] = value;
+  } else {
+    state.theme.colors[role] = value;
+  }
+  changed();
+}
+
+function noteRecent(value) {
+  state.recent = [value, ...state.recent.filter((one) => one !== value)].slice(0, 8);
+}
+
+function refreshSwatches() {
+  let list = document.getElementById("swatches");
+  if (!list) {
+    list = el("datalist", { id: "swatches" });
+    document.body.append(list);
+  }
+  const colours = [...(state.picture?.palette.map((entry) => entry.color) ?? []), ...state.recent, ...Object.values(state.theme.colors)];
+  list.replaceChildren(...[...new Set(colours.filter((one) => /^#[0-9a-f]{6}$/i.test(one)))].slice(0, 24).map((one) => el("option", { value: one })));
+}
+
+function eyedropper(set) {
+  if (!("EyeDropper" in window)) {
+    return null;
+  }
+  return el("button", { type: "button", class: "dropper", title: "Pick a colour from anywhere on the screen", "aria-label": "Pick a colour from the screen", onclick: async (event) => {
+    event.preventDefault();
+    try {
+      const { sRGBHex } = await new window.EyeDropper().open();
+      set(sRGBHex.toLowerCase());
+    } catch {
+      return;
+    }
+  } }, icon("M13.5 3.5l3 3-2 2-3-3zM11.5 5.5l-7 7V16h3.5l7-7"));
 }
 
 function field(label, control, note) {
@@ -354,12 +453,18 @@ function group(...fields) {
 }
 
 function colourInput(value, set) {
-  const picker = el("input", { type: "color", value });
+  const picker = el("input", { type: "color", value, list: "swatches" });
   const hex = el("input", { class: "hex", value, maxlength: 7, spellcheck: "false", "aria-label": "Colour code" });
   picker.addEventListener("input", () => {
     hex.value = picker.value;
     set(picker.value);
   });
+  picker.addEventListener("change", () => noteRecent(picker.value));
+  const dropped = (chosen) => {
+    picker.value = hex.value = chosen;
+    noteRecent(chosen);
+    set(chosen);
+  };
   hex.addEventListener("change", () => {
     const tidy = hex.value.trim().replace(/^#?/, "#").toLowerCase();
     if (/^#[0-9a-f]{6}$/.test(tidy)) {
@@ -369,7 +474,7 @@ function colourInput(value, set) {
       hex.value = picker.value;
     }
   });
-  return el("span", { class: "color-control" }, picker, hex);
+  return el("span", { class: "color-control" }, picker, hex, eyedropper(dropped));
 }
 
 function shownAccentOf(role) {
@@ -382,16 +487,8 @@ function shownColour(role) {
 }
 
 function roleColour(role) {
-  const control = colourInput(shownColour(role), (value) => {
-    const accent = shownAccentOf(role);
-    if (accent) {
-      accent[role] = value;
-    } else {
-      state.theme.colors[role] = value;
-    }
-    changed();
-  });
-  const row = field(ROLE_LABELS[role], control);
+  const control = colourInput(shownColour(role), (value) => setRole(role, value));
+  const row = field(ROLE_LABELS[role], el("span", { class: "role-control" }, control, readingBadge(role)));
   row.dataset.role = role;
   return row;
 }
@@ -402,11 +499,12 @@ function choiceColour(value, set) {
     roles.map((role) => new Option(COLOUR_NAMES[role], `@${role}`)),
     new Option("My own colour", "custom"));
   select.value = typeof value === "string" && value.startsWith("@") ? value : "custom";
-  const picker = el("input", { type: "color", value: colorOf(value, state.theme) });
+  const picker = el("input", { type: "color", value: colorOf(value, state.theme), list: "swatches" });
   picker.addEventListener("input", () => {
     select.value = "custom";
     set(picker.value);
   });
+  picker.addEventListener("change", () => noteRecent(picker.value));
   select.addEventListener("change", () => {
     if (select.value === "custom") {
       set(picker.value);
@@ -415,7 +513,12 @@ function choiceColour(value, set) {
       set(select.value);
     }
   });
-  return el("span", { class: "color-control" }, picker, select);
+  return el("span", { class: "color-control" }, picker, select, eyedropper((chosen) => {
+    picker.value = chosen;
+    select.value = "custom";
+    noteRecent(chosen);
+    set(chosen);
+  }));
 }
 
 function range(value, least, most, set, unit = "px") {
@@ -611,12 +714,66 @@ function panelColours() {
     el("h2", {}, "Colours"),
     el("p", { class: "lead" }, "Click something on the screen to jump to its colour."),
     noticeBox(),
+    ...pictureColours(),
     ...groups.flat(),
     el("h3", {}, "Cover Flow"),
     group(field("Keep it dark", cover, "Good for light themes: the album wall stays on black")),
     el("h3", {}, "Accent choices"),
     el("p", { class: "hint" }, "Colours people can pick for the selected row under Settings, Display, Accent color. Leave the list empty to keep yours."),
     accents,
+  ];
+}
+
+async function pictureFile(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const side = Math.min(1, 160 / Math.max(bitmap.width, bitmap.height));
+    const sketch = el("canvas", { width: Math.max(1, Math.round(bitmap.width * side)), height: Math.max(1, Math.round(bitmap.height * side)) });
+    const pen = sketch.getContext("2d", { willReadFrequently: true });
+    pen.drawImage(bitmap, 0, 0, sketch.width, sketch.height);
+    const palette = paletteOf(pen.getImageData(0, 0, sketch.width, sketch.height).data, 6);
+    if (!palette.length) {
+      say(`${file.name} has no colours to take.`, true);
+      return;
+    }
+    state.picture = { name: file.name, palette };
+    refreshSwatches();
+    render();
+  } catch {
+    say(`${file.name} couldn't be opened as a picture.`, true);
+  }
+}
+
+function pictureColours() {
+  const picker = el("input", { type: "file", accept: "image/*", hidden: true });
+  picker.addEventListener("change", () => picker.files[0] && pictureFile(picker.files[0]));
+  const choose = el("button", { type: "button", onclick: () => picker.click() }, state.picture ? "Another picture…" : "Colours from a picture…");
+  if (!state.picture) {
+    return [el("div", { class: "actions picture-colours" }, choose, picker)];
+  }
+  const swatches = el("div", { class: "palette", role: "list", "aria-label": `Colours in ${state.picture.name}` },
+    state.picture.palette.map((entry) => el("span", { class: "palette-swatch", role: "listitem", title: entry.color, style: `background: ${entry.color}; flex-grow: ${Math.max(1, Math.round(entry.share * 20))}` })));
+  return [
+    el("h3", {}, "Colours from a picture"),
+    group(
+      el("div", { class: "palette-block" }, swatches, el("p", { class: "hint" }, `From ${state.picture.name}. These colours are also offered in every colour picker.`)),
+      field("Make it", chips([[true, "Dark"], [false, "Light"]], state.dark, (dark) => {
+        state.dark = dark;
+        render();
+      })),
+    ),
+    el("div", { class: "actions" },
+      el("button", { type: "button", class: "primary", onclick: () => {
+        const scheme = schemeFrom(state.picture.palette, state.dark);
+        Object.assign(state.theme.colors, scheme);
+        const accent = shownAccentOf("selection_background");
+        for (const role of accent ? ACCENT_SHADES : []) {
+          accent[role] = scheme[role] ?? accent[role];
+        }
+        changed({ rebuild: true });
+        say("Coloured from the picture. Undo puts your colours back.");
+      } }, "Use these colours"),
+      choose, picker),
   ];
 }
 
@@ -775,8 +932,8 @@ function withMemory(parts) {
 function panelShare() {
   const bytes = apply();
   const memory = memoryParts(state.theme, state.schema).used;
-  const size = bytes ? `This theme is ${bytes.length.toLocaleString("en")} bytes` : "";
-  const used = memory ? `, and uses ${memory.toLocaleString("en")} of the player's ${state.schema.asset_memory.toLocaleString("en")} bytes for pictures and fonts` : "";
+  const size = bytes ? `The theme file is ${kilobytes(bytes.length)}` : "";
+  const used = memory ? `, and its pictures and fonts use ${kilobytes(memory)} of the player's ${kilobytes(state.schema.asset_memory)}` : "";
   return [
     el("h2", {}, "Save & share"),
     el("p", { class: "lead" }, "Put the theme on your player, or share it with everyone."),
@@ -973,6 +1130,7 @@ function renderScreens() {
 }
 
 function render() {
+  refreshSwatches();
   renderSteps();
   renderScreens();
   $("name").value = state.theme.name;
