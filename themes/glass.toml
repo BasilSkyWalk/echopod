@@ -1,0 +1,161 @@
+name = "Glass"
+author = "EchoPod"
+description = "Deep blue glass: a soft cover, round buttons and a slider that follows the song"
+selection = "selection"
+
+[spacing]
+row_height = 28
+
+[colors]
+background = "#2a35b2"
+text = "#ffffff"
+text_secondary = "#c3cbff"
+text_tertiary = "#97a4ff"
+selection_background = "#5866ee"
+selection_top = "#6d7cff"
+selection_shine = "#aab4ff"
+selection_text = "#ffffff"
+header_background = "#2f3bc4"
+header_top = "#3e4bd6"
+header_text = "#ffffff"
+divider = "#4c58d6"
+scrollbar_thumb = "#97a4ff"
+danger = "#ff8e8e"
+success = "#8ef0c0"
+chevron = "#c3cbff"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+ink = "selection_text"
+inset = [6, 2]
+radius = 12
+opacity = 70
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+ink = "header_text"
+opacity = 45
+
+[boxes.toast]
+fill = "header_top"
+ink = "header_text"
+radius = 14
+opacity = 85
+
+[boxes.section]
+fill = "header_top"
+ink = "header_text"
+radius = 14
+opacity = 85
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "text"
+radius = 2
+
+[wallpaper]
+image = "glass.png"
+
+[wallpaper_portrait]
+image = "glass-tall.png"
+
+[home_scene]
+script = '''
+backdrop(x, y, width, height)
+if width > height {
+    let p0_0 = x + 206
+    let p0_1 = y + 16
+    let p0_2 = x + 194
+    menu(x, y, 186, 146)
+    rounded(x + 190, y + 8, 124, 130, 14, #2c38b4)
+    if has_cover {
+        cover(p0_0, p0_1, 92)
+    } else {
+        rect(p0_0, p0_1, 92, 92, #3a47cf)
+    }
+    line(song, body, p0_2, y + 110, 116, 18, center, #ffffff)
+    line(artist, small, p0_2, y + 124, 116, 14, center, #c3cbff)
+} else {
+    let p0_0 = x + 49
+    let p0_1 = y + 164
+    let p0_2 = x + 12
+    menu(x, y, 170, 150)
+    rounded(x + 8, y + 156, 154, 118, 14, #2c38b4)
+    if has_cover {
+        cover(p0_0, p0_1, 72)
+    } else {
+        rect(p0_0, p0_1, 72, 72, #3a47cf)
+    }
+    line(song, body, p0_2, y + 238, 146, 18, center, #ffffff)
+    line(artist, small, p0_2, y + 256, 146, 14, center, #c3cbff)
+}
+'''
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":65,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@header_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":66,\"kind\":\"menu\",\"name\":\"Menu\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":186,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":150}},\"bind\":{}},{\"id\":67,\"kind\":\"box\",\"name\":\"Card\",\"hidden\":false,\"at\":{\"wide\":{\"x\":190,\"y\":8,\"w\":124,\"h\":130},\"tall\":{\"x\":8,\"y\":156,\"w\":154,\"h\":118}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#2c38b4\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":14,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":68,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":206,\"y\":16,\"w\":92,\"h\":92},\"tall\":{\"x\":49,\"y\":164,\"w\":72,\"h\":72}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#3a47cf\",\"reflection\":false},{\"id\":69,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":194,\"y\":110,\"w\":116,\"h\":18,\"align\":\"center\"},\"tall\":{\"x\":12,\"y\":238,\"w\":146,\"h\":18,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":true},{\"id\":70,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":194,\"y\":124,\"w\":116,\"h\":14,\"align\":\"center\"},\"tall\":{\"x\":12,\"y\":256,\"w\":146,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#c3cbff\",\"scroll\":true}]}"
+
+[now_playing_scene]
+script = '''
+gradient(x, y, width, height, #4a5ae6, #1d2690)
+if width > height {
+    let p0_0 = x + 126
+    let p0_1 = x + 16
+    let p0_2 = y + 8
+    let p0_3 = x + 10
+    let p0_4 = y + 80
+    let p0_5 = x + 175
+    rounded(x + 14, y + 12, 104, 104, 4, #161d6c)
+    if has_cover {
+        cover(p0_3, p0_2, 104)
+    } else {
+        rect(p0_3, p0_2, 104, 104, #2a35b0)
+    }
+    line(song, title, p0_0, p0_2, 186, 22, left, #ffffff)
+    line(artist, body, p0_0, y + 30, 186, 20, left, #c3cbff)
+    line(album, body, p0_0, y + 50, 186, 20, left, #97a4ff)
+    icon(previous, x + 134, p0_4, 14, 14, #ffffff)
+    rounded(x + 156, y + 72, 56, 30, 14, #3a47cf)
+    if playing {
+        icon(pause, p0_5, y + 78, 18, 18, #ffffff)
+    }
+    if !(playing) {
+        icon(play, p0_5, y + 78, 18, 18, #ffffff)
+    }
+    icon(next, x + 220, p0_4, 14, 14, #ffffff)
+    rect(p0_0, y + 108, 186, 1, #4c58d6)
+    rounded(p0_1, y + 120, 288, 4, 2, #3a46c4)
+    rounded(p0_1, y + 120, (288 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 4, 2, #9aa8ff)
+    ring((p0_1) * 16 + 8, (y + 122) * 16 + 8, 96, 0, #ffffff)
+    text(elapsed, small, p0_1, y + 130, 80, 14, left, #c3cbff)
+    text(remaining, small, x + 224, y + 130, 80, 14, right, #97a4ff)
+} else {
+    let p0_0 = x + 14
+    let p0_1 = x + 6
+    let p0_2 = x + 25
+    let p0_3 = y + 8
+    let p0_4 = y + 212
+    let p0_5 = x + 76
+    rounded(x + 29, y + 12, 116, 116, 4, #161d6c)
+    if has_cover {
+        cover(p0_2, p0_3, 116)
+    } else {
+        rect(p0_2, p0_3, 116, 116, #2a35b0)
+    }
+    line(song, title, p0_1, y + 134, 158, 22, center, #ffffff)
+    line(artist, body, p0_1, y + 156, 158, 20, center, #c3cbff)
+    line(album, body, p0_1, y + 176, 158, 20, center, #97a4ff)
+    icon(previous, x + 36, p0_4, 14, 14, #ffffff)
+    rounded(x + 57, y + 204, 56, 30, 14, #3a47cf)
+    if playing {
+        icon(pause, p0_5, y + 210, 18, 18, #ffffff)
+    }
+    if !(playing) {
+        icon(play, p0_5, y + 210, 18, 18, #ffffff)
+    }
+    icon(next, x + 120, p0_4, 14, 14, #ffffff)
+    rounded(p0_0, y + 246, 142, 4, 2, #3a46c4)
+    rounded(p0_0, y + 246, (142 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 4, 2, #9aa8ff)
+    ring((p0_0) * 16 + 8, (y + 248) * 16 + 8, 96, 0, #ffffff)
+    text(elapsed, small, p0_0, y + 256, 70, 14, left, #c3cbff)
+    text(remaining, small, x + 86, y + 256, 70, 14, right, #97a4ff)
+}
+'''
+design = "{\"version\":2,\"screen\":\"playing\",\"elements\":[{\"id\":47,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#4a5ae6\",\"bottom\":\"#1d2690\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":48,\"kind\":\"box\",\"name\":\"Shadow\",\"hidden\":false,\"at\":{\"wide\":{\"x\":14,\"y\":12,\"w\":104,\"h\":104},\"tall\":{\"x\":29,\"y\":12,\"w\":116,\"h\":116}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#161d6c\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":4,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":49,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":8,\"w\":104,\"h\":104},\"tall\":{\"x\":25,\"y\":8,\"w\":116,\"h\":116}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#2a35b0\",\"reflection\":false},{\"id\":50,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":126,\"y\":8,\"w\":186,\"h\":22},\"tall\":{\"x\":6,\"y\":134,\"w\":158,\"h\":22,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":true},{\"id\":51,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":126,\"y\":30,\"w\":186,\"h\":20},\"tall\":{\"x\":6,\"y\":156,\"w\":158,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"#c3cbff\",\"scroll\":true},{\"id\":52,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":126,\"y\":50,\"w\":186,\"h\":20},\"tall\":{\"x\":6,\"y\":176,\"w\":158,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"#97a4ff\",\"scroll\":true},{\"id\":53,\"kind\":\"symbol\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":134,\"y\":80,\"w\":14,\"h\":14},\"tall\":{\"x\":36,\"y\":212,\"w\":14,\"h\":14}},\"bind\":{},\"mark\":\"previous\",\"color\":\"#ffffff\"},{\"id\":54,\"kind\":\"box\",\"name\":\"Play button\",\"hidden\":false,\"at\":{\"wide\":{\"x\":156,\"y\":72,\"w\":56,\"h\":30},\"tall\":{\"x\":57,\"y\":204,\"w\":56,\"h\":30}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#3a47cf\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":14,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":55,\"kind\":\"symbol\",\"name\":\"Pause\",\"hidden\":false,\"at\":{\"wide\":{\"x\":175,\"y\":78,\"w\":18,\"h\":18},\"tall\":{\"x\":76,\"y\":210,\"w\":18,\"h\":18}},\"bind\":{\"show\":{\"when\":{\"on\":\"playing\"}}},\"mark\":\"pause\",\"color\":\"#ffffff\"},{\"id\":56,\"kind\":\"symbol\",\"name\":\"Play\",\"hidden\":false,\"at\":{\"wide\":{\"x\":175,\"y\":78,\"w\":18,\"h\":18},\"tall\":{\"x\":76,\"y\":210,\"w\":18,\"h\":18}},\"bind\":{\"show\":{\"when\":{\"on\":\"playing\",\"not\":true}}},\"mark\":\"play\",\"color\":\"#ffffff\"},{\"id\":57,\"kind\":\"symbol\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":220,\"y\":80,\"w\":14,\"h\":14},\"tall\":{\"x\":120,\"y\":212,\"w\":14,\"h\":14}},\"bind\":{},\"mark\":\"next\",\"color\":\"#ffffff\"},{\"id\":58,\"kind\":\"box\",\"name\":\"Rule\",\"hidden\":false,\"at\":{\"wide\":{\"x\":126,\"y\":108,\"w\":186,\"h\":1},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#4c58d6\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":59,\"kind\":\"box\",\"name\":\"Track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":16,\"y\":120,\"w\":288,\"h\":4},\"tall\":{\"x\":14,\"y\":246,\"w\":142,\"h\":4}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#3a46c4\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":2,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":60,\"kind\":\"box\",\"name\":\"Played\",\"hidden\":false,\"at\":{\"wide\":{\"x\":16,\"y\":120,\"w\":288,\"h\":4},\"tall\":{\"x\":14,\"y\":246,\"w\":142,\"h\":4}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"#9aa8ff\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":2,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":61,\"kind\":\"circle\",\"name\":\"Knob\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":116,\"w\":12,\"h\":12},\"tall\":null},\"bind\":{\"x\":{\"source\":\"progress_volume\",\"from\":10,\"to\":298}},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":62,\"kind\":\"circle\",\"name\":\"Knob\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":8,\"y\":242,\"w\":12,\"h\":12}},\"bind\":{\"x\":{\"source\":\"progress_volume\",\"from\":8,\"to\":150}},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":63,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":16,\"y\":130,\"w\":80,\"h\":14},\"tall\":{\"x\":14,\"y\":256,\"w\":70,\"h\":14}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#c3cbff\",\"scroll\":false},{\"id\":64,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":224,\"y\":130,\"w\":80,\"h\":14,\"align\":\"right\"},\"tall\":{\"x\":86,\"y\":256,\"w\":70,\"h\":14,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#97a4ff\",\"scroll\":false}]}"
