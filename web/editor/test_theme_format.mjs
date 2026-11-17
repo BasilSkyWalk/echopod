@@ -151,6 +151,8 @@ const barsScript = drawingScript({ version: 2, elements: [bars] }, homeTheme);
 assert.equal(barsScript.match(/let beat_/g).length, 1, "bars inside bars share the outer beat");
 assert.match(barsScript, /copy_2 < \(beat_copy_1 \* 125\) \* 8 \/ 1000/);
 compileScene(barsScript, schema.scene);
+const veil = element("box", at(0, 0, 40, 20), at(0, 0, 40, 20), { fill: "none", grid: 2, gridColor: "#000000" });
+assert.equal(drawingScript({ version: 2, elements: [veil] }, homeTheme).trim(), "lattice(x, y, 40, 20, 2, #000000)", "a box with no fill draws only its grid");
 const hidden = { ...box, hidden: true };
 assert.equal(drawingScript({ version: 2, elements: [hidden] }, homeTheme).trim(), "");
 assert.equal(readDrawing("not json"), null);

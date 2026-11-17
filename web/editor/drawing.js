@@ -387,6 +387,11 @@ function placed(item, scope) {
   return { at, x, y, w, h };
 }
 
+function gridLines(item, theme, scope, [ix, iy, iw, ih]) {
+  const grid = Math.max(0, whole(item.grid));
+  return grid > 1 ? [`lattice(${ix}, ${iy}, ${iw}, ${ih}, ${grid}, ${colourOf(item, "gridColor", theme, scope)})`] : [];
+}
+
 function boxLines(item, scope, theme) {
   const { x, y, w, h } = placed(item, scope);
   const [left, top] = anchor(scope, x, y);
@@ -405,7 +410,11 @@ function boxLines(item, scope, theme) {
   const iy = sum(by, inset);
   const iw = less(bw, 2 * inset);
   const ih = less(bh, 2 * inset);
-  if (item.fill === "wallpaper") {
+  const painted = item.fill === "none" ? null : item.fill;
+  if (!painted) {
+    return [...lines, ...gridLines(item, theme, scope, [ix, iy, iw, ih])];
+  }
+  if (painted === "wallpaper") {
     lines.push(`backdrop(${ix}, ${iy}, ${iw}, ${ih})`);
   } else if (item.fill === "gradient") {
     lines.push(`gradient(${ix}, ${iy}, ${iw}, ${ih}, ${colourOf(item, "top", theme, scope)}, ${colourOf(item, "bottom", theme, scope)})`);
@@ -416,11 +425,7 @@ function boxLines(item, scope, theme) {
   } else {
     lines.push(`rect(${ix}, ${iy}, ${iw}, ${ih}, ${colourOf(item, "color", theme, scope)})`);
   }
-  const grid = Math.max(0, whole(item.grid));
-  if (grid > 1) {
-    lines.push(`lattice(${ix}, ${iy}, ${iw}, ${ih}, ${grid}, ${colourOf(item, "gridColor", theme, scope)})`);
-  }
-  return lines;
+  return [...lines, ...gridLines(item, theme, scope, [ix, iy, iw, ih])];
 }
 
 function circleLines(item, scope, theme) {

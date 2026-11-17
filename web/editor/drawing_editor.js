@@ -486,10 +486,10 @@ export function drawingEditor(ctx) {
     const fields = [];
     switch (item.kind) {
       case "box":
-        fields.push(field("Fill", chips([["solid", "Colour"], ["gradient", "Top to bottom"], ["wallpaper", "Wallpaper"]], item.fill ?? "solid", set("fill", true))));
+        fields.push(field("Fill", chips([["solid", "Colour"], ["gradient", "Top to bottom"], ["wallpaper", "Wallpaper"], ["none", "None"]], item.fill ?? "solid", set("fill", true))));
         if (item.fill === "gradient") {
           fields.push(colourField(item, "top", "Top"), colourField(item, "bottom", "Bottom"));
-        } else if (item.fill !== "wallpaper") {
+        } else if (item.fill === "solid" || !item.fill) {
           fields.push(colourField(item, "color", "Colour"));
         }
         fields.push(field("Corners", range(item.radius ?? 0, 0, 40, set("radius"))));
@@ -498,6 +498,10 @@ export function drawingEditor(ctx) {
           fields.push(colourField(item, "borderColor", "Border colour"));
         }
         fields.push(field("Narrower at the bottom", range(item.taper ?? 0, 0, 60, set("taper"))));
+        fields.push(field("Grid lines over it", range(item.grid ?? 0, 0, 12, set("grid", true)), "Lines every so many pixels; 0 for none"));
+        if ((item.grid ?? 0) > 1) {
+          fields.push(colourField(item, "gridColor", "Grid colour"));
+        }
         break;
       case "circle":
         fields.push(colourField(item, "color", "Colour"));
