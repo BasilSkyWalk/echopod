@@ -2,7 +2,9 @@
 
 #include <stddef.h>
 
-const ThemeBoxes THEME_STANDARD_BOXES = {
+#include "core/resident.h"
+
+ECHO_RESIDENT const ThemeBoxes THEME_STANDARD_BOXES = {
     .selection = {.fill_top = THEME_COLOR_SELECTION_TOP,
                   .fill_bottom = THEME_COLOR_SELECTION_BACKGROUND,
                   .shine = THEME_COLOR_SELECTION_SHINE,

@@ -26,3 +26,6 @@ target_link_libraries(echo_ui
     PUBLIC echo_core echo_gfx
     PRIVATE echo_options echo_compact echo_lto
 )
+if(CMAKE_CROSSCOMPILING)
+    set_source_files_properties(theme.c PROPERTIES COMPILE_DEFINITIONS ECHO_RESIDENT_TABLES)
+endif()

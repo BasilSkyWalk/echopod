@@ -253,6 +253,14 @@ ECHO_NP_FACES_CODE static Rect rect_from(const int32_t *values)
     return (Rect){values[0], values[1], values[2], values[3]};
 }
 
+ECHO_NP_FACES_CODE static void fill_gradient(Canvas *canvas, Rect area, Color top, Color bottom)
+{
+    for (int row = 0; row < area.height; row++) {
+        Color color = color_between(top, bottom, row, area.height - 1);
+        canvas_fill_rect(canvas, (Rect){area.x, area.y + row, area.width, 1}, color);
+    }
+}
+
 ECHO_NP_FACES_CODE static int32_t compute(Machine *machine, SceneOp op)
 {
     const int32_t *v = machine->values;
@@ -396,7 +404,7 @@ ECHO_NP_FACES_CODE static void draw(Machine *machine, SceneOp op)
         shape_trapezoid(canvas, rect_from(v), v[4], (Color)v[5]);
         break;
     case SCENE_OP_GRADIENT:
-        canvas_fill_gradient(canvas, rect_from(v), (Color)v[4], (Color)v[5]);
+        fill_gradient(canvas, rect_from(v), (Color)v[4], (Color)v[5]);
         break;
     case SCENE_OP_LATTICE:
         shape_lattice(canvas, rect_from(v), v[4], (Color)v[5]);

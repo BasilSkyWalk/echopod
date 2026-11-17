@@ -5,7 +5,7 @@
 #include "hal/display.h"
 #include "settings/settings.h"
 
-const ThemeColors DEFAULT_THEME_DARK_COLORS = {
+ECHO_RESIDENT const ThemeColors DEFAULT_THEME_DARK_COLORS = {
     .background = COLOR_RGB(16, 17, 20),
     .text = COLOR_RGB(242, 242, 245),
     .text_secondary = COLOR_RGB(142, 142, 150),
@@ -24,7 +24,7 @@ const ThemeColors DEFAULT_THEME_DARK_COLORS = {
     .chevron = COLOR_RGB(110, 110, 118),
 };
 
-const Theme DEFAULT_THEME = {
+ECHO_RESIDENT const Theme DEFAULT_THEME = {
     .colors = &DEFAULT_THEME_DARK_COLORS,
     .boxes = &THEME_STANDARD_BOXES,
     .fonts =

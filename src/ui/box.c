@@ -58,13 +58,11 @@ static void draw_fill(Canvas *canvas, const ThemeColors *colors, const BoxStyle 
                       theme_color(colors, style->shine), alpha);
     if (top == bottom) {
         canvas_blend_rect(canvas, body, top, alpha);
-    } else if (alpha == COLOR_ALPHA_OPAQUE) {
-        canvas_fill_gradient(canvas, body, top, bottom);
-    } else {
-        for (int row = 0; row < body.height; row++) {
-            Color color = color_between(top, bottom, row, body.height - 1);
-            canvas_blend_rect(canvas, (Rect){body.x, body.y + row, body.width, 1}, color, alpha);
-        }
+        return;
+    }
+    for (int row = 0; row < body.height; row++) {
+        Color color = color_between(top, bottom, row, body.height - 1);
+        canvas_blend_rect(canvas, (Rect){body.x, body.y + row, body.width, 1}, color, alpha);
     }
 }
 
