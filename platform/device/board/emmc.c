@@ -5,6 +5,8 @@
 #include "board.h"
 #include "cru.h"
 #include "device/card_write.h"
+#include "device/sd_card.h"
+#include "hal/clock.h"
 #include "mmc.h"
 #include "registers.h"
 
@@ -43,6 +45,7 @@ enum {
     CMD_SET_BLOCK_LENGTH = 16,
     CMD_READ_SINGLE_BLOCK = 17,
     OCR_TRIES = 8000,
+    OCR_SILENT_TRIES = 10,
     STATUS_TRIES = 1000,
     EXT_CSD_SECTOR_COUNT = 212,
     MUX_SETTLE_US = 10,
@@ -55,6 +58,13 @@ static const MmcHost EMMC_HOST = {EMMC_BASE, CRU_EMMC_IDENTIFY, CRU_EMMC_TRANSFE
                                   &emmc_fifo_depth};
 static EmmcInfo emmc;
 static bool started;
+static SdCard sd_nand;
+
+typedef enum OcrResult {
+    OCR_SECTOR_MODE_READY,
+    OCR_UNUSABLE,
+    OCR_NO_ANSWER
+} OcrResult;
 
 static bool command(uint8_t index, uint32_t argument, SdResponse response, uint32_t words[4])
 {
@@ -76,17 +86,22 @@ static void power_controller(void)
     mmc_power_cycle(&EMMC_HOST);
 }
 
-static bool wait_for_ocr(void)
+static OcrResult wait_for_ocr(void)
 {
     uint32_t words[4] = {0, 0, 0, 0};
+    bool answered = false;
     for (int attempt = 0; attempt < OCR_TRIES; attempt++) {
-        if (command(CMD_SEND_OP_COND, OCR_ARGUMENT, SD_RESPONSE_SHORT_NO_CRC, words) &&
-            (words[0] & OCR_READY) != 0) {
-            return (words[0] & OCR_SECTOR_MODE) != 0;
+        if (command(CMD_SEND_OP_COND, OCR_ARGUMENT, SD_RESPONSE_SHORT_NO_CRC, words)) {
+            answered = true;
+            if ((words[0] & OCR_READY) != 0) {
+                return (words[0] & OCR_SECTOR_MODE) != 0 ? OCR_SECTOR_MODE_READY : OCR_UNUSABLE;
+            }
+        } else if (!answered && attempt + 1 >= OCR_SILENT_TRIES) {
+            return OCR_NO_ANSWER;
         }
         board_delay_ms(1);
     }
-    return false;
+    return OCR_UNUSABLE;
 }
 
 static uint32_t cid_serial(const uint32_t cid[4])
@@ -94,13 +109,15 @@ static uint32_t cid_serial(const uint32_t cid[4])
     return (cid[1] & 0xFFFFu) << 16 | cid[0] >> 16;
 }
 
-static bool identify(void)
+static bool identify(bool *no_answer)
 {
     uint32_t words[4] = {0, 0, 0, 0};
     uint32_t none[4] = {0, 0, 0, 0};
     mmc_command(&EMMC_HOST, (SdCommand){CMD_GO_IDLE, 0, SD_RESPONSE_NONE, true}, none);
     board_delay_us(IDLE_SETTLE_US);
-    if (!wait_for_ocr() || !command(CMD_ALL_SEND_CID, 0, SD_RESPONSE_LONG, words)) {
+    OcrResult ocr = wait_for_ocr();
+    *no_answer = ocr == OCR_NO_ANSWER;
+    if (ocr != OCR_SECTOR_MODE_READY || !command(CMD_ALL_SEND_CID, 0, SD_RESPONSE_LONG, words)) {
         return false;
     }
     emmc.serial = cid_serial(words);
@@ -108,11 +125,21 @@ static bool identify(void)
            command(CMD_SEND_CSD, RCA_ARGUMENT, SD_RESPONSE_LONG, words);
 }
 
+static uint32_t rca_argument(void)
+{
+    return emmc.sd_nand ? sd_card_rca_argument(&sd_nand) : RCA_ARGUMENT;
+}
+
+static uint32_t card_address(uint32_t lba)
+{
+    return emmc.sd_nand ? sd_card_address(&sd_nand, lba) : lba;
+}
+
 static bool wait_for_transfer_state(void)
 {
     uint32_t words[4] = {0, 0, 0, 0};
     for (int attempt = 0; attempt < STATUS_TRIES; attempt++) {
-        if (command(CMD_SEND_STATUS, RCA_ARGUMENT, SD_RESPONSE_SHORT, words) &&
+        if (command(CMD_SEND_STATUS, rca_argument(), SD_RESPONSE_SHORT, words) &&
             (words[0] & STATUS_READY_FOR_DATA) != 0 &&
             ((words[0] >> STATUS_STATE_SHIFT) & STATUS_STATE_MASK) == STATE_TRANSFER) {
             return true;
@@ -146,13 +173,66 @@ static bool select_and_widen(void)
     return true;
 }
 
+static bool sd_nand_command(void *context, SdCommand sd, uint32_t response[4])
+{
+    (void)context;
+    return mmc_command(&EMMC_HOST, sd, response);
+}
+
+static void sd_nand_set_clock(void *context, SdClock clock)
+{
+    (void)context;
+    mmc_set_clock(&EMMC_HOST, clock);
+}
+
+static void sd_nand_set_bus_width(void *context, uint8_t bits)
+{
+    (void)context;
+    mmc_set_bus_width(&EMMC_HOST, bits);
+}
+
+static void sd_nand_delay(void *context, uint32_t milliseconds)
+{
+    (void)context;
+    board_delay_ms(milliseconds);
+}
+
+static bool sd_nand_present(void *context)
+{
+    (void)context;
+    return true;
+}
+
+static void sd_nand_stop(void *context)
+{
+    (void)context;
+}
+
+static uint32_t sd_nand_now_ms(void *context)
+{
+    (void)context;
+    return hal_clock_milliseconds();
+}
+
+static const SdHost SD_NAND_HOST = {
+    sd_nand_command, sd_nand_set_clock, sd_nand_set_bus_width, sd_nand_delay,
+    sd_nand_present, sd_nand_stop,      sd_nand_now_ms,        NULL};
+
+static bool start_sd_nand(void)
+{
+    mmc_set_clock(&EMMC_HOST, SD_CLOCK_IDENTIFY);
+    emmc.sd_nand = sd_card_init(&sd_nand, &SD_NAND_HOST);
+    emmc.sector_count = emmc.sd_nand ? sd_nand.sector_count : 0;
+    return emmc.sector_count != 0;
+}
+
 bool emmc_read(void *context, uint32_t lba, uint32_t count, void *buffer)
 {
     (void)context;
     uint32_t *words = buffer;
     for (uint32_t index = 0; index < count; index++) {
         if (!started || lba >= emmc.sector_count || index >= emmc.sector_count - lba ||
-            !mmc_read_block(&EMMC_HOST, CMD_READ_SINGLE_BLOCK, lba + index,
+            !mmc_read_block(&EMMC_HOST, CMD_READ_SINGLE_BLOCK, card_address(lba + index),
                             words + index * (BLOCK_LENGTH / 4))) {
             return false;
         }
@@ -170,7 +250,7 @@ static bool write_data(void *context, uint8_t command, uint32_t address, uint32_
 static bool stop_writing(void *context)
 {
     (void)context;
-    return mmc_stop(&EMMC_HOST, RCA_ARGUMENT);
+    return mmc_stop(&EMMC_HOST, rca_argument());
 }
 
 static bool wait_until_ready(void *context)
@@ -191,7 +271,7 @@ bool emmc_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
     if (!started || !emmc_layout_allows_write(&emmc.layout, lba, count)) {
         return false;
     }
-    return card_write(&WRITER, lba, count, buffer);
+    return card_write(&WRITER, card_address(lba), count, buffer);
 }
 
 uint32_t emmc_fifo_depth_words(void)
@@ -224,7 +304,7 @@ bool emmc_volume_write(void *context, uint32_t lba, uint32_t count, const void *
 bool emmc_status(uint32_t *status)
 {
     uint32_t words[4] = {0, 0, 0, 0};
-    if (!started || !command(CMD_SEND_STATUS, RCA_ARGUMENT, SD_RESPONSE_SHORT, words)) {
+    if (!started || !command(CMD_SEND_STATUS, rca_argument(), SD_RESPONSE_SHORT, words)) {
         return false;
     }
     *status = words[0];
@@ -235,10 +315,19 @@ bool emmc_start(EmmcInfo *info)
 {
     if (!started) {
         power_controller();
-        started = identify() && select_and_widen();
+        bool no_answer = false;
+        started = identify(&no_answer) && select_and_widen();
+        if (!started && no_answer) {
+            started = start_sd_nand();
+        }
         BlockDevice device = emmc_device();
         started = started && emmc_layout_read(&emmc.layout, &device, emmc.sector_count);
     }
     *info = emmc;
     return started;
+}
+
+bool emmc_is_sd_nand(void)
+{
+    return started && emmc.sd_nand;
 }
