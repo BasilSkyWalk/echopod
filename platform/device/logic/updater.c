@@ -292,7 +292,9 @@ static UpdateCheck stock_check(const UpdateFile *file, const UpdateStorage *stor
     if (!crc_is_valid(file, STOCK_FW_END, &scan)) {
         return refuse(UPDATE_REFUSED_CRC);
     }
-    if (!scan.eight_gb || scan.small_model) {
+    bool for_this_model = storage->small_model ? scan.small_model && !scan.eight_gb
+                                               : scan.eight_gb && !scan.small_model;
+    if (!for_this_model) {
         return refuse(UPDATE_REFUSED_MODEL);
     }
     return UPDATE_STOCK;

@@ -1,6 +1,7 @@
 #include "hal/power.h"
 #include "board.h"
 #include "dac.h"
+#include "emmc.h"
 #include "gpio.h"
 #include "hal/clock.h"
 #include "hal/system.h"
@@ -13,10 +14,13 @@
 static const GpioPin POWER_KEY = {2, 5};
 static const GpioPin POWER_HOLD = {2, 6};
 static const GpioPin CHARGE_STATUS = {2, 3};
+static const GpioPin DEBUG_SERIAL_OUT = {0, 14};
+static const GpioPin DAC_RESET = {2, 1};
 
 enum {
     START_HOLD_MS = 1000,
-    CUT_WAIT_MS = 1000
+    CUT_WAIT_MS = 1000,
+    RELEASE_SETTLE_US = 5000
 };
 
 static bool charge_status_ready;
@@ -138,17 +142,32 @@ HalBattery hal_power_battery(void)
                         .millivolts = (uint16_t)battery_gauge_recent_millivolts(&gauge)};
 }
 
+static void drive_low(GpioPin pin)
+{
+    gpio_mux(pin, GPIO_FUNCTION_GPIO);
+    gpio_output(pin, false);
+}
+
+static void release_power_hold(void)
+{
+    if (emmc_is_sd_nand()) {
+        drive_low(DEBUG_SERIAL_OUT);
+        drive_low(DAC_RESET);
+        board_delay_us(RELEASE_SETTLE_US);
+    }
+    __asm__ volatile("cpsid i" ::: "memory");
+    board_start_record_power_off();
+    drive_low(POWER_HOLD);
+    for (;;) {
+        board_watchdog_kick();
+    }
+}
+
 void board_power_cut(void)
 {
     board_backlight_off();
     board_bluetooth_off();
-    __asm__ volatile("cpsid i" ::: "memory");
-    board_start_record_power_off();
-    gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
-    gpio_output(POWER_HOLD, false);
-    for (;;) {
-        board_watchdog_kick();
-    }
+    release_power_hold();
 }
 
 bool board_power_key_down(void)
@@ -164,11 +183,5 @@ void hal_power_off(void)
     dac_path_stop_if_up();
     board_backlight_off();
     board_bluetooth_off();
-    __asm__ volatile("cpsid i" ::: "memory");
-    board_start_record_power_off();
-    gpio_mux(POWER_HOLD, GPIO_FUNCTION_GPIO);
-    gpio_output(POWER_HOLD, false);
-    for (;;) {
-        board_watchdog_kick();
-    }
+    release_power_hold();
 }
