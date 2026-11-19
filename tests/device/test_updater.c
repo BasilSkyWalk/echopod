@@ -157,7 +157,7 @@ static void report(void *context, uint32_t done, uint32_t total)
 
 static UpdateStorage target(void)
 {
-    return (UpdateStorage){storage_read, storage_write, NULL, SLOT_1, SLOT_2, SLOT_SECTORS};
+    return (UpdateStorage){storage_read, storage_write, NULL, SLOT_1, SLOT_2, SLOT_SECTORS, false};
 }
 
 static UpdateFile source(void)
@@ -406,8 +406,8 @@ static uint8_t *stock_image(uint8_t seed)
 
 static UpdateStorage stock_target(void)
 {
-    return (UpdateStorage){storage_read, storage_write, NULL,
-                           SLOT_1,       STOCK_SLOT_2,  STOCK_SLOT_SECTORS};
+    return (UpdateStorage){storage_read, storage_write,      NULL, SLOT_1,
+                           STOCK_SLOT_2, STOCK_SLOT_SECTORS, false};
 }
 
 static UpdateCheck check_stock(uint8_t *image, uint32_t size, uint32_t slot_sectors)
@@ -450,6 +450,24 @@ static void the_512_mb_model_and_unmarked_images_are_invalid(void)
     memcpy(image + 2 * MARKER_AT, SMALL_MODEL_MARKER, MARKER_LENGTH);
     seal_stock(image);
     CHECK_EQUAL(UPDATE_INVALID, check_stock(image, STOCK_IMAGE_SIZE, STOCK_SLOT_SECTORS));
+}
+
+static UpdateCheck check_small_model_stock(uint8_t *image)
+{
+    reset(image, STOCK_IMAGE_SIZE);
+    UpdateStorage storage_target = stock_target();
+    storage_target.small_model = true;
+    UpdateFile update = source();
+    return updater_check(&update, &storage_target);
+}
+
+static void the_512_mb_model_takes_only_its_own_stock_images(void)
+{
+    CHECK_EQUAL(UPDATE_STOCK, check_small_model_stock(
+                                  model_image(1, STOCK_V4_FW_SIZE, SMALL_MODEL_MARKER, MARKER_AT)));
+    CHECK_EQUAL(UPDATE_INVALID, check_small_model_stock(stock_image(1)));
+    CHECK_EQUAL(UPDATE_REFUSED_MODEL, updater_refusal());
+    CHECK_EQUAL(UPDATE_INVALID, check_small_model_stock(model_image(1, STOCK_FW_SIZE, NULL, 0)));
 }
 
 static void a_stock_header_copy_off_a_sector_is_invalid(void)
@@ -544,6 +562,7 @@ int main(void)
         TEST_CASE(firmware_4_stock_images_are_recognised_as_stock),
         TEST_CASE(a_model_marker_across_two_reads_is_found),
         TEST_CASE(the_512_mb_model_and_unmarked_images_are_invalid),
+        TEST_CASE(the_512_mb_model_takes_only_its_own_stock_images),
         TEST_CASE(a_stock_header_copy_off_a_sector_is_invalid),
         TEST_CASE(damaged_or_other_model_stock_images_are_invalid),
         TEST_CASE(a_stock_image_needs_a_slot_it_fits),
