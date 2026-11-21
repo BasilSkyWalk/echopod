@@ -4,7 +4,7 @@ import { buildFonts } from "./font_editor.js";
 import { buildIcons } from "./icon_editor.js";
 import { AREAS, colorOf, drawingScript, findElement, walk } from "./drawing.js";
 import { drawingEditor } from "./drawing_editor.js";
-import { STARTS, drawingFrom, faceOf, plainPicture, standardDrawing, startDrawing } from "./drawings.js";
+import { STARTS, drawingFrom, faceOf, fitTiles, isTiles, plainPicture, standardDrawing, startDrawing, tileRows } from "./drawings.js";
 import { KEY, PLAYBACK, PLAYER, Preview, SONGS } from "./preview_host.js";
 import {
   ACCENT_SHADES,
@@ -1596,6 +1596,11 @@ function barRange(label, value, most, set) {
   return el("label", { class: "bar-range" }, el("span", {}, label), slider);
 }
 
+function barStep(label, value, least, most, set) {
+  const step = (by, title, mark) => el("button", { type: "button", class: "bar-icon", title, "aria-label": title, disabled: value + by < least || value + by > most, onclick: () => set(value + by) }, mark);
+  return el("span", { class: "bar-step" }, el("span", {}, label), step(-1, `Fewer ${label.toLowerCase()}`, "−"), el("b", {}, String(value)), step(1, `More ${label.toLowerCase()}`, "+"));
+}
+
 function barColours(current, set) {
   const custom = typeof current === "string" && !current.startsWith("@");
   return [
@@ -1625,6 +1630,14 @@ function partBar() {
   }
   const item = picks[0];
   const bits = [el("span", { class: "bar-name" }, drawer.nameOf(item))];
+  if (isTiles(item) && item.at[shape()]) {
+    const grid = (key) => (value) => {
+      item.repeat[key] = value;
+      fitTiles(item, shape());
+      changed({ rebuild: true });
+    };
+    bits.push(barStep("Across", item.repeat.columns ?? 1, 1, 6, grid("columns")), barStep("Rows", tileRows(item, shape()), 1, 4, grid("rows")));
+  }
   const key = BAR_KEYS[item.kind];
   if (key && !(item.kind === "box" && item.fill && item.fill !== "solid")) {
     bits.push(...barColours(item[key], (value, redraw) => {

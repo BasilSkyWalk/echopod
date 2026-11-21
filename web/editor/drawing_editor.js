@@ -12,7 +12,7 @@ import {
   newElement,
   walk,
 } from "./drawing.js";
-import { SHELF, SHELF_ART, SHELF_MORE, fitTiles, isTiles, tilesFor } from "./drawings.js";
+import { SHELF, SHELF_ART, SHELF_MORE, fitTiles, isTiles, tileRows, tilesFor } from "./drawings.js";
 
 const HANDLE = 7;
 const HIT = 4;
@@ -1329,6 +1329,16 @@ export function drawingEditor(ctx) {
       repeat[key] = value;
       ctx.changed();
     };
+    if (isTiles(item)) {
+      const grid = (key) => (value) => {
+        item.repeat[key] = value;
+        fitTiles(item, shape());
+        ctx.changed({ rebuild: true });
+      };
+      fields.push(field("Tiles across", numberInput(repeat.columns ?? 1, grid("columns"), { least: 1, most: 6 }), "The tiles stretch to fill the group"));
+      fields.push(field("Rows showing", numberInput(tileRows(item, shape()), grid("rows"), { least: 1, most: 4 }), "More items scroll into view"));
+      return fields;
+    }
     if (repeat.count !== "items") {
       fields.push(field("How many", numberInput(repeat.count, set("count"), { least: 1, most: 96 })));
     }

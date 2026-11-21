@@ -66,7 +66,8 @@ function tileBoxes(w, h) {
 function tiles(spot, frame, columns, [w, h], name) {
   const gap = 4;
   const boxes = tileBoxes(w, h);
-  return element("group", ...spot(...frame), { name, repeat: { count: "items", columns, dx: w + gap, dy: h + gap, turn: 0, start: 0, spin: 0 }, children: [
+  const rows = Math.max(1, Math.floor((frame[3] + 1) / (h + gap)));
+  return element("group", ...spot(...frame), { name, repeat: { count: "items", columns, rows, dx: w + gap, dy: h + gap, turn: 0, start: 0, spin: 0 }, children: [
     element("box", ...spot(...boxes.Highlight), { name: "Highlight", color: "@text", bind: { show: when("highlighted") } }),
     element("box", ...spot(...boxes.Tile), { name: "Tile", color: "@selection_background" }),
     element("symbol", ...spot(...boxes.Icon), { name: "Icon", mark: "item", color: "@selection_text" }),
@@ -96,13 +97,25 @@ export function isTiles(item) {
   return item?.kind === "group" && item.repeat?.count === "items" && (item.children ?? []).some((child) => child.kind === "box" && child.name === "Tile");
 }
 
+export function tileRows(group, shape) {
+  const frame = group.at?.[shape];
+  const kept = Math.round(Number(group.repeat?.rows));
+  if (kept >= 1) {
+    return kept;
+  }
+  return frame ? Math.max(1, Math.floor((Number(frame.h) + 1) / Math.max(1, Number(group.repeat?.dy) || 1))) : 1;
+}
+
 export function fitTiles(group, shape) {
   const frame = group.at?.[shape];
   if (!frame) {
     return;
   }
-  const { columns, size: [w, h] } = tileGrid({ w: Number(frame.w), h: Number(frame.h) });
-  group.repeat = { ...group.repeat, columns, dx: w + TILE_GAP, dy: h + TILE_GAP };
+  const columns = Math.max(1, Math.round(Number(group.repeat.columns) || 1));
+  const rows = tileRows(group, shape);
+  const w = Math.max(8, Math.floor((Number(frame.w) - TILE_GAP * (columns - 1)) / columns));
+  const h = Math.max(8, Math.floor((Number(frame.h) + 1) / rows) - TILE_GAP);
+  group.repeat = { ...group.repeat, columns, rows, dx: w + TILE_GAP, dy: h + TILE_GAP };
   const boxes = tileBoxes(w, h);
   for (const child of group.children ?? []) {
     const box = boxes[child.name];
