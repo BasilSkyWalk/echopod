@@ -5,7 +5,7 @@ import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from
 import { coveredCodes } from "./font_editor.js";
 import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawing.js";
 import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
-import { mix, paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
+import { ACCENT_FAMILY, COLOUR_SETS, mix, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
 import { LIBRARY, VERSION_EVERY_MS, VERSION_LIMIT, addVersion, copyTheme, keep, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 import { READY, STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
 import { TILE_ICONS, addTileIcons, starterRows } from "./tile_icons.js";
@@ -590,3 +590,16 @@ const tiledBytes = pack(tiledTheme, schema);
 assert.deepEqual(unpack(tiledBytes, schema).icons.home_music, iconed.icons.home_music);
 const crowded = { ...iconed, icons: { ...ember.icons, ...Object.fromEntries(TILE_ICONS.map((name) => [name, iconed.icons[name]])) } };
 assert.throws(() => pack(crowded, schema), /Make some icons smaller/, "too many big icons is said plainly");
+
+for (const [name, background, text, accent] of COLOUR_SETS) {
+  const coloured = defaultTheme(schema);
+  const scheme = schemeOf(background, text, accent);
+  assert.deepEqual([scheme.background, scheme.text, scheme.selection_background], [background, text, accent], `${name} keeps its three colours`);
+  assert.deepEqual(Object.keys(scheme).sort(), Object.keys(coloured.colors).sort(), "three colours make every colour a theme has");
+  Object.assign(coloured.colors, scheme);
+  assert.deepEqual(lint(coloured, schema), [], `the ${name} colour set reads well`);
+}
+const recoloured = schemeOf("#101114", "#f2f2f5", "#e0469a");
+const before = schemeOf("#101114", "#f2f2f5", "#2f6fdb");
+const reshaded = Object.keys(before).filter((role) => before[role] !== recoloured[role]);
+assert.ok(reshaded.length >= 3 && reshaded.every((role) => ACCENT_FAMILY.includes(role)), "a new accent changes the highlighted row and nothing else");

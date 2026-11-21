@@ -19,7 +19,7 @@ import {
   unpack,
 } from "./theme_format.js";
 import { buildWallpapers } from "./wallpaper_editor.js";
-import { paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
+import { ACCENT_FAMILY, COLOUR_SETS, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
 import { addTileIcons } from "./tile_icons.js";
 import { addVersion, copyTheme, emptyLibrary, entryOf, keep, newId, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 
@@ -548,6 +548,7 @@ function refreshNotices() {
   if (memory) {
     memory.replaceWith(memoryBar());
   }
+  inspector.querySelector("[data-made]")?.replaceWith(madeDots());
   for (const badge of inspector.querySelectorAll("[data-reads]")) {
     const fresh = readingBadge(badge.dataset.reads);
     if (fresh && !badge.contains(document.activeElement)) {
@@ -571,7 +572,9 @@ function noticeBox(inColours = false) {
   return el("div", { class: "notice", "data-notice": where },
     found.length === 1 ? "One thing may be hard to read:" : `${found.length} things may be hard to read:`,
     el("ul", {}, found.map(plainNotice)),
-    inColours ? null : el("button", { type: "button", onclick: () => showLook("colours") }, "Fix it in Colours"));
+    inColours
+      ? el("button", { type: "button", onclick: fixReading }, found.length === 1 ? "Fix it" : "Fix them")
+      : el("button", { type: "button", onclick: () => showLook("colours") }, "Fix it in Colours"));
 }
 
 function readingChecks(role) {
@@ -590,7 +593,7 @@ function readingChecks(role) {
   });
 }
 
-function readingBadge(role) {
+function readingOf(role) {
   const checks = readingChecks(role);
   if (!checks.length) {
     return null;
@@ -599,7 +602,77 @@ function readingBadge(role) {
   const worst = checks
     .map(({ check, backs }) => ({ check, backs, ratio: Math.min(...backs.map((back) => contrast(colour, back))) }))
     .sort((a, b) => a.ratio / a.check.floor - b.ratio / b.check.floor)[0];
-  const good = worst.ratio >= worst.check.floor;
+  return { colour, worst, good: worst.ratio >= worst.check.floor };
+}
+
+function fixReading() {
+  let fixed = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    for (const role of Object.keys(state.theme.colors)) {
+      const reading = readingOf(role);
+      if (reading && !reading.good) {
+        const shade = readableShade(reading.colour, reading.worst.backs, reading.worst.check.floor + 0.1);
+        (shownAccentOf(role) ?? state.theme.colors)[role] = shade;
+        fixed++;
+      }
+    }
+  }
+  changed({ rebuild: true });
+  say(fixed ? "Made the text easier to read. Undo puts it back." : "Nothing needed changing.");
+}
+
+function mainColours() {
+  return { background: shownColour("background"), text: shownColour("text"), accent: shownColour("selection_background") };
+}
+
+function putScheme(scheme, roles) {
+  for (const role of roles) {
+    (shownAccentOf(role) ?? state.theme.colors)[role] = scheme[role];
+  }
+}
+
+function setMain(key, value) {
+  const three = { ...mainColours(), [key]: value };
+  const scheme = schemeOf(three.background, three.text, three.accent);
+  putScheme(scheme, Object.keys(scheme).filter((role) => ACCENT_FAMILY.includes(role) === (key === "accent")));
+  changed();
+}
+
+function madeDots() {
+  const made = [["text_secondary", "Soft text"], ["divider", "Lines"], ["header_background", "Title bar"], ["selection_text", "Text on the accent"]];
+  return el("p", { class: "made", "data-made": "" }, "Made from them:",
+    made.map(([role, label]) => el("span", { class: "made-dot", title: label, style: `background: ${shownColour(role)}` })));
+}
+
+function mainTrio() {
+  const three = mainColours();
+  return el("div", { class: "trio" }, [["background", "Background"], ["text", "Text"], ["accent", "Accent"]].map(([key, label]) => {
+    const picker = el("input", { type: "color", value: three[key], list: "swatches", "data-main": key });
+    picker.addEventListener("input", () => setMain(key, picker.value));
+    picker.addEventListener("change", () => {
+      noteRecent(picker.value);
+      render();
+    });
+    return el("label", { class: "trio-swatch" }, picker, el("span", {}, label));
+  }));
+}
+
+function colourSets() {
+  return el("div", { class: "colour-sets" }, COLOUR_SETS.map(([name, background, text, accent]) =>
+    el("button", { type: "button", onclick: () => {
+      const scheme = schemeOf(background, text, accent);
+      putScheme(scheme, Object.keys(scheme));
+      changed({ rebuild: true });
+      say(`Coloured with ${name}. Undo puts your colours back.`);
+    } }, el("span", { class: "set-dots", "aria-hidden": "true" }, [background, text, accent].map((colour) => el("span", { style: `background: ${colour}` }))), name)));
+}
+
+function readingBadge(role) {
+  const reading = readingOf(role);
+  if (!reading) {
+    return null;
+  }
+  const { colour, worst, good } = reading;
   const badge = el("span", {
     class: good ? "reads good" : "reads poor",
     "data-reads": role,
@@ -907,17 +980,35 @@ function panelColours() {
       restart();
     },
   });
-  return [
-    el("h2", {}, "Colours"),
-    el("p", { class: "lead" }, "Click something on the screen to jump to its colour."),
-    noticeBox(true),
-    ...pictureColours(),
+  const every = el("details", { class: "more every-colour" },
+    el("summary", {}, "Every colour, one by one"),
+    el("p", { class: "hint" }, "Changing Background or Text above sets the colours made from them again; changing Accent sets the highlighted row's."),
     ...groups.flat(),
     el("h3", {}, "Cover Flow"),
     group(field("Keep it dark", cover, "Good for light themes: the album wall stays on black")),
     el("h3", {}, "Accent choices"),
     el("p", { class: "hint" }, "Colours people can pick for the selected row under Settings, Display, Accent color. Leave the list empty to keep yours."),
-    accents,
+    accents);
+  every.open = state.open.has("colours:every");
+  every.addEventListener("toggle", () => {
+    if (every.open) {
+      state.open.add("colours:every");
+    } else {
+      state.open.delete("colours:every");
+    }
+  });
+  return [
+    el("h2", {}, "Colours"),
+    el("p", { class: "lead" }, "Click something on the screen to jump to its colour."),
+    el("p", { class: "hint look-lead" }, "Three colours set the whole theme. The rest are made from them."),
+    mainTrio(),
+    madeDots(),
+    noticeBox(true),
+    el("h3", { class: "keep" }, "Colour sets"),
+    colourSets(),
+    el("h3", { class: "keep" }, "Colours from a picture"),
+    ...pictureColours(),
+    every,
   ];
 }
 
@@ -951,7 +1042,6 @@ function pictureColours() {
   const swatches = el("div", { class: "palette", role: "list", "aria-label": `Colours in ${state.picture.name}` },
     state.picture.palette.map((entry) => el("span", { class: "palette-swatch", role: "listitem", title: entry.color, style: `background: ${entry.color}; flex-grow: ${Math.max(1, Math.round(entry.share * 20))}` })));
   return [
-    el("h3", {}, "Colours from a picture"),
     group(
       el("div", { class: "palette-block" }, swatches, el("p", { class: "hint" }, `From ${state.picture.name}. These colours are also offered in every colour picker.`)),
       field("Make it", chips([[true, "Dark"], [false, "Light"]], state.dark, (dark) => {
@@ -1765,6 +1855,9 @@ function jumpToRole(role) {
   const own = kind === "script" || kind === "chrome";
   state.panel = "look";
   state.look = new Set([own ? "screen" : "colours"]);
+  if (!own) {
+    state.open.add("colours:every");
+  }
   keepLook();
   render();
   const row = own

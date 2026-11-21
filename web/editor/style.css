@@ -1677,3 +1677,95 @@ button.danger {
     display: none;
   }
 }
+
+.trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.trio-swatch {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.trio-swatch input[type="color"] {
+  width: 100%;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: pointer;
+}
+
+.trio-swatch input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+.trio-swatch input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 7px;
+}
+
+.made {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 14px;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.made-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.colour-sets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.colour-sets button {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 9px 4px 7px;
+  font-size: 12.5px;
+}
+
+.set-dots {
+  display: flex;
+}
+
+.set-dots span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  margin-left: -5px;
+  box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 2.5px var(--line);
+}
+
+.set-dots span:first-child {
+  margin-left: 0;
+}
+
+details.every-colour {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+details.every-colour > summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+}

@@ -100,15 +100,17 @@ export function paletteOf(pixels, count = 6) {
   return [...merged].map(([color, share]) => ({ color, share })).sort((a, b) => b.share - a.share);
 }
 
-export function schemeFrom(palette, dark = true) {
-  const colours = palette.map((entry) => entry.color);
-  const common = palette.filter((entry) => entry.share >= 0.05).map((entry) => entry.color);
-  const pool = common.length ? common : colours;
-  const base = pool.reduce((best, color) => (dark ? lightness(color) < lightness(best) : lightness(color) > lightness(best)) ? color : best, pool[0]);
-  const background = dark ? mix(base, BLACK, Math.max(0, lightness(base) - 0.04) * 1.5) : mix(base, WHITE, Math.max(0, 0.92 - lightness(base)) * 1.5);
-  const lively = colours.filter((color) => color !== base && lightness(color) > 0.08 && lightness(color) < 0.9);
-  const accent = (lively.length ? lively : colours).reduce((best, color) => (saturation(color) > saturation(best) ? color : best));
-  const text = readableShade(mix(background, dark ? WHITE : BLACK, 0.9), background, 7);
+export const ACCENT_FAMILY = ["selection_background", "selection_top", "selection_shine", "selection_text"];
+export const COLOUR_SETS = [
+  ["Midnight", "#101114", "#f2f2f5", "#2f6fdb"],
+  ["Paper", "#f4f1ea", "#22201c", "#b4472c"],
+  ["Forest", "#0f1a14", "#e6f1e6", "#3fae6a"],
+  ["Sunset", "#1c1220", "#ffe9d6", "#ff7a4d"],
+  ["Mono", "#000000", "#ffffff", "#9a9a9a"],
+  ["Candy", "#fff6fb", "#3a1d3f", "#e0469a"],
+];
+
+export function schemeOf(background, text, accent) {
   const selectionTop = mix(accent, WHITE, 0.15);
   const ink = contrast(WHITE, accent) >= contrast(BLACK, accent) ? WHITE : BLACK;
   const headerBackground = mix(background, text, 0.08);
@@ -131,4 +133,16 @@ export function schemeFrom(palette, dark = true) {
     danger: readableShade(DANGER, background, 3.2),
     success: readableShade(SUCCESS, background, 3.2),
   };
+}
+
+export function schemeFrom(palette, dark = true) {
+  const colours = palette.map((entry) => entry.color);
+  const common = palette.filter((entry) => entry.share >= 0.05).map((entry) => entry.color);
+  const pool = common.length ? common : colours;
+  const base = pool.reduce((best, color) => (dark ? lightness(color) < lightness(best) : lightness(color) > lightness(best)) ? color : best, pool[0]);
+  const background = dark ? mix(base, BLACK, Math.max(0, lightness(base) - 0.04) * 1.5) : mix(base, WHITE, Math.max(0, 0.92 - lightness(base)) * 1.5);
+  const lively = colours.filter((color) => color !== base && lightness(color) > 0.08 && lightness(color) < 0.9);
+  const accent = (lively.length ? lively : colours).reduce((best, color) => (saturation(color) > saturation(best) ? color : best));
+  const text = readableShade(mix(background, dark ? WHITE : BLACK, 0.9), background, 7);
+  return schemeOf(background, text, accent);
 }
