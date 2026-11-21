@@ -37,8 +37,7 @@ function numbers(at) {
   return { x: Number(at.x), y: Number(at.y), w: Number(at.w), h: Number(at.h) };
 }
 
-function clustersOf(items) {
-  const groups = items.map((item) => [item]);
+function joined(groups) {
   for (let merged = true; merged;) {
     merged = false;
     for (let a = 0; a < groups.length && !merged; a++) {
@@ -50,7 +49,36 @@ function clustersOf(items) {
       }
     }
   }
-  return groups.map((members) => ({ members, box: union(members.map((item) => numbers(item.at.wide))) }));
+  return groups;
+}
+
+function shared(a, b) {
+  const across = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const down = Math.min(a.y + Math.max(a.h, 1), b.y + Math.max(b.h, 1)) - Math.max(a.y, b.y);
+  return across > 0 && down > 0 ? across * down : 0;
+}
+
+function clustersOf(items) {
+  const solid = items.filter((item) => !flat(item) || item.kind === "menu");
+  const bodies = joined(solid.map((item) => [item])).map((members) => ({ members, box: union(members.map((item) => numbers(item.at.wide))) }));
+  const loose = [];
+  for (const item of items.filter((one) => !solid.includes(one))) {
+    const box = numbers(item.at.wide);
+    const over = bodies.map((body) => body.members.reduce((sum, one) => sum + shared(box, numbers(one.at.wide)), 0));
+    const most = Math.max(0, ...over);
+    if (most > 0) {
+      bodies[over.indexOf(most)].members.push(item);
+    } else {
+      loose.push([item]);
+    }
+  }
+  return [...bodies, ...joined(loose).map((members) => ({ members, box: union(members.map((item) => numbers(item.at.wide))) }))];
+}
+
+function within(box, frame) {
+  const x = Math.max(frame.x, Math.min(box.x, frame.x + frame.w - 1));
+  const y = Math.max(frame.y, Math.min(box.y, frame.y + frame.h - 1));
+  return { x, y, w: Math.max(1, Math.min(box.w, frame.x + frame.w - x)), h: Math.min(box.h, Math.max(0, frame.y + frame.h - y)) };
 }
 
 function sized(cluster, wide, tall) {
@@ -119,7 +147,7 @@ export function arrangedBoxes(drawing) {
     const left = frame.x + (frame.w - cluster.w) / 2;
     const middle = centred(cluster);
     for (const item of cluster.members) {
-      const from = numbers(item.at.wide);
+      const from = within(numbers(item.at.wide), cluster.box);
       const backing = !cluster.level && item.kind === "box" && from.w * from.h >= cluster.box.w * cluster.box.h * WHOLE;
       const rail = !cluster.level && item.kind === "box" && from.w <= THIN / 2 && from.h >= cluster.box.h * WHOLE;
       const box = backing ? { ...frame } : rail ? { x: frame.x, y: frame.y, w: frame.w, h: Math.max(1, Math.round(from.w)) } : {

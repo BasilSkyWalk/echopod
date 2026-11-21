@@ -1052,7 +1052,9 @@ export function drawingEditor(ctx) {
       ctx.changed({ rebuild: true });
       return;
     }
-    insert(all[0], true);
+    if (insert(all[0], true)) {
+      ctx.wantSong?.(key);
+    }
   }
 
   function addMenu(screen) {

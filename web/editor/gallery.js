@@ -35,7 +35,7 @@ function card(theme) {
   links.append(
     link("Download", `themes/${theme.file}.echotheme`, `${theme.name}.echotheme`),
     link("Open in the editor", `index.html?theme=${encodeURIComponent(theme.file)}`),
-    link("Source", `themes/${theme.file}.toml`, `${theme.file}.toml`),
+    link("Editable copy", `themes/${theme.file}.toml`, `${theme.file}.toml`),
   );
   made.append(picture(theme), element("h2", theme.name), element("p", by, "by"));
   made.append(element("p", theme.description), links);

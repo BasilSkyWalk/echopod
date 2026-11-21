@@ -2004,3 +2004,119 @@ details.every-colour > summary {
 .bar-step .bar-icon:disabled {
   opacity: 0.35;
 }
+
+.bar a.make {
+  padding: 7px 14px;
+  border-radius: var(--radius-small);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#gallery-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+#gallery-page h1 {
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+#gallery-page .note {
+  max-width: 64ch;
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+}
+
+#gallery-page code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--sunken);
+  font-size: 0.93em;
+}
+
+#gallery-page #status {
+  margin: 0 0 22px;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+#gallery-page #status.bad {
+  color: var(--warn);
+}
+
+#gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--device);
+}
+
+.card h2 {
+  margin: 14px 16px 0;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.card p {
+  margin: 6px 16px 0;
+  color: var(--ink-soft);
+}
+
+.card .by {
+  margin-top: 2px;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+.card p:empty {
+  display: none;
+}
+
+.card .links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: auto 16px 16px;
+  padding-top: 14px;
+}
+
+.card .links a {
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.card .links a:first-child {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.card .links a:hover {
+  border-color: var(--ink);
+}

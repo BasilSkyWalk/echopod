@@ -120,6 +120,9 @@ const BAR_COLOURS = [["@text", "Text"], ["@text_secondary", "Soft text"], ["@sel
 const BAR_KEYS = { box: "color", circle: "color", line: "color", text: "color", symbol: "color", number: "lit" };
 const BAR_SIZES = [["small", "S", "Small text"], ["medium", "M", "List text"], ["large", "L", "Titles"]];
 const BAR_ALIGN = [["left", "Line up left", "M4 5h12M4 9h7M4 13h10"], ["center", "Line up in the middle", "M4 5h12M6.5 9h7M5 13h10"], ["right", "Line up right", "M4 5h12M9 9h7M6 13h10"]];
+const TEXT_ROLES = ["text", "text_secondary", "text_tertiary", "selection_text", "header_text", "chevron"];
+const TEXT_REACH = 3;
+const SONG_PARTS = ["title", "artist", "album", "progress", "play", "clock", "lyrics", "quality", "modes", "levels", "vu", "record", "cassette"];
 const MAIN_ROLES = { background: "Background", text: "Text", selection_background: "Accent" };
 const FOLLOWING_STARTS = ["standard", "empty", "tiles"];
 const FIRST_STARTS = ["dark", "light", "paper"];
@@ -222,7 +225,11 @@ function mergedTheme(saved) {
 }
 
 function revived(design, screen) {
-  return design ? drawingFrom(JSON.stringify(design), screen) : null;
+  const drawing = design ? drawingFrom(JSON.stringify(design), screen) : null;
+  if (drawing?.upright === "auto") {
+    arrangeUpright(drawing);
+  }
+  return drawing;
 }
 
 function restore(text) {
@@ -891,6 +898,7 @@ const drawer = drawingEditor({
   remember: () => remember(),
   tileIcons: () => tileIcons(),
   sideNote: () => sideNote(),
+  wantSong: (key) => wantSong(key),
   coarse: () => window.matchMedia?.("(pointer: coarse)").matches ?? false,
 });
 
@@ -1463,6 +1471,14 @@ function shelfParts() {
       el("button", { type: "button", onclick: () => startFrom(step, name, label) }, label)), ...modeButtons(step)),
     shortcuts,
   ];
+}
+
+function wantSong(key) {
+  if (SONG_PARTS.includes(key) && state.screen === "home" && !state.playback.song) {
+    state.playback.song = "usual";
+    restart();
+    say("Playing a song so you can see it. Change that under the screen.");
+  }
 }
 
 function sideNote() {
@@ -2110,7 +2126,9 @@ function roleAt(point) {
   const own = scriptRoles(point);
   const theme = Object.keys(state.theme.colors).map((role) => [role, shownColour(role)]);
   const header = point.y < AREAS[shape()].top ? theme.filter(([role]) => role.startsWith("header_")) : [];
-  const found = (own.length > 0 && closestRole(point, own)) || (header.length > 0 && closestRole(point, header)) || closestRole(point, theme);
+  const script = own.length > 0 && closestRole(point, own);
+  const plain = script || (header.length > 0 && closestRole(point, header)) || closestRole(point, theme);
+  const found = script || TEXT_ROLES.includes(plain) ? plain : textNear(point, header.length > 0 ? header : theme, plain) ?? plain;
   if (found === "selection_top" || found === "selection_shine") {
     return "selection_background";
   }
@@ -2142,6 +2160,27 @@ function blendOf(shade, candidates) {
     }
   }
   return best;
+}
+
+function textNear(point, candidates, behind) {
+  const { width, height } = state.preview.frame();
+  const colours = new Map(candidates);
+  const back = channels(colours.get(behind) ?? "#000000");
+  const seen = new Set();
+  for (let dy = -TEXT_REACH; dy <= TEXT_REACH; dy++) {
+    for (let dx = -TEXT_REACH; dx <= TEXT_REACH; dx++) {
+      const spot = { x: point.x + dx, y: point.y + dy };
+      if (spot.x < 0 || spot.y < 0 || spot.x >= width || spot.y >= height) {
+        continue;
+      }
+      const role = closestRole(spot, candidates);
+      if (TEXT_ROLES.includes(role)) {
+        seen.add(role);
+      }
+    }
+  }
+  const apart = (role) => gapBetween(channels(colours.get(role)), back);
+  return [...seen].sort((a, b) => apart(b) - apart(a))[0] ?? null;
 }
 
 function closestRole(point, candidates) {

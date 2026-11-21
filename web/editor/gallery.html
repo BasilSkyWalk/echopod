@@ -6,18 +6,25 @@
     <title>EchoPod themes</title>
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
-    <header>
-      <h1>EchoPod themes</h1>
-      <nav><a href="index.html">Make your own</a></nav>
-      <p id="status" role="status">Loading the themes…</p>
+  <body class="gallery">
+    <header class="bar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span>EchoPod Themes</span>
+      </div>
+      <span class="theme-name"></span>
+      <div class="bar-actions">
+        <a class="make" href="index.html">Make your own</a>
+      </div>
     </header>
     <main id="gallery-page">
+      <h1>Themes for the player</h1>
       <p class="note">
-        Download a theme, copy the <code>.echotheme</code> file into a folder called
-        <code>Themes</code> at the top of the player's microSD card, then pick it under
-        Settings → Display → Theme.
+        Download a theme, copy the file into a folder called <code>Themes</code> at the top of the
+        player's microSD card, then pick it under Settings, Display, Theme. Or open one in the
+        editor and make it yours.
       </p>
+      <p id="status" role="status">Loading the themes…</p>
       <div id="gallery"></div>
     </main>
     <script type="module" src="gallery.js"></script>

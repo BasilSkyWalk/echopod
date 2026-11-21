@@ -706,3 +706,11 @@ delete unmarked.repeat.rows;
 assert.equal(tileRows(unmarked, "wide"), 2, "tiles made before rows were kept still know how many rows they show");
 compileScene(drawingScript({ version: 2, screen: "home", elements: [stretchy] }, homeTheme), schema.scene);
 assert.equal(isTiles(element("group", { x: 0, y: 0, w: 10, h: 10 }, null)), false);
+
+const bridged = startDrawing("standard", "home");
+bridged.elements.push(element("text", { x: 12, y: 113, w: 180, h: 22 }, { x: 0, y: 0, w: 10, h: 10 }, { source: "song", size: "large" }));
+arrangeUpright(bridged);
+const bridgedNow = Object.fromEntries(bridged.elements.map((item) => [item.name || item.source || item.kind, item.at.tall]));
+assert.deepEqual([bridgedNow.Menu.w, bridgedNow["Art panel"].w], [170, 170], "a title laid across the menu and the art doesn't shrink the screen to a miniature");
+assert.ok(bridgedNow.song.y >= 100 && bridgedNow.song.y < 146 && bridgedNow.song.x + bridgedNow.song.w <= 170, "it stays with the menu it mostly sat on");
+assert.equal(bridgedNow["Art panel"].y + bridgedNow["Art panel"].h, 280);
