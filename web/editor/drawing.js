@@ -72,6 +72,7 @@ export const MARKS = {
   next: "Next",
   previous: "Previous",
   badge: "The skip, play or pause mark, while it shows",
+  item: "The menu item's icon",
 };
 export const NUMBERS = { time: "Time played", time_volume: "Time played, or the volume while it changes", track: "Track number", volume: "Volume" };
 const FULL = 1000;
@@ -339,8 +340,18 @@ function numberOf(item, key, base, scope) {
   return `(${from} + ${to - from} * ${valueOf(rule.source, scope)} / ${FULL})`;
 }
 
+function turnColour(item, key, theme, scope) {
+  const colours = scope.copy ? item.each?.[key] ?? [] : [];
+  if (colours.length < 2) {
+    return colorOf(item[key], theme);
+  }
+  const turn = `${scope.copy.name} % ${colours.length}`;
+  const earlier = colours.slice(0, -1).map((colour, index) => `${turn} == ${index} ? ${colorOf(colour, theme)} : `);
+  return `(${earlier.join("")}${colorOf(colours.at(-1), theme)})`;
+}
+
 function colourOf(item, key, theme, scope) {
-  const plain = colorOf(item[key], theme);
+  const plain = turnColour(item, key, theme, scope);
   const rule = item.bind?.[key];
   const test = rule ? conditionOf(rule.when, scope) : null;
   return test ? `(${test} ? ${colorOf(rule.color, theme)} : ${plain})` : plain;
@@ -523,9 +534,13 @@ function coverLines(item, scope, theme) {
 function symbolLines(item, scope, theme) {
   const { x, y, w, h } = placed(item, scope);
   const [left, top] = anchor(scope, x, y);
+  const colour = colourOf(item, "color", theme, scope);
+  if (item.mark === "item") {
+    return [`item_icon(${scope.copy?.items ? scope.copy.name : "selected()"}, ${left}, ${top}, ${w}, ${h}, ${colour})`];
+  }
   const marks = { state: "badge != none ? badge : (playing ? none : pause)", playpause: "playing ? play : pause", badge: "badge" };
   const mark = marks[item.mark] ?? (MARKS[item.mark] ? item.mark : marks.state);
-  return [`icon(${mark}, ${left}, ${top}, ${w}, ${h}, ${colourOf(item, "color", theme, scope)})`];
+  return [`icon(${mark}, ${left}, ${top}, ${w}, ${h}, ${colour})`];
 }
 
 function numberLines(item, scope, theme) {

@@ -700,7 +700,8 @@ def pack(theme, base, colors, boxes, where="theme", spacing=(), icons=(), fonts=
     size = CHECKED_FROM + len(body) + ASSET_ENTRY_SIZE * len(assets) + len(icon_bytes)
     body += asset_table(assets, size) + icon_bytes
     if size > MAX_SIZE:
-        raise ThemeError(f"{where}: {size} bytes; a theme may be at most {MAX_SIZE}")
+        raise ThemeError(f"{where}: the colours, shapes and icons take {size:,} bytes, more than the "
+                         f"{MAX_SIZE:,} the player keeps for them; make some icons smaller, or draw fewer")
     header_size = ASSET_HEADER_SIZE if long_header else HEADER_SIZE
     core = MAGIC + struct.pack("<HHII", VERSION, header_size, size, checksum(body)) + body
     return core + b"".join(section for _, section, _ in assets)

@@ -13,7 +13,7 @@ BOX_FIELDS = ("fill_top", "fill_bottom", "border", "shine", "ink", "border_width
               "shine_height", "inset_across", "inset_down", "radius", "see_through")
 COLOR_FIELDS = 5
 PAGE_FILES = ("index.html", "style.css", "editor.js", "theme_format.js", "preview_host.js",
-              "icon_editor.js", "wallpaper_editor.js", "font_editor.js",
+              "icon_editor.js", "tile_icons.js", "wallpaper_editor.js", "font_editor.js",
               "accent_editor.js", "drawing.js", "drawings.js", "drawing_editor.js", "pixel_letters.js", "colour_tools.js", "library.js", "scene_compile.js",
               "gallery.html",
               "gallery.js")

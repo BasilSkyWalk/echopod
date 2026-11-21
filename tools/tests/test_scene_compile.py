@@ -107,10 +107,15 @@ class LanguageTest(unittest.TestCase):
         names = [name for name, _ in decoded(code)]
         self.assertEqual(["selected", "items", "item", "line", "menu", "backdrop", "reflect", "end"], names)
 
+    def test_a_tile_draws_its_items_icon(self):
+        code, _ = compiled("repeat n from 0 to items() {\n    item_icon(n, n * 40, 0, 24, 24, #ffffff)\n}")
+        self.assertIn("item_icon", [name for name, _ in decoded(code)])
+
     def test_new_operations_leave_the_older_codes_alone(self):
         self.assertEqual(56, OPS["outline"]["code"])
         self.assertTrue(all(OPS[name]["code"] > OPS["outline"]["code"]
                             for name in ("item", "items", "selected", "menu", "reflect", "backdrop")))
+        self.assertEqual(OPS["backdrop"]["code"] + 1, OPS["item_icon"]["code"])
 
     def test_every_built_in_face_compiles(self):
         for path in sorted((ROOT / "assets" / "faces").glob("*.scene")):

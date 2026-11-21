@@ -603,14 +603,30 @@ class IconTest(unittest.TestCase):
             self.assertEqual(1, names.index(pair[1]) - names.index(pair[0]))
         self.assertEqual([], theme_pack.icons_in(DEFINITIONS / "none.def"))
 
-    def test_a_theme_with_every_icon_at_its_largest_fits_a_file(self):
+    def test_the_bar_and_list_icons_or_the_tile_icons_at_their_largest_fit_a_file(self):
+        icons = theme_pack.icons_in(DEFINITIONS / "theme_icons.def")
+        colors = theme_pack.names_in(DEFINITIONS / "theme_colors.def")
+        boxes = theme_pack.names_in(DEFINITIONS / "theme_boxes.def")
+        dark = theme_pack.read_source(DEFINITIONS.parents[3] / "assets" / "themes" / "dark.toml")
+        for tiles in (False, True):
+            full = {name: ["f" * width] * height for name, width, height in icons
+                    if name.startswith("home_") == tiles}
+            package = theme_pack.pack({"name": "Full", "icons": full}, dark, colors, boxes, icons=icons)
+            self.assertLessEqual(len(package), theme_pack.MAX_SIZE)
+
+    def test_every_icon_at_its_largest_is_too_much_and_says_what_to_do(self):
         icons = theme_pack.icons_in(DEFINITIONS / "theme_icons.def")
         colors = theme_pack.names_in(DEFINITIONS / "theme_colors.def")
         boxes = theme_pack.names_in(DEFINITIONS / "theme_boxes.def")
         dark = theme_pack.read_source(DEFINITIONS.parents[3] / "assets" / "themes" / "dark.toml")
         full = {name: ["f" * width] * height for name, width, height in icons}
-        package = theme_pack.pack({"name": "Full", "icons": full}, dark, colors, boxes, icons=icons)
-        self.assertLessEqual(len(package), theme_pack.MAX_SIZE)
+        with self.assertRaisesRegex(theme_pack.ThemeError, "make some icons smaller"):
+            theme_pack.pack({"name": "Full", "icons": full}, dark, colors, boxes, icons=icons)
+
+    def test_the_home_tiles_have_an_icon_each_after_the_older_icons(self):
+        names = [name for name, _, _ in theme_pack.icons_in(DEFINITIONS / "theme_icons.def")]
+        self.assertEqual(["home_music", "home_audiobooks", "home_podcasts", "home_settings",
+                          "home_diagnostics", "home_now_playing"], names[17:])
 
 
 CLEAR_HEADER = {"fill": "background", "ink": "text"}

@@ -180,6 +180,12 @@ void menu_screen_scene_list(void *context, Canvas *canvas, Rect area)
     list_view_draw(&menu->list, canvas, area, menu->now_ms);
 }
 
+int menu_screen_scene_slot(void *context, int position)
+{
+    const MenuScreen *menu = context;
+    return (int)(shown_item(menu, position) - menu->config.items);
+}
+
 ScreenAction menu_open_screen(void *screen)
 {
     return screen_action_push(screen);

@@ -654,7 +654,7 @@ export function pack(theme, schema) {
     tall.length + accents.bytes.length;
   const core = header + tables + ASSET_ENTRY_SIZE * assets.length + icons.bytes.length;
   if (core > MAX_SIZE) {
-    throw new ThemeError(`${core} bytes; a theme may be at most ${MAX_SIZE}`);
+    throw new ThemeError(`The colours, shapes and icons take ${core.toLocaleString("en")} bytes, more than the ${MAX_SIZE.toLocaleString("en")} the player keeps for them. Make some icons smaller, or draw fewer.`);
   }
   const bytes = new Uint8Array(core + assets.reduce((sum, asset) => sum + asset.bytes.length, 0));
   const view = new DataView(bytes.buffer);

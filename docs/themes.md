@@ -34,7 +34,7 @@ The built-in themes are theme files too, kept inside the firmware: their sources
 
 - **A Now Playing scene:** its own drawing of the whole Now Playing screen, from a short script.
 
-- **A Home scene:** its own Home screen: the menu as a list, tiles or one item at a time, the album art, what's playing, anywhere on the screen. The buttons still move through the menu from top to bottom.
+- **A Home scene:** its own Home screen: the menu as a list, tiles with an icon each, or one item at a time, the album art, what's playing, anywhere on the screen. The buttons still move through the menu from top to bottom.
 
 The other screens are the theme's lists, drawn in its colours, boxes, spacing, wallpaper, fonts and icons.
 
@@ -47,12 +47,12 @@ The editor is a web page that runs the player's own interface, so the screen in 
 - **Under the screen**, on Home and Now Playing, you choose what the player is doing: playing or paused, how far into the song, the volume, shuffle and repeat, and which song: a usual one, one with a long title and no cover, or one with lyrics. On Home you can also have nothing playing. **Show the volume change** shows the screen while the volume changes.
 - **Start** begins from any built-in or shared theme, or opens an `.echotheme` file.
 - **Lists & shapes** edits the boxes the player draws with: the selected row, the title bar, messages and the letter bubble, and under "Scrollbar and bars" the rest. Each has its fill (one colour or top to bottom), the colour of the text on it, a border and the edges it runs along, a shine along the top, rounded corners, gaps at the sides and above and below, and how see-through it is.
-- **Home and Now Playing are drawings.** Choose "My own drawing" and the screen is made of parts you place yourself: boxes (one colour, top to bottom, the wallpaper or no fill; rounded, bordered, narrowing toward the bottom, or with grid lines over them, which with no fill makes a fine screen over whatever is underneath), circles and rings, lines at any angle, text (the song, artist, album, lyrics, the audio format, the codec in a box, the times, your own words), the album cover (square or round, with a reflection), play and pause marks, seven-segment numbers and, on Home, the menu. Drag a part to move it, drag its corner to resize it, and drag a line's end to turn it; the arrow keys nudge it. "Start again from" gives a plain screen, VU meters, Cassette, Record player or LCD deck built from these parts, or an empty screen.
+- **Home and Now Playing are drawings.** Choose "My own drawing" and the screen is made of parts you place yourself: boxes (one colour, top to bottom, the wallpaper or no fill; rounded, bordered, narrowing toward the bottom, or with grid lines over them, which with no fill makes a fine screen over whatever is underneath), circles and rings, lines at any angle, text (the song, artist, album, lyrics, the audio format, the codec in a box, the times, your own words), the album cover (square or round, with a reflection), play and pause marks, seven-segment numbers and, on Home, the menu. Drag a part to move it, drag its corner to resize it, and drag a line's end to turn it; the arrow keys nudge it. "Start again from" gives a plain screen, VU meters, Cassette, Record player or LCD deck built from these parts, or an empty screen; on Home it also gives **Tiles**: a tile for each menu item, with its icon and name, four across sideways and two across upright.
 - **Lining up.** While you drag, a part snaps to the screen's edges and middle and to the edges and middles of the other parts, with a pink guide; hold Alt to place it freely. "Line up" in a part's settings puts it against an edge or in the middle of the screen (or of its group).
 - **Several parts at once.** Shift-click parts, or drag across an empty or locked part, to pick several; then drag them together, line them up, space them evenly, group them, copy, duplicate or remove them. In the list, double-click a name to rename it, and the padlock locks a part so it can't be moved on the screen; a new drawing's background starts locked.
 - **Copy and paste** (Ctrl+C, Ctrl+V) work between Home and Now Playing. Ctrl+G groups, Ctrl+Shift+G ungroups, Ctrl+D duplicates, Ctrl+A picks everything at that level and Delete removes.
 - Clicking a drawn Home or Now Playing screen from any step opens it with that part picked.
-- **Groups** move their parts together and can cut off whatever spills over. On the screen, a click picks the whole group and a double-click goes inside. A group can be drawn many times: in a row or a grid, each copy turned a little further round the middle (a ring of lights), turning while a song plays (reel teeth), or once for each menu item (tiles on Home).
+- **Groups** move their parts together and can cut off whatever spills over. On the screen, a click picks the whole group and a double-click goes inside. A group can be drawn many times: in a row or a grid, each copy turned a little further round the middle (a ring of lights), turning while a song plays (reel teeth), or once for each menu item (tiles on Home). A part inside copies can have **a colour for each copy**: give it two or more and the copies take them in turn, so every tile can be its own colour.
 - **Moving with the music.** A part's place, size or angle can follow the song's position, the volume, or the left or right level, and a line can keep turning while a song plays. Its colour can change while playing or paused, when a level is high, when a menu item is highlighted, when a copy is lit by the song's position or a beat, and on shuffle, repeat and more; a part can also show only at those times. That's how the VU needles, the tape winding from reel to reel, the tonearm and the level bars work.
 - The sideways and upright screens are drawn separately; "Copy the … drawing" starts one from the other. A part drawn the same way both ways is stored once.
 - **A theme's own screen.** When a theme draws Home or Now Playing from its own script, that step offers "This theme's own": every colour the script names, and the title bar's colours on that screen, ready to change. Clicking the screen jumps to them too. "My own drawing" on one of the four faces starts from that face drawn in parts, in its current colours.
@@ -60,7 +60,7 @@ The editor is a web page that runs the player's own interface, so the screen in 
 - **Fonts** has a card for titles, list text and small text. Each can stay the player's own, use a font file (drop a `.ttf`, `.otf`, `.woff` or `.woff2` on the card, pick one of three sizes, and tick **Crisp edges** for a sharp pixel look), come from a picture (**Download the template**, draw a letter in each box in any paint program, and drop the picture back; the pink guides are ignored, and a picture of your own works if its letters are in 16 equal boxes a row, starting with a space and going on in keyboard order), or be drawn: **Draw my own** starts from a set of capitals, digits and marks in a dot-matrix, block or fine style, with sliders for the dot size, the space between dots, the glow, boldness and the space between letters. Click any letter to change it on a grid with its baseline and width marked, start it from another letter, mirror it, turn it upside down or move it; letters the font lacks are shown dashed.
 - A bar on the Wallpaper and Fonts steps shows how much of the player's memory for pictures and fonts each one uses. When it is too much, the bar says how much to free and offers to remove a font or the wallpaper.
 - **Colours** shows beside each text colour whether it is easy to read on what's behind it, with a **Fix** button when it isn't. **Colours from a picture** takes the main colours of any picture and makes a dark or light set from them that reads well. Every colour picker offers the theme's colours, the picture's and the ones you used last, and where the browser allows it the dropper picks a colour from anywhere on the screen.
-- **Ready-made** parts on Home and Now Playing (song details, a progress bar with times, a play button, a big clock, shuffle and repeat lights, level bars, a VU meter, a record player and a cassette) arrive as groups you can open and change like anything you draw.
+- **Ready-made** parts on Home and Now Playing (song details, a progress bar with times, a play button, a big clock, shuffle and repeat lights, level bars, a VU meter, a record player, a cassette and, on Home, menu tiles with icons) arrive as groups you can open and change like anything you draw.
 - A note appears when something would be hard to read (see Readability below). Undo and redo are at the top.
 - **My themes**, under Start, keeps every theme you make in this browser, with earlier versions of the one that's open: one every ten minutes while you work, one before you open another theme over it, and any you keep yourself. "Go back to this" returns to one, and Undo comes back. Download a theme to keep it for good.
 - **Getting around.** Drag the panel's left edge to make it wider, and click a heading to fold that section away. Ctrl and the mouse wheel, or a pinch, zoom the screen; drag the space around it, or scroll, to move about. It works with touch too. The first visit offers a short tour, and "Show me around" under Start runs it again.
@@ -113,7 +113,7 @@ Pack it into a file for the player:
 python tools/theme_pack.py --themes my-themes --base assets/themes/dark.toml --definitions src/ui/include/ui --output my-themes/packed
 ```
 
-This packs every `.toml` in `my-themes` to `my-themes/packed/<file>.echotheme` and prints a warning for anything hard to read. A packed theme is 205 bytes without icons and about 2,000 with all of them (the player takes up to 3,072), plus about 27,000 for each full-screen wallpaper and about 5,000 for each font.
+This packs every `.toml` in `my-themes` to `my-themes/packed/<file>.echotheme` and prints a warning for anything hard to read. A packed theme is 205 bytes without icons, about 2,000 with every title bar and list icon, and about 1,800 more with six Home tile icons at their largest (the player takes up to 3,072, so a theme can't have every icon at its largest), plus about 27,000 for each full-screen wallpaper and about 5,000 for each font.
 
 ### Top level
 
@@ -337,6 +337,7 @@ repeat mark from 0 to 48 {
 | `items()` | On Home, how many menu items there are; 0 on Now Playing |
 | `selected()` | On Home, which item is highlighted, from 0 |
 | `item(n)` | Menu item `n`, to show with `text()` or `line()`: `line(item(selected()), title, ...)` |
+| `item_icon(n, x, y, w, h, colour)` | On Home, the theme's icon for menu item `n`, centred in the area. It draws the icon that belongs to the item (`home_music`, `home_settings` and so on), whichever items are showing; nothing when the theme has no icon for it |
 
 ### Drawing
 
@@ -482,14 +483,17 @@ chevron = [
 | `status_bluetooth_large` | 9 x 14 | | |
 | `status_bolt_large` | 8 x 14 | | |
 | `battery_large`, `battery_level_large` | 30 x 14 | | |
+| `home_music`, `home_audiobooks`, `home_podcasts`, `home_settings`, `home_diagnostics`, `home_now_playing` | 24 x 24 | On a Home the theme draws itself, wherever it puts `item_icon` (the tiles) | The colour the drawing gives |
 
 - An icon may be smaller than its largest size. It is drawn centred in its place; the chevron's row makes room for its width.
 - Every row of an icon needs the same length.
 - `battery` and `battery_level` come together and at the same size. Draw the level as the battery looks when full: the player shows it from the left as far as the charge goes, so a level made of separate blocks works too.
 - The upright screen has taller status icons. With no large icon the small one is used there, centred.
 - The Now Playing faces (Cassette, VU meters and so on) keep their own icons.
+- The Home tile icons have no built-in shape: the standard Home is a list without icons, so they show only on a Home the theme draws. Audiobooks, Podcasts and Now Playing are on Home only when there is something in them, and each item keeps its own icon either way.
+- The colours, shapes and icons of a theme share 3,072 bytes. An icon takes half a byte for each pixel, so six 24 x 24 tile icons take 1,728; with every other icon redrawn too, make the tile icons 16 x 16 or smaller.
 
-In the editor, the Icons section has a grid for each one: drag to paint, Shift-drag or right-drag to erase, set how solid the brush is, or fill the grid from an image file (its transparency becomes the shape; a picture without transparency is read as dark ink on light paper).
+In the editor, the Icons section has a grid for each one: drag to paint, Shift-drag or right-drag to erase, set how solid the brush is, or fill the grid from an image file (its transparency becomes the shape; a picture without transparency is read as dark ink on light paper). The six Home tile icons each have a ready-made one to start from, at whatever size you set; starting Home from Tiles, or adding the ready-made tiles, puts them in for you.
 
 ## Readability
 

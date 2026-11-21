@@ -77,7 +77,8 @@ class SchemaTest(unittest.TestCase):
     def test_the_schema_lists_the_icons_with_their_largest_sizes_and_pairs(self):
         schema = web_editor.schema(THEMES, DEFINITIONS)
         self.assertEqual({"name": "status_play", "width": 10, "height": 10}, schema["icons"][0])
-        self.assertEqual(17, len(schema["icons"]))
+        self.assertEqual(23, len(schema["icons"]))
+        self.assertEqual({"name": "home_music", "width": 24, "height": 24}, schema["icons"][17])
         self.assertIn(["battery", "battery_level"], schema["icon_pairs"])
 
     def test_the_schema_lists_the_wallpapers_with_their_screen_sizes(self):
@@ -123,7 +124,7 @@ class SiteTest(unittest.TestCase):
                 self.assertTrue((output / face["file"]).is_file(), face["file"])
 
     def test_every_page_the_site_links_is_one_it_copies(self):
-        for name in ("preview_host.js", "icon_editor.js", "wallpaper_editor.js", "font_editor.js",
+        for name in ("preview_host.js", "icon_editor.js", "tile_icons.js", "wallpaper_editor.js", "font_editor.js",
                      "drawing.js", "drawings.js", "drawing_editor.js", "scene_compile.js", "colour_tools.js", "library.js", "gallery.html",
                      "gallery.js"):
             self.assertIn(name, web_editor.PAGE_FILES)

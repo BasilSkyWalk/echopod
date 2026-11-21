@@ -1,4 +1,5 @@
 import { ICON_MARKS } from "./theme_format.js";
+import { TILE_ICONS, starterRows } from "./tile_icons.js";
 
 const CELL = 12;
 const SOLID = 15;
@@ -17,6 +18,12 @@ const NAMES = {
   badge_pause: "Pause, on Now Playing",
   badge_next: "Next song, on Now Playing",
   badge_previous: "Previous song, on Now Playing",
+  home_music: "Music, on a Home tile",
+  home_audiobooks: "Audiobooks, on a Home tile",
+  home_podcasts: "Podcasts, on a Home tile",
+  home_settings: "Settings, on a Home tile",
+  home_diagnostics: "Diagnostics, on a Home tile",
+  home_now_playing: "Now Playing, on a Home tile",
 };
 
 function label(name) {
@@ -123,20 +130,23 @@ function iconPanel(entry, theme, changed, pair) {
   const high = numberField("Height", entry.height);
   const level = document.createElement("input");
   const picker = document.createElement("input");
+  const tile = TILE_ICONS.includes(entry.name);
   const draw = button("Draw one");
+  const ready = button("Use the ready-made one");
   const load = button("From an image…");
-  const clear = button("Use the player's own");
+  const clear = button(tile ? "Remove it" : "Use the player's own");
   let painting = false;
 
   const rows = () => theme.icons[entry.name];
   const show = () => {
     const own = rows() === null;
     summary.textContent = own
-      ? `${label(entry.name)}: the player's own`
+      ? `${label(entry.name)}: ${tile ? "not drawn yet" : "the player's own"}`
       : `${label(entry.name)}: ${rows()[0].length} × ${rows().length}`;
     grid.hidden = own;
     clear.hidden = own;
     draw.hidden = !own;
+    ready.hidden = !tile;
     wide.input.value = own ? entry.width : rows()[0].length;
     high.input.value = own ? entry.height : rows().length;
     if (!own) {
@@ -181,9 +191,10 @@ function iconPanel(entry, theme, changed, pair) {
   Object.assign(picker, { type: "file", accept: "image/*", hidden: true });
   grid.className = "icon-grid";
   controls.className = "row";
-  controls.append(wide.wrap, high.wrap, "Brush", level, draw, load, clear, picker);
+  controls.append(wide.wrap, high.wrap, "Brush", level, draw, ready, load, clear, picker);
 
   draw.addEventListener("click", () => put(blankRows(...sized())));
+  ready.addEventListener("click", () => put(starterRows(entry.name, ...sized())));
   clear.addEventListener("click", () => put(null));
   load.addEventListener("click", () => picker.click());
   picker.addEventListener("change", async () => {

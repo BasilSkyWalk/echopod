@@ -52,6 +52,30 @@ export function standardDrawing(screen) {
   };
 }
 
+const TILE_ICON = 24;
+
+function tiles(spot, frame, columns, [w, h], name) {
+  const gap = 4;
+  return element("group", ...spot(...frame), { name, repeat: { count: "items", columns, dx: w + gap, dy: h + gap, turn: 0, start: 0, spin: 0 }, children: [
+    element("box", ...spot(0, 0, w, h), { name: "Highlight", color: "@text", bind: { show: when("highlighted") } }),
+    element("box", ...spot(2, 2, w - 4, h - 4), { name: "Tile", color: "@selection_background" }),
+    element("symbol", ...spot(Math.floor((w - TILE_ICON) / 2), Math.floor((h - TILE_ICON) / 2) - 7, TILE_ICON, TILE_ICON), { name: "Icon", mark: "item", color: "@selection_text" }),
+    element("text", ...spot(7, h - 23, w - 14, 16), { name: "Name", source: "item", size: "small", color: "@selection_text" }),
+  ] });
+}
+
+export function tilesDrawing() {
+  return {
+    version: 2,
+    screen: "home",
+    elements: [
+      element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", locked: true, fill: "wallpaper" }),
+      tiles(oneWay("wide"), [2, 3, 316, 143], 4, [76, 68], "Menu tiles, sideways"),
+      tiles(oneWay("tall"), [3, 4, 164, 275], 2, [80, 88], "Menu tiles, upright"),
+    ],
+  };
+}
+
 function degrees(units) {
   return units * UNITS_TO_DEGREES;
 }
@@ -611,7 +635,7 @@ const MAKERS = { vu: vuDrawing, cassette: cassetteDrawing, turntable: turntableD
 
 export const STARTS = {
   playing: [["standard", "Plain"], ["vu", "VU meters"], ["cassette", "Cassette"], ["turntable", "Record player"], ["lcd", "LCD deck"], ["empty", "Empty"]],
-  home: [["standard", "Plain"], ["empty", "Empty"]],
+  home: [["standard", "Plain"], ["tiles", "Tiles"], ["empty", "Empty"]],
 };
 
 export function faceOf(consts) {
@@ -621,6 +645,9 @@ export function faceOf(consts) {
 export function startDrawing(name, screen, consts = {}) {
   if (MAKERS[name]) {
     return MAKERS[name]({ ...FACE_COLOURS[name], ...consts });
+  }
+  if (name === "tiles" && screen === "home") {
+    return tilesDrawing();
   }
   return name === "empty" ? emptyDrawing(screen) : standardDrawing(screen);
 }
@@ -671,4 +698,5 @@ export const READY = {
   vu: ["VU meter", () => meter(FACE_COLOURS.vu, ...same(10, 4, 146, 72), { wide: "both", tall: "both" })],
   record: ["Record player", () => recordPlayer(FACE_COLOURS.turntable, ...same(10, 6, 153, 135))],
   cassette: ["Cassette", () => cassetteSmall(FACE_COLOURS.cassette, same, 8, 8)],
+  tiles: ["Menu tiles with icons", () => tiles(same, [0, 0, 160, 143], 2, [78, 68], "Menu tiles"), "home"],
 };

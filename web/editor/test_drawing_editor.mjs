@@ -92,6 +92,16 @@ other.editor.key(key("v", { ctrlKey: true }));
 assert.equal(playing.current.elements.length, 3, "the menu isn't pasted on Now Playing");
 assert.match(other.said.at(-1), /menu only goes on Home/);
 
+const tileIcon = element("symbol", box(280, 120, 24, 24), box(140, 250, 24, 24), { mark: "item" });
+home.current.elements.push(tileIcon);
+editor.key(key("escape"));
+click(editor, 290, 155);
+assert.equal(state.picked, tileIcon.id);
+editor.key(key("c", { ctrlKey: true }));
+other.editor.key(key("v", { ctrlKey: true }));
+assert.equal(playing.current.elements.at(-1).mark, "state", "a tile icon pasted on Now Playing becomes a play mark");
+home.current.elements.pop();
+
 right.locked = true;
 editor.key(key("escape"));
 click(editor, 200, 75);

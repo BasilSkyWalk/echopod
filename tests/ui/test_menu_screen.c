@@ -169,6 +169,16 @@ static void a_hidden_item_is_skipped(void)
     CHECK(press(screen, KEY_PLAY, KEY_GESTURE_PRESS).target == &last_target);
 }
 
+static void a_scene_learns_which_item_each_place_holds(void)
+{
+    open_sometimes_menu(false);
+    CHECK_EQUAL(0, menu_screen_scene_slot(&menu, 0));
+    CHECK_EQUAL(2, menu_screen_scene_slot(&menu, 1));
+    second_shown = true;
+    CHECK_EQUAL(1, menu_screen_scene_slot(&menu, 1));
+    CHECK_EQUAL(2, menu_screen_scene_slot(&menu, 2));
+}
+
 static void an_item_appears_once_it_is_shown(void)
 {
     Screen *screen = open_sometimes_menu(false);
@@ -321,6 +331,7 @@ int main(void)
         TEST_CASE(the_menu_title_is_the_screen_title),
         TEST_CASE(items_that_open_a_screen_show_a_chevron),
         TEST_CASE(a_hidden_item_is_skipped),
+        TEST_CASE(a_scene_learns_which_item_each_place_holds),
         TEST_CASE(a_side_panel_takes_the_right_of_the_content),
         TEST_CASE(a_theme_without_the_panel_gives_the_list_the_whole_content),
         TEST_CASE(a_scene_draws_the_menu_in_its_own_place),

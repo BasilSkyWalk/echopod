@@ -216,6 +216,9 @@ static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, Spoke
         .shown_context = entry};
 }
 
+_Static_assert(THEME_ICON_COUNT - THEME_ICON_HOME_MUSIC == HOME_ITEM_COUNT,
+               "Home has an icon for each of its items");
+
 static bool home_scene_update(void *context, uint32_t now_ms)
 {
     AppScreens *screens = context;
@@ -231,7 +234,8 @@ static bool home_scene_draw(void *context, Canvas *canvas, MenuScreen *menu)
 {
     const AppScreens *screens = context;
     const HomeArt *art = &screens->home_art;
-    SceneMenu items = {&menu->model, menu->list.selected, menu_screen_scene_list, menu};
+    SceneMenu items = {&menu->model, menu->list.selected, menu_screen_scene_list,
+                       menu_screen_scene_slot, menu};
     NowPlayingHome stage = {.title = menu->config.title, .menu = &items};
     if (!art->has_album ||
         cover_cache_full(art->covers, art->album, &stage.cover) != COVER_LOADED) {

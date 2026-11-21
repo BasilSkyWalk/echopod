@@ -38,6 +38,7 @@ typedef struct SceneMenu {
     const ListModel *model;
     int selected;
     void (*draw)(void *context, Canvas *canvas, Rect area);
+    int (*slot)(void *context, int position);
     void *context;
 } SceneMenu;
 

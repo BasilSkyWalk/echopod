@@ -5,6 +5,7 @@
 #include "face_text.h"
 #include "np_faces/face_shapes.h"
 #include "ui/backdrop.h"
+#include "ui/icons.h"
 #include "ui/label.h"
 
 enum {
@@ -379,6 +380,20 @@ ECHO_NP_FACES_CODE static void draw_text_op(Machine *machine, SceneOp op, Canvas
     }
 }
 
+ECHO_NP_FACES_CODE static void item_icon(const Machine *machine, Canvas *canvas)
+{
+    const int32_t *v = machine->values;
+    const SceneMenu *menu = machine->frame->menu;
+    if (menu == NULL || menu->slot == NULL || v[0] < 0 || v[0] >= item_count(machine->frame)) {
+        return;
+    }
+    int id = THEME_ICON_HOME_MUSIC + menu->slot(menu->context, v[0]);
+    if (id >= THEME_ICON_HOME_MUSIC && id < THEME_ICON_COUNT) {
+        Icon icon = {(ThemeIconId)id, rect_from(v + 1), (Color)v[5]};
+        icon_draw(canvas, machine->frame->theme, icon);
+    }
+}
+
 ECHO_NP_FACES_CODE static void draw(Machine *machine, SceneOp op)
 {
     const int32_t *v = machine->values;
@@ -461,6 +476,9 @@ ECHO_NP_FACES_CODE static void draw(Machine *machine, SceneOp op)
         break;
     case SCENE_OP_BACKDROP:
         backdrop_paint(canvas, machine->frame->theme, rect_from(v));
+        break;
+    case SCENE_OP_ITEM_ICON:
+        item_icon(machine, canvas);
         break;
     default:
         draw_text_op(machine, op, canvas);

@@ -757,6 +757,9 @@ export function drawingEditor(ctx) {
     if (item.kind === "text" && item.source === "item") {
       item.source = "song";
     }
+    if (item.kind === "symbol" && item.mark === "item") {
+      item.mark = "state";
+    }
     if (item.repeat?.count === "items") {
       item.repeat.count = 6;
     }
@@ -978,7 +981,11 @@ export function drawingEditor(ctx) {
       el("div", { class: "add-menu" }, kinds.map(([kind, label]) => el("button", { type: "button", onclick: () => insert(newElement(kind, screen)) }, `+ ${label}`))),
       el("h4", {}, "Ready-made"),
       el("p", { class: "hint" }, "Groups of parts you can change like any other: open them in the list."),
-      el("div", { class: "add-menu ready" }, Object.entries(READY).map(([key, [label, make]]) => el("button", { type: "button", onclick: () => insert(make(), true) }, label))),
+      el("div", { class: "add-menu ready" }, Object.entries(READY).filter(([, [, , only]]) => !only || only === screen).map(([key, [label, make]]) => el("button", { type: "button", onclick: () => {
+        if (insert(make(), true) && key === "tiles") {
+          ctx.tileIcons?.();
+        }
+      } }, label))),
     ];
   }
 
@@ -1006,13 +1013,14 @@ export function drawingEditor(ctx) {
       (host ? host.children : drawing().elements).pop();
       ctx.fits();
       ctx.say("There's no room for more on this screen. Remove something first.", true);
-      return;
+      return false;
     }
     if (open) {
       expanded.add(made.id);
     }
     setChosen([made.id]);
     ctx.changed({ rebuild: true });
+    return true;
   }
 
   function numberInput(value, set, { least = -400, most = 400, step = 1, width = 64 } = {}) {
@@ -1151,10 +1159,16 @@ export function drawingEditor(ctx) {
         fields.push(colourField(item, "placeholder", screen === "home" ? "With no album art" : "Without a cover"));
         break;
       case "symbol": {
-        const marks = el("select", {}, Object.entries(MARKS).map(([value, label]) => new Option(label, value)));
+        const offered = Object.entries(MARKS).filter(([value]) => value !== "item" || screen === "home");
+        const marks = el("select", {}, offered.map(([value, label]) => new Option(label, value)));
         marks.value = item.mark ?? "state";
-        marks.addEventListener("change", () => set("mark")(marks.value));
-        fields.push(field("Shows", marks), colourField(item, "color", "Colour"));
+        marks.addEventListener("change", () => {
+          if (marks.value === "item") {
+            ctx.tileIcons?.();
+          }
+          set("mark")(marks.value);
+        });
+        fields.push(field("Shows", marks, item.mark === "item" ? "Draw each item's icon in the Icons step" : undefined), colourField(item, "color", "Colour"));
         break;
       }
       case "number": {
@@ -1291,6 +1305,36 @@ export function drawingEditor(ctx) {
     return el("span", { class: "color-control wrap" }, ...parts);
   }
 
+  function copyColourFields(item) {
+    if (!insideCopies(item)) {
+      return [];
+    }
+    return (COLOURED[item.kind] ?? []).map(([key, label]) => {
+      const list = item.each?.[key] ?? [];
+      const put = (next) => {
+        item.each ??= {};
+        if (next.length < 2) {
+          delete item.each[key];
+        } else {
+          item.each[key] = next;
+        }
+        ctx.changed({ rebuild: true });
+      };
+      if (list.length === 0) {
+        return field(`${label} for each copy`, el("button", { type: "button", onclick: () => put([item[key], item[key]]) }, "Give each copy its own"));
+      }
+      const rows = list.map((colour, index) => el("span", { class: "each-colour" },
+        choiceColour(colour, (value) => {
+          list[index] = value;
+          ctx.changed();
+        }),
+        el("button", { type: "button", title: "Remove this colour", "aria-label": `Remove colour ${index + 1}`, onclick: () => put(list.filter((_, at) => at !== index)) }, "×")));
+      return stacked(`${label} for each copy`, el("span", { class: "stack-control" }, ...rows,
+        el("button", { type: "button", onclick: () => put([...list, list.at(-1)]) }, "+ Colour")),
+      "Copies take these in turn, then start again");
+    });
+  }
+
   function colourChangeFields(item) {
     const copy = insideCopies(item);
     return (COLOURED[item.kind] ?? []).map(([key, label]) => {
@@ -1382,7 +1426,7 @@ export function drawingEditor(ctx) {
     const bound = Object.keys(item.bind ?? {}).length > 0;
     const sections = [
       el("h3", { class: "keep" }, nameOf(item)),
-      group(field("Name", name), ...kindFields(item, screen), ...placeFields(item), ...(item.at[shape()] ? [lineUpRow(1)] : [])),
+      group(field("Name", name), ...kindFields(item, screen), ...copyColourFields(item), ...placeFields(item), ...(item.at[shape()] ? [lineUpRow(1)] : [])),
       el("div", { class: "actions" }, ...actions),
     ];
     const live = [...moves, ...colours, showField(item)];

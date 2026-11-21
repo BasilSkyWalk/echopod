@@ -20,6 +20,7 @@ import {
 } from "./theme_format.js";
 import { buildWallpapers } from "./wallpaper_editor.js";
 import { paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
+import { addTileIcons } from "./tile_icons.js";
 import { addVersion, copyTheme, emptyLibrary, entryOf, keep, newId, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 
 const STEPS = [
@@ -749,6 +750,7 @@ const drawer = drawingEditor({
   fits: () => fits(),
   say: (text, bad) => say(text, bad),
   remember: () => remember(),
+  tileIcons: () => tileIcons(),
   coarse: () => window.matchMedia?.("(pointer: coarse)").matches ?? false,
 });
 
@@ -1188,14 +1190,23 @@ function designFrom(step) {
   return face && STARTS[DESIGNS[step].screen].some(([name]) => name === face) ? startDrawing(face, DESIGNS[step].screen, consts) : null;
 }
 
+function tileIcons() {
+  const added = addTileIcons(state.theme, state.schema);
+  if (added) {
+    say("Added ready-made icons for the tiles. Redraw them in Icons.");
+  }
+  return added;
+}
+
 function startFrom(step, name, label) {
   const consts = stashColours(step);
   state.designs[step] = startDrawing(name, DESIGNS[step].screen, faceOf(consts) === name ? consts : {});
   state.picked = null;
+  const icons = name === "tiles" && tileIcons();
   if (!fits()) {
     say("That drawing doesn't fit with the rest of this theme. Make room by removing a picture or a font.", true);
   } else {
-    say(`Started again from ${label}. Undo brings back your drawing.`);
+    say(`Started again from ${label}.${icons ? " Its icons are in Icons, ready to redraw." : ""} Undo brings back your drawing.`);
   }
   changed({ rebuild: true });
   restart();
@@ -1297,7 +1308,7 @@ function panelFor(step) {
     case "fonts":
       return withMemory(panelLegacy("Fonts", "Lettering for titles, lists and small text: draw your own, or use a font file.", buildFonts));
     case "icons":
-      return panelLegacy("Icons", "The small pictures in the title bar and the lists. Drag to draw and right-drag to erase; the theme's colours tint them.", buildIcons);
+      return panelLegacy("Icons", "The small pictures in the title bar and the lists, and the icons on Home tiles. Drag to draw and right-drag to erase; the theme's colours tint them.", buildIcons);
     default:
       return panelShare();
   }

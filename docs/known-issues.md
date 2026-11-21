@@ -52,7 +52,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **VU meters in landscape leave out the album, the format and the modes row.** Portrait shows them.
 - **Standard shows if the face code can't be loaded.** The faces are read from internal storage when first needed. If that fails (internal storage doesn't answer, or the copy is damaged twice), Now Playing draws Standard and keeps doing so until you restart the player.
 - **Going back to an older EchoPod resets the face to Standard.** Older firmware ignores the setting and writes 0 in its place the next time it saves. No other setting is lost.
-- **The faces' region is nearly full:** it has 876 of 13,824 bytes free, so a fifth face needs a smaller one or a bigger region. `.high_ram` keeps 31,140 bytes free (44,964 before the faces).
+- **The faces' region is full:** after the faces' code and a theme's largest scene it has 20 of 13,824 bytes free, and the faces' code can grow by about 290 bytes before it needs another 512-byte sector that isn't there. More scene functions need a smaller scene limit or a bigger region. The main code window has 124 bytes free in the developer build and 1,664 in the release build. `.high_ram` keeps 31,140 bytes free (44,964 before the faces).
 - **"Standard" isn't translated** in any language; the Portrait status bar setting shares the word. The LCD deck's legends stay English on purpose.
 
 ## Languages

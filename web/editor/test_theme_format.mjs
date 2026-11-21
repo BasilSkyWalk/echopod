@@ -8,6 +8,7 @@ import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayou
 import { mix, paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
 import { LIBRARY, VERSION_EVERY_MS, VERSION_LIMIT, addVersion, copyTheme, keep, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 import { READY, STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
+import { TILE_ICONS, addTileIcons, starterRows } from "./tile_icons.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
 import {
@@ -101,7 +102,10 @@ for (const screen of ["home", "playing"]) {
   }
 }
 for (const screen of ["home", "playing"]) {
-  for (const [key, [label, make]] of Object.entries(READY)) {
+  for (const [key, [label, make, only]] of Object.entries(READY)) {
+    if (only && only !== screen) {
+      continue;
+    }
     const drawing = startDrawing("standard", screen);
     drawing.elements.push(make());
     const script = drawingScript(drawing, homeTheme);
@@ -547,3 +551,42 @@ assert.equal(outline[4], "f..................fff");
 assert.equal(fill[4], "..ffffffffffffffff....");
 const paired = { ...defaultTheme(schema), icons: { ...defaultTheme(schema).icons, battery: outline, battery_level: fill } };
 assert.ok(pack(paired, schema).length > 0, "a drawn battery outline and fill pack together");
+
+const tiled = startDrawing("tiles", "home");
+const tiledScript = drawingScript(tiled, homeTheme);
+assert.match(tiledScript, /item_icon\(copy_1, /, "each tile draws the icon of the item it holds");
+assert.match(tiledScript, /line\(item\(copy_1\), small, /, "and its name");
+assert.equal(tiled.elements.filter((item) => item.repeat?.count === "items").length, 2, "one set of tiles for each way the player is held");
+const single = element("symbol", { x: 4, y: 4, w: 24, h: 24 }, { x: 4, y: 4, w: 24, h: 24 }, { mark: "item" });
+const loneScript = drawingScript({ version: 2, screen: "home", elements: [single] }, homeTheme);
+assert.match(loneScript, /item_icon\(selected\(\), x \+ 4, y \+ 4, 24, 24, /, "outside the tiles, the highlighted item's icon");
+compileScene(loneScript, schema.scene);
+
+const striped = startDrawing("tiles", "home");
+const stripedTile = striped.elements[1].children.find((item) => item.name === "Tile");
+stripedTile.each = { color: ["#0050ef", "@selection_background", "#a20025"] };
+const stripedScript = drawingScript(striped, homeTheme);
+assert.ok(stripedScript.includes(`(copy_1 % 3 == 0 ? #0050ef : copy_1 % 3 == 1 ? ${homeTheme.colors.selection_background} : #a20025)`), "copies take their colours in turn");
+compileScene(stripedScript, schema.scene);
+const apart = element("box", { x: 0, y: 0, w: 10, h: 10 }, { x: 0, y: 0, w: 10, h: 10 }, { color: "#112233", each: { color: ["#0050ef", "#a20025"] } });
+assert.doesNotMatch(drawingScript({ version: 2, screen: "home", elements: [apart] }, homeTheme), /%/, "a part that isn't copied keeps its one colour");
+
+assert.deepEqual(TILE_ICONS, schema.icons.slice(-TILE_ICONS.length).map((entry) => entry.name), "a ready-made icon for every Home item");
+for (const name of TILE_ICONS) {
+  const rows = starterRows(name);
+  assert.deepEqual([rows.length, rows[0].length], [24, 24]);
+  const inked = rows.join("").replaceAll(".", "").length;
+  assert.ok(inked > 60 && inked < 420, `${name} is drawn, with room around it`);
+  assert.deepEqual([starterRows(name, 16, 12).length, starterRows(name, 16, 12)[0].length], [12, 16]);
+}
+assert.equal(starterRows("chevron"), null);
+assert.equal(starterRows("home_settings")[12][12], ".", "the gear has a hole in the middle");
+const iconed = defaultTheme(schema);
+assert.equal(addTileIcons(iconed, schema), true);
+assert.ok(TILE_ICONS.every((name) => iconed.icons[name].length === 24));
+assert.equal(addTileIcons(iconed, schema), false, "icons already drawn are left alone");
+const tiledTheme = { ...iconed, home_scene: { script: tiledScript, chrome: null, design: JSON.stringify(tiled) } };
+const tiledBytes = pack(tiledTheme, schema);
+assert.deepEqual(unpack(tiledBytes, schema).icons.home_music, iconed.icons.home_music);
+const crowded = { ...iconed, icons: { ...ember.icons, ...Object.fromEntries(TILE_ICONS.map((name) => [name, iconed.icons[name]])) } };
+assert.throws(() => pack(crowded, schema), /Make some icons smaller/, "too many big icons is said plainly");

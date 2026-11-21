@@ -54,3 +54,4 @@ struct MenuScreen {
 Screen *menu_screen_init(MenuScreen *menu, MenuConfig config);
 ScreenAction menu_open_screen(void *screen);
 void menu_screen_scene_list(void *context, Canvas *canvas, Rect area);
+int menu_screen_scene_slot(void *context, int position);

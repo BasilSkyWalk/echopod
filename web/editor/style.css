@@ -770,6 +770,17 @@ details.more summary {
   justify-content: flex-end;
 }
 
+.each-colour {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.each-colour > button {
+  min-width: 28px;
+  padding: 2px 6px;
+}
+
 .stack-control {
   display: flex;
   flex-direction: column;

@@ -59,17 +59,26 @@ static void red(Program *program, uint16_t target)
     put(program, 0);
 }
 
-static NpTestScene run_with(const Program *program, const SceneMenu *menu)
+static NpTestScene run_themed(const Program *program, const SceneMenu *menu,
+                              const ThemeIcons *icons)
 {
     NpTestScene scene = np_test_scene(NP_FACE_STANDARD, NP_TEST_LAYOUTS[0], NP_TEST_PLAYING);
     static uint32_t work[SCENE_WORK_BYTES / sizeof(uint32_t)];
     scene.frame.scene = (SceneCode){program->bytes, program->size, NULL, 0, work, sizeof work};
+    if (icons != NULL) {
+        scene.theme.icons = icons;
+    }
     np_test_clear(pixels);
     Canvas canvas = canvas_make(pixels, (Rect){0, 0, scene.layout.width, scene.layout.height});
     NowPlayingFrame frame = np_test_frame(&scene);
     frame.menu = menu;
     scene_draw(&frame, &canvas);
     return scene;
+}
+
+static NpTestScene run_with(const Program *program, const SceneMenu *menu)
+{
+    return run_themed(program, menu, NULL);
 }
 
 static NpTestScene run(const Program *program, const char *strings, uint32_t strings_size)
@@ -109,8 +118,14 @@ static void draw_menu(void *context, Canvas *canvas, Rect area)
     menu_draws++;
 }
 
+static int slot_at(void *context, int position)
+{
+    (void)context;
+    return position == 0 ? 0 : position + 2;
+}
+
 static const ListModel MODEL = {.count = label_count, .label = label_at};
-static const SceneMenu MENU = {&MODEL, 2, draw_menu, NULL};
+static const SceneMenu MENU = {&MODEL, 2, draw_menu, slot_at, NULL};
 
 static void value(Program *program, int code, uint16_t target)
 {
@@ -355,6 +370,54 @@ static void without_a_menu_the_menu_ops_draw_nothing(void)
     CHECK_EQUAL(0, menu_draws);
 }
 
+static void item_icon(Program *program, int position, int x)
+{
+    op(program, OP_ITEM_ICON);
+    put(program, number(position));
+    put(program, number(x));
+    put(program, number(10));
+    put(program, number(2));
+    put(program, number(2));
+    put(program, FIRST_FREE);
+}
+
+static Program item_icons(void)
+{
+    Program program = {.size = 0};
+    red(&program, FIRST_FREE);
+    item_icon(&program, 0, 10);
+    item_icon(&program, 1, 20);
+    item_icon(&program, 3, 30);
+    item_icon(&program, -1, 40);
+    return program;
+}
+
+static const uint8_t SOLID_ICON[] = {0xFF, 0xFF};
+
+static void a_tile_draws_the_icon_of_the_item_it_holds(void)
+{
+    static ThemeIcons icons;
+    icons.masks[THEME_ICON_HOME_SETTINGS] = (IconMask){SOLID_ICON, 2, 2};
+    Program program = item_icons();
+    NpTestScene scene = run_themed(&program, &MENU, &icons);
+    CHECK_EQUAL(RED, at(&scene, 20, 10));
+    CHECK_EQUAL(RED, at(&scene, 21, 11));
+    CHECK(!drawn_in(&scene, (Rect){10, 10, 2, 2}));
+    CHECK(!drawn_in(&scene, (Rect){30, 10, 2, 2}));
+    CHECK(!drawn_in(&scene, (Rect){40, 10, 2, 2}));
+}
+
+static void without_a_menu_or_an_icon_a_tile_draws_no_icon(void)
+{
+    static ThemeIcons icons;
+    icons.masks[THEME_ICON_HOME_SETTINGS] = (IconMask){SOLID_ICON, 2, 2};
+    Program program = item_icons();
+    NpTestScene scene = run_themed(&program, NULL, &icons);
+    CHECK(!drawn_in(&scene, (Rect){0, 10, 60, 2}));
+    scene = run_with(&program, &MENU);
+    CHECK(!drawn_in(&scene, (Rect){0, 10, 60, 2}));
+}
+
 static void a_backdrop_fills_its_area_with_the_theme(void)
 {
     Program program = {.size = 0};
@@ -381,6 +444,8 @@ int main(void)
         TEST_CASE(a_home_scene_reads_the_menu),
         TEST_CASE(without_a_menu_the_menu_ops_draw_nothing),
         TEST_CASE(a_backdrop_fills_its_area_with_the_theme),
+        TEST_CASE(a_tile_draws_the_icon_of_the_item_it_holds),
+        TEST_CASE(without_a_menu_or_an_icon_a_tile_draws_no_icon),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }
