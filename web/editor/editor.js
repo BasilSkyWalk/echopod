@@ -686,15 +686,29 @@ function mainColours() {
 
 function putScheme(scheme, roles) {
   for (const role of roles) {
-    (shownAccentOf(role) ?? state.theme.colors)[role] = scheme[role];
+    state.theme.colors[role] = scheme[role];
+  }
+  if (!roles.some((role) => ACCENT_FAMILY.includes(role)) || !(state.theme.accents ?? []).length) {
+    return false;
+  }
+  state.theme.accents = [];
+  state.accent = 0;
+  return true;
+}
+
+function ownAccent(cleared) {
+  if (cleared) {
+    restart();
+    say("This theme's accent is yours now. The accent choices it came with are gone; add your own under Every colour.");
   }
 }
 
 function setMain(key, value) {
   const three = { ...mainColours(), [key]: value };
   const scheme = schemeOf(three.background, three.text, three.accent);
-  putScheme(scheme, Object.keys(scheme).filter((role) => ACCENT_FAMILY.includes(role) === (key === "accent")));
+  const cleared = putScheme(scheme, Object.keys(scheme).filter((role) => ACCENT_FAMILY.includes(role) === (key === "accent")));
   changed();
+  ownAccent(cleared);
 }
 
 function madeDots() {
@@ -720,8 +734,11 @@ function colourSets() {
   return el("div", { class: "colour-sets" }, COLOUR_SETS.map(([name, background, text, accent]) =>
     el("button", { type: "button", onclick: () => {
       const scheme = schemeOf(background, text, accent);
-      putScheme(scheme, Object.keys(scheme));
+      const cleared = putScheme(scheme, Object.keys(scheme));
       changed({ rebuild: true });
+      if (cleared) {
+        restart();
+      }
       say(`Coloured with ${name}. Undo puts your colours back.`);
     } }, el("span", { class: "set-dots", "aria-hidden": "true" }, [background, text, accent].map((colour) => el("span", { style: `background: ${colour}` }))), name)));
 }
@@ -1113,12 +1130,11 @@ function pictureColours() {
     el("div", { class: "actions" },
       el("button", { type: "button", class: "primary", onclick: () => {
         const scheme = schemeFrom(state.picture.palette, state.dark);
-        Object.assign(state.theme.colors, scheme);
-        const accent = shownAccentOf("selection_background");
-        for (const role of accent ? ACCENT_SHADES : []) {
-          accent[role] = scheme[role] ?? accent[role];
-        }
+        const cleared = putScheme(scheme, Object.keys(scheme));
         changed({ rebuild: true });
+        if (cleared) {
+          restart();
+        }
         say("Coloured from the picture. Undo puts your colours back.");
       } }, "Use these colours"),
       choose, picker),
@@ -1241,7 +1257,10 @@ function memoryBar() {
       : pieces.length
         ? `Pictures and fonts use ${used} of the player's room for them`
         : "The player has room for a wallpaper and your own fonts"),
-    bar, pieces.length ? legend : null);
+    bar, pieces.length ? legend : null,
+    !over && parts.wallpaper > parts.limit * 0.8
+      ? el("p", { class: "hint" }, "A picture the size of the screen takes nearly all of it. Tick “Repeat a small picture” to leave room for your own fonts.")
+      : null);
   if (over) {
     box.append(
       el("p", { class: "hint" }, "Make a font smaller, use a smaller or repeating wallpaper, or remove one of these."),

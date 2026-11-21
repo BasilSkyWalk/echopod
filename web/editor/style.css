@@ -2120,3 +2120,39 @@ details.every-colour > summary {
 .card .links a:hover {
   border-color: var(--ink);
 }
+
+.drop-zone[hidden] {
+  display: none;
+}
+
+.bar .primary {
+  white-space: nowrap;
+}
+
+@media (max-width: 800px) {
+  .bar {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 8px 12px;
+  }
+
+  .bar .bar-actions {
+    margin-left: auto;
+  }
+
+  .bar .theme-name {
+    order: 5;
+    flex-basis: 100%;
+  }
+
+  .bar .theme-name input {
+    width: 100%;
+    text-align: left;
+    border-color: var(--line);
+  }
+
+  .app {
+    height: auto;
+  }
+}

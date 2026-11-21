@@ -462,7 +462,7 @@ const screen = { palette: ["#000000"], rows: Array(170).fill("0".repeat(320)) };
 pack({ ...fresh, fonts: { ...fresh.fonts, body: heavy } }, schema);
 assert.throws(
   () => pack({ ...fresh, fonts: { ...fresh.fonts, body: heavy }, wallpapers: { ...fresh.wallpapers, wallpaper: screen } }, schema),
-  /28,224/,
+  /more than the player has room for/,
 );
 const fontLines = toToml({ ...fresh, fonts: { ...fresh.fonts, small: letters } }, schema).split(String.fromCharCode(10));
 const fontAt = fontLines.indexOf("[fonts.small]");
@@ -714,3 +714,10 @@ const bridgedNow = Object.fromEntries(bridged.elements.map((item) => [item.name 
 assert.deepEqual([bridgedNow.Menu.w, bridgedNow["Art panel"].w], [170, 170], "a title laid across the menu and the art doesn't shrink the screen to a miniature");
 assert.ok(bridgedNow.song.y >= 100 && bridgedNow.song.y < 146 && bridgedNow.song.x + bridgedNow.song.w <= 170, "it stays with the menu it mostly sat on");
 assert.equal(bridgedNow["Art panel"].y + bridgedNow["Art panel"].h, 280);
+
+const crossed = startDrawing("standard", "playing");
+crossed.elements.push(element("circle", { x: 146, y: 59, w: 28, h: 28 }, { x: 0, y: 0, w: 28, h: 28 }));
+arrangeUpright(crossed);
+const crossedNow = Object.fromEntries(crossed.elements.map((item) => [item.name || item.source || item.kind, item.at.tall]));
+assert.deepEqual([crossedNow.album.w, crossedNow.format.w, crossedNow.format.h], [154, 154, 16], "a small part dropped over some text doesn't squeeze the text into its own box");
+assert.ok(crossedNow.circle.w === crossedNow.circle.h && crossedNow.circle.w >= 20 && crossedNow.circle.w <= 28, "and stays round");

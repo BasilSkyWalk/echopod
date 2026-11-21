@@ -478,8 +478,7 @@ function checkMemory(walls, fonts, schema) {
   const needed = fonts.reduce((sum, font) => sum + font.memory, 0) + Math.max(0, ...walls.map((wall) => wall.memory));
   if (needed > schema.asset_memory) {
     throw new ThemeError(
-      `the fonts and wallpaper need ${needed.toLocaleString("en")} bytes of the player's memory, more than its ` +
-        `${schema.asset_memory.toLocaleString("en")}; use a smaller or repeating wallpaper, or fewer fonts`,
+      "The wallpaper and your fonts together are more than the player has room for. Use a smaller or repeating wallpaper, or fewer fonts.",
     );
   }
   return needed;

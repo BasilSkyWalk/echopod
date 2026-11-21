@@ -66,7 +66,7 @@ function clustersOf(items) {
     const box = numbers(item.at.wide);
     const over = bodies.map((body) => body.members.reduce((sum, one) => sum + shared(box, numbers(one.at.wide)), 0));
     const most = Math.max(0, ...over);
-    if (most > 0) {
+    if (most > 0 && most * 2 >= box.w * Math.max(box.h, 1)) {
       bodies[over.indexOf(most)].members.push(item);
     } else {
       loose.push([item]);
