@@ -1589,6 +1589,13 @@ function barPicker(value, label, set) {
   return picker;
 }
 
+function barRange(label, value, most, set) {
+  const slider = el("input", { type: "range", min: 0, max: most, value: Math.min(most, value), "aria-label": label });
+  slider.addEventListener("input", () => set(Number(slider.value)));
+  slider.addEventListener("change", () => render());
+  return el("label", { class: "bar-range" }, el("span", {}, label), slider);
+}
+
 function barColours(current, set) {
   const custom = typeof current === "string" && !current.startsWith("@");
   return [
@@ -1643,6 +1650,19 @@ function partBar() {
       item.shape = form;
       changed({ rebuild: true });
     })));
+    const at = item.at[shape()];
+    if (at && item.shape !== "circle") {
+      bits.push(barRange("Corners", item.corner ?? 0, Math.max(1, Math.floor(Math.min(at.w, at.h) / 2)), (value) => {
+        item.corner = value;
+        changed();
+      }));
+    }
+  }
+  if (item.kind === "box" && (item.fill ?? "solid") === "solid") {
+    bits.push(barGap(), barRange("Corners", item.radius ?? 0, 40, (value) => {
+      item.radius = value;
+      changed();
+    }));
   }
   return [...bits, barGap(), ...tools];
 }

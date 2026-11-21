@@ -96,7 +96,7 @@ function defaults(kind) {
     circle: { color: "@selection_background", thickness: 0 },
     line: { color: "@text", angle: 0, start: 0, thickness: 2 },
     text: { source: "song", custom: "Hello", size: "medium", align: "left", color: "@text", scroll: true },
-    cover: { shape: "square", placeholder: "@divider", reflection: false },
+    cover: { shape: "square", placeholder: "@divider", reflection: false, corner: 0 },
     symbol: { mark: "state", color: "@text" },
     number: { show: "time", lit: "@text", dim: "@divider", lean: 8 },
     menu: {},
@@ -512,6 +512,48 @@ function textLines(item, scope, theme) {
   return [`${verb}(${what}, ${font}, ${where}, ${align}, ${colour})`];
 }
 
+let backdrops = new Map();
+
+function backdropsOf(drawing) {
+  const found = new Map();
+  drawing.elements.forEach((item, index) => {
+    if (item.kind !== "cover") {
+      return;
+    }
+    const behind = {};
+    for (const shape of Object.keys(AREAS)) {
+      const at = item.at?.[shape];
+      if (!at) {
+        continue;
+      }
+      const side = Math.min(whole(at.w), whole(at.h));
+      const under = drawing.elements.slice(0, index).findLast((other) => {
+        const box = other.kind === "box" && !other.hidden ? other.at?.[shape] : null;
+        return box && whole(box.x) <= whole(at.x) && whole(box.y) <= whole(at.y)
+          && whole(box.x) + whole(box.w) >= whole(at.x) + side && whole(box.y) + whole(box.h) >= whole(at.y) + side;
+      });
+      if (under && (under.fill ?? "solid") === "solid") {
+        behind[shape] = under.color;
+      }
+    }
+    found.set(item.id, behind);
+  });
+  return found;
+}
+
+function cornerLines(left, top, side, corner, colour) {
+  const reach = corner * 24;
+  return [[0, 0], [side - corner, 0], [0, side - corner], [side - corner, side - corner]].flatMap(([dx, dy]) => {
+    const [cx, cy] = [sum(left, dx === 0 ? corner : dx), sum(top, dy === 0 ? corner : dy)];
+    const scaled = (value) => (NUMBER.test(value) ? String(Number(value) * 16) : `(${value}) * 16`);
+    return [
+      `clip(${sum(left, dx)}, ${sum(top, dy)}, ${corner}, ${corner})`,
+      `ring(${scaled(cx)}, ${scaled(cy)}, ${reach}, ${corner * 16}, ${colour})`,
+      "unclip()",
+    ];
+  });
+}
+
 function coverLines(item, scope, theme) {
   const at = item.at[scope.shape];
   const side = Math.max(1, Math.min(whole(at.w), whole(at.h)));
@@ -524,9 +566,15 @@ function coverLines(item, scope, theme) {
   }
   const [left, top] = anchor(scope, whole(at.x), whole(at.y));
   const rows = item.reflection ? Math.max(0, whole(at.h) - side) : 0;
+  const corner = Math.max(0, Math.min(Math.floor(side / 2), whole(item.corner)));
   const shown = [`    cover(${left}, ${top}, ${side})`];
   if (rows > 0) {
     shown.push(`    reflect(${left}, ${top}, ${side}, ${rows})`);
+  }
+  if (corner > 0 && !scope.turn) {
+    const behind = colorOf(item.behind ?? backdrops.get(item.id)?.[scope.shape] ?? "@background", theme);
+    shown.push(...indented(cornerLines(left, top, side, corner, behind)));
+    return ["if has_cover {", ...shown, "} else {", `    rounded(${left}, ${top}, ${side}, ${side}, ${corner}, ${empty})`, "}"];
   }
   return ["if has_cover {", ...shown, "} else {", `    rect(${left}, ${top}, ${side}, ${side}, ${empty})`, "}"];
 }
@@ -820,6 +868,7 @@ function sameBothWays(item, theme) {
 }
 
 export function drawingScript(drawing, theme) {
+  backdrops = backdropsOf(drawing);
   const body = [];
   let levels = false;
   let run = { wide: [], tall: [] };

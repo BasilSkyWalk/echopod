@@ -12,7 +12,7 @@ import {
   newElement,
   walk,
 } from "./drawing.js";
-import { SHELF, SHELF_ART, SHELF_MORE, tilesFor } from "./drawings.js";
+import { SHELF, SHELF_ART, SHELF_MORE, fitTiles, isTiles, tilesFor } from "./drawings.js";
 
 const HANDLE = 7;
 const HIT = 4;
@@ -418,6 +418,9 @@ export function drawingEditor(ctx) {
       const at = primary.item.at[shape()];
       at.w = Math.max(1, start.w + dx);
       at.h = Math.max(primary.item.kind === "line" ? 0 : 1, start.h + dy);
+      if (isTiles(primary.item)) {
+        fitTiles(primary.item, shape());
+      }
       ctx.apply();
       return null;
     }
@@ -1148,7 +1151,10 @@ export function drawingEditor(ctx) {
     }
     const set = (key) => (value) => {
       at[key] = value;
-      ctx.changed();
+      if ((key === "w" || key === "h") && isTiles(item)) {
+        fitTiles(item, shape());
+      }
+      ctx.changed({ rebuild: isTiles(item) });
     };
     const fields = [];
     if (item.kind === "line") {
@@ -1243,6 +1249,24 @@ export function drawingEditor(ctx) {
       case "cover":
         fields.push(field("Round", toggle(item.shape === "circle", (round) => set("shape", true)(round ? "circle" : "square"))));
         if (item.shape !== "circle") {
+          fields.push(field("Rounded corners", range(item.corner ?? 0, 0, 40, (value) => {
+            const was = item.corner ?? 0;
+            item.corner = value;
+            ctx.changed({ rebuild: (was > 0) !== (value > 0) });
+          })));
+          if ((item.corner ?? 0) > 0) {
+            fields.push(field("Corner colour", chips([["auto", "From what's behind"], ["own", "My own"]], item.behind ? "own" : "auto", (mode) => {
+              if (mode === "own") {
+                item.behind ??= "@background";
+              } else {
+                delete item.behind;
+              }
+              ctx.changed({ rebuild: true });
+            }), "The corners are painted over the cover, so they need one plain colour behind it"));
+            if (item.behind) {
+              fields.push(colourField(item, "behind", "Colour behind the cover"));
+            }
+          }
           fields.push(field("Reflection", toggle(Boolean(item.reflection), set("reflection")), "Make the box taller than it is wide to show more"));
         }
         fields.push(colourField(item, "placeholder", screen === "home" ? "With no album art" : "Without a cover"));

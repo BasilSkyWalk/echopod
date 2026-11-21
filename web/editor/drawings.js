@@ -54,26 +54,68 @@ export function standardDrawing(screen) {
 
 const TILE_ICON = 24;
 
+function tileBoxes(w, h) {
+  return {
+    Highlight: [0, 0, w, h],
+    Tile: [2, 2, w - 4, h - 4],
+    Icon: [Math.floor((w - TILE_ICON) / 2), Math.max(2, Math.floor((h - TILE_ICON) / 2) - 7), TILE_ICON, TILE_ICON],
+    Name: [7, Math.max(2, h - 23), Math.max(1, w - 14), 16],
+  };
+}
+
 function tiles(spot, frame, columns, [w, h], name) {
   const gap = 4;
+  const boxes = tileBoxes(w, h);
   return element("group", ...spot(...frame), { name, repeat: { count: "items", columns, dx: w + gap, dy: h + gap, turn: 0, start: 0, spin: 0 }, children: [
-    element("box", ...spot(0, 0, w, h), { name: "Highlight", color: "@text", bind: { show: when("highlighted") } }),
-    element("box", ...spot(2, 2, w - 4, h - 4), { name: "Tile", color: "@selection_background" }),
-    element("symbol", ...spot(Math.floor((w - TILE_ICON) / 2), Math.floor((h - TILE_ICON) / 2) - 7, TILE_ICON, TILE_ICON), { name: "Icon", mark: "item", color: "@selection_text" }),
-    element("text", ...spot(7, h - 23, w - 14, 16), { name: "Name", source: "item", size: "small", color: "@selection_text" }),
+    element("box", ...spot(...boxes.Highlight), { name: "Highlight", color: "@text", bind: { show: when("highlighted") } }),
+    element("box", ...spot(...boxes.Tile), { name: "Tile", color: "@selection_background" }),
+    element("symbol", ...spot(...boxes.Icon), { name: "Icon", mark: "item", color: "@selection_text" }),
+    element("text", ...spot(...boxes.Name), { name: "Name", source: "item", size: "small", color: "@selection_text" }),
   ] });
 }
 
 const TILE_FRAMES = { wide: { x: 2, y: 3, w: 316, h: 143 }, tall: { x: 3, y: 4, w: 164, h: 275 } };
 const TILE_GAP = 4;
-const TILE_TALL = 90;
+const TILE_WIDE = 80;
+const TILE_ROWS_MOST = 4;
+
+function tileGrid(frame) {
+  const columns = Math.max(1, Math.min(6, Math.round(frame.w / TILE_WIDE)));
+  const wide = Math.floor((frame.w - TILE_GAP * (columns - 1)) / columns);
+  const tallFor = (rows) => Math.floor((frame.h + 1) / rows) - TILE_GAP;
+  let rows = 1;
+  for (let count = 2; count <= TILE_ROWS_MOST; count++) {
+    if (tallFor(count) > 8 && Math.abs(Math.log(wide / tallFor(count))) < Math.abs(Math.log(wide / tallFor(rows)))) {
+      rows = count;
+    }
+  }
+  return { columns, size: [wide, Math.max(8, tallFor(rows))] };
+}
+
+export function isTiles(item) {
+  return item?.kind === "group" && item.repeat?.count === "items" && (item.children ?? []).some((child) => child.kind === "box" && child.name === "Tile");
+}
+
+export function fitTiles(group, shape) {
+  const frame = group.at?.[shape];
+  if (!frame) {
+    return;
+  }
+  const { columns, size: [w, h] } = tileGrid({ w: Number(frame.w), h: Number(frame.h) });
+  group.repeat = { ...group.repeat, columns, dx: w + TILE_GAP, dy: h + TILE_GAP };
+  const boxes = tileBoxes(w, h);
+  for (const child of group.children ?? []) {
+    const box = boxes[child.name];
+    if (box && child.at?.[shape]) {
+      Object.assign(child.at[shape], { x: box[0], y: box[1], w: box[2], h: box[3] });
+    }
+  }
+}
 
 export function tilesFor(frames = TILE_FRAMES) {
   return ["wide", "tall"].filter((shape) => frames[shape]).map((shape) => {
     const frame = frames[shape];
-    const columns = frame.w >= 240 ? 4 : frame.w >= 110 ? 2 : 1;
-    const rows = Math.max(1, Math.round(frame.h / TILE_TALL));
-    const size = [Math.floor((frame.w - TILE_GAP * (columns - 1)) / columns), Math.floor((frame.h + 1) / rows) - TILE_GAP];
+    const { columns, size } = tileGrid(frame);
     return tiles(oneWay(shape), [frame.x, frame.y, frame.w, frame.h], columns, size, shape === "wide" ? "Menu tiles, sideways" : "Menu tiles, upright");
   });
 }
