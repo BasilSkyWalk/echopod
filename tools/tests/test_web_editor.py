@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import struct
 import subprocess
@@ -130,6 +131,15 @@ class SiteTest(unittest.TestCase):
             self.assertIn(name, web_editor.PAGE_FILES)
         for name in web_editor.PAGE_FILES:
             self.assertTrue((PAGES / name).is_file(), name)
+
+    def test_the_page_has_everything_its_script_looks_up(self):
+        page = (PAGES / "index.html").read_text(encoding="utf-8")
+        script = (PAGES / "editor.js").read_text(encoding="utf-8")
+        ids = set(re.findall(r'id="([\w-]+)"', page))
+        tour = script[script.index("const TOUR = ["):script.index("const CHROME_ROLES")]
+        wanted = set(re.findall(r'\$\("([\w-]+)"\)', script)) | set(re.findall(r'^  \["([\w-]+)", "', tour, re.M))
+        self.assertEqual(set(), wanted - ids)
+        self.assertGreaterEqual(len(wanted), 12)
 
     def test_only_the_small_latin_faces_are_offered_with_their_place_in_the_face_order(self):
         faces = web_editor.glyph_faces(GLYPHS, PACKS)

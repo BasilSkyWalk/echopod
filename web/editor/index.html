@@ -23,12 +23,13 @@
         <button type="button" class="quiet" id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5 4 4-4 4M15.5 9H8a4 4 0 0 0 0 8h2" /></svg>
         </button>
+        <button type="button" class="wordy" id="themes" aria-pressed="false">Themes</button>
         <a class="link" href="gallery.html">Gallery</a>
-        <button type="button" class="primary" id="save">Download for my player</button>
+        <button type="button" class="primary" id="save" aria-pressed="false">Put on my player</button>
       </div>
     </header>
     <div class="app">
-      <nav class="steps" aria-label="Steps" id="steps"></nav>
+      <aside class="shelf" id="shelf" aria-label="The screen you're on"></aside>
       <main class="stage" id="stage">
         <div class="stage-tools">
           <div class="segmented" id="screens" role="tablist" aria-label="Screen"></div>

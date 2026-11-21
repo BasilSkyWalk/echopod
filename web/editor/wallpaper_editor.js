@@ -164,7 +164,8 @@ function wallpaperPanel(entry, theme, changed) {
   const picker = document.createElement("input");
   const dim = document.createElement("input");
   const tile = document.createElement("input");
-  const choose = button("Choose an image…");
+  const drop = button("Drop a picture here, or click to choose one");
+  const choose = button("Choose another…");
   const remove = button("Remove");
   const saved = keptFor(entry, theme);
   let picture = saved?.picture ?? null;
@@ -173,9 +174,11 @@ function wallpaperPanel(entry, theme, changed) {
     const paper = theme.wallpapers[entry.name];
     summary.textContent = paper
       ? `${LABELS[entry.name]}: ${paper.rows[0].length} × ${paper.rows.length}, ${paper.palette.length} colours`
-      : `${LABELS[entry.name]}: none`;
+      : `${LABELS[entry.name]}: none yet`;
     shown.hidden = !paper;
     remove.hidden = !paper;
+    choose.hidden = !paper;
+    drop.hidden = Boolean(paper);
     if (paper) {
       drawPaper(shown, paper);
     }
@@ -205,21 +208,39 @@ function wallpaperPanel(entry, theme, changed) {
   tile.checked = saved?.tile ?? false;
   shown.className = "wallpaper-shown";
   controls.className = "row";
+  drop.className = "drop-zone";
   controls.append(choose, control("Fade", dim), control("Repeat a small picture", tile), remove, picker);
 
+  const take = async (file) => {
+    try {
+      picture = await createImageBitmap(file);
+    } catch {
+      summary.textContent = `${LABELS[entry.name]}: that file isn't a picture this browser can read`;
+      details.open = true;
+      return;
+    }
+    remake();
+  };
   choose.addEventListener("click", () => picker.click());
+  drop.addEventListener("click", () => picker.click());
   picker.addEventListener("change", async () => {
     if (picker.files.length > 0) {
-      try {
-        picture = await createImageBitmap(picker.files[0]);
-      } catch {
-        summary.textContent = `${LABELS[entry.name]}: that file isn't a picture this browser can read`;
-        details.open = true;
-        return;
-      } finally {
-        picker.value = "";
-      }
-      remake();
+      const file = picker.files[0];
+      picker.value = "";
+      await take(file);
+    }
+  });
+  details.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    details.classList.add("dropping");
+  });
+  details.addEventListener("dragleave", () => details.classList.remove("dropping"));
+  details.addEventListener("drop", (event) => {
+    event.preventDefault();
+    details.classList.remove("dropping");
+    const file = event.dataTransfer?.files[0];
+    if (file) {
+      take(file);
     }
   });
   dim.addEventListener("change", remake);
@@ -229,7 +250,7 @@ function wallpaperPanel(entry, theme, changed) {
     put(null);
   });
 
-  details.append(summary, controls, shown);
+  details.append(summary, drop, controls, shown);
   show();
   return details;
 }

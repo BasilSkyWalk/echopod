@@ -235,43 +235,203 @@ input[type="radio"] {
 .app {
   position: relative;
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr) var(--panel, 420px);
+  grid-template-columns: 264px minmax(0, 1fr) var(--panel, 420px);
   height: calc(100vh - 56px);
 }
 
-.steps {
+.shelf {
   border-right: 1px solid var(--line);
-  padding: 16px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   background: var(--surface);
   overflow-y: auto;
+  padding: 18px 14px 32px;
+  min-width: 0;
 }
 
-.steps button {
+.shelf h2 {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+}
+
+.shelf .lead {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.shelf h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  margin: 22px 0 8px;
+}
+
+.shelf h4 {
+  font-size: 13px;
+  margin: 16px 0 2px;
+}
+
+.shelf .add-menu button {
+  padding: 7px 8px;
+  font-size: 13px;
+}
+
+.shelf .actions button {
+  font-size: 13px;
+}
+
+.shelf .layers li {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-height: 34px;
+  padding: 4px 6px 4px 10px;
+}
+
+.shelf .layers .tools {
+  display: none;
+  justify-content: flex-end;
+}
+
+.shelf .layers li:hover .tools,
+.shelf .layers li:focus-within .tools,
+.shelf .layers li[aria-selected="true"] .tools {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  text-align: left;
+}
+
+.shelf .layers.scroller {
+  max-height: 320px;
+}
+
+.shelf details.more {
+  margin-top: 18px;
+}
+
+.shelf details.more summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.wordy {
   border: 0;
   background: transparent;
-  padding: 8px 10px;
-  border-radius: var(--radius-small);
   color: var(--ink-soft);
+  padding: 6px 10px;
+  border-radius: var(--radius-small);
 }
 
-.steps button:hover {
+.wordy:hover,
+.wordy[aria-pressed="true"] {
   background: var(--sunken);
   color: var(--ink);
 }
 
-.steps button[aria-current="step"] {
-  background: var(--sunken);
-  color: var(--ink);
+.wordy[aria-pressed="true"] {
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--ink);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 4px 8px 4px 0;
+  margin: 0 0 10px;
+}
+
+.back:hover {
+  color: var(--ink);
+}
+
+.look-section {
+  border-top: 1px solid var(--line);
+}
+
+.look-section:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.inspector h3.look-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.look-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.look-head::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--ink-faint);
+  border-bottom: 1.5px solid var(--ink-faint);
+  transform: rotate(-45deg);
+  margin-right: 6px;
+  transition: transform 0.15s;
+}
+
+.look-head[aria-expanded="true"]::after {
+  transform: rotate(45deg);
+  margin-bottom: 4px;
+}
+
+.look-head:hover::after {
+  border-color: var(--ink);
+}
+
+.look-body {
+  padding: 0 0 18px;
+}
+
+.look-body > h3:first-child,
+.look-body > .look-lead + h3 {
+  margin-top: 6px;
+}
+
+.look-lead {
+  margin: 0 0 12px;
+}
+
+.drop-zone {
+  display: block;
+  width: 100%;
+  padding: 16px 12px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--sunken);
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.drop-zone:hover,
+details.dropping .drop-zone {
+  border-color: var(--focus);
+  background: var(--focus-soft);
+  color: var(--ink);
+}
+
+.font-card > summary {
+  cursor: pointer;
 }
 
 .stage {
@@ -724,11 +884,7 @@ details.more summary {
 
 @media (max-width: 1100px) {
   .app {
-    grid-template-columns: 64px minmax(0, 1fr) var(--panel, 340px);
-  }
-
-  .steps button span {
-    display: none;
+    grid-template-columns: 216px minmax(0, 1fr) var(--panel, 340px);
   }
 }
 
@@ -738,18 +894,18 @@ details.more summary {
     height: auto;
   }
 
-  .steps {
-    flex-direction: row;
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+  .stage {
+    order: 1;
   }
 
-  .steps button span {
-    display: inline;
+  .shelf {
+    order: 2;
+    border-right: 0;
+    border-top: 1px solid var(--line);
   }
 
   .inspector {
+    order: 3;
     border-left: 0;
     border-top: 1px solid var(--line);
   }

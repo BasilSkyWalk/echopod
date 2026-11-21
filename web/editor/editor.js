@@ -23,17 +23,19 @@ import { paletteOf, readableShade, schemeFrom } from "./colour_tools.js";
 import { addTileIcons } from "./tile_icons.js";
 import { addVersion, copyTheme, emptyLibrary, entryOf, keep, newId, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 
-const STEPS = [
-  { id: "start", label: "Start", icon: "M4 10h12M10 4v12" },
-  { id: "colours", label: "Colours", icon: "M10 3a7 7 0 1 0 0 14c1 0 1.5-.8 1.2-1.6-.4-1 .2-2.4 1.6-2.4H15a2 2 0 0 0 2-2 7 7 0 0 0-7-8z" },
-  { id: "shapes", label: "Lists & shapes", icon: "M4 5.5h12M4 10h12M4 14.5h8" },
-  { id: "home", label: "Home", icon: "M3.5 9.5 10 4l6.5 5.5V16h-4.5v-4h-4v4H3.5z" },
-  { id: "playing", label: "Now Playing", icon: "M4 4h12v12H4zM8 7.5v5l4-2.5z" },
-  { id: "wallpaper", label: "Wallpaper", icon: "M3.5 4.5h13v11h-13zM3.5 13l4-4 3 3 2-2 4 4" },
-  { id: "fonts", label: "Fonts", icon: "M5 15 9.5 4h1L15 15M6.8 11h6.4" },
-  { id: "icons", label: "Icons", icon: "M10 3.5l2 4.2 4.5.6-3.3 3.1.8 4.5L10 13.7 6 15.9l.8-4.5-3.3-3.1 4.5-.6z" },
-  { id: "share", label: "Save & share", icon: "M10 3v9M6 8l4 4 4-4M4 15.5h12" },
+const LOOK = [
+  { id: "colours", label: "Colours" },
+  { id: "wallpaper", label: "Picture behind the lists", screen: "list" },
+  { id: "fonts", label: "Lettering" },
+  { id: "shapes", label: "Rows, title bar and spacing", screen: "list" },
+  { id: "icons", label: "Icons", screen: "list" },
 ];
+const OWN_SCREEN = { id: "screen", label: "This screen's colours" };
+const LOOK_LEADS = {
+  wallpaper: "It's cut to 16 colours. Fade it until the text reads well.",
+  fonts: "Lettering for titles, lists and small text: use a font file, a picture of your letters, or draw your own.",
+  icons: "The small pictures in the title bar and the lists, and the icons on Home tiles. Drag to draw and right-drag to erase; the theme's colours tint them.",
+};
 const SCREENS = [
   ["home", "Home"],
   ["list", "Lists"],
@@ -46,13 +48,13 @@ const DESIGNS = {
     screen: "home",
     key: "home_scene",
     title: "Home",
-    lead: "Draw the first screen from boxes, circles, lines, words and the menu. Drag things on the screen to move them, and drag a corner to resize. The buttons still move through the menu from top to bottom.",
+    standard: "This is the player's own Home: the menu, with album art beside it.",
   },
   playing: {
     screen: "playing",
     key: "now_playing_scene",
     title: "Now Playing",
-    lead: "Draw the Now Playing screen from boxes, circles, lines and words, and make any of them move with the music. Drag things on the screen to move them, and drag a corner to resize.",
+    standard: "This is the player's own Now Playing: the cover, the song and its progress.",
   },
 };
 const COLOUR_GROUPS = [
@@ -96,6 +98,8 @@ const SCRIPT_COLOUR = /^const ([A-Z][A-Z0-9_]*) = (#[0-9a-fA-F]{6})[ \t]*$/gm;
 const SCRIPT_WORDS = { HI: "highlight", ALU: "metal", DIM: "dim", BG: "background", SOFT: "soft" };
 const PANEL = "echopod-panel-width";
 const FOLDED = "echopod-folded";
+const LOOK_OPEN = "echopod-look";
+const SHARE_GUIDE = "https://github.com/BasilSkyWalk/echopod/blob/main/docs/themes.md";
 const WELCOMED = "echopod-welcomed";
 const PANEL_DEFAULT = 420;
 const PANEL_LEAST = 320;
@@ -104,11 +108,12 @@ const STAGE_LEAST = 360;
 const LIBRARY_SETTLE_MS = 1500;
 const MINUTE = 60 * 1000;
 const TOUR = [
-  ["steps", "Work through these steps in any order: colours, the Home and Now Playing screens, the wallpaper, fonts and icons."],
+  ["screens", "Pick the screen to work on: Home, the lists or Now Playing. The buttons beside them zoom and turn the player."],
   ["device", "This is the player, running for real. Click anything on it to change it. Ctrl and the mouse wheel, or two fingers, zoom in; drag the space around it to move about."],
   ["playback", "Try your theme playing or paused, part way through a song, with lyrics or a long title."],
-  ["inspector", "The settings for the step you're on. Drag its left edge to make it wider, and click a heading to fold a section away."],
-  ["save", "When you're happy, download the theme and copy it to the Themes folder on your card. Your themes are also kept in this browser, under Start."],
+  ["shelf", "What's on the screen you picked. Make Home or Now Playing your own and this side fills with things to add."],
+  ["inspector", "The theme's look: colours, lettering, the picture behind the lists. Pick a part of a screen you drew and its settings show here. Drag the left edge to make this side wider."],
+  ["save", "When you're happy, put it on your player. Your themes are kept in this browser, under Themes."],
 ];
 const CHROME_ROLES = [["header_top", "Title bar, top"], ["header_background", "Title bar"], ["header_text", "Title"]];
 
@@ -126,7 +131,8 @@ const state = {
   stash: {},
   open: new Set(),
   draftFailed: false,
-  step: "start",
+  panel: "look",
+  look: new Set(["colours"]),
   screen: "home",
   turn: 0,
   accent: 0,
@@ -216,12 +222,17 @@ function restore(text) {
   state.picked = currentDesign() && findElement(currentDesign(), state.picked) ? state.picked : null;
 }
 
+function designStep() {
+  return Object.keys(DESIGNS).find((step) => DESIGNS[step].screen === state.screen) ?? null;
+}
+
 function currentDesign() {
-  return DESIGNS[state.step] ? state.designs[state.step] : null;
+  const step = designStep();
+  return step ? state.designs[step] : null;
 }
 
 function designScreen() {
-  return DESIGNS[state.step]?.screen ?? "playing";
+  return DESIGNS[designStep()]?.screen ?? "playing";
 }
 
 function record() {
@@ -284,6 +295,7 @@ function openKept(id) {
   restore(entry.snapshot);
   state.stash = {};
   state.picked = null;
+  state.panel = "look";
   freshHistory();
   keepNow();
   restart();
@@ -299,11 +311,12 @@ function newKept() {
   state.designs = { playing: null, home: null };
   state.stash = {};
   state.picked = null;
+  state.panel = "look";
   freshHistory();
   keepNow();
   restart();
   render();
-  say("A new theme. Your other themes are under My themes.");
+  say("A new theme. Your other themes are under Themes.");
 }
 
 function ago(time) {
@@ -529,7 +542,7 @@ function changed({ rebuild = false } = {}) {
 function refreshNotices() {
   const box = inspector.querySelector("[data-notice]");
   if (box) {
-    box.replaceWith(noticeBox());
+    box.replaceWith(noticeBox(box.dataset.notice === "colours"));
   }
   const memory = inspector.querySelector("[data-memory]");
   if (memory) {
@@ -549,15 +562,16 @@ function plainNotice(text) {
   return match ? el("li", { title: `Contrast ${match[2]}; it should be at least ${match[3]}` }, `${match[1]} is hard to read against what's behind it`) : el("li", {}, text);
 }
 
-function noticeBox() {
+function noticeBox(inColours = false) {
   const found = lint(state.theme, state.schema);
+  const where = inColours ? "colours" : "";
   if (found.length === 0) {
-    return el("div", { "data-notice": "" });
+    return el("div", { "data-notice": where });
   }
-  return el("div", { class: "notice", "data-notice": "" },
+  return el("div", { class: "notice", "data-notice": where },
     found.length === 1 ? "One thing may be hard to read:" : `${found.length} things may be hard to read:`,
     el("ul", {}, found.map(plainNotice)),
-    state.step === "colours" ? null : el("button", { type: "button", onclick: () => goTo("colours") }, "Fix it in Colours"));
+    inColours ? null : el("button", { type: "button", onclick: () => showLook("colours") }, "Fix it in Colours"));
 }
 
 function readingChecks(role) {
@@ -853,32 +867,14 @@ function slug(name) {
   return (tidy || "theme").slice(0, SLUG_LETTERS).replace(/-+$/, "");
 }
 
-function panelStart() {
-  const name = el("input", { value: state.theme.name, maxlength: NAME_BYTES });
-  name.addEventListener("input", () => {
-    state.theme.name = fitBytes(name, NAME_BYTES);
-    $("name").value = name.value;
-    changed();
-  });
-  const about = el("input", { value: state.theme.description ?? "", maxlength: 120, placeholder: "A line about it" });
-  about.addEventListener("input", () => {
-    state.theme.description = about.value;
-    remember();
-  });
-  const author = el("input", { value: state.theme.author ?? "", maxlength: 40, placeholder: "Your name" });
-  author.addEventListener("input", () => {
-    state.theme.author = author.value;
-    remember();
-  });
+function panelThemes() {
   const starts = el("div", { class: "starts" }, state.schema.samples.map((sample) =>
     el("button", { type: "button", onclick: () => openSample(sample) },
       el("span", { class: "thumb", style: `background-image: url("previews/${sample}.png")` }),
       el("span", {}, sampleName(sample)))));
   return [
-    el("h2", {}, "Make a theme"),
-    el("p", { class: "lead" }, "Everything you change shows on the player straight away. When you're happy, download it and copy it to the Themes folder on your card."),
-    group(field("Name", name), field("Made by", author, "Shown in the gallery if you share it"),
-      field("Description", about, "One line for the gallery")),
+    el("h2", {}, "Themes"),
+    el("p", { class: "lead" }, "Begin from one of these, or go back to one you made earlier. The theme you're making now is kept first."),
     el("h3", {}, "Begin from"),
     starts,
     el("div", { class: "actions" },
@@ -914,7 +910,7 @@ function panelColours() {
   return [
     el("h2", {}, "Colours"),
     el("p", { class: "lead" }, "Click something on the screen to jump to its colour."),
-    noticeBox(),
+    noticeBox(true),
     ...pictureColours(),
     ...groups.flat(),
     el("h3", {}, "Cover Flow"),
@@ -1007,7 +1003,7 @@ function panelShapes() {
   });
   return [
     el("h2", {}, "Lists & shapes"),
-    el("p", { class: "lead" }, "The boxes the player draws its lists, title bar and messages with. Colours come from the Colours step."),
+    el("p", { class: "lead" }, "The boxes the player draws its lists, title bar and messages with. Their colours are under Colours."),
     el("h3", {}, "Selected row"),
     group(...boxFields(boxes[state.theme.selection] ?? boxes.selection)),
     el("h3", {}, "Title bar"),
@@ -1019,7 +1015,7 @@ function panelShapes() {
     group(...boxFields(boxes.section)),
     el("h3", {}, "Home"),
     state.designs.home
-      ? el("p", { class: "hint" }, "Your own Home drawing decides what goes on the Home screen. Change it in the Home step.")
+      ? el("p", { class: "hint" }, "Your own Home drawing decides what goes on the Home screen. Change it on the Home screen itself.")
       : group(field("Album art beside the menu", toggle(state.theme.home_art !== false, (shown) => {
         state.theme.home_art = shown;
         changed();
@@ -1030,21 +1026,21 @@ function panelShapes() {
   ];
 }
 
-function panelLegacy(title, lead, build) {
+function panelLegacy(section, build, openFirst = false) {
   const host = el("div", { class: "legacy" });
   build(host, state.theme, state.schema, () => changed());
   host.querySelectorAll("details").forEach((details, index) => {
-    const key = `${state.step}:${index}`;
-    details.open = state.open.has(key);
+    const key = `${openFirst ? "shut:" : ""}${section}:${index}`;
+    details.open = state.open.has(key) !== openFirst;
     details.addEventListener("toggle", () => {
-      if (details.open) {
+      if (details.open !== openFirst) {
         state.open.add(key);
       } else {
         state.open.delete(key);
       }
     });
   });
-  return [el("h2", {}, title), el("p", { class: "lead" }, lead), host];
+  return [el("h2", {}, section), el("p", { class: "lead" }, LOOK_LEADS[section]), host];
 }
 
 const FONT_NAMES = { title: "Titles font", body: "List text font", small: "Small text font" };
@@ -1057,6 +1053,11 @@ const LICENCES = [
 
 function kilobytes(bytes) {
   return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function share(bytes, limit) {
+  const part = (bytes * 100) / limit;
+  return `${part > 0 && part < 1 ? "under 1" : Math.round(part)}%`;
 }
 
 function memoryBar() {
@@ -1074,28 +1075,30 @@ function memoryBar() {
   ].filter(([, bytes]) => bytes > 0);
   const over = parts.used > parts.limit;
   const scale = Math.max(parts.limit, parts.used);
-  const bar = el("div", { class: "memory-track", role: "img", "aria-label": `${kilobytes(parts.used)} of ${kilobytes(parts.limit)} used` },
+  const used = share(parts.used, parts.limit);
+  const bar = el("div", { class: "memory-track", role: "img", "aria-label": `${used} of the player's room for pictures and fonts used`, title: `${kilobytes(parts.used)} of ${kilobytes(parts.limit)}` },
     pieces.map(([label, bytes], index) => el("span", {
       class: `memory-part memory-part-${index}`,
       style: `width: ${(bytes * 100) / scale}%`,
       title: `${label}: ${kilobytes(bytes)}`,
     })));
   const legend = el("ul", { class: "memory-legend" }, pieces.map(([label, bytes], index) =>
-    el("li", {}, el("span", { class: `memory-dot memory-part-${index}` }), `${label} ${kilobytes(bytes)}`)));
+    el("li", {}, el("span", { class: `memory-dot memory-part-${index}` }), `${label} ${share(bytes, parts.limit)}`)));
   const box = el("div", { class: over ? "memory over" : "memory", "data-memory": "" },
     el("p", { class: "memory-total" }, over
-      ? `Too much: ${kilobytes(parts.used)} of the player's ${kilobytes(parts.limit)} for pictures and fonts`
-      : `${kilobytes(parts.used)} of the player's ${kilobytes(parts.limit)} for pictures and fonts`),
+      ? `Too much: the pictures and fonts need ${used} of the player's room for them`
+      : pieces.length
+        ? `Pictures and fonts use ${used} of the player's room for them`
+        : "The player has room for a wallpaper and your own fonts"),
     bar, pieces.length ? legend : null);
   if (over) {
-    const short = parts.used - parts.limit;
     box.append(
-      el("p", { class: "hint" }, `Free up ${kilobytes(short)}: make a font smaller, use a smaller or repeating wallpaper, or remove one of these.`),
+      el("p", { class: "hint" }, "Make a font smaller, use a smaller or repeating wallpaper, or remove one of these."),
       el("div", { class: "actions" }, pieces.map(([label, bytes, drop]) => el("button", { type: "button", onclick: () => {
         drop();
         changed({ rebuild: true });
         say(`Removed the ${label.toLowerCase()}. Undo brings it back.`);
-      } }, `Remove the ${label.toLowerCase()} (${kilobytes(bytes)})`))),
+      } }, `Remove the ${label.toLowerCase()} (${share(bytes, parts.limit)})`))),
     );
   }
   return box;
@@ -1132,25 +1135,32 @@ function withMemory(parts) {
 
 function panelShare() {
   const bytes = apply();
-  const memory = memoryParts(state.theme, state.schema).used;
-  const size = bytes ? `The theme file is ${kilobytes(bytes.length)}` : "";
-  const used = memory ? `, and its pictures and fonts use ${kilobytes(memory)} of the player's ${kilobytes(state.schema.asset_memory)}` : "";
+  const about = el("input", { value: state.theme.description ?? "", maxlength: 120, placeholder: "A line about it" });
+  about.addEventListener("input", () => {
+    state.theme.description = about.value;
+    remember();
+  });
+  const author = el("input", { value: state.theme.author ?? "", maxlength: 40, placeholder: "Your name" });
+  author.addEventListener("input", () => {
+    state.theme.author = author.value;
+    remember();
+  });
   return [
-    el("h2", {}, "Save & share"),
-    el("p", { class: "lead" }, "Put the theme on your player, or share it with everyone."),
+    el("h2", {}, "Put it on your player"),
     noticeBox(),
-    el("h3", {}, "On your player"),
-    el("ol", { class: "hint" },
-      el("li", {}, "Download the theme file."),
-      el("li", {}, "Connect the player and copy the file into a folder called Themes on the microSD card."),
-      el("li", {}, "On the player, open Settings, Display, Theme.")),
+    el("ol", { class: "steps-list" },
+      el("li", {}, "Save the theme file."),
+      el("li", {}, "Plug in the player and copy the file into the Themes folder on its card. Make the folder if it isn't there."),
+      el("li", {}, "On the player, open Settings, Display, Theme and pick it.")),
     el("div", { class: "actions" },
-      el("button", { type: "button", class: "primary", onclick: download }, "Download for my player"),
-      el("button", { type: "button", onclick: downloadSource }, "Save an editable copy")),
-    el("p", { class: "hint" }, bytes ? `${size}${used}.` : ""),
-    licenceField(),
-    el("h3", {}, "With everyone"),
-    el("p", { class: "hint" }, "Download the source and add it to the themes folder of the EchoPod project in a pull request. Once it's merged, it appears in the gallery."),
+      el("button", { type: "button", class: "primary", disabled: !bytes, onclick: download }, "Save the theme file")),
+    ...(licenceField() ?? []),
+    el("h3", {}, "Share it with everyone"),
+    el("p", { class: "hint" }, "The gallery's themes are kept with the EchoPod project. Save an editable copy and send it there to have yours added."),
+    group(field("Made by", author, "Shown in the gallery"), field("Description", about, "One line for the gallery")),
+    el("div", { class: "actions" },
+      el("button", { type: "button", onclick: downloadSource }, "Save an editable copy"),
+      el("a", { class: "link", href: SHARE_GUIDE, target: "_blank", rel: "noopener" }, "How to send it in")),
   ];
 }
 
@@ -1163,7 +1173,7 @@ function handWritten(step) {
 }
 
 function setMode(mode) {
-  const step = state.step;
+  const step = designStep();
   const { key, screen } = DESIGNS[step];
   if (handWritten(step)) {
     state.stash[step] = state.theme[key];
@@ -1193,7 +1203,7 @@ function designFrom(step) {
 function tileIcons() {
   const added = addTileIcons(state.theme, state.schema);
   if (added) {
-    say("Added ready-made icons for the tiles. Redraw them in Icons.");
+    say("Added ready-made icons for the tiles. Redraw them under Icons.");
   }
   return added;
 }
@@ -1206,7 +1216,7 @@ function startFrom(step, name, label) {
   if (!fits()) {
     say("That drawing doesn't fit with the rest of this theme. Make room by removing a picture or a font.", true);
   } else {
-    say(`Started again from ${label}.${icons ? " Its icons are in Icons, ready to redraw." : ""} Undo brings back your drawing.`);
+    say(`Started again from ${label}.${icons ? " Its icons are under Icons, ready to redraw." : ""} Undo brings back your drawing.`);
   }
   changed({ rebuild: true });
   restart();
@@ -1235,7 +1245,7 @@ function scriptPanel(step) {
     return row;
   });
   const parts = [
-    el("p", { class: "hint" }, "This screen comes with the theme. Change its colours here, or choose “My own drawing” to draw a screen of your own."),
+    el("p", { class: "hint" }, "This screen came with the theme. Change its colours here, or make the screen your own to move things around."),
   ];
   if (colours.length > 0) {
     parts.push(el("h3", {}, "Its colours"), group(...colours));
@@ -1254,73 +1264,153 @@ function scriptPanel(step) {
   return parts;
 }
 
-function panelDesign(step) {
+function modeButtons(step) {
+  const buttons = [];
+  if (state.designs[step] || handWritten(step)) {
+    buttons.push(el("button", { type: "button", onclick: () => setMode("standard") }, "The player's own"));
+  }
+  if (state.stash[step] && !handWritten(step)) {
+    buttons.push(el("button", { type: "button", onclick: () => setMode("script") }, "This theme's own"));
+  }
+  return buttons;
+}
+
+function shelfParts() {
+  const step = designStep();
+  if (!step) {
+    return [
+      el("h2", {}, SCREENS.find(([id]) => id === state.screen)[1]),
+      el("p", { class: "lead" }, "The player draws this screen itself. Click anything on it to change its colour."),
+      el("p", { class: "hint" }, "Its rows, title bar and spacing are under Look."),
+    ];
+  }
   const config = DESIGNS[step];
   const design = state.designs[step];
-  const scripted = handWritten(step);
-  const mode = design ? "design" : scripted ? "script" : "standard";
-  const modes = [["standard", "The player's own"]];
-  if (scripted || state.stash[step]) {
-    modes.push(["script", "This theme's own"]);
-  }
-  modes.push(["design", "My own drawing"]);
-  const parts = [
-    el("h2", {}, config.title),
-    el("p", { class: "lead" }, config.lead),
-    group(el("div", { class: "field stack" }, chips(modes, mode, setMode))),
-  ];
-  if (scripted) {
-    return [...parts, ...scriptPanel(step)];
-  }
   if (!design) {
-    return parts;
+    return [
+      el("h2", {}, config.title),
+      el("p", { class: "lead" }, handWritten(step)
+        ? "This screen came with the theme. Click it to change its colours."
+        : config.standard),
+      el("div", { class: "actions" },
+        el("button", { type: "button", class: "primary", onclick: () => setMode("design") }, "Make it my own"),
+        ...modeButtons(step)),
+      el("p", { class: "hint" }, "Making it your own gives you every part of this screen to move, resize, recolour and add to."),
+    ];
   }
   let menu = false;
   walk(design.elements, (item) => {
     menu ||= !item.hidden && (item.kind === "menu" || item.repeat?.count === "items");
   });
-  if (config.screen === "home" && !menu) {
-    parts.push(el("p", { class: "notice" }, "This Home screen shows no menu. The buttons still move through Music, Settings and the rest, so add a Menu."));
-  }
-  parts.push(
-    ...drawer.panel(config.screen),
-    el("h3", {}, "Start again from"),
+  const shortcuts = el("details", { class: "more" }, el("summary", {}, "Keyboard and mouse shortcuts"),
+    el("p", { class: "hint shortcuts" }, "Shift-click, or drag across an empty or locked part, to pick several parts. Ctrl+C and Ctrl+V copy parts, also between Home and Now Playing; Ctrl+G groups, Ctrl+D duplicates, Delete removes. Hold Alt while dragging to place freely, without lining up."));
+  return [
+    el("h2", {}, "Add to this screen"),
+    el("p", { class: "lead" }, "Click one and it lands on the screen, ready to move."),
+    config.screen === "home" && !menu
+      ? el("p", { class: "notice" }, "This Home screen shows no menu. The buttons still move through Music, Settings and the rest, so add a Menu.")
+      : null,
+    ...drawer.adding(config.screen),
+    el("h3", { class: "keep" }, "On this screen"),
+    ...drawer.parts(),
+    el("h3", { class: "keep" }, "Start again from"),
     el("p", { class: "hint" }, "Replaces this drawing. Undo brings it back."),
     el("div", { class: "actions" }, STARTS[config.screen].map(([name, label]) =>
-      el("button", { type: "button", onclick: () => startFrom(step, name, label) }, label))),
-  );
-  return parts;
+      el("button", { type: "button", onclick: () => startFrom(step, name, label) }, label)), ...modeButtons(step)),
+    shortcuts,
+  ];
 }
 
-function panelFor(step) {
-  switch (step) {
-    case "start":
-      return panelStart();
-    case "colours":
-      return panelColours();
-    case "shapes":
-      return panelShapes();
-    case "home":
-    case "playing":
-      return panelDesign(step);
-    case "wallpaper":
-      return withMemory(panelLegacy("Wallpaper", "A picture behind the lists. It's cut to 16 colours; fade it until the text reads well.", buildWallpapers));
-    case "fonts":
-      return withMemory(panelLegacy("Fonts", "Lettering for titles, lists and small text: draw your own, or use a font file.", buildFonts));
-    case "icons":
-      return panelLegacy("Icons", "The small pictures in the title bar and the lists, and the icons on Home tiles. Drag to draw and right-drag to erase; the theme's colours tint them.", buildIcons);
-    default:
-      return panelShare();
+function renderShelf() {
+  $("shelf").replaceChildren(...shelfParts().flat().filter(Boolean));
+}
+
+function lookParts(id) {
+  const built = {
+    screen: () => [null, null, ...scriptPanel(shownScript())],
+    colours: () => panelColours(),
+    shapes: () => panelShapes(),
+    wallpaper: () => withMemory(panelLegacy("wallpaper", buildWallpapers, true)),
+    fonts: () => withMemory(panelLegacy("fonts", buildFonts, true)),
+    icons: () => panelLegacy("icons", buildIcons),
+  }[id]();
+  const [, lead, ...rest] = built;
+  return [lead && id !== "colours" ? el("p", { class: "hint look-lead" }, lead.textContent) : null, ...rest];
+}
+
+function keepLook() {
+  try {
+    localStorage.setItem(LOOK_OPEN, JSON.stringify([...state.look]));
+  } catch {
+    return;
   }
 }
 
-function renderSteps() {
-  $("steps").replaceChildren(...STEPS.map((step) => el("button", {
-    type: "button",
-    "aria-current": step.id === state.step ? "step" : null,
-    title: step.label,
-    onclick: () => goTo(step.id),
-  }, icon(step.icon), el("span", {}, step.label))));
+function toggleLook(id) {
+  const opening = !state.look.has(id);
+  state.look = new Set(opening ? [id] : []);
+  keepLook();
+  const wanted = LOOK.find((entry) => entry.id === id)?.screen;
+  if (opening && wanted && state.screen === "playing") {
+    state.screen = wanted;
+    restart();
+  }
+  render();
+  if (opening) {
+    inspector.querySelector(`[data-look="${id}"]`)?.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function showLook(id) {
+  state.panel = "look";
+  state.picked = null;
+  state.also = null;
+  state.look = new Set([id]);
+  keepLook();
+  render();
+  inspector.querySelector(`[data-look="${id}"]`)?.scrollIntoView({ block: "start" });
+}
+
+function lookSection({ id, label }) {
+  const open = state.look.has(id);
+  const head = el("button", { type: "button", class: "look-head", "aria-expanded": String(open), onclick: () => toggleLook(id) }, label);
+  const section = el("section", { class: "look-section", "data-look": id }, el("h3", { class: "look-title keep" }, head));
+  if (open) {
+    const body = el("div", { class: "look-body" }, ...lookParts(id).flat().filter(Boolean));
+    foldSections(body, id);
+    section.append(body);
+  }
+  return section;
+}
+
+function panelLook() {
+  const sections = shownScript() ? [OWN_SCREEN, ...LOOK] : LOOK;
+  return [
+    el("h2", {}, "Look"),
+    el("p", { class: "lead" }, "Colours, lettering and pictures for the whole theme. Click anything on a screen the player draws to jump to its colour."),
+    ...sections.map(lookSection),
+  ];
+}
+
+function backToLook() {
+  return el("button", { type: "button", class: "back", onclick: () => {
+    state.panel = "look";
+    render();
+  } }, icon("M12 5 7 10l5 5"), "Back to the look");
+}
+
+function panelRight() {
+  const part = designing() ? drawer.settings(designScreen()) : [];
+  if (part.length > 0) {
+    return part;
+  }
+  if (state.panel === "themes") {
+    return [backToLook(), ...panelThemes()];
+  }
+  if (state.panel === "share") {
+    return [backToLook(), ...panelShare()];
+  }
+  return panelLook();
 }
 
 function renderScreens() {
@@ -1339,11 +1429,11 @@ function renderScreens() {
   }
 }
 
-function foldSections() {
+function foldSections(host, prefix) {
   let body = null;
-  for (const node of [...inspector.children]) {
+  for (const node of [...host.children]) {
     if (node.tagName === "H3" && !node.classList.contains("keep")) {
-      const key = `${state.step}:${node.textContent}`;
+      const key = `${prefix}:${node.textContent}`;
       const shut = state.folded.has(key);
       body = el("div", { class: "fold-body", hidden: shut });
       const head = el("button", { type: "button", class: "fold-head", "aria-expanded": String(!shut) }, node.textContent);
@@ -1388,11 +1478,17 @@ function unfoldTo(node) {
 
 function render() {
   refreshSwatches();
-  renderSteps();
   renderScreens();
+  renderShelf();
   $("name").value = state.theme.name;
-  inspector.replaceChildren(...panelFor(state.step));
-  foldSections();
+  const picking = designing() && Boolean(state.picked);
+  const panel = picking ? "look" : state.panel;
+  inspector.replaceChildren(...panelRight().flat().filter(Boolean));
+  if (!picking && panel !== "look") {
+    foldSections(inspector, panel === "themes" ? "start" : panel);
+  }
+  $("themes").setAttribute("aria-pressed", String(panel === "themes"));
+  $("save").setAttribute("aria-pressed", String(panel === "share"));
   $("hint").textContent = designing()
     ? "Drag to move, drag the corner to resize. Arrow keys nudge the picked part."
     : "Click anything on the screen to change its colour.";
@@ -1400,21 +1496,16 @@ function render() {
   drawOverlay();
 }
 
-function goTo(step) {
-  state.step = step;
+function showPanel(panel) {
+  state.panel = state.panel === panel ? "look" : panel;
   state.picked = null;
-  const screen = DESIGNS[step]?.screen;
-  if (screen && state.screen !== screen) {
-    state.screen = screen;
-    restart();
-  }
+  state.also = null;
   render();
   inspector.scrollTop = 0;
 }
 
 function designing() {
-  const config = DESIGNS[state.step];
-  return Boolean(config && state.designs[state.step] && state.screen === config.screen);
+  return Boolean(currentDesign());
 }
 
 function restart() {
@@ -1670,9 +1761,11 @@ function closestRole(point, candidates) {
 }
 
 function jumpToRole(role) {
-  const [kind, step, name] = role.split(":");
+  const [kind, , name] = role.split(":");
   const own = kind === "script" || kind === "chrome";
-  state.step = own ? step : "colours";
+  state.panel = "look";
+  state.look = new Set([own ? "screen" : "colours"]);
+  keepLook();
   render();
   const row = own
     ? inspector.querySelector(`[data-${kind}="${name}"]`)
@@ -1685,7 +1778,7 @@ function jumpToRole(role) {
 }
 
 function setPanel(width, keepIt = true) {
-  const room = document.querySelector(".app").clientWidth - STAGE_LEAST - 64;
+  const room = document.querySelector(".app").clientWidth - STAGE_LEAST - $("shelf").offsetWidth;
   const shown = Math.round(Math.max(PANEL_LEAST, Math.min(PANEL_MOST, room, width)));
   document.documentElement.style.setProperty("--panel", `${shown}px`);
   $("resizer").setAttribute("aria-valuenow", String(shown));
@@ -1709,6 +1802,7 @@ function wirePanel() {
   try {
     saved = Number(localStorage.getItem(PANEL)) || PANEL_DEFAULT;
     state.folded = new Set(JSON.parse(localStorage.getItem(FOLDED) ?? "[]"));
+    state.look = new Set(JSON.parse(localStorage.getItem(LOOK_OPEN) ?? '["colours"]'));
   } catch {
     saved = PANEL_DEFAULT;
   }
@@ -1843,12 +1937,21 @@ function startTour(at = 0) {
   document.body.append(bubble);
   const spot = target.getBoundingClientRect();
   const box = bubble.getBoundingClientRect();
-  const below = spot.bottom + 12 + box.height < window.innerHeight;
-  const left = Math.max(12, Math.min(window.innerWidth - box.width - 12, spot.left + spot.width / 2 - box.width / 2));
-  const top = below ? spot.bottom + 12 : Math.max(12, spot.top + Math.min(spot.height / 2, 120) - box.height / 2);
-  const beside = !below && spot.left > box.width + 24 ? spot.left - box.width - 12 : left;
-  bubble.style.left = `${below ? left : beside}px`;
-  bubble.style.top = `${top}px`;
+  const gap = 12;
+  const across = Math.max(gap, Math.min(window.innerWidth - box.width - gap, spot.left + spot.width / 2 - box.width / 2));
+  const down = Math.max(gap, Math.min(window.innerHeight - box.height - gap, spot.top + Math.min(spot.height / 2, 160) - box.height / 2));
+  let place = [across, down];
+  if (spot.bottom + gap + box.height < window.innerHeight) {
+    place = [across, spot.bottom + gap];
+  } else if (spot.right + gap + box.width < window.innerWidth) {
+    place = [spot.right + gap, down];
+  } else if (spot.left - gap - box.width > 0) {
+    place = [spot.left - gap - box.width, down];
+  } else if (spot.top - gap - box.height > 0) {
+    place = [across, spot.top - gap - box.height];
+  }
+  bubble.style.left = `${place[0]}px`;
+  bubble.style.top = `${place[1]}px`;
   bubble.querySelector(".primary").focus();
 }
 
@@ -1868,9 +1971,9 @@ function welcome(returning) {
   const card = el("div", { class: "welcome", role: "dialog", "aria-label": "Welcome" },
     el("h2", {}, "Make your own EchoPod theme"),
     el("ol", {},
-      el("li", {}, "Begin from one of the themes, or from scratch."),
-      el("li", {}, "Change its colours, draw Home and Now Playing, add a wallpaper, fonts and icons."),
-      el("li", {}, "Download it and copy it to the Themes folder on your card.")),
+      el("li", {}, "Set its colours, lettering and wallpaper on the right."),
+      el("li", {}, "Open Home or Now Playing above the screen and make them your own: move things, add things."),
+      el("li", {}, "Put it on your player.")),
     el("p", { class: "hint" }, "Nothing to install, and your work is kept in this browser."),
     el("div", { class: "actions" },
       el("button", { type: "button", class: "primary", onclick: () => {
@@ -1887,10 +1990,6 @@ function welcome(returning) {
 function wireOverlay() {
   overlay.addEventListener("pointerdown", (event) => {
     const point = pointer(event);
-    const drawn = Object.keys(DESIGNS).find((step) => DESIGNS[step].screen === state.screen && state.designs[step]);
-    if (!designing() && drawn) {
-      goTo(drawn);
-    }
     if (!designing()) {
       event.preventDefault();
       const role = roleAt(point);
@@ -1902,6 +2001,7 @@ function wireOverlay() {
       canvas.focus({ preventScroll: true });
       return;
     }
+    state.panel = "look";
     if (drawer.down(point, { add: event.shiftKey || event.ctrlKey || event.metaKey })) {
       overlay.setPointerCapture(event.pointerId);
     }
@@ -1971,6 +2071,7 @@ function wear(bytes) {
     };
     state.stash = {};
     state.picked = null;
+    state.panel = "look";
     restart();
     remember();
     render();
@@ -2021,7 +2122,8 @@ function wireControls() {
     state.theme.name = event.target.value;
     changed();
   });
-  $("save").addEventListener("click", download);
+  $("save").addEventListener("click", () => showPanel("share"));
+  $("themes").addEventListener("click", () => showPanel("themes"));
   $("undo").addEventListener("click", () => travel(true));
   $("redo").addEventListener("click", () => travel(false));
   $("picker").addEventListener("change", async () => {

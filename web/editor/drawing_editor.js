@@ -1132,7 +1132,7 @@ export function drawingEditor(ctx) {
           words.addEventListener("input", () => {
             item.custom = words.value;
             ctx.changed();
-            const named = ctx.inspector.querySelector('.layers [aria-selected="true"] span');
+            const named = document.querySelector('.layers [aria-selected="true"] span');
             if (named) {
               named.textContent = nameOf(item);
             }
@@ -1479,28 +1479,34 @@ export function drawingEditor(ctx) {
     return list;
   }
 
-  function panel(screen) {
+  function settings(screen) {
     const item = picked();
     const items = chosen();
-    const other = shape() === "wide" ? "upright" : "sideways";
-    const settings = items.length > 1 ? selectionPanel(items) : item ? itemPanel(item, screen) : [];
+    const shown = items.length > 1 ? selectionPanel(items) : item ? itemPanel(item, screen) : [];
     if (item && settingsShown !== item.id) {
-      requestAnimationFrame(() => settings[0]?.scrollIntoView({ block: "nearest" }));
+      requestAnimationFrame(() => shown[0]?.scrollIntoView({ block: "nearest" }));
     }
     settingsShown = item?.id ?? null;
+    return shown;
+  }
+
+  function parts() {
+    const other = shape() === "wide" ? "upright" : "sideways";
     return [
-      ...settings,
-      el("h3", { class: "keep" }, "On the screen, back to front"),
-      el("p", { class: "hint" }, `You're drawing the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to draw the ${other} one.`),
+      el("p", { class: "hint" }, `Back to front, on the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to draw the ${other} one.`),
       partList(),
-      el("p", { class: "hint" }, item?.kind === "group" ? "New parts go inside the picked group." : "Pick a group first to add parts inside it."),
-      ...addMenu(screen),
       el("div", { class: "actions" },
         heldParts() ? el("button", { type: "button", onclick: () => paste() }, "Paste") : null,
         el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} drawing`)),
-      el("p", { class: "hint shortcuts" }, "Shift-click, or drag across an empty or locked part, to pick several parts. Ctrl+C and Ctrl+V copy parts, also between Home and Now Playing; Ctrl+G groups, Ctrl+D duplicates, Delete removes. Hold Alt while dragging to place freely, without lining up."),
     ];
   }
 
-  return { panel, overlay, down, deeper, move, up, nudge, key, lineUp, spread, nameOf, colorOf, walk };
+  function adding(screen) {
+    return [
+      ...addMenu(screen),
+      el("p", { class: "hint" }, picked()?.kind === "group" ? "New parts go inside the picked group." : "Pick a group first to add parts inside it."),
+    ];
+  }
+
+  return { settings, parts, adding, overlay, down, deeper, move, up, nudge, key, lineUp, spread, nameOf, colorOf, walk };
 }

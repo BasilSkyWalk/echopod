@@ -137,4 +137,8 @@ assert.equal(one.at.wide.x, 150, "one part lines up with the middle of the scree
 tidy.editor.lineUp("bottom");
 assert.equal(one.at.wide.y, 126, "and with its bottom");
 
+tidy.editor.key(key("escape"));
+assert.deepEqual(tidy.editor.settings("playing"), [], "with nothing picked there are no part settings to show");
+assert.deepEqual(["adding", "parts", "settings"].filter((name) => typeof tidy.editor[name] !== "function"), [], "the page gets the add menu, the parts list and the settings apart");
+
 console.log("ok: drawing tools");
