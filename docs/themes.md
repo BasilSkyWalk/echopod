@@ -1,6 +1,6 @@
 # Making and sharing themes
 
-A theme file changes EchoPod's colours, the shape of its bars and boxes, and a few spacings. This page covers using one, making one and sharing it. How the firmware reads the file is in `docs/architecture.md` under "Theme files".
+A theme file changes EchoPod's colours, the shape of its bars and boxes, and a few spacings. The quickest way to make one is the theme editor, a web page at https://basilskywalk.github.io/echopod/; themes other people made are in its gallery at https://basilskywalk.github.io/echopod/gallery.html. This page covers using a theme, making one and sharing it. How the firmware reads the file is in `docs/architecture.md` under "Theme files".
 
 ## Using a theme
 
