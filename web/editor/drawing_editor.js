@@ -208,6 +208,12 @@ export function drawingEditor(ctx) {
     return { x: 0, y: area.top, w: area.width, h: area.height };
   }
 
+  function frame() {
+    const picks = new Set(chosen());
+    const boxes = placements().filter((place) => picks.has(place.item)).map(boxOf);
+    return boxes.length ? union(boxes) : null;
+  }
+
   function snapTargets(moving) {
     const area = AREAS[shape()];
     const xs = [0, area.width / 2, area.width];
@@ -1588,5 +1594,5 @@ export function drawingEditor(ctx) {
     return addMenu(screen);
   }
 
-  return { settings, parts, adding, add, overlay, down, deeper, move, up, nudge, key, lineUp, spread, nameOf, colorOf, walk };
+  return { settings, parts, adding, add, frame, picks: chosen, dragging: () => Boolean(drag), removeChosen, duplicateChosen, groupChosen, overlay, down, deeper, move, up, nudge, key, lineUp, spread, nameOf, colorOf, walk };
 }

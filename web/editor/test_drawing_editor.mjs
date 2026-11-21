@@ -141,6 +141,16 @@ tidy.editor.key(key("escape"));
 assert.deepEqual(tidy.editor.settings("playing"), [], "with nothing picked there are no part settings to show");
 assert.deepEqual(["adding", "parts", "settings"].filter((name) => typeof tidy.editor[name] !== "function"), [], "the page gets the add menu, the parts list and the settings apart");
 
+click(tidy.editor, 155, 155);
+assert.deepEqual(tidy.editor.frame(), { x: 150, y: 150, w: 20, h: 20 }, "the picked part's place on the screen, for the bar beside it");
+assert.deepEqual(tidy.editor.picks().map((item) => item.id), [one.id]);
+tidy.editor.down({ x: 155, y: 155 });
+assert.equal(tidy.editor.dragging(), true);
+tidy.editor.up();
+assert.equal(tidy.editor.dragging(), false);
+tidy.editor.key(key("escape"));
+assert.equal(tidy.editor.frame(), null);
+
 const shelfHome = { current: { version: 2, screen: "home", elements: [
   element("box", box(0, 0, 320, 146), box(0, 0, 170, 280), { locked: true }),
   element("menu", box(0, 0, 176, 146), box(0, 0, 170, 152)),

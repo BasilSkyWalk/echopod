@@ -112,9 +112,14 @@ const TOUR = [
   ["device", "This is the player, running for real. Click anything on it to change it. Ctrl and the mouse wheel, or two fingers, zoom in; drag the space around it to move about."],
   ["playback", "Try your theme playing or paused, part way through a song, with lyrics or a long title."],
   ["shelf", "What's on the screen you picked. Make Home or Now Playing your own and this side fills with things to add."],
-  ["inspector", "The theme's look: colours, lettering, the picture behind the lists. Pick a part of a screen you drew and its settings show here. Drag the left edge to make this side wider."],
+  ["inspector", "The theme's look: colours, lettering, the picture behind the lists. Drag the left edge to make this side wider. Pick a part of a screen you drew and a small bar appears beside it; More on that bar opens every setting here."],
   ["save", "When you're happy, put it on your player. Your themes are kept in this browser, under Themes."],
 ];
+const BAR_COLOURS = [["@text", "Text"], ["@text_secondary", "Soft text"], ["@selection_background", "Accent"], ["@divider", "Lines"], ["@background", "Background"]];
+const BAR_KEYS = { box: "color", circle: "color", line: "color", text: "color", symbol: "color", number: "lit" };
+const BAR_SIZES = [["small", "S", "Small text"], ["medium", "M", "List text"], ["large", "L", "Titles"]];
+const BAR_ALIGN = [["left", "Line up left", "M4 5h12M4 9h7M4 13h10"], ["center", "Line up in the middle", "M4 5h12M6.5 9h7M5 13h10"], ["right", "Line up right", "M4 5h12M9 9h7M6 13h10"]];
+const MAIN_ROLES = { background: "Background", text: "Text", selection_background: "Accent" };
 const CHROME_ROLES = [["header_top", "Title bar, top"], ["header_background", "Title bar"], ["header_text", "Title"]];
 
 const $ = (id) => document.getElementById(id);
@@ -132,6 +137,8 @@ const state = {
   open: new Set(),
   draftFailed: false,
   panel: "look",
+  more: false,
+  spot: null,
   look: new Set(["colours"]),
   screen: "home",
   turn: 0,
@@ -549,6 +556,12 @@ function refreshNotices() {
     memory.replaceWith(memoryBar());
   }
   inspector.querySelector("[data-made]")?.replaceWith(madeDots());
+  const three = mainColours();
+  for (const input of inspector.querySelectorAll("[data-main]")) {
+    if (input !== document.activeElement) {
+      input.value = three[input.dataset.main];
+    }
+  }
   for (const badge of inspector.querySelectorAll("[data-reads]")) {
     const fresh = readingBadge(badge.dataset.reads);
     if (fresh && !badge.contains(document.activeElement)) {
@@ -1482,6 +1495,153 @@ function panelLook() {
   ];
 }
 
+function barChip(label, pressed, act, title) {
+  return el("button", { type: "button", class: "bar-chip", "aria-pressed": pressed === null ? null : String(pressed), title, onclick: act }, label);
+}
+
+function barIcon(title, path, act, pressed = null) {
+  return el("button", { type: "button", class: "bar-icon", title, "aria-label": title, "aria-pressed": pressed === null ? null : String(pressed), onclick: act }, icon(path));
+}
+
+function barGap() {
+  return el("span", { class: "bar-gap", "aria-hidden": "true" });
+}
+
+function barPicker(value, label, set) {
+  const picker = el("input", { type: "color", class: "bar-own", value, list: "swatches", title: label, "aria-label": label });
+  picker.addEventListener("input", () => set(picker.value));
+  picker.addEventListener("change", () => {
+    noteRecent(picker.value);
+    render();
+  });
+  return picker;
+}
+
+function barColours(current, set) {
+  const custom = typeof current === "string" && !current.startsWith("@");
+  return [
+    ...BAR_COLOURS.map(([role, label]) => el("button", {
+      type: "button", class: "bar-dot", title: label, "aria-label": label, "aria-pressed": String(current === role),
+      style: `background: ${shownColour(role.slice(1))}`, onclick: () => set(role, true),
+    })),
+    el("span", { class: custom ? "bar-own-wrap chosen" : "bar-own-wrap" }, barPicker(colorOf(current, state.theme), "Its own colour", (value) => set(value, false))),
+  ];
+}
+
+function partBar() {
+  const picks = designing() ? drawer.picks() : [];
+  if (picks.length === 0) {
+    return null;
+  }
+  const tools = [
+    barChip("More", state.more, () => {
+      state.more = !state.more;
+      render();
+    }, "Every setting for this part"),
+    barIcon("Duplicate", "M7 7h9v9H7zM4 13V4h9", () => drawer.duplicateChosen()),
+    barIcon("Remove", "M5 6h10M8 6V4.5h4V6m-6 0 .7 9.5h6.6L14 6", () => drawer.removeChosen()),
+  ];
+  if (picks.length > 1) {
+    return [el("span", { class: "bar-name" }, `${picks.length} parts`), barChip("Group", null, () => drawer.groupChosen(), "Make them one group"), barGap(), ...tools];
+  }
+  const item = picks[0];
+  const bits = [el("span", { class: "bar-name" }, drawer.nameOf(item))];
+  const key = BAR_KEYS[item.kind];
+  if (key && !(item.kind === "box" && item.fill && item.fill !== "solid")) {
+    bits.push(...barColours(item[key], (value, redraw) => {
+      item[key] = value;
+      changed({ rebuild: redraw });
+    }));
+  }
+  if (item.kind === "text") {
+    const at = item.at[shape()];
+    bits.push(barGap(), ...BAR_SIZES.map(([size, mark, title]) => barChip(mark, (item.size ?? "medium") === size, () => {
+      item.size = size;
+      changed({ rebuild: true });
+    }, title)));
+    if (at) {
+      bits.push(barGap(), ...BAR_ALIGN.map(([align, title, path]) => barIcon(title, path, () => {
+        at.align = align;
+        changed({ rebuild: true });
+      }, (at.align ?? item.align ?? "left") === align)));
+    }
+  }
+  if (item.kind === "cover") {
+    bits.push(...[["square", "Square"], ["circle", "Round"]].map(([form, label]) => barChip(label, (item.shape ?? "square") === form, () => {
+      item.shape = form;
+      changed({ rebuild: true });
+    })));
+  }
+  return [...bits, barGap(), ...tools];
+}
+
+function spotBar() {
+  const spot = state.spot;
+  if (!spot || designing()) {
+    return null;
+  }
+  const [kind, step, name] = spot.role.split(":");
+  const scene = step ? state.theme[DESIGNS[step]?.key] : null;
+  let label = COLOUR_NAMES[spot.role] ?? spot.role;
+  let value = shownColour(spot.role);
+  let set = (shade) => setRole(spot.role, shade);
+  if (kind === "script" && scene) {
+    label = friendlyName(name);
+    value = scriptColours(scene.script).find((entry) => entry.name === name)?.value ?? "#000000";
+    set = (shade) => setScriptColour(step, name, shade);
+  } else if (kind === "chrome" && scene?.chrome) {
+    label = CHROME_ROLES.find(([role]) => role === name)?.[1] ?? name;
+    value = scene.chrome[name] ?? state.theme.colors[name];
+    set = (shade) => {
+      scene.chrome[name] = shade;
+      changed();
+    };
+  } else if (MAIN_ROLES[spot.role]) {
+    const main = spot.role === "selection_background" ? "accent" : spot.role;
+    label = MAIN_ROLES[spot.role];
+    set = (shade) => setMain(main, shade);
+  }
+  return [
+    el("span", { class: "bar-name" }, label),
+    barPicker(value, `${label} colour`, set),
+    barChip("More", null, () => {
+      const role = spot.role;
+      state.spot = null;
+      jumpToRole(role);
+    }, "Find it among all the colours"),
+  ];
+}
+
+function renderBar() {
+  const bar = $("bar");
+  const bits = partBar() ?? spotBar();
+  bar.hidden = !bits;
+  bar.replaceChildren(...(bits ?? []).flat().filter(Boolean));
+  placeBar();
+}
+
+function placeBar() {
+  const bar = $("bar");
+  if (bar.hidden) {
+    return;
+  }
+  const box = designing() ? drawer.frame() : state.spot ? { x: state.spot.x, y: state.spot.y, w: 0, h: 0 } : null;
+  if (!box || drawer.dragging()) {
+    bar.style.visibility = "hidden";
+    return;
+  }
+  const stage = $("stage").getBoundingClientRect();
+  const screen = canvas.getBoundingClientRect();
+  const zoom = screen.width / canvas.width || state.zoom;
+  const left = screen.left - stage.left + (box.x + box.w / 2) * zoom - bar.offsetWidth / 2;
+  const above = screen.top - stage.top + box.y * zoom - bar.offsetHeight - 10;
+  const below = screen.top - stage.top + (box.y + box.h) * zoom + 12;
+  const top = above >= 6 ? above : Math.min(stage.height - bar.offsetHeight - 6, below);
+  bar.style.left = `${Math.max(6, Math.min(stage.width - bar.offsetWidth - 6, left))}px`;
+  bar.style.top = `${Math.max(6, top)}px`;
+  bar.style.visibility = "visible";
+}
+
 function backToLook() {
   return el("button", { type: "button", class: "back", onclick: () => {
     state.panel = "look";
@@ -1490,7 +1650,7 @@ function backToLook() {
 }
 
 function panelRight() {
-  const part = designing() ? drawer.settings(designScreen()) : [];
+  const part = designing() && state.more ? drawer.settings(designScreen()) : [];
   if (part.length > 0) {
     return part;
   }
@@ -1571,7 +1731,7 @@ function render() {
   renderScreens();
   renderShelf();
   $("name").value = state.theme.name;
-  const picking = designing() && Boolean(state.picked);
+  const picking = designing() && state.more && Boolean(state.picked);
   const panel = picking ? "look" : state.panel;
   inspector.replaceChildren(...panelRight().flat().filter(Boolean));
   if (!picking && panel !== "look") {
@@ -1580,9 +1740,10 @@ function render() {
   $("themes").setAttribute("aria-pressed", String(panel === "themes"));
   $("save").setAttribute("aria-pressed", String(panel === "share"));
   $("hint").textContent = designing()
-    ? "Drag to move, drag the corner to resize. Arrow keys nudge the picked part."
+    ? "Click a part to change it. Drag to move, drag the corner to resize; the arrow keys nudge it."
     : "Click anything on the screen to change its colour.";
   overlay.classList.toggle("designing", designing());
+  renderBar();
   drawOverlay();
 }
 
@@ -1599,6 +1760,7 @@ function designing() {
 }
 
 function restart() {
+  state.spot = null;
   state.accent = shownAccent(state.theme, state.accent);
   state.preview.start(state.turn, state.screen, state.accent, 0, state.playback);
   apply();
@@ -1772,6 +1934,7 @@ function drawOverlay() {
   }
   const pen = overlay.getContext("2d");
   pen.clearRect(0, 0, width, height);
+  placeBar();
   if (!designing()) {
     return;
   }
@@ -2086,9 +2249,9 @@ function wireOverlay() {
     if (!designing()) {
       event.preventDefault();
       const role = roleAt(point);
-      if (role) {
-        jumpToRole(role);
-      } else {
+      state.spot = role ? { role, x: point.x, y: point.y } : null;
+      renderBar();
+      if (!role) {
         say("Couldn't tell which colour that is. It may be part of a picture, such as the wallpaper or a cover.");
       }
       canvas.focus({ preventScroll: true });
@@ -2256,7 +2419,17 @@ function wireControls() {
       state.preview.key(keyboard[event.key], false);
     }
   });
+  document.addEventListener("pointerdown", (event) => {
+    if (state.spot && event.target !== overlay && !event.target.closest("#bar")) {
+      state.spot = null;
+      renderBar();
+    }
+  });
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.spot) {
+      state.spot = null;
+      renderBar();
+    }
     if (nudge(event)) {
       return;
     }
