@@ -95,7 +95,7 @@ Starting points stay few: Plain, Tiles and Empty for Home; Plain, the four faces
 
 ## Building it
 
-Stage 1 is built. The rest is still to do.
+Stages 1 to 6 are built. Stage 7, trying it with people, is still to do.
 
 Each stage leaves the editor working and better than before.
 

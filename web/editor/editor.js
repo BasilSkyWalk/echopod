@@ -122,6 +122,7 @@ const BAR_SIZES = [["small", "S", "Small text"], ["medium", "M", "List text"], [
 const BAR_ALIGN = [["left", "Line up left", "M4 5h12M4 9h7M4 13h10"], ["center", "Line up in the middle", "M4 5h12M6.5 9h7M5 13h10"], ["right", "Line up right", "M4 5h12M9 9h7M6 13h10"]];
 const MAIN_ROLES = { background: "Background", text: "Text", selection_background: "Accent" };
 const FOLLOWING_STARTS = ["standard", "empty", "tiles"];
+const FIRST_STARTS = ["dark", "light", "paper"];
 const CHROME_ROLES = [["header_top", "Title bar, top"], ["header_background", "Title bar"], ["header_text", "Title"]];
 
 const $ = (id) => document.getElementById(id);
@@ -2297,22 +2298,35 @@ function welcome(returning) {
   if (welcomed) {
     return;
   }
+  const done = () => {
+    card.remove();
+    try {
+      localStorage.setItem(WELCOMED, "1");
+    } catch {
+      return;
+    }
+  };
+  const begin = async (sample) => {
+    card.remove();
+    if (sample !== FIRST_STARTS[0]) {
+      await openSample(sample);
+    }
+    startTour(0);
+  };
   const card = el("div", { class: "welcome", role: "dialog", "aria-label": "Welcome" },
     el("h2", {}, "Make your own EchoPod theme"),
-    el("ol", {},
-      el("li", {}, "Set its colours, lettering and wallpaper on the right."),
-      el("li", {}, "Open Home or Now Playing above the screen and make them your own: move things, add things."),
-      el("li", {}, "Put it on your player.")),
-    el("p", { class: "hint" }, "Nothing to install, and your work is kept in this browser."),
+    el("p", {}, "What would you like to begin from?"),
+    el("div", { class: "starts" }, FIRST_STARTS.filter((sample) => state.schema.samples.includes(sample)).map((sample) =>
+      el("button", { type: "button", onclick: () => begin(sample) },
+        el("span", { class: "thumb", style: `background-image: url("previews/${sample}.png")` }),
+        el("span", {}, sampleName(sample))))),
+    el("p", { class: "hint" }, "Pick one and a short tour shows you around. Nothing to install, and your work is kept in this browser."),
     el("div", { class: "actions" },
-      el("button", { type: "button", class: "primary", onclick: () => {
-        card.remove();
-        startTour(0);
-      } }, "Show me around"),
       el("button", { type: "button", onclick: () => {
-        card.remove();
-        startTour(TOUR.length);
-      } }, "I'll find my way")));
+        done();
+        showPanel("themes");
+      } }, "More to begin from"),
+      el("button", { type: "button", onclick: done }, "I'll find my way")));
   document.querySelector(".stage").append(card);
 }
 
@@ -2356,7 +2370,7 @@ function wireOverlay() {
 
 function nudge(event) {
   const steps = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-  if (!designing() || !(event.key in steps) || event.target.closest("input, select, textarea, canvas")) {
+  if (!designing() || !(event.key in steps) || event.target.closest?.("input, select, textarea, canvas")) {
     return false;
   }
   const [dx, dy] = steps[event.key];
@@ -2493,7 +2507,7 @@ function wireControls() {
     }
   });
   document.addEventListener("pointerdown", (event) => {
-    if (state.spot && event.target !== overlay && !event.target.closest("#bar")) {
+    if (state.spot && event.target !== overlay && !event.target.closest?.("#bar")) {
       state.spot = null;
       renderBar();
     }
@@ -2506,11 +2520,11 @@ function wireControls() {
     if (nudge(event)) {
       return;
     }
-    if (designing() && !event.target.closest("input, select, textarea, canvas") && drawer.key(event)) {
+    if (designing() && !event.target.closest?.("input, select, textarea, canvas") && drawer.key(event)) {
       event.preventDefault();
       return;
     }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.target.closest("input, textarea")) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.target.closest?.("input, textarea")) {
       event.preventDefault();
       travel(!event.shiftKey);
     }

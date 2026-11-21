@@ -1952,3 +1952,12 @@ details.every-colour > summary {
   padding: 3px 9px;
   font-size: 12.5px;
 }
+
+.welcome .starts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 10px 0;
+}
+
+.welcome > p {
+  margin: 0;
+}
