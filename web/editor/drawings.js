@@ -1,4 +1,4 @@
-import { element, emptyDrawing, readDrawing } from "./drawing.js";
+import { element, emptyDrawing, newElement, readDrawing } from "./drawing.js";
 
 const UNITS_TO_DEGREES = 360 / 256;
 const LIGHTS = 48;
@@ -64,14 +64,27 @@ function tiles(spot, frame, columns, [w, h], name) {
   ] });
 }
 
+const TILE_FRAMES = { wide: { x: 2, y: 3, w: 316, h: 143 }, tall: { x: 3, y: 4, w: 164, h: 275 } };
+const TILE_GAP = 4;
+const TILE_TALL = 90;
+
+export function tilesFor(frames = TILE_FRAMES) {
+  return ["wide", "tall"].filter((shape) => frames[shape]).map((shape) => {
+    const frame = frames[shape];
+    const columns = frame.w >= 240 ? 4 : frame.w >= 110 ? 2 : 1;
+    const rows = Math.max(1, Math.round(frame.h / TILE_TALL));
+    const size = [Math.floor((frame.w - TILE_GAP * (columns - 1)) / columns), Math.floor((frame.h + 1) / rows) - TILE_GAP];
+    return tiles(oneWay(shape), [frame.x, frame.y, frame.w, frame.h], columns, size, shape === "wide" ? "Menu tiles, sideways" : "Menu tiles, upright");
+  });
+}
+
 export function tilesDrawing() {
   return {
     version: 2,
     screen: "home",
     elements: [
       element("box", at(0, 0, 320, 146), at(0, 0, 170, 280), { name: "Background", locked: true, fill: "wallpaper" }),
-      tiles(oneWay("wide"), [2, 3, 316, 143], 4, [76, 68], "Menu tiles, sideways"),
-      tiles(oneWay("tall"), [3, 4, 164, 275], 2, [80, 88], "Menu tiles, upright"),
+      ...tilesFor(),
     ],
   };
 }
@@ -699,4 +712,49 @@ export const READY = {
   record: ["Record player", () => recordPlayer(FACE_COLOURS.turntable, ...same(10, 6, 153, 135))],
   cassette: ["Cassette", () => cassetteSmall(FACE_COLOURS.cassette, same, 8, 8)],
   tiles: ["Menu tiles with icons", () => tiles(same, [0, 0, 160, 143], 2, [78, 68], "Menu tiles"), "home"],
+};
+
+export const SHELF = [
+  ["title", "Song title", () => element("text", ...same(0, 0, 180, 22), { source: "song", size: "large", color: "@text" })],
+  ["artist", "Artist", () => element("text", ...same(0, 0, 180, 20), { source: "artist", color: "@text_secondary" })],
+  ["album", "Album", () => element("text", ...same(0, 0, 180, 20), { source: "album", color: "@text_tertiary" })],
+  ["cover", "Album cover", () => element("cover", ...same(0, 0, 96, 96), { placeholder: "@divider" })],
+  ["progress", "Progress bar and times", READY.progress[1]],
+  ["play", "Play button", READY.play[1]],
+  ["clock", "Big time", READY.clock[1]],
+  ["menu", "Menu as a list", () => element("menu", at(0, 0, 176, 146), at(0, 0, 170, 152), { name: "Menu" }), "home"],
+  ["tiles", "Menu as tiles", () => tilesFor(), "home"],
+  ["words", "My own words", () => element("text", ...same(0, 0, 120, 20), { source: "custom", custom: "Hello", color: "@text" })],
+  ["box", "Box", () => newElement("box")],
+  ["circle", "Circle or ring", () => newElement("circle")],
+  ["line", "Line", () => newElement("line")],
+];
+
+export const SHELF_MORE = [
+  ["lyrics", "Lyrics", () => element("text", ...same(0, 0, 180, 20), { source: "lyric", color: "@text_secondary" })],
+  ["quality", "Audio quality", () => element("text", ...same(0, 0, 180, 16), { source: "format", size: "small", color: "@text_secondary", scroll: false })],
+  ["mark", "Play mark", () => newElement("symbol")],
+  ["number", "Number", () => newElement("number")],
+  ["group", "Group", () => newElement("group")],
+  ["modes", READY.modes[0], READY.modes[1]],
+  ["levels", READY.levels[0], READY.levels[1]],
+  ["vu", READY.vu[0], READY.vu[1]],
+  ["record", READY.record[0], READY.record[1]],
+  ["cassette", READY.cassette[0], READY.cassette[1]],
+];
+
+export const SHELF_ART = {
+  title: '<rect x="6" y="9" width="32" height="6" rx="1.5" fill="currentColor"/>',
+  artist: '<rect x="6" y="10.5" width="24" height="4" rx="1" fill="currentColor" opacity=".6"/>',
+  album: '<rect x="6" y="10.5" width="28" height="4" rx="1" fill="currentColor" opacity=".4"/>',
+  cover: '<rect x="12" y="3" width="20" height="20" rx="2" fill="currentColor" opacity=".3"/><circle cx="22" cy="13" r="5.5" fill="currentColor"/>',
+  progress: '<rect x="4" y="9" width="36" height="3" rx="1.5" fill="currentColor" opacity=".3"/><rect x="4" y="9" width="15" height="3" rx="1.5" fill="currentColor"/><rect x="4" y="15" width="8" height="2.5" fill="currentColor" opacity=".55"/><rect x="32" y="15" width="8" height="2.5" fill="currentColor" opacity=".55"/>',
+  play: '<circle cx="22" cy="13" r="10" fill="currentColor" opacity=".25"/><path d="M19 8v10l8.5-5z" fill="currentColor"/>',
+  clock: '<path d="M7 6h6v14H7zM17 6h6v7h-6zM17 13v7h6M27.5 10v.2M27.5 16v.2M32 6h5v14h-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+  menu: '<rect x="4" y="4" width="36" height="5.5" rx="1" fill="currentColor"/><rect x="4" y="11.5" width="24" height="4" rx="1" fill="currentColor" opacity=".4"/><rect x="4" y="17.5" width="29" height="4" rx="1" fill="currentColor" opacity=".4"/>',
+  tiles: '<rect x="4" y="5" width="10" height="16" rx="1.5" fill="currentColor"/><rect x="17" y="5" width="10" height="16" rx="1.5" fill="currentColor" opacity=".55"/><rect x="30" y="5" width="10" height="16" rx="1.5" fill="currentColor" opacity=".55"/>',
+  words: '<path d="M14 21 22 5l8 16M17 16h10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>',
+  box: '<rect x="8" y="6" width="28" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>',
+  circle: '<circle cx="22" cy="13" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/>',
+  line: '<path d="M9 20 35 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
 };

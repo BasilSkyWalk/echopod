@@ -7,7 +7,7 @@ import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawin
 import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
 import { ACCENT_FAMILY, COLOUR_SETS, mix, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
 import { LIBRARY, VERSION_EVERY_MS, VERSION_LIMIT, addVersion, copyTheme, keep, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
-import { READY, STARTS, drawingFrom, fromDesign, startDrawing } from "./drawings.js";
+import { READY, SHELF, SHELF_ART, SHELF_MORE, STARTS, drawingFrom, fromDesign, startDrawing, tilesFor } from "./drawings.js";
 import { TILE_ICONS, addTileIcons, starterRows } from "./tile_icons.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
@@ -603,3 +603,21 @@ const recoloured = schemeOf("#101114", "#f2f2f5", "#e0469a");
 const before = schemeOf("#101114", "#f2f2f5", "#2f6fdb");
 const reshaded = Object.keys(before).filter((role) => before[role] !== recoloured[role]);
 assert.ok(reshaded.length >= 3 && reshaded.every((role) => ACCENT_FAMILY.includes(role)), "a new accent changes the highlighted row and nothing else");
+
+for (const screen of ["home", "playing"]) {
+  for (const [key, label, make, only] of [...SHELF, ...SHELF_MORE]) {
+    if (only && only !== screen) {
+      continue;
+    }
+    const drawing = startDrawing("empty", screen);
+    drawing.elements.push(...[make(screen)].flat());
+    compileScene(drawingScript(drawing, homeTheme), schema.scene);
+    assert.ok(sceneSize(drawing) < SCENE_ROOM, `${label} fits on ${screen}`);
+    assert.ok(drawing.elements.slice(1).every((item) => item.at.wide || item.at.tall), `${key} has a place`);
+  }
+}
+assert.deepEqual(SHELF.map(([key]) => key).filter((key) => !SHELF_ART[key]), [], "every part on the shelf has a picture");
+const narrow = tilesFor({ wide: { x: 0, y: 0, w: 176, h: 146 }, tall: null });
+assert.equal(narrow.length, 1, "tiles are made only for the screens the menu was on");
+assert.deepEqual([narrow[0].repeat.columns, narrow[0].repeat.dx, narrow[0].repeat.dy], [2, 90, 73], "tiles fill the place the list had");
+assert.deepEqual(narrow[0].at.wide, { x: 0, y: 0, w: 176, h: 146 });

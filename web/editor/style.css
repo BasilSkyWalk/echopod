@@ -1769,3 +1769,53 @@ details.every-colour > summary {
   font-weight: 600;
   margin-bottom: 8px;
 }
+
+.inside {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.parts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.part-btn {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 4px 8px;
+  border-radius: var(--radius);
+  background: var(--sunken);
+  font-size: 12.5px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.part-btn:hover {
+  border-color: var(--focus);
+  background: var(--focus-soft);
+}
+
+.part-art svg {
+  display: block;
+  width: 44px;
+  height: 26px;
+  stroke: none;
+  fill: none;
+}
+
+.shelf details.more .add-menu {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 800px) {
+  .parts-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+}

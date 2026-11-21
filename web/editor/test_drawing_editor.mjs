@@ -141,4 +141,24 @@ tidy.editor.key(key("escape"));
 assert.deepEqual(tidy.editor.settings("playing"), [], "with nothing picked there are no part settings to show");
 assert.deepEqual(["adding", "parts", "settings"].filter((name) => typeof tidy.editor[name] !== "function"), [], "the page gets the add menu, the parts list and the settings apart");
 
+const shelfHome = { current: { version: 2, screen: "home", elements: [
+  element("box", box(0, 0, 320, 146), box(0, 0, 170, 280), { locked: true }),
+  element("menu", box(0, 0, 176, 146), box(0, 0, 170, 152)),
+] } };
+const shelf = editorFor(shelfHome);
+shelf.editor.add("tiles", "home");
+assert.equal(shelfHome.current.elements.some((item) => item.kind === "menu"), false, "tiles take the list's place");
+const tileGroups = shelfHome.current.elements.filter((item) => item.repeat?.count === "items");
+assert.deepEqual(tileGroups.map((item) => item.at.wide ?? item.at.tall), [box(0, 0, 176, 146), box(0, 0, 170, 152)], "in the same spot, both ways up");
+assert.equal(shelf.state.picked, tileGroups[0].id);
+shelf.editor.add("tiles", "home");
+assert.match(shelf.said.at(-1), /already on this screen/);
+shelf.editor.add("menu", "home");
+assert.deepEqual(shelfHome.current.elements.map((item) => item.kind), ["box", "menu"], "and the list takes the tiles' place");
+assert.deepEqual(shelfHome.current.elements[1].at, { wide: box(0, 0, 176, 146), tall: box(0, 0, 170, 152) });
+shelf.editor.add("title", "home");
+shelf.editor.add("title", "home");
+const titles = shelfHome.current.elements.filter((item) => item.source === "song");
+assert.deepEqual(titles.map((item) => item.at.wide.x), [70, 76], "a second part of the same kind lands beside the first, not on it");
+
 console.log("ok: drawing tools");

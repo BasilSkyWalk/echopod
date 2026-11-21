@@ -12,7 +12,7 @@ import {
   newElement,
   walk,
 } from "./drawing.js";
-import { READY } from "./drawings.js";
+import { SHELF, SHELF_ART, SHELF_MORE, tilesFor } from "./drawings.js";
 
 const HANDLE = 7;
 const HIT = 4;
@@ -63,6 +63,7 @@ export function drawingEditor(ctx) {
   let listScroll = 0;
   let shownPick = null;
   let settingsShown = null;
+  let inside = null;
 
   const drawing = () => ctx.drawing();
   const shape = () => ctx.shape();
@@ -975,22 +976,99 @@ export function drawingEditor(ctx) {
     });
   }
 
+  function isMenu(item) {
+    return item.kind === "menu" || (item.kind === "group" && item.repeat?.count === "items");
+  }
+
+  function swapMenu(key, made) {
+    const list = drawing().elements;
+    const old = list.filter(isMenu);
+    if (old.length === 0) {
+      return false;
+    }
+    if (old.every((item) => (item.kind === "menu") === (key === "menu"))) {
+      setChosen([old[0].id]);
+      ctx.say("The menu is already on this screen. It's picked now.");
+      ctx.render();
+      return true;
+    }
+    const frames = {};
+    for (const shapeName of Object.keys(AREAS)) {
+      const boxes = old.map((item) => item.at?.[shapeName]).filter(Boolean);
+      frames[shapeName] = boxes.length ? union(boxes.map((box) => ({ x: Number(box.x), y: Number(box.y), w: Number(box.w), h: Number(box.h) }))) : null;
+    }
+    const fresh = key === "tiles" ? tilesFor(frames) : [made];
+    if (key === "menu") {
+      made.at = { wide: frames.wide ?? made.at.wide, tall: frames.tall ?? made.at.tall };
+    }
+    const at = list.indexOf(old[0]);
+    const kept = list.filter((item) => !old.includes(item));
+    kept.splice(Math.min(at, kept.length), 0, ...fresh);
+    drawing().elements = kept;
+    if (!ctx.fits()) {
+      drawing().elements = list;
+      ctx.fits();
+      ctx.say("There's no room to change the menu on this screen. Remove something first.", true);
+      return true;
+    }
+    if (key === "tiles") {
+      ctx.tileIcons?.();
+    }
+    setChosen([fresh[0].id]);
+    ctx.changed({ rebuild: true });
+    return true;
+  }
+
+  function add(key, screen) {
+    const entry = [...SHELF, ...SHELF_MORE].find(([name]) => name === key);
+    if (!entry) {
+      return;
+    }
+    const made = entry[2](screen);
+    if ((key === "menu" || key === "tiles") && swapMenu(key, made)) {
+      return;
+    }
+    const all = Array.isArray(made) ? made : [made];
+    if (key === "tiles") {
+      const list = drawing().elements;
+      list.push(...all);
+      if (!ctx.fits()) {
+        list.splice(list.length - all.length, all.length);
+        ctx.fits();
+        ctx.say("There's no room for more on this screen. Remove something first.", true);
+        return;
+      }
+      ctx.tileIcons?.();
+      setChosen([all[0].id]);
+      ctx.changed({ rebuild: true });
+      return;
+    }
+    insert(all[0], true);
+  }
+
   function addMenu(screen) {
-    const kinds = Object.entries(KINDS).filter(([kind]) => kind !== "menu" || screen === "home");
+    const offered = (list) => list.filter(([, , , only]) => !only || only === screen);
+    const button = ([key, label]) => {
+      const picture = el("span", { class: "part-art", "aria-hidden": "true" });
+      picture.innerHTML = `<svg viewBox="0 0 44 26">${SHELF_ART[key]}</svg>`;
+      return el("button", { type: "button", class: "part-btn", onclick: () => add(key, screen) }, picture, el("span", {}, label));
+    };
+    const group = picked()?.kind === "group" && chosen().length === 1 && !picked().repeat ? picked() : null;
+    if (inside !== group?.id) {
+      inside = null;
+    }
     return [
-      el("div", { class: "add-menu" }, kinds.map(([kind, label]) => el("button", { type: "button", onclick: () => insert(newElement(kind, screen)) }, `+ ${label}`))),
-      el("h4", {}, "Ready-made"),
-      el("p", { class: "hint" }, "Groups of parts you can change like any other: open them in the list."),
-      el("div", { class: "add-menu ready" }, Object.entries(READY).filter(([, [, , only]]) => !only || only === screen).map(([key, [label, make]]) => el("button", { type: "button", onclick: () => {
-        if (insert(make(), true) && key === "tiles") {
-          ctx.tileIcons?.();
-        }
-      } }, label))),
+      group ? el("label", { class: "inside" }, toggle(inside === group.id, (on) => {
+        inside = on ? group.id : null;
+      }, "Add inside the picked group"), `Add inside “${nameOf(group)}”`) : null,
+      el("div", { class: "parts-grid" }, offered(SHELF).map(button)),
+      el("details", { class: "more" }, el("summary", {}, "More parts"),
+        el("div", { class: "add-menu" }, offered(SHELF_MORE).map(([key, label]) => el("button", { type: "button", onclick: () => add(key, screen) }, label)))),
     ];
   }
 
   function insert(made, open = false) {
-    const host = picked()?.kind === "group" && chosen().length === 1 ? picked() : null;
+    const host = picked()?.kind === "group" && chosen().length === 1 && inside === picked().id ? picked() : null;
     if (host) {
       for (const shapeName of Object.keys(AREAS)) {
         made.at[shapeName] = host.at[shapeName] ? { ...made.at[shapeName], x: 4, y: 4 } : null;
@@ -1004,6 +1082,11 @@ export function drawingEditor(ctx) {
           if (at) {
             at.x = Math.round((area.width - at.w) / 2);
             at.y = Math.round((area.height - at.h) / 2);
+            const taken = (x, y) => drawing().elements.some((other) => other.at?.[shapeName]?.x === x && other.at?.[shapeName]?.y === y);
+            for (let step = 0; step < 6 && taken(at.x, at.y); step++) {
+              at.x = Math.min(area.width - at.w, at.x + PASTE_STEP);
+              at.y = Math.min(area.height - Math.max(at.h, 1), at.y + PASTE_STEP);
+            }
           }
         }
       }
@@ -1502,11 +1585,8 @@ export function drawingEditor(ctx) {
   }
 
   function adding(screen) {
-    return [
-      ...addMenu(screen),
-      el("p", { class: "hint" }, picked()?.kind === "group" ? "New parts go inside the picked group." : "Pick a group first to add parts inside it."),
-    ];
+    return addMenu(screen);
   }
 
-  return { settings, parts, adding, overlay, down, deeper, move, up, nudge, key, lineUp, spread, nameOf, colorOf, walk };
+  return { settings, parts, adding, add, overlay, down, deeper, move, up, nudge, key, lineUp, spread, nameOf, colorOf, walk };
 }
