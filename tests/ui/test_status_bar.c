@@ -44,7 +44,7 @@ static void an_idle_player_without_a_battery_reading_draws_nothing(void)
     Theme theme = status_theme();
     Canvas canvas = draw_status(&theme, (StatusBarState){.playback = STATUS_PLAYBACK_NONE});
     Rect header = {0, 0, TEST_SCREEN_WIDTH, STATUS_HEADER_HEIGHT - 1};
-    CHECK(ui_test_area_has_only(&canvas, header, theme.colors.header_background));
+    CHECK(ui_test_area_has_only(&canvas, header, theme.colors->header_background));
 }
 
 static void a_playing_player_shows_the_play_icon_at_the_left(void)
@@ -54,7 +54,7 @@ static void a_playing_player_shows_the_play_icon_at_the_left(void)
     Rect icon = status_bar_playback_area(&theme);
     Rect middle = {icon.x + 2, icon.y, 3, icon.height};
     CHECK(icon.x + icon.width <= TEST_HEADER_INSET);
-    CHECK(ui_test_area_has_color(&canvas, middle, theme.colors.header_text));
+    CHECK(ui_test_area_has_color(&canvas, middle, theme.colors->header_text));
 }
 
 static void a_paused_player_shows_two_bars(void)
@@ -65,9 +65,9 @@ static void a_paused_player_shows_two_bars(void)
     Rect first = {icon.x, icon.y, 1, icon.height};
     Rect gap = {icon.x + 2, icon.y, 3, icon.height};
     Rect last = {icon.x + icon.width - 1, icon.y, 1, icon.height};
-    CHECK(ui_test_area_has_only(&canvas, first, theme.colors.header_text));
-    CHECK(!ui_test_area_has_color(&canvas, gap, theme.colors.header_text));
-    CHECK(ui_test_area_has_only(&canvas, last, theme.colors.header_text));
+    CHECK(ui_test_area_has_only(&canvas, first, theme.colors->header_text));
+    CHECK(!ui_test_area_has_color(&canvas, gap, theme.colors->header_text));
+    CHECK(ui_test_area_has_only(&canvas, last, theme.colors->header_text));
 }
 
 static void the_battery_sits_inside_the_right_inset(void)
@@ -77,7 +77,7 @@ static void the_battery_sits_inside_the_right_inset(void)
     Rect battery = status_bar_battery_area(&theme);
     CHECK(battery.x >= TEST_SCREEN_WIDTH - TEST_HEADER_INSET);
     CHECK(battery.x + battery.width <= TEST_SCREEN_WIDTH);
-    CHECK(ui_test_area_has_color(&canvas, battery, theme.colors.header_text));
+    CHECK(ui_test_area_has_color(&canvas, battery, theme.colors->header_text));
 }
 
 static void the_fill_follows_the_charge(void)
@@ -93,7 +93,7 @@ static void a_low_battery_is_drawn_in_the_danger_color(void)
 {
     Theme theme = status_theme();
     Canvas canvas = draw_status(&theme, battery_at(LOW_BATTERY, false));
-    CHECK(ui_test_area_has_color(&canvas, status_bar_battery_area(&theme), theme.colors.danger));
+    CHECK(ui_test_area_has_color(&canvas, status_bar_battery_area(&theme), theme.colors->danger));
 }
 
 static void a_charging_battery_is_drawn_in_the_success_color(void)
@@ -101,8 +101,8 @@ static void a_charging_battery_is_drawn_in_the_success_color(void)
     Theme theme = status_theme();
     Canvas canvas = draw_status(&theme, battery_at(LOW_BATTERY, true));
     Rect battery = status_bar_battery_area(&theme);
-    CHECK(ui_test_area_has_color(&canvas, battery, theme.colors.success));
-    CHECK(!ui_test_area_has_color(&canvas, battery, theme.colors.danger));
+    CHECK(ui_test_area_has_color(&canvas, battery, theme.colors->success));
+    CHECK(!ui_test_area_has_color(&canvas, battery, theme.colors->danger));
 }
 
 static void the_percentage_reads_as_a_number_and_a_percent_sign(void)
@@ -131,7 +131,7 @@ static void a_known_battery_shows_its_percentage(void)
     Theme theme = status_theme();
     Canvas canvas = draw_status(&theme, battery_at(HALF_BATTERY, false));
     Rect percent = status_bar_percent_area(&theme, "50%", false);
-    CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
+    CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors->header_background));
 }
 
 static void an_unknown_battery_shows_no_percentage(void)
@@ -141,7 +141,7 @@ static void an_unknown_battery_shows_no_percentage(void)
     state.battery_known = false;
     Canvas canvas = draw_status(&theme, state);
     Rect percent = status_bar_percent_area(&theme, "50%", false);
-    CHECK(ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
+    CHECK(ui_test_area_has_only(&canvas, percent, theme.colors->header_background));
 }
 
 static void a_charging_battery_has_a_bolt_beside_it(void)
@@ -151,9 +151,9 @@ static void a_charging_battery_has_a_bolt_beside_it(void)
     Rect battery = status_bar_battery_area(&theme);
     CHECK(bolt.x + bolt.width < battery.x);
     Canvas charging = draw_status(&theme, battery_at(50, true));
-    CHECK(ui_test_area_has_color(&charging, bolt, theme.colors.success));
+    CHECK(ui_test_area_has_color(&charging, bolt, theme.colors->success));
     Canvas resting = draw_status(&theme, battery_at(50, false));
-    CHECK(!ui_test_area_has_color(&resting, bolt, theme.colors.success));
+    CHECK(!ui_test_area_has_color(&resting, bolt, theme.colors->success));
 }
 
 static void the_percentage_moves_left_of_the_bolt_while_charging(void)
@@ -163,7 +163,7 @@ static void the_percentage_moves_left_of_the_bolt_while_charging(void)
     Rect percent = status_bar_percent_area(&theme, "50%", true);
     CHECK(percent.x + percent.width < bolt.x);
     Canvas canvas = draw_status(&theme, battery_at(50, true));
-    CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors.header_background));
+    CHECK(!ui_test_area_has_only(&canvas, percent, theme.colors->header_background));
 }
 
 static void the_clock_sits_after_the_left_icons_inside_the_inset(void)
@@ -177,11 +177,11 @@ static void the_clock_sits_after_the_left_icons_inside_the_inset(void)
     CHECK(clock.x > bluetooth.x + bluetooth.width);
     CHECK(clock.x + clock.width <= theme.metrics.header_inset);
     Canvas canvas = draw_status(&theme, state);
-    CHECK(!ui_test_area_has_only(&canvas, clock, theme.colors.header_background));
+    CHECK(!ui_test_area_has_only(&canvas, clock, theme.colors->header_background));
     state.clock = NULL;
     CHECK(rect_is_empty(status_bar_clock_area(&theme, state)));
     Canvas without = draw_status(&theme, state);
-    CHECK(ui_test_area_has_only(&without, clock, theme.colors.header_background));
+    CHECK(ui_test_area_has_only(&without, clock, theme.colors->header_background));
 }
 
 static void a_clock_that_does_not_fit_the_inset_is_left_out(void)
@@ -263,7 +263,112 @@ static void the_percentage_gives_way_to_a_clock_that_does_not_fit_beside_it(void
         }
     }
     CHECK_EQUAL(0, differences);
-    CHECK(!ui_test_area_has_only(&expected, clock, theme.colors.header_background));
+    CHECK(!ui_test_area_has_only(&expected, clock, theme.colors->header_background));
+}
+
+static const uint8_t SOLID_ROWS[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static const uint8_t HALF_ROWS[] = {0x88, 0x80, 0x88, 0x80, 0x88, 0x80};
+static const uint8_t FRAME_ROWS[] = {0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const uint8_t LEVEL_ROWS[] = {0, 0, 0, 0, 0, 0xFF, 0xFF, 0, 0, 0xFF, 0xFF, 0, 0, 0, 0, 0};
+
+static Theme icon_theme(const ThemeIcons *icons)
+{
+    Theme theme = status_theme();
+    theme.icons = icons;
+    return theme;
+}
+
+static void a_theme_icon_replaces_the_play_shape_centered_in_its_place(void)
+{
+    ThemeIcons icons = {.masks[THEME_ICON_STATUS_PLAY] = {SOLID_ROWS, 3, 3}};
+    Theme theme = icon_theme(&icons);
+    Canvas canvas = draw_status(&theme, (StatusBarState){.playback = STATUS_PLAYBACK_PLAYING});
+    Rect area = status_bar_playback_area(&theme);
+    Rect inked = {area.x + 1, area.y + 1, 3, 3};
+    Rect left_edge = {area.x, area.y, 1, area.height};
+    CHECK(ui_test_area_has_only(&canvas, inked, theme.colors->header_text));
+    CHECK(!ui_test_area_has_color(&canvas, left_edge, theme.colors->header_text));
+}
+
+static void an_icon_the_theme_lacks_keeps_the_built_in_shape(void)
+{
+    ThemeIcons icons = {.masks[THEME_ICON_STATUS_PLAY] = {SOLID_ROWS, 3, 3}};
+    Theme theme = icon_theme(&icons);
+    Canvas canvas = draw_status(&theme, (StatusBarState){.playback = STATUS_PLAYBACK_PAUSED});
+    Rect area = status_bar_playback_area(&theme);
+    Rect first = {area.x, area.y, 1, area.height};
+    CHECK(ui_test_area_has_only(&canvas, first, theme.colors->header_text));
+}
+
+static void a_level_between_clear_and_solid_blends_with_what_is_behind(void)
+{
+    ThemeIcons icons = {.masks[THEME_ICON_STATUS_PLAY] = {HALF_ROWS, 3, 3}};
+    Theme theme = icon_theme(&icons);
+    Canvas canvas = draw_status(&theme, (StatusBarState){.playback = STATUS_PLAYBACK_PLAYING});
+    Rect area = status_bar_playback_area(&theme);
+    Color blended = canvas_pixel_at(&canvas, area.x + 2, area.y + 2);
+    CHECK(blended != theme.colors->header_text && blended != theme.colors->header_background);
+}
+
+static void a_large_icon_is_used_when_it_fits_the_status_icon_size(void)
+{
+    ThemeIcons icons = {.masks[THEME_ICON_STATUS_PLAY] = {SOLID_ROWS, 3, 3},
+                        .masks[THEME_ICON_STATUS_PLAY_LARGE] = {SOLID_ROWS, 5, 6}};
+    Theme theme = icon_theme(&icons);
+    StatusBarState playing = {.playback = STATUS_PLAYBACK_PLAYING};
+    Canvas canvas = draw_status(&theme, playing);
+    Rect area = status_bar_playback_area(&theme);
+    Rect large = {area.x, area.y, 5, 6};
+    CHECK(ui_test_area_has_only(&canvas, large, theme.colors->header_text));
+    icons.masks[THEME_ICON_STATUS_PLAY_LARGE].height = 7;
+    canvas = draw_status(&theme, playing);
+    Rect top_row = {area.x, area.y, area.width, 1};
+    CHECK(!ui_test_area_has_color(&canvas, top_row, theme.colors->header_text));
+}
+
+static Canvas draw_themed_battery(const ThemeIcons *icons, uint8_t percent, Rect *origin)
+{
+    Theme theme = icon_theme(icons);
+    Rect area = status_bar_battery_area(&theme);
+    *origin = (Rect){area.x + (area.width - 8) / 2, area.y + 1, 8, 4};
+    StatusBarState state = battery_at(percent, true);
+    state.hide_percent = true;
+    return draw_status(&theme, state);
+}
+
+static void a_theme_battery_lights_its_level_from_the_left_by_the_charge(void)
+{
+    ThemeIcons icons = {.masks[THEME_ICON_BATTERY] = {FRAME_ROWS, 8, 4},
+                        .masks[THEME_ICON_BATTERY_LEVEL] = {LEVEL_ROWS, 8, 4}};
+    Rect at;
+    Canvas canvas = draw_themed_battery(&icons, HALF_BATTERY, &at);
+    Rect frame = {at.x, at.y, 8, 1};
+    Rect lit = {at.x + 2, at.y + 1, 2, 2};
+    Rect unlit = {at.x + 4, at.y + 1, 2, 2};
+    CHECK(ui_test_area_has_only(&canvas, frame, TEST_COLORS.header_text));
+    CHECK(ui_test_area_has_only(&canvas, lit, TEST_COLORS.success));
+    CHECK(ui_test_area_has_only(&canvas, unlit, TEST_COLORS.header_background));
+    canvas = draw_themed_battery(&icons, 100, &at);
+    CHECK(ui_test_area_has_only(&canvas, unlit, TEST_COLORS.success));
+    canvas = draw_themed_battery(&icons, 1, &at);
+    Rect least = {at.x + 2, at.y + 1, 1, 2};
+    CHECK(ui_test_area_has_only(&canvas, least, TEST_COLORS.success));
+}
+
+static void a_theme_battery_without_a_level_of_its_size_stays_the_built_in_one(void)
+{
+    ThemeIcons icons = {.masks[THEME_ICON_BATTERY] = {FRAME_ROWS, 8, 4}};
+    Rect at;
+    Canvas canvas = draw_themed_battery(&icons, HALF_BATTERY, &at);
+    Theme theme = status_theme();
+    Rect area = status_bar_battery_area(&theme);
+    Rect left_side = {area.x, area.y, 1, area.height};
+    CHECK(ui_test_area_has_only(&canvas, left_side, TEST_COLORS.header_text));
+    icons.masks[THEME_ICON_BATTERY_LEVEL] = (IconMask){LEVEL_ROWS, 6, 4};
+    canvas = draw_themed_battery(&icons, HALF_BATTERY, &at);
+    CHECK(ui_test_area_has_only(&canvas, left_side, TEST_COLORS.header_text));
 }
 
 int main(void)
@@ -288,6 +393,12 @@ int main(void)
         TEST_CASE(a_status_font_replaces_the_small_font),
         TEST_CASE(a_clock_too_wide_to_center_sits_after_the_left_icons),
         TEST_CASE(the_percentage_gives_way_to_a_clock_that_does_not_fit_beside_it),
+        TEST_CASE(a_theme_icon_replaces_the_play_shape_centered_in_its_place),
+        TEST_CASE(an_icon_the_theme_lacks_keeps_the_built_in_shape),
+        TEST_CASE(a_level_between_clear_and_solid_blends_with_what_is_behind),
+        TEST_CASE(a_large_icon_is_used_when_it_fits_the_status_icon_size),
+        TEST_CASE(a_theme_battery_lights_its_level_from_the_left_by_the_charge),
+        TEST_CASE(a_theme_battery_without_a_level_of_its_size_stays_the_built_in_one),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

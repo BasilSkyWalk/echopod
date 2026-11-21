@@ -1,0 +1,349 @@
+name = "Ember"
+author = "EchoPod"
+description = "Warm charcoal with an amber marker on the selected row"
+selection = "selection"
+
+[spacing]
+row_height = 28
+padding = 12
+
+[colors]
+background = "#181210"
+text = "#f8ece0"
+text_secondary = "#c0a890"
+text_tertiary = "#907860"
+selection_background = "#382418"
+selection_top = "#f8a030"
+selection_shine = "#f8c878"
+selection_text = "#f8ece0"
+header_background = "#201810"
+header_top = "#402818"
+header_text = "#f8ece0"
+divider = "#503828"
+scrollbar_thumb = "#a07040"
+danger = "#f86848"
+success = "#a0d068"
+chevron = "#a08060"
+
+[boxes.selection]
+fill = "selection_background"
+border = "selection_top"
+border_width = 3
+border_edges = ["left"]
+ink = "selection_text"
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "selection_top"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_top"
+border = "selection_top"
+border_width = 1
+ink = "header_text"
+radius = 8
+
+[boxes.section]
+fill = "header_top"
+border = "selection_top"
+border_width = 1
+ink = "header_text"
+radius = 10
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+radius = 1
+
+[boxes.progress_fill]
+fill = "selection_top"
+
+[boxes.progress_active]
+fill = "selection_shine"
+
+[icons]
+status_play = [
+    ".5........",
+    ".dd5......",
+    ".dffb3....",
+    ".dffffa2..",
+    ".dffffff81",
+    ".dffffffa2",
+    ".dffffb3..",
+    ".dffc4....",
+    ".dd5......",
+    ".5........",
+]
+status_pause = [
+    ".287..683.",
+    ".bff53ffd.",
+    ".bff64ffd.",
+    ".bff64ffd.",
+    ".bff64ffd.",
+    ".bff64ffd.",
+    ".bff64ffd.",
+    ".bff64ffd.",
+    ".bff54ffd.",
+    ".3981.894.",
+]
+status_bluetooth = [
+    "...d4..",
+    "...fe4.",
+    "58.f4e3",
+    "1b9f9b1",
+    "..afa..",
+    "..afa..",
+    "1b9f9b1",
+    "58.f4e3",
+    "...fe4.",
+    "...d4..",
+]
+status_bolt = [
+    "...b7.",
+    "..5f3.",
+    "..dd..",
+    ".7f8..",
+    "2efff7",
+    "6bdfc.",
+    "..8f3.",
+    "..a9..",
+    "..b1..",
+    "..5...",
+]
+battery = [
+    "1bffffffffffffffffb1..",
+    "b8................8b..",
+    "f..................f..",
+    "f..................fdd",
+    "f..................fff",
+    "f..................fff",
+    "f..................fdc",
+    "f..................f..",
+    "b8................8a..",
+    "1bffffffffffffffffa1..",
+]
+battery_level = [
+    "......................",
+    "......................",
+    "..affffffffffffffa....",
+    "..ffffffffffffffff....",
+    "..ffffffffffffffff....",
+    "..ffffffffffffffff....",
+    "..ffffffffffffffff....",
+    "..affffffffffffffa....",
+    "......................",
+    "......................",
+]
+chevron = [
+    ".12....",
+    ".ae1...",
+    ".3fb...",
+    "..6f8..",
+    "...9f5.",
+    "....ce2",
+    "....bf3",
+    "...8f6.",
+    "..5f9..",
+    ".3ec...",
+    ".ae1...",
+    ".12....",
+]
+badge_play = [
+    "..................",
+    "...76.............",
+    "...8fc4...........",
+    "...8fffa1.........",
+    "...8ffffe7........",
+    "...8ffffffd4......",
+    "...8ffffffffa2....",
+    "...8ffffffffff7...",
+    "...8fffffffffffd5.",
+    "...8fffffffffffe7.",
+    "...8ffffffffff91..",
+    "...8ffffffffc3....",
+    "...8ffffffe6......",
+    "...8fffff91.......",
+    "...8fffb3.........",
+    "...8fe5...........",
+    "...781............",
+    "..................",
+]
+badge_pause = [
+    "..................",
+    "...2786....6872...",
+    "...cfff9..7fffe...",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...ffffb..9ffff2..",
+    "...dfff9..8fffe1..",
+    "...39981..18993...",
+    "..................",
+]
+badge_next = [
+    "..................",
+    "..................",
+    ".2.....21......471",
+    ".e2....4b1.....ff7",
+    ".fe4...4fc1....ff8",
+    ".ffe4..4ffd1...ff8",
+    ".fffe4.4fffd1..ff8",
+    ".ffffe44ffffd2.ff8",
+    ".ffffff9fffffe2ff8",
+    ".ffffffafffffe4ff8",
+    ".fffff64ffffe4.ff8",
+    ".ffff5.4fffe2..ff8",
+    ".fff5..4ffe2...ff8",
+    ".ff5...4fd2....ff8",
+    ".e4....4d1.....ff7",
+    ".4.....21......691",
+    "..................",
+    "..................",
+]
+badge_previous = [
+    "..................",
+    "..................",
+    ".75......12.....11",
+    "5ff1....1b4....2d2",
+    "6ff2...1cf4...2ef2",
+    "6ff2..1dff4..3eff2",
+    "6ff2.1dfff4.4efff2",
+    "6ff22dffff44effff2",
+    "6ff4efffff9ffffff2",
+    "6ff5efffffaffffff2",
+    "6ff24effff45fffff2",
+    "6ff2.2efff4.5ffff2",
+    "6ff2..2eff4..4eff2",
+    "6ff2...2df4...4ef2",
+    "5ff2....1d4....3e2",
+    "187......12.....21",
+    "..................",
+    "..................",
+]
+status_play_large = [
+    ".21...........",
+    ".6e7..........",
+    ".6ffd6........",
+    ".6ffffc4......",
+    ".6ffffffb2....",
+    ".6ffffffff91..",
+    ".6fffffffffe8.",
+    ".6ffffffffff91",
+    ".6ffffffffa2..",
+    ".6ffffffb4....",
+    ".6ffffd5......",
+    ".6ffe6........",
+    ".6e8..........",
+    ".21...........",
+]
+status_pause_large = [
+    "..244....442..",
+    ".3fffb..afff4.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".6ffff..dfff8.",
+    ".3fffc..afff5.",
+    "..3651..1564..",
+]
+status_bluetooth_large = [
+    "...1c4...",
+    "...2fe2..",
+    "...2fbe2.",
+    "4c12f2bd1",
+    "1cd3f3db.",
+    ".1befeb1.",
+    "..1bfb1..",
+    "..1bfb1..",
+    ".1befeb1.",
+    "1cd3f3db.",
+    "4c12f2bd1",
+    "...2fbe2.",
+    "...2fe2..",
+    "...1c4...",
+]
+status_bolt_large = [
+    "....8f2.",
+    "...1ec..",
+    "...9f7..",
+    "..3ff3..",
+    "..bfd...",
+    ".4ffb663",
+    ".cfffff2",
+    "6fffff8.",
+    "...9fd1.",
+    "...bf5..",
+    "...eb...",
+    "..1f3...",
+    "..48....",
+    "..51....",
+]
+battery_large = [
+    ".4cfffffffffffffffffffffd6....",
+    "4fb6666666666666666666669f8...",
+    "cb.......................7f1..",
+    "f6.......................2f4..",
+    "f6.......................2f8b7",
+    "f6.......................2ffff",
+    "f6.......................2ffff",
+    "f6.......................2ffff",
+    "f6.......................2ffff",
+    "f6.......................2f8b7",
+    "f6.......................2f4..",
+    "cb.......................7f1..",
+    "4fb6666666666666666666669f7...",
+    ".4cfffffffffffffffffffffd6....",
+]
+battery_level_large = [
+    "..............................",
+    "..............................",
+    "...144444444444444444441......",
+    "..1dfffffffffffffffffffe3.....",
+    "..4fffffffffffffffffffff8.....",
+    "..4fffffffffffffffffffff8.....",
+    "..4fffffffffffffffffffff8.....",
+    "..4fffffffffffffffffffff8.....",
+    "..4fffffffffffffffffffff8.....",
+    "..4fffffffffffffffffffff7.....",
+    "...bfffffffffffffffffffd2.....",
+    "....2222222222222222222.......",
+    "..............................",
+    "..............................",
+]
+
+[wallpaper]
+palette = ["#181210", "#1d1512", "#221814"]
+rows = [
+    "2000000020000000",
+    "0200000102000001",
+    "0020001000200010",
+    "0002010000020100",
+    "0000200000002000",
+    "0001020000010200",
+    "0010002000100020",
+    "0100000201000002",
+    "2000000020000000",
+    "0200000102000001",
+    "0020001000200010",
+    "0002010000020100",
+    "0000200000002000",
+    "0001020000010200",
+    "0010002000100020",
+    "0100000201000002",
+]

@@ -253,10 +253,8 @@ ECHO_NP_FACES_CODE static Bounds axis_bounds(int factor, int low, int high, Boun
                     smaller(within.high, round_div(high, factor))};
 }
 
-ECHO_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y)
+ECHO_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y, int sine, int cosine)
 {
-    int sine = shape_sine(spoke->angle);
-    int cosine = shape_cosine(spoke->angle);
     int row = (y - spoke->pivot.y) * SHAPE_Q4;
     int half = spoke->width_q4 * SHAPE_UNIT / 2;
     Bounds along =
@@ -267,13 +265,17 @@ ECHO_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y)
 
 ECHO_NP_FACES_CODE void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Color color)
 {
-    int reach =
-        larger(magnitude(spoke->from), magnitude(spoke->to)) + spoke->width_q4 / SHAPE_Q4 + 1;
-    int top = larger(spoke->pivot.y - reach, canvas->clip.y);
-    int bottom = smaller(spoke->pivot.y + reach + 1, canvas->clip.y + canvas->clip.height);
+    int sine = shape_sine(spoke->angle);
+    int cosine = shape_cosine(spoke->angle);
+    int near = -spoke->from * cosine / SHAPE_UNIT;
+    int far = -spoke->to * cosine / SHAPE_UNIT;
+    int spread = spoke->width_q4 / SHAPE_Q4 + 2;
+    int top = larger(spoke->pivot.y + smaller(near, far) - spread, canvas->clip.y);
+    int bottom = smaller(spoke->pivot.y + larger(near, far) + spread + 1,
+                         canvas->clip.y + canvas->clip.height);
     int origin = spoke->pivot.x * SHAPE_Q4 + HALF_PIXEL_Q4;
     for (int y = top; y < bottom; y++) {
-        Bounds row = spoke_bounds(spoke, y);
+        Bounds row = spoke_bounds(spoke, y, sine, cosine);
         if (row.high > row.low) {
             shape_span(canvas, span_of(y, origin + row.low, origin + row.high), color);
         }

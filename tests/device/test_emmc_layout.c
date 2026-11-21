@@ -97,7 +97,8 @@ static void a_second_slot_found_by_its_header_replaces_the_assumed_one(void)
     CHECK_EQUAL(0x4000, layout.slot_sectors);
     CHECK(emmc_layout_allows_write(&layout, 0x6000, 8));
     CHECK(emmc_layout_allows_write(&layout, 0x2000, 8));
-    CHECK(!emmc_layout_allows_write(&layout, 0xB000, 8));
+    CHECK(emmc_layout_allows_write(&layout, 0xB000, 8));
+    CHECK(!emmc_layout_allows_write(&layout, 0x24000 - 4, 8));
 }
 
 static void without_any_second_header_the_assumed_slot_is_kept(void)
@@ -225,12 +226,32 @@ static void writes_inside_the_user_volume_are_allowed(void)
     CHECK(!emmc_layout_allows_write(&layout, TOTAL_SECTORS - 1, 2));
 }
 
-static void writes_inside_one_firmware_slot_are_allowed(void)
+static void writes_inside_the_firmware_area_are_allowed(void)
 {
     EmmcLayout layout = rechord_layout();
     CHECK(emmc_layout_allows_write(&layout, 0x2000, 16));
     CHECK(emmc_layout_allows_write(&layout, 0x13000 + 0x11000 - 1, 1));
-    CHECK(!emmc_layout_allows_write(&layout, 0x13000 - 1, 2));
+    CHECK(emmc_layout_allows_write(&layout, 0x13000 - 1, 2));
+    CHECK(!emmc_layout_allows_write(&layout, 0x13000 + 0x11000 - 1, 2));
+    CHECK(!emmc_layout_allows_write(&layout, 0x2000 - 1, 2));
+}
+
+static void a_60_mib_firmware_area_has_slots_too_small_for_a_stock_image(void)
+{
+    static FakeDisk disk;
+    fake_disk_init(&disk, TOTAL_SECTORS);
+    write_idb(&disk, 0, 0x3C);
+    write_save_block(&disk, 0x20000);
+    write_fat_boot_sector(&disk, 0x84000);
+    write_image_header(&disk, 0x2000);
+    write_image_header(&disk, 0x11000);
+    EmmcLayout layout;
+    CHECK(read_layout(&disk, &layout));
+    CHECK_EQUAL(0x11000, layout.slot_2);
+    CHECK_EQUAL(30u * 0x800u, layout.slot_sectors);
+    CHECK_EQUAL(0x20000, layout.firmware_end);
+    CHECK(emmc_layout_allows_write(&layout, 0x2000 + 32u * 0x800u - 16, 16));
+    CHECK(!emmc_layout_allows_write(&layout, 0x20000, 16));
 }
 
 static void writes_to_the_idb_the_save_block_or_the_gap_are_refused(void)
@@ -301,7 +322,8 @@ int main(void)
         TEST_CASE(no_volume_within_the_scan_limit_fails),
         TEST_CASE(a_volume_is_never_accepted_inside_the_firmware_area),
         TEST_CASE(writes_inside_the_user_volume_are_allowed),
-        TEST_CASE(writes_inside_one_firmware_slot_are_allowed),
+        TEST_CASE(writes_inside_the_firmware_area_are_allowed),
+        TEST_CASE(a_60_mib_firmware_area_has_slots_too_small_for_a_stock_image),
         TEST_CASE(writes_to_the_idb_the_save_block_or_the_gap_are_refused),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

@@ -54,6 +54,7 @@ static uint32_t call_from_high_ram(void)
 HalHighRamTest hal_system_high_ram_test(void)
 {
     board_np_faces_forget();
+    board_theme_assets_forget();
     board_audio_shut_down();
     uint32_t bad = check_memory(0);
     bad = bad != 0 ? bad : check_memory(0xFFFFFFFFu);

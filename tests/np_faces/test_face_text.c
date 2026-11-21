@@ -607,6 +607,21 @@ static void the_format_row_centres_the_box_and_stream_together(void)
     CHECK_EQUAL(NORMAL, at(grid, origin, 0));
 }
 
+static void the_format_row_ends_at_the_right_edge_when_right_aligned(void)
+{
+    NpTestScene scene = scene_of(NP_TEST_PLAYING);
+    scene.frame.codec = "A";
+    scene.frame.stream = "AB";
+    NowPlayingFrame frame = np_test_frame(&scene);
+    FaceLine line = line_of(FACE_ALIGN_RIGHT);
+    line.area = (Rect){0, 0, WIDTH, 10};
+    Canvas canvas = fresh(grid);
+    face_format_row(&canvas, &frame, &line);
+    int total = face_codec_width(&TINY_FONT, "A") + FACE_FORMAT_GAP + text_width(&TINY_FONT, "AB");
+    CHECK_EQUAL(BACKGROUND, at(grid, WIDTH - total - 1, 0));
+    CHECK_EQUAL(NORMAL, at(grid, WIDTH - total, 0));
+}
+
 static void the_format_row_without_a_codec_has_no_box(void)
 {
     NpTestScene scene = scene_of(NP_TEST_PLAYING);
@@ -669,6 +684,7 @@ int main(void)
         TEST_CASE(the_codec_box_outlines_its_area_and_centres_the_name),
         TEST_CASE(the_format_row_puts_the_box_first_when_left_aligned),
         TEST_CASE(the_format_row_centres_the_box_and_stream_together),
+        TEST_CASE(the_format_row_ends_at_the_right_edge_when_right_aligned),
         TEST_CASE(the_format_row_without_a_codec_has_no_box),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

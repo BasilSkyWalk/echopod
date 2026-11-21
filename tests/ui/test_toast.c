@@ -32,8 +32,8 @@ static void a_visible_toast_paints_its_box(void)
     Rect area = toast_area(&toast, &TEST_THEME);
     CHECK(area.width > 0);
     CHECK(area.y + area.height <= TEST_SCREEN_HEIGHT);
-    CHECK(ui_test_area_has_color(&canvas, area, TEST_THEME.colors.header_background));
-    CHECK(ui_test_area_has_color(&canvas, area, TEST_THEME.colors.header_text));
+    CHECK(ui_test_area_has_color(&canvas, area, TEST_THEME.colors->header_background));
+    CHECK(ui_test_area_has_color(&canvas, area, TEST_THEME.colors->header_text));
 }
 
 static void a_hidden_toast_paints_nothing(void)
@@ -44,7 +44,7 @@ static void a_hidden_toast_paints_nothing(void)
     Canvas canvas = ui_test_canvas();
     Rect screen = {0, 0, TEST_SCREEN_WIDTH, TEST_SCREEN_HEIGHT};
     toast_draw(&toast, &canvas, &TEST_THEME);
-    CHECK(!ui_test_area_has_color(&canvas, screen, TEST_THEME.colors.header_background));
+    CHECK(!ui_test_area_has_color(&canvas, screen, TEST_THEME.colors->header_background));
 }
 
 int main(void)

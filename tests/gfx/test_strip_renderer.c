@@ -122,6 +122,55 @@ static void a_drawer_that_paints_everything_skips_the_clear(void)
     CHECK_EQUAL(LEFTOVER, recording.frame[4][5]);
 }
 
+static int backdrops;
+
+static void paint_leftover(void *context, Canvas *canvas)
+{
+    (void)context;
+    backdrops += canvas->backdrop_painted ? 0 : 1;
+    canvas_clear(canvas, LEFTOVER);
+}
+
+static void note_backdrop(void *context, Canvas *canvas)
+{
+    int *painted = context;
+    *painted += canvas->backdrop_painted ? 1 : 0;
+}
+
+static int render_with_backdrop(bool drawer_paints_everything)
+{
+    static Recording recording;
+    int drawn_on_backdrop = 0;
+    recording = (Recording){0};
+    backdrops = 0;
+    StripRenderer renderer = {
+        .strip_pixels = strip_pixels,
+        .screen_width = SCREEN_WIDTH,
+        .screen_height = SCREEN_HEIGHT,
+        .strip_height = STRIP_HEIGHT,
+        .background = BACKGROUND,
+        .backdrop = {.draw = paint_leftover},
+        .drawer_paints_everything = drawer_paints_everything,
+    };
+    FrameDrawer drawer = {.draw = note_backdrop, .context = &drawn_on_backdrop};
+    FrameSink sink = {.write = record_write, .context = &recording};
+    strip_renderer_render(&renderer, drawer, sink);
+    CHECK_EQUAL(LEFTOVER, recording.frame[4][5]);
+    return drawn_on_backdrop;
+}
+
+static void a_backdrop_painter_replaces_the_clear_and_tells_the_drawer(void)
+{
+    CHECK_EQUAL(EXPECTED_STRIPS, render_with_backdrop(false));
+    CHECK_EQUAL(EXPECTED_STRIPS, backdrops);
+}
+
+static void a_drawer_that_paints_everything_gets_no_backdrop(void)
+{
+    CHECK_EQUAL(0, render_with_backdrop(true));
+    CHECK_EQUAL(0, backdrops);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -129,6 +178,8 @@ int main(void)
         TEST_CASE(strips_start_from_the_background_color),
         TEST_CASE(a_rect_spanning_strips_appears_whole),
         TEST_CASE(a_drawer_that_paints_everything_skips_the_clear),
+        TEST_CASE(a_backdrop_painter_replaces_the_clear_and_tells_the_drawer),
+        TEST_CASE(a_drawer_that_paints_everything_gets_no_backdrop),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

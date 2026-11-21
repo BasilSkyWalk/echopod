@@ -1,0 +1,334 @@
+name = "Mosaic"
+author = "EchoPod"
+description = "Flat tiles on black with one accent colour: clean and minimal"
+selection = "selection"
+
+[colors]
+background = "#000000"
+text = "#ffffff"
+text_secondary = "#b3b3b3"
+text_tertiary = "#808080"
+selection_background = "#0050ef"
+selection_top = "#266af1"
+selection_shine = "#598df5"
+selection_text = "#ffffff"
+header_background = "#141414"
+header_top = "#292929"
+header_text = "#ffffff"
+divider = "#2e2e2e"
+scrollbar_thumb = "#4d4d4d"
+danger = "#e5484d"
+success = "#30a46c"
+chevron = "#737373"
+
+[boxes.selection]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = "background"
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
+
+[now_playing_scene]
+script = '''
+rect(x, y, width, height, #000000)
+if width > height {
+    let p0_0 = x + 10
+    let p0_1 = x + 132
+    let p0_2 = y + 8
+    let p0_3 = y + 32
+    let p0_4 = y + 128
+    let p0_5 = y + 132
+    if has_cover {
+        cover(p0_0, p0_2, 112)
+    } else {
+        rect(p0_0, p0_2, 112, 112, #2e2e2e)
+    }
+    line(song, title, p0_1, p0_2, 180, 22, left, #ffffff)
+    if present(feedback) {
+        line(feedback, body, p0_1, p0_3, 180, 20, left, #b3b3b3)
+    }
+    if !(present(feedback)) {
+        if present(lyric) {
+            line(lyric, body, p0_1, p0_3, 180, 20, left, #b3b3b3)
+        } else {
+            line(artist, body, p0_1, p0_3, 180, 20, left, #b3b3b3)
+        }
+    }
+    line(album, body, p0_1, y + 54, 180, 20, left, #808080)
+    rect(p0_0, p0_4, 300, 3, #2e2e2e)
+    rect(p0_0, p0_4, (300 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 3, #0050ef)
+    text(elapsed, small, p0_0, p0_5, 300, 14, left, #b3b3b3)
+    text(remaining, small, p0_0, p0_5, 300, 14, right, #808080)
+} else {
+    let p0_0 = x + 8
+    let p0_1 = y + 154
+    let p0_2 = x + 29
+    let p0_3 = y + 8
+    let p0_4 = y + 249
+    let p0_5 = y + 258
+    if has_cover {
+        cover(p0_2, p0_3, 112)
+    } else {
+        rect(p0_2, p0_3, 112, 112, #2e2e2e)
+    }
+    line(song, title, p0_0, y + 126, 154, 22, center, #ffffff)
+    if present(feedback) {
+        line(feedback, body, p0_0, p0_1, 154, 20, center, #b3b3b3)
+    }
+    if !(present(feedback)) {
+        if present(lyric) {
+            line(lyric, body, p0_0, p0_1, 154, 20, center, #b3b3b3)
+        } else {
+            line(artist, body, p0_0, p0_1, 154, 20, center, #b3b3b3)
+        }
+    }
+    line(album, body, p0_0, y + 180, 154, 20, center, #808080)
+    rect(p0_0, p0_4, 154, 3, #2e2e2e)
+    rect(p0_0, p0_4, (154 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 3, #0050ef)
+    text(elapsed, small, p0_0, p0_5, 154, 14, left, #b3b3b3)
+    text(remaining, small, p0_0, p0_5, 154, 14, right, #808080)
+}
+'''
+design = "{\"version\":2,\"screen\":\"playing\",\"elements\":[{\"id\":1,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\",\"locked\":true},{\"id\":2,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":8,\"w\":112,\"h\":112},\"tall\":{\"x\":29,\"y\":8,\"w\":112,\"h\":112}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"@divider\",\"reflection\":false,\"corner\":0},{\"id\":3,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":8,\"w\":180,\"h\":22},\"tall\":{\"x\":8,\"y\":126,\"w\":154,\"h\":22,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":4,\"kind\":\"text\",\"name\":\"Messages\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":32,\"w\":180,\"h\":20},\"tall\":{\"x\":8,\"y\":154,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\"}}},\"source\":\"feedback\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":5,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":32,\"w\":180,\"h\":20},\"tall\":{\"x\":8,\"y\":154,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\",\"not\":true}}},\"source\":\"lyric\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":6,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":54,\"w\":180,\"h\":20},\"tall\":{\"x\":8,\"y\":180,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":true},{\"id\":8,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":128,\"w\":300,\"h\":3},\"tall\":{\"x\":8,\"y\":249,\"w\":154,\"h\":3}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":9,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":128,\"w\":300,\"h\":3},\"tall\":{\"x\":8,\"y\":249,\"w\":154,\"h\":3}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":10,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":132,\"w\":300,\"h\":14},\"tall\":{\"x\":8,\"y\":258,\"w\":154,\"h\":14}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":false},{\"id\":11,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":132,\"w\":300,\"h\":14,\"align\":\"right\"},\"tall\":{\"x\":8,\"y\":258,\"w\":154,\"h\":14,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false}],\"upright\":\"auto\"}"
+
+[home_scene]
+script = '''
+backdrop(x, y, width, height)
+if width > height {
+    if 1 {
+        let gx_1 = x + 2
+        let gy_1 = y + 3
+        let chosen_1 = selected()
+        let first_1 = max(0, chosen_1 / 3 - 1) * 3
+        repeat copy_1 from first_1 to min(items(), first_1 + 6) {
+            let cx_1 = gx_1 + (copy_1 - first_1) % 3 * 106
+            let cy_1 = gy_1 + (copy_1 - first_1) / 3 * 72
+            if copy_1 == chosen_1 {
+                rect(cx_1, cy_1, 102, 68, #ffffff)
+            }
+            rect(cx_1 + 2, cy_1 + 2, 98, 64, #0050ef)
+            item_icon(copy_1, cx_1 + 39, cy_1 + 15, 24, 24, #ffffff)
+            line(item(copy_1), small, cx_1 + 7, cy_1 + 45, 88, 16, left, #ffffff)
+        }
+    }
+} else {
+    if 1 {
+        let gx_1 = x + 3
+        let gy_1 = y + 4
+        let chosen_1 = selected()
+        let first_1 = max(0, chosen_1 / 2 - 2) * 2
+        repeat copy_1 from first_1 to min(items(), first_1 + 6) {
+            let cx_1 = gx_1 + (copy_1 - first_1) % 2 * 84
+            let cy_1 = gy_1 + (copy_1 - first_1) / 2 * 92
+            if copy_1 == chosen_1 {
+                rect(cx_1, cy_1, 80, 88, #ffffff)
+            }
+            rect(cx_1 + 2, cy_1 + 2, 76, 84, #0050ef)
+            item_icon(copy_1, cx_1 + 28, cy_1 + 25, 24, 24, #ffffff)
+            line(item(copy_1), small, cx_1 + 7, cy_1 + 65, 66, 16, left, #ffffff)
+        }
+    }
+}
+'''
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":12,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@header_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\",\"locked\":true},{\"id\":17,\"kind\":\"group\",\"name\":\"Menu tiles, sideways\",\"hidden\":false,\"at\":{\"wide\":{\"x\":2,\"y\":3,\"w\":316,\"h\":143},\"tall\":null},\"bind\":{},\"children\":[{\"id\":13,\"kind\":\"box\",\"name\":\"Highlight\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":102,\"h\":68},\"tall\":null},\"bind\":{\"show\":{\"when\":{\"on\":\"highlighted\"}}},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":14,\"kind\":\"box\",\"name\":\"Tile\",\"hidden\":false,\"at\":{\"wide\":{\"x\":2,\"y\":2,\"w\":98,\"h\":64},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":15,\"kind\":\"symbol\",\"name\":\"Icon\",\"hidden\":false,\"at\":{\"wide\":{\"x\":39,\"y\":15,\"w\":24,\"h\":24},\"tall\":null},\"bind\":{},\"mark\":\"item\",\"color\":\"@selection_text\"},{\"id\":16,\"kind\":\"text\",\"name\":\"Name\",\"hidden\":false,\"at\":{\"wide\":{\"x\":7,\"y\":45,\"w\":88,\"h\":16},\"tall\":null},\"bind\":{},\"source\":\"item\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@selection_text\",\"scroll\":true}],\"clip\":false,\"repeat\":{\"count\":\"items\",\"columns\":3,\"rows\":2,\"dx\":106,\"dy\":72,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":22,\"kind\":\"group\",\"name\":\"Menu tiles, upright\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":3,\"y\":4,\"w\":164,\"h\":275}},\"bind\":{},\"children\":[{\"id\":18,\"kind\":\"box\",\"name\":\"Highlight\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":0,\"w\":80,\"h\":88}},\"bind\":{\"show\":{\"when\":{\"on\":\"highlighted\"}}},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":19,\"kind\":\"box\",\"name\":\"Tile\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":2,\"y\":2,\"w\":76,\"h\":84}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":20,\"kind\":\"symbol\",\"name\":\"Icon\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":28,\"y\":25,\"w\":24,\"h\":24}},\"bind\":{},\"mark\":\"item\",\"color\":\"@selection_text\"},{\"id\":21,\"kind\":\"text\",\"name\":\"Name\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":7,\"y\":65,\"w\":66,\"h\":16}},\"bind\":{},\"source\":\"item\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@selection_text\",\"scroll\":true}],\"clip\":false,\"repeat\":{\"count\":\"items\",\"columns\":2,\"rows\":3,\"dx\":84,\"dy\":92,\"turn\":0,\"start\":0,\"spin\":0}}],\"upright\":\"auto\"}"
+
+[icons]
+home_music = [
+    "........................",
+    "..................354...",
+    "............358acfff8...",
+    "........4acfffffffff8...",
+    "........8fffffffffff8...",
+    "........8fffffffffff8...",
+    "........8ffffffca8af8...",
+    "........8fc853....8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8...19ffdf8...",
+    "........8f8...cfffff8...",
+    "....19ffdf8..6ffffff8...",
+    "....cfffff8..8ffffff8...",
+    "...6ffffff8..6ffffff6...",
+    "...8ffffff8...cffffc....",
+    "...6ffffff6...19ff91....",
+    "....cffffc..............",
+    "....19ff91..............",
+    "........................",
+    "........................",
+]
+home_audiobooks = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "..da74............47ad..",
+    "..fffffb852..258bfffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..258bfffff..fffffb852..",
+    ".......47ad..da74.......",
+    "........................",
+    "........................",
+    "........................",
+]
+home_podcasts = [
+    "........................",
+    "........................",
+    "..........8ee8..........",
+    ".........8ffff8.........",
+    ".........effffe.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    "....8f4..ffffff..4f8....",
+    "....5f8..cffffc..8f5....",
+    "....1fd..3effe3..df1....",
+    ".....9f8..2772..8f9.....",
+    ".....1ef8......8fe1.....",
+    "......3efd8448dfe3......",
+    ".......19ffffff91.......",
+    ".........15ff51.........",
+    "...........ff...........",
+    ".......1888ff8881.......",
+    ".......8ffffffff8.......",
+    ".......1888888881.......",
+    "........................",
+]
+home_settings = [
+    "........................",
+    ".........288882.........",
+    ".........4ffff4.........",
+    ".....69..4ffff4..96.....",
+    "....6ff9.6ffff6.9ff6....",
+    "...6ffffdffffffdffff6...",
+    "...9ffffffffffffffff9...",
+    "....9ffffffffffffff9....",
+    ".....dfffffbbfffffd.....",
+    ".2446ffffc2..2cffff6442.",
+    ".8fffffff2....2fffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8fffffff2....2fffffff8.",
+    ".2446ffffc2..2cffff6442.",
+    ".....dfffffbbfffffd.....",
+    "....9ffffffffffffff9....",
+    "...9ffffffffffffffff9...",
+    "...6ffffdffffffdffff6...",
+    "....6ff9.6ffff6.9ff6....",
+    ".....69..4ffff4..96.....",
+    ".........4ffff4.........",
+    ".........288882.........",
+    "........................",
+]
+home_diagnostics = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    ".........3b3............",
+    ".........cfb............",
+    "........3fff1...........",
+    "........9fff5...........",
+    ".......1efff9...........",
+    ".......6ffcfd...........",
+    ".......cfc5ff3..........",
+    ".244446ff61ff7..2444442.",
+    "2effffffe1.bfb.2efffffe2",
+    "2effffff8..7ff17ffffffe2",
+    ".2444444...3ff5dfb44442.",
+    "............dfcff5......",
+    "............9fffe.......",
+    "............5fff8.......",
+    "............1fff2.......",
+    ".............bfc........",
+    ".............3b3........",
+    "........................",
+    "........................",
+    "........................",
+]
+home_now_playing = [
+    "........................",
+    ".........368863.........",
+    "......18dffffffd81......",
+    ".....4dffeb88beffd4.....",
+    "....6ffd6......6dff6....",
+    "...4ff91........19ff4...",
+    "..1df9............9fd1..",
+    "..8fd1...94.......1df8..",
+    "..df6....bfa1......6fd..",
+    ".3fe.....bffe7......ef3.",
+    ".6fb.....bffffc4....bf6.",
+    ".8f8.....bffffff91..8f8.",
+    ".8f8.....bffffff91..8f8.",
+    ".6fb.....bffffc4....bf6.",
+    ".3fe.....bffe7......ef3.",
+    "..df6....bfa1......6fd..",
+    "..8fd1...94.......1df8..",
+    "..1df9............9fd1..",
+    "...4ff91........19ff4...",
+    "....6ffd6......6dff6....",
+    ".....4dffeb88beffd4.....",
+    "......18dffffffd81......",
+    ".........368863.........",
+    "........................",
+]

@@ -426,8 +426,9 @@ static void draw_info(const EqualizerEditor *editor, Canvas *canvas)
     int padding = theme->metrics.padding;
     int width = theme->metrics.screen_width - 2 * padding;
     TextStyle band = {.font = theme->fonts.title,
-                      .color = editor->editing ? theme->colors.selection_top : theme->colors.text};
-    TextStyle preamp = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
+                      .color =
+                          editor->editing ? theme->colors->selection_top : theme->colors->text};
+    TextStyle preamp = {.font = theme->fonts.small, .color = theme->colors->text_secondary};
     draw_text(canvas, band, (Rect){padding, INFO_TOP, width, INFO_HEIGHT}, editor->band_text);
     int preamp_width = text_width(preamp.font, editor->preamp_text);
     draw_text(canvas, preamp,
@@ -445,7 +446,7 @@ static Rect bar_of(int center, int gain)
 
 static void draw_slider(const EqualizerEditor *editor, Canvas *canvas, int band)
 {
-    const ThemeColors *colors = &editor->config.theme->colors;
+    const ThemeColors *colors = editor->config.theme->colors;
     bool selected = band == editor->band;
     int left = COLUMN_LEFT + band * COLUMN_WIDTH;
     int center = left + COLUMN_WIDTH / 2;
@@ -502,7 +503,7 @@ static Rect side_bar_of(int zero_x, int middle, int gain)
 static void draw_stacked_slider(const EqualizerEditor *editor, Canvas *canvas,
                                 StackGeometry geometry, int band)
 {
-    const ThemeColors *colors = &editor->config.theme->colors;
+    const ThemeColors *colors = editor->config.theme->colors;
     bool selected = band == editor->band;
     int top = geometry.rows_top + band * STACK_ROW_HEIGHT;
     int middle = top + STACK_ROW_HEIGHT / 2;
@@ -548,8 +549,9 @@ static void draw_stacked_editor(const EqualizerEditor *editor, Canvas *canvas)
     StackGeometry geometry = stack_geometry(theme);
     header_draw(canvas, theme, editor->screen.title);
     TextStyle band = {.font = theme->fonts.title,
-                      .color = editor->editing ? theme->colors.selection_top : theme->colors.text};
-    TextStyle preamp = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
+                      .color =
+                          editor->editing ? theme->colors->selection_top : theme->colors->text};
+    TextStyle preamp = {.font = theme->fonts.small, .color = theme->colors->text_secondary};
     draw_text(canvas, band, (Rect){padding, geometry.info_top, width - 2 * padding, INFO_HEIGHT},
               editor->band_text);
     draw_text(canvas, preamp,
@@ -558,15 +560,15 @@ static void draw_stacked_editor(const EqualizerEditor *editor, Canvas *canvas)
     canvas_fill_rect(canvas,
                      (Rect){STACK_ROW_INSET, geometry.rows_top + editor->band * STACK_ROW_HEIGHT,
                             width - 2 * STACK_ROW_INSET, STACK_ROW_HEIGHT},
-                     editor->editing ? theme->colors.selection_background
-                                     : theme->colors.header_top);
+                     editor->editing ? theme->colors->selection_background
+                                     : theme->colors->header_top);
     int rows_height = EQUALIZER_CUSTOM_BANDS * STACK_ROW_HEIGHT;
     canvas_fill_rect(canvas, (Rect){geometry.zero_x, geometry.rows_top, 1, rows_height},
-                     theme->colors.text_tertiary);
+                     theme->colors->text_tertiary);
     for (int index = 0; index < EQUALIZER_CUSTOM_BANDS; index++) {
         draw_stacked_slider(editor, canvas, geometry, index);
     }
-    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors->text_tertiary};
     HintLines lines = hint_lines(editor);
     int hint_top = geometry.rows_top + rows_height + STACK_HINT_GAP;
     draw_centered(canvas, hint, (Rect){0, hint_top, width, LINE_HEIGHT}, i18n_text(lines.first));
@@ -588,13 +590,13 @@ static void draw_editor(void *context, Canvas *canvas)
     canvas_fill_rect(
         canvas,
         (Rect){COLUMN_LEFT + editor->band * COLUMN_WIDTH, COLUMN_TOP, COLUMN_WIDTH, COLUMN_HEIGHT},
-        editor->editing ? theme->colors.selection_background : theme->colors.header_top);
+        editor->editing ? theme->colors->selection_background : theme->colors->header_top);
     canvas_fill_rect(canvas, (Rect){COLUMN_LEFT, ZERO_Y, width - 2 * COLUMN_LEFT, 1},
-                     theme->colors.text_tertiary);
+                     theme->colors->text_tertiary);
     for (int band = 0; band < EQUALIZER_CUSTOM_BANDS; band++) {
         draw_slider(editor, canvas, band);
     }
-    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors->text_tertiary};
     draw_centered(canvas, hint, (Rect){0, HINT_TOP, width, LINE_HEIGHT},
                   i18n_text(editor->bypassed  ? STR_SETTINGS_EQ_BYPASS_HINT
                             : editor->editing ? STR_SETTINGS_EQ_EDIT_HINT

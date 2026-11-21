@@ -1,0 +1,118 @@
+name = "Dark"
+author = "EchoPod"
+description = "The player's own dark look, where every theme starts"
+selection = "selection"
+
+[colors]
+background = "#101114"
+text = "#f2f2f5"
+text_secondary = "#8e8e96"
+text_tertiary = "#62626a"
+selection_background = "#2260d0"
+selection_top = "#5291f0"
+selection_shine = "#78aaf8"
+selection_text = "#ffffff"
+header_background = "#16171b"
+header_top = "#2e2f36"
+header_text = "#f2f2f5"
+divider = "#303138"
+scrollbar_thumb = "#60616a"
+danger = "#eb4d3d"
+success = "#34c759"
+chevron = "#6e6e76"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+shine = "selection_shine"
+shine_height = 1
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+
+[boxes.progress_track]
+fill = "divider"
+
+[boxes.progress_fill]
+fill = "text"
+
+[boxes.progress_active]
+fill = "selection_background"
+
+[[accents]]
+name = "Blue"
+selection_background = "#2260d0"
+selection_top = "#5291f0"
+selection_shine = "#78aaf8"
+
+[[accents]]
+name = "Red"
+selection_background = "#c0262e"
+selection_top = "#e65458"
+selection_shine = "#f48080"
+
+[[accents]]
+name = "Orange"
+selection_background = "#ce6412"
+selection_top = "#f0943a"
+selection_shine = "#faba6e"
+
+[[accents]]
+name = "Green"
+selection_background = "#1c8844"
+selection_top = "#44ba6c"
+selection_shine = "#78d696"
+
+[[accents]]
+name = "Teal"
+selection_background = "#0e7c88"
+selection_top = "#32aeb8"
+selection_shine = "#6eced4"
+
+[[accents]]
+name = "Purple"
+selection_background = "#6c38c2"
+selection_top = "#9666e8"
+selection_shine = "#ba96f4"
+
+[[accents]]
+name = "Pink"
+selection_background = "#c43076"
+selection_top = "#ea609e"
+selection_shine = "#f692be"
+
+[[accents]]
+name = "Graphite"
+selection_background = "#4c4e5a"
+selection_top = "#747684"
+selection_shine = "#9c9eaa"

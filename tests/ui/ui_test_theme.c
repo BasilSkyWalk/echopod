@@ -2,26 +2,28 @@
 
 #include "tiny_font.h"
 
+const ThemeColors TEST_COLORS = {
+    .background = 0x0000,
+    .text = 0xFFFF,
+    .text_secondary = 0x7BEF,
+    .text_tertiary = 0x4208,
+    .selection_background = 0x001F,
+    .selection_top = 0x001F,
+    .selection_shine = 0x001F,
+    .selection_text = 0xFFE0,
+    .header_background = 0x8000,
+    .header_top = 0x8000,
+    .header_text = 0x07FF,
+    .divider = 0x4208,
+    .scrollbar_thumb = 0xF81F,
+    .danger = 0xF800,
+    .success = 0x07E0,
+    .chevron = 0xC618,
+};
+
 const Theme TEST_THEME = {
-    .colors =
-        {
-            .background = 0x0000,
-            .text = 0xFFFF,
-            .text_secondary = 0x7BEF,
-            .text_tertiary = 0x4208,
-            .selection_background = 0x001F,
-            .selection_top = 0x001F,
-            .selection_shine = 0x001F,
-            .selection_text = 0xFFE0,
-            .header_background = 0x8000,
-            .header_top = 0x8000,
-            .header_text = 0x07FF,
-            .divider = 0x4208,
-            .scrollbar_thumb = 0xF81F,
-            .danger = 0xF800,
-            .success = 0x07E0,
-            .chevron = 0xC618,
-        },
+    .colors = &TEST_COLORS,
+    .boxes = &THEME_STANDARD_BOXES,
     .fonts = {.title = &TINY_FONT, .body = &TINY_FONT, .small = &TINY_FONT},
     .metrics =
         {
@@ -38,3 +40,13 @@ const Theme TEST_THEME = {
         },
     .marquee = {.pause_ms = 1000, .speed_px_per_s = 30, .gap_px = 8},
 };
+
+ThemeColors *ui_test_colors(Theme *theme)
+{
+    static ThemeColors scratch;
+    if (theme->colors != &scratch) {
+        scratch = *theme->colors;
+        theme->colors = &scratch;
+    }
+    return &scratch;
+}

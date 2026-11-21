@@ -14,6 +14,7 @@
 
 void fake_hal_reset(void);
 void fake_hal_set_version(const char *version);
+void fake_hal_wipe_theme_assets(void);
 void fake_hal_set_build_day(uint32_t day);
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size);
 void fake_hal_add_directory_entry(const char *path, const char *name, bool directory, bool hidden);
@@ -28,6 +29,12 @@ int fake_hal_watchdog_test_count(void);
 int fake_hal_keep_alive_count(void);
 void fake_hal_set_restart_pending(bool pending);
 void fake_hal_set_np_faces(bool present);
+void fake_hal_set_builtin_themes(bool present);
+void fake_hal_wipe_scene_memory(void);
+void fake_hal_set_scene_memory(bool present);
+void fake_hal_set_startup(bool present);
+int fake_hal_startup_loads(void);
+int fake_hal_startup_releases(void);
 void fake_hal_set_language_pack(const uint8_t *pack, uint32_t size);
 uint32_t fake_hal_language_requested(void);
 void fake_hal_set_reserve_result(HalReserveResult result);

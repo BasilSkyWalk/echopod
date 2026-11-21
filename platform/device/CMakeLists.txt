@@ -255,6 +255,7 @@ target_link_options(echo_device PRIVATE
     -flto -flto-partition=one
     ${ECHO_OVERLAY_IMPORT_OPTIONS}
     -Wl,--require-defined=NOW_PLAYING_FACES
+    -Wl,--require-defined=APP_STARTUP
     -T${ECHO_DEVICE_LINKER_SCRIPT}
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_device.map
 )
@@ -274,6 +275,10 @@ target_link_options(echo_rescan_overlay PRIVATE
     -Wl,--allow-multiple-definition
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_rescan_overlay.map
 )
+
+if(ECHO_TEST_SLOT_1_RESTORE)
+    set_property(SOURCE board/update.c APPEND PROPERTY COMPILE_DEFINITIONS ECHO_TEST_SLOT_1_RESTORE)
+endif()
 
 set(ECHO_USB_OVERLAY_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/overlay/usb_overlay.ld)
 add_executable(echo_usb_overlay
@@ -308,7 +313,7 @@ set(ECHO_FIRMWARE_VERSION "0.12.0" CACHE STRING "major.minor.patch written to th
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
 set(ECHO_GLYPH_FACE_ARGUMENTS "")
-foreach(face_file ${ECHO_GLYPH_FACE_FILES} ${ECHO_LANGUAGE_PACK_FILES})
+foreach(face_file ${ECHO_GLYPH_FACE_FILES} ${ECHO_LANGUAGE_PACK_FILES} ${ECHO_BUILTIN_THEME_FILES})
     list(APPEND ECHO_GLYPH_FACE_ARGUMENTS --glyph-face ${face_file})
 endforeach()
 

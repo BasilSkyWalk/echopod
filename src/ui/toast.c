@@ -1,6 +1,7 @@
 #include "ui/toast.h"
 
 #include "core/deadline.h"
+#include "ui/box.h"
 #include "ui/label.h"
 
 enum {
@@ -43,9 +44,8 @@ void toast_draw(const Toast *toast, Canvas *canvas, const Theme *theme)
     Rect area = toast_area(toast, theme);
     Rect inner = {area.x + BORDER, area.y + BORDER, area.width - 2 * BORDER,
                   area.height - 2 * BORDER};
-    TextStyle style = {.font = theme->fonts.body, .color = theme->colors.header_text};
-    canvas_fill_rect(canvas, area, theme->colors.divider);
-    canvas_fill_rect(canvas, inner, theme->colors.header_background);
+    TextStyle style = {.font = theme->fonts.body, .color = theme->colors->header_text};
+    box_draw(canvas, theme->colors, &theme->boxes->toast, area);
     Rect text_area = label_centered_area(style.font, inner, toast->text);
     label_draw(canvas, style, (Label){.area = text_area, .text = toast->text});
 }

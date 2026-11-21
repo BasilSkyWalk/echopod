@@ -1,0 +1,34 @@
+name = "LCD deck"
+author = "EchoPod"
+description = "A green segment display with a big clock, a spectrum and lit mode legends"
+
+[colors]
+background = "#202028"
+text = "#b0c468"
+text_secondary = "#90a850"
+text_tertiary = "#788848"
+selection_background = "#90a850"
+selection_top = "#a0b860"
+selection_shine = "#c8dc8c"
+selection_text = "#181820"
+header_background = "#181820"
+header_top = "#383840"
+header_text = "#b0c468"
+divider = "#383840"
+scrollbar_thumb = "#788848"
+danger = "#f86048"
+success = "#78c860"
+chevron = "#788848"
+
+[now_playing_scene]
+file = "lcd.scene"
+
+[now_playing_scene.chrome]
+background = "#202028"
+header_top = "#404048"
+header_background = "#181820"
+divider = "#484850"
+header_text = "#b0c468"
+text_tertiary = "#90a850"
+success = "#78c860"
+danger = "#f86048"

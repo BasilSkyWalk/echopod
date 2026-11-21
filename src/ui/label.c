@@ -49,7 +49,13 @@ Rect label_centered_area(const Font *font, Rect bounds, const char *text)
 
 void label_draw(Canvas *canvas, TextStyle style, Label label)
 {
-    Canvas clipped = canvas_clipped(canvas, label.area);
+    Rect area = label.area;
+    int line = font_line_height(style.font);
+    if (line > area.height) {
+        area.y -= (line - area.height) / 2;
+        area.height = line;
+    }
+    Canvas clipped = canvas_clipped(canvas, area);
     if (rect_is_empty(clipped.clip)) {
         return;
     }

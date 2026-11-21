@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "core/i18n.h"
+#include "ui/backdrop.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/navigation.h"
@@ -62,7 +63,7 @@ static void update(void *context, uint32_t now_ms)
 static void draw_line(Canvas *canvas, const Theme *theme, Rect content, int index)
 {
     const SampleLine *line = &LINES[index];
-    Color color = line->secondary ? theme->colors.text_secondary : theme->colors.text;
+    Color color = line->secondary ? theme->colors->text_secondary : theme->colors->text;
     TextStyle style = {.font = font_of(theme, line->font), .color = color};
     Rect area = {content.x + theme->metrics.padding, content.y + TOP_MARGIN + index * LINE_HEIGHT,
                  content.width - 2 * theme->metrics.padding, LINE_HEIGHT};
@@ -74,7 +75,7 @@ static void draw(void *context, Canvas *canvas)
     const FontSampleScreen *sample = context;
     const Theme *theme = sample->theme;
     Rect content = theme_content_area(theme);
-    canvas_fill_rect(canvas, content, theme->colors.background);
+    backdrop_paint(canvas, theme, content);
     header_draw(canvas, theme, sample->screen.title);
     for (int index = 0; index < LINE_COUNT; index++) {
         draw_line(canvas, theme, content, index);

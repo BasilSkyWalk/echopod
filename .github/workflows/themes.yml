@@ -1,0 +1,112 @@
+name: themes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "themes/**"
+      - "assets/themes/**"
+      - "web/editor/**"
+      - "platform/web/**"
+      - "src/**"
+      - "cmake/wasm32.cmake"
+      - "tools/theme_pack.py"
+      - "tools/scene_compile.py"
+      - "tools/web_editor.py"
+      - "tools/demo_library.py"
+      - ".github/workflows/themes.yml"
+  pull_request:
+    paths:
+      - "themes/**"
+      - "assets/themes/**"
+      - "web/editor/**"
+      - "platform/web/**"
+      - "src/ui/**"
+      - "src/np_faces/**"
+      - "cmake/wasm32.cmake"
+      - "tools/theme_pack.py"
+      - "tools/scene_compile.py"
+      - "tools/web_editor.py"
+      - "tools/demo_library.py"
+      - ".github/workflows/themes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: themes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    env:
+      CMAKE_GENERATOR: Ninja
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install the tools' packages
+        run: python -m pip install -r tools/requirements.txt
+      - name: Check the shared themes
+        run: |
+          {
+            echo '### Shared themes'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          python tools/theme_pack.py --themes themes --base assets/themes/dark.toml \
+            --definitions src/ui/include/ui --output build/themes --strict 2>&1 \
+            | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - name: Install the WebAssembly compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build
+      - name: Build the preview
+        run: |
+          cmake --preset web
+          cmake --build --preset web
+      - name: Build the site
+        run: >
+          python tools/web_editor.py --pages web/editor
+          --module build/web/platform/web/echo_preview.wasm
+          --themes assets/themes --community themes --definitions src/ui/include/ui
+          --glyphs assets/fonts/glyph_pack.json --packs src/fonts/packs
+          --output build/web-editor
+      - name: Draw every theme
+        run: node web/editor/render_theme.mjs build/web-editor
+      - name: Test the packer and the pages
+        run: python -m unittest tools.tests.test_theme_pack tools.tests.test_web_editor
+      - uses: actions/upload-artifact@v4
+        with:
+          name: theme-previews
+          path: build/web-editor/previews
+          if-no-files-found: error
+      - if: github.event_name != 'pull_request' && vars.THEME_SITE == 'on'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web-editor
+
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.THEME_SITE == 'on'
+    needs: site
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

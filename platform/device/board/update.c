@@ -20,7 +20,8 @@ enum {
     HIGHEST_NUMBER = 97,
     TENS_AT = 7,
     UNITS_AT = 8,
-    SECTORS_PER_MIB = 2048
+    SECTORS_PER_MIB = 2048,
+    TEST_SLOT_MIB = 30
 };
 
 static const char UPDATE_TEMPLATE[] = "/HIFIEC00.IMG";
@@ -91,8 +92,16 @@ static bool open_update(UpdateStorage *storage)
     if (!emmc_start(&info) || !fat_mount(&volume, device) || !open_highest_numbered()) {
         return false;
     }
-    *storage = (UpdateStorage){emmc_read,          emmc_write,         NULL,
-                               info.layout.slot_1, info.layout.slot_2, info.layout.slot_sectors};
+    *storage = (UpdateStorage){emmc_read,
+                               emmc_write,
+                               NULL,
+                               info.layout.slot_1,
+                               info.layout.slot_2,
+                               info.layout.slot_sectors,
+                               info.layout.firmware_end - info.layout.slot_1};
+#ifdef ECHO_TEST_SLOT_1_RESTORE
+    storage->slot_sectors = TEST_SLOT_MIB * SECTORS_PER_MIB;
+#endif
     return true;
 }
 
@@ -156,6 +165,8 @@ void update_after_usb(UsbShared *state)
         string_builder_append_unsigned(&builder, (uint32_t)updater_refusal());
         string_builder_append_char(&builder, '/');
         string_builder_append_unsigned(&builder, storage.slot_sectors / SECTORS_PER_MIB);
+        string_builder_append_char(&builder, '/');
+        string_builder_append_unsigned(&builder, storage.area_sectors / SECTORS_PER_MIB);
         string_builder_append_char(&builder, ')');
         app_show_notice(i18n_text(STR_UPDATE_NOT_INSTALLED), text);
         board_wait_for_key();

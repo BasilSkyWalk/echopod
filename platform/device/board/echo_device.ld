@@ -71,13 +71,23 @@ SECTIONS
         device_resident_end = .;
     } > RESIDENT_RAM
 
-    .np_faces :
+    OVERLAY 0x0308BA00 : NOCROSSREFS
     {
-        LONG(0) LONG(0) LONG(0) LONG(0)
-        KEEP(*(.np_faces.entry))
-        *(.np_faces.text .np_faces.text.*)
-        *(.np_faces.rodata .np_faces.rodata.*)
-        . = ALIGN(4);
+        .np_faces
+        {
+            LONG(0) LONG(0) LONG(0) LONG(0)
+            KEEP(*(.np_faces.entry))
+            *(.np_faces.text .np_faces.text.*)
+            *(.np_faces.rodata .np_faces.rodata.*)
+            . = ALIGN(4);
+        }
+        .startup
+        {
+            LONG(0) LONG(0) LONG(0) LONG(0)
+            KEEP(*(.startup.entry))
+            *(.startup.text .startup.text.*)
+            . = ALIGN(4);
+        }
     } > NP_FACES_RAM
 
     .comment 0 : { *(.comment) }
@@ -97,3 +107,5 @@ ASSERT(device_noinit_end <= 0x0304C000, ".data, .bss and .noinit must end below 
 ASSERT(ADDR(.resident) == 0x0309A800, "the resident tables must start at 0x0309A800")
 ASSERT(ADDR(.np_faces) == 0x0308BA00, "the Now Playing faces must start at 0x0308BA00")
 ASSERT(NOW_PLAYING_FACES == 0x0308BA10, "the Now Playing faces entry must follow the 16-byte header")
+ASSERT(ADDR(.startup) == 0x0308BA00, "the start-up code must share the faces window at 0x0308BA00")
+ASSERT(APP_STARTUP == 0x0308BA10, "the start-up entry must follow the 16-byte header")

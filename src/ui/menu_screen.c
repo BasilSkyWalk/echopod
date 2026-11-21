@@ -58,10 +58,21 @@ static ScreenAction select_item(void *context, int index)
     return item->select != NULL ? item->select(item->context) : screen_action_none();
 }
 
-static bool panel_below(const MenuScreen *menu)
+static bool scene_on(const MenuScreen *menu)
+{
+    return menu->config.scene != NULL && menu->config.scene->on;
+}
+
+static bool panel_shown(const MenuScreen *menu)
 {
     const MenuPanel *panel = &menu->config.panel;
-    return panel->width > 0 && panel->draw != NULL && theme_is_portrait(menu->config.theme);
+    return panel->width > 0 && panel->draw != NULL && !menu->config.theme->no_menu_panel &&
+           !scene_on(menu);
+}
+
+static bool panel_below(const MenuScreen *menu)
+{
+    return panel_shown(menu) && theme_is_portrait(menu->config.theme);
 }
 
 static int rows_above_panel(const MenuScreen *menu)
@@ -76,7 +87,9 @@ static int rows_above_panel(const MenuScreen *menu)
 
 static void fit_list(MenuScreen *menu)
 {
-    menu->list.visible_rows = panel_below(menu) ? rows_above_panel(menu) : 0;
+    if (!scene_on(menu)) {
+        menu->list.visible_rows = panel_below(menu) ? rows_above_panel(menu) : 0;
+    }
 }
 
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
@@ -98,21 +111,29 @@ static void update(void *context, uint32_t now_ms)
 {
     MenuScreen *menu = context;
     menu->now_ms = now_ms;
+    MenuScene *scene = menu->config.scene;
+    if (scene != NULL) {
+        scene->on = scene->update(scene->context, now_ms);
+    }
     fit_list(menu);
     const MenuPanel *panel = &menu->config.panel;
-    if (panel->width > 0 && panel->update != NULL) {
+    if (panel_shown(menu) && panel->update != NULL) {
         panel->update(panel->context, now_ms);
     }
 }
 
 static void draw(void *context, Canvas *canvas)
 {
-    const MenuScreen *menu = context;
+    MenuScreen *menu = context;
+    const MenuScene *scene = menu->config.scene;
+    if (scene_on(menu) && scene->draw(scene->context, canvas, menu)) {
+        return;
+    }
     const Theme *theme = menu->config.theme;
     const MenuPanel *panel = &menu->config.panel;
     Rect content = theme_content_area(theme);
     header_draw(canvas, theme, menu->config.title);
-    if (panel->width <= 0 || panel->draw == NULL) {
+    if (!panel_shown(menu)) {
         list_view_draw(&menu->list, canvas, content, menu->now_ms);
         return;
     }
@@ -149,6 +170,20 @@ Screen *menu_screen_init(MenuScreen *menu, MenuConfig config)
         .draw = draw,
     };
     return &menu->screen;
+}
+
+void menu_screen_scene_list(void *context, Canvas *canvas, Rect area)
+{
+    MenuScreen *menu = context;
+    int rows = area.height / menu->config.theme->metrics.row_height;
+    menu->list.visible_rows = rows > 0 ? rows : 1;
+    list_view_draw(&menu->list, canvas, area, menu->now_ms);
+}
+
+int menu_screen_scene_slot(void *context, int position)
+{
+    const MenuScreen *menu = context;
+    return (int)(shown_item(menu, position) - menu->config.items);
 }
 
 ScreenAction menu_open_screen(void *screen)

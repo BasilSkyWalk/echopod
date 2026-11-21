@@ -13,7 +13,7 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **Tested on one player.** One Echo Mini 8 GB, starting from FiiO firmware 3.7.0, 3.9.0 and 4.0.0, installed from Windows 11. Other units, other FiiO versions and other computers haven't been tried.
 - **Installing from a Mac is unproven.** Earlier attempts to copy an image from a Mac with FiiO's firmware running were refused (FiiO's firmware showed "Updating" for under a second and kept itself). The cause isn't known. Install from Windows if you can.
 - **The 512 MB Echo Mini isn't supported.** EchoPod refuses its firmware, and its firmware ignores EchoPod's file.
-- **Going back to FiiO's firmware** is checked with FiiO's 8 GB 3.7.0, 3.8.0, 3.9.0 and 4.0.0 images, and 0.3.0 installed FiiO 4.0.0 on the player and was installed back from it (EchoPod 0.2.0 refuses 4.0.0, see `docs/user-guide.md`). Another custom firmware can't be installed from EchoPod: go back to FiiO's first.
+- **Going back to FiiO's firmware** is checked with FiiO's 8 GB 3.7.0, 3.8.0, 3.9.0 and 4.0.0 images, and 0.3.0 installed FiiO 4.0.0 on the player and was installed back from it (EchoPod 0.2.0 refuses 4.0.0, see `docs/user-guide.md`). Another custom firmware can't be installed from EchoPod: go back to FiiO's first. On a player whose firmware area is too small for two copies of FiiO's image (0.12.0 and earlier refuse FiiO's file there with `E6/30`), EchoPod writes one copy only; that path hasn't been run on such a player yet, and a power cut near its end needs maskrom (`docs/device-recovery.md`).
 - **If the player doesn't start at all,** the only recovery known is the chip's maskrom mode (`docs/device-recovery.md`). It works, but it needs a patched tool and care.
 
 ## USB
@@ -51,8 +51,8 @@ EchoPod is early firmware made by one person and tested on one player. It comes 
 - **The VU needles and the LCD spectrum are decorative.** The player has no audio-level data, so they move in a fixed pattern that doesn't follow the music.
 - **VU meters in landscape leave out the album, the format and the modes row.** Portrait shows them.
 - **Standard shows if the face code can't be loaded.** The faces are read from internal storage when first needed. If that fails (internal storage doesn't answer, or the copy is damaged twice), Now Playing draws Standard and keeps doing so until you restart the player.
-- **Going back to an older EchoPod resets the face to Standard.** Older firmware ignores the setting and writes 0 in its place the next time it saves. No other setting is lost.
-- **The faces' region is nearly full:** it has 876 of 13,824 bytes free, so a fifth face needs a smaller one or a bigger region. `.high_ram` keeps 31,140 bytes free (44,964 before the faces).
+- **Going back to 0.12.0 or earlier with Cassette, VU meters, Turntable or LCD deck as the theme resets all settings.** The four are themes now, and older firmware rejects a theme value it doesn't know and starts from the defaults. Choose Dark or Light before you go back. Picking a theme file doesn't change this setting, so what counts is the built-in theme you used before it.
+- **The faces' region is full:** after the faces' code and a theme's largest scene it has 20 of 13,824 bytes free, and the faces' code can grow by about 290 bytes before it needs another 512-byte sector that isn't there. More scene functions need a smaller scene limit or a bigger region. The main code window has 124 bytes free in the developer build and 1,664 in the release build. `.high_ram` keeps 31,140 bytes free (44,964 before the faces).
 - **"Standard" isn't translated** in any language; the Portrait status bar setting shares the word. The LCD deck's legends stay English on purpose.
 
 ## Languages

@@ -1,0 +1,34 @@
+name = "VU meters"
+author = "EchoPod"
+description = "A pair of moving-coil meters, the needles swinging while a track plays"
+
+[colors]
+background = "#201c18"
+text = "#f0e8d8"
+text_secondary = "#c0b090"
+text_tertiary = "#a89880"
+selection_background = "#c88020"
+selection_top = "#d89030"
+selection_shine = "#f8c870"
+selection_text = "#201c18"
+header_background = "#181410"
+header_top = "#383430"
+header_text = "#f0e8d8"
+divider = "#403830"
+scrollbar_thumb = "#a89880"
+danger = "#f86048"
+success = "#78c860"
+chevron = "#a89880"
+
+[now_playing_scene]
+file = "vu.scene"
+
+[now_playing_scene.chrome]
+background = "#201c18"
+header_top = "#383430"
+header_background = "#181410"
+divider = "#484038"
+header_text = "#f0e8d8"
+text_tertiary = "#a89880"
+success = "#78c860"
+danger = "#f86048"

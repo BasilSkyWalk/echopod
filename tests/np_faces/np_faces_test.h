@@ -46,6 +46,7 @@ typedef bool (*NpTestCheck)(const NpTestScene *scene);
 extern const NpTestLayout NP_TEST_LAYOUTS[NP_TEST_LAYOUT_COUNT];
 extern const char NP_TEST_LONG_TITLE[];
 
+bool np_test_scene_code(uint8_t face, SceneCode *code, const ThemeColors **chrome);
 NpTestScene np_test_scene(uint8_t face, NpTestLayout layout, NpTestState state);
 NowPlayingFrame np_test_frame(const NpTestScene *scene);
 void np_test_clear(Color *pixels);

@@ -213,7 +213,7 @@ static bool apply_field(FilterFields *fields, uint8_t field, const Token *value,
         return fail(error, line, EQUALIZER_TEXT_VALUE);
     }
     if (field == FIELD_FREQUENCY) {
-        if (parsed <= 0 || parsed > UINT16_MAX || (uint32_t)parsed * 20 >= EQUALIZER_MAX_RATE * 9) {
+        if (parsed <= 0 || parsed > (int32_t)UINT16_MAX || (uint32_t)parsed * 20 >= EQUALIZER_MAX_RATE * 9) {
             return fail(error, line, EQUALIZER_TEXT_FREQUENCY);
         }
         fields->frequency_hz = parsed;

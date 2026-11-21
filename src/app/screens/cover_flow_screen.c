@@ -2,10 +2,10 @@
 
 #include <stddef.h>
 
+#include "core/draw_profile.h"
 #include "core/i18n.h"
 #include "core/random.h"
 #include "core/string_builder.h"
-#include "draw_profile.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "settings/settings.h"
@@ -750,7 +750,7 @@ static void draw_cover(const CoverFlowScreen *flow, Canvas *canvas, int position
         image_draw_reflection(canvas, image, quad, reflected, REFLECTION_ROWS);
         draw_profile_add(DRAW_PART_REFLECTIONS, hal_clock_microseconds() - reflection_us);
     } else {
-        image_fill_quad(canvas, quad, flow->config.theme->colors.divider);
+        image_fill_quad(canvas, quad, flow->config.theme->colors->divider);
     }
 }
 
@@ -773,8 +773,8 @@ static void draw_text(const CoverFlowScreen *flow, Canvas *canvas)
     const Theme *theme = flow->config.theme;
     int padding = theme->metrics.padding;
     int width = theme->metrics.screen_width - 2 * padding;
-    TextStyle title = {.font = theme->fonts.title, .color = theme->colors.text};
-    TextStyle artist = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
+    TextStyle title = {.font = theme->fonts.title, .color = theme->colors->text};
+    TextStyle artist = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
     bool stacked = theme_is_portrait(theme);
     int title_top = stacked ? STACK_TITLE_TOP : TITLE_TOP;
     int artist_top = stacked ? STACK_ARTIST_TOP : ARTIST_TOP;
@@ -785,7 +785,7 @@ static void draw_text(const CoverFlowScreen *flow, Canvas *canvas)
 
 static void draw_empty(const Theme *theme, Canvas *canvas)
 {
-    TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text_secondary};
+    TextStyle style = {.font = theme->fonts.body, .color = theme->colors->text_secondary};
     Rect screen = {0, 0, theme->metrics.screen_width, theme->metrics.screen_height};
     const char *message = i18n_text(STR_MENU_NOTHING_HERE);
     label_draw(canvas, style, (Label){label_centered_area(style.font, screen, message), message});

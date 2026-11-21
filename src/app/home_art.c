@@ -112,7 +112,7 @@ void home_art_draw(void *context, Canvas *canvas, Rect area)
     Rect divider =
         below ? (Rect){area.x, area.y, area.width, 1} : (Rect){area.x, area.y, 1, area.height};
     canvas_fill_rect(canvas, area, PANEL_BACKGROUND);
-    canvas_fill_rect(canvas, divider, art->theme->colors.divider);
+    canvas_fill_rect(canvas, divider, art->theme->colors->divider);
     if (art->notice != NULL) {
         TextStyle style = {.font = art->theme->fonts.small, .color = NOTICE_TEXT};
         Rect line = {area.x + NOTICE_MARGIN, area.y, area.width - 2 * NOTICE_MARGIN, area.height};

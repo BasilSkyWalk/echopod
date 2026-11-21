@@ -1,0 +1,22 @@
+name = "Orbit"
+author = "EchoPod"
+description = "Deep navy with a Now Playing scene: the cover in a ring of lights that fill as the track plays"
+
+[colors]
+background = "#0b0e19"
+text = "#eef1fa"
+text_secondary = "#8e97b4"
+text_tertiary = "#6c7592"
+selection_background = "#2b6fa8"
+selection_top = "#3f8fd0"
+selection_shine = "#7fd3ff"
+selection_text = "#ffffff"
+header_background = "#10142a"
+header_top = "#1b2140"
+header_text = "#eef1fa"
+divider = "#232a42"
+scrollbar_thumb = "#4a5578"
+chevron = "#6c7592"
+
+[now_playing_scene]
+file = "orbit.scene"

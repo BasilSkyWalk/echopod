@@ -1,4 +1,5 @@
 #include "app/app.h"
+#include "app/startup.h"
 
 #include <stddef.h>
 
@@ -8,14 +9,15 @@
 #include "card_files.h"
 #include "clock_store.h"
 #include "core/deadline.h"
+#include "core/draw_profile.h"
 #include "core/i18n.h"
 #include "core/key_tracker.h"
 #include "core/low_battery.h"
 #include "core/power_policy.h"
+#include "core/resident.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
 #include "default_theme.h"
-#include "draw_profile.h"
 #include "equalizer_store.h"
 #include "favorites_store.h"
 #include "frame_overlay.h"
@@ -38,6 +40,8 @@
 #include "scrobbler_log.h"
 #include "settings/rocker.h"
 #include "settings_store.h"
+#include "theme_store.h"
+#include "ui/backdrop.h"
 #include "ui/choice_screen.h"
 #include "ui/fade.h"
 #include "ui/header.h"
@@ -59,7 +63,8 @@ enum {
     IDLE_RENDER_MS = 100,
     NUMBER_CAPACITY = 12,
     PROGRESS_TEXT_CAPACITY = 64,
-    MESSAGE_TEXT_CAPACITY = 64
+    MESSAGE_TEXT_CAPACITY = 64,
+    START_REFUSAL_MS = 5000
 };
 
 static const KeyConfig KEY_CONFIG = {
@@ -115,6 +120,7 @@ typedef struct AppState {
     KeyTracker keys;
     bool rocker_swapped[KEY_COUNT];
     uint32_t dac_volume_until_ms;
+    ThemeColors colors;
     Theme theme;
     Theme stage_theme;
     int shown_theme;
@@ -169,6 +175,7 @@ typedef struct AppState {
     AppOptions options;
     bool display_on;
     bool powered_off;
+    bool start_refused;
     bool charging;
     uint32_t charge_lit_until_ms;
     HalBattery charge_battery;
@@ -182,6 +189,7 @@ static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
 static const char SPLASH_TEXT[] = "EchoPod";
 static const char GOODBYE_TEXT[] = "Goodbye";
+static const char START_CODE_MISSING[] = "Start-up code missing: reinstall the update";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_LONG_SIDE];
 
@@ -218,24 +226,84 @@ static int theme_key(const Settings *settings)
 {
     return (int)settings->orientation | settings->options[OPTION_ACCENT] << 2 |
            settings->options[OPTION_HIGHLIGHT] << 5 | settings->options[OPTION_STATUS_BAR] << 7 |
-           settings->options[OPTION_THEME] << 8;
+           settings->options[OPTION_THEME] << 8 | theme_store_revision() << 12;
+}
+
+static void wear_spacing(ThemeMetrics *metrics, const uint8_t *spacing)
+{
+    for (int id = 0; id < THEME_SPACING_COUNT; id++) {
+        if (spacing[id] != THEME_PACKAGE_SPACING_UNSET) {
+            theme_space(metrics, (ThemeSpacingId)id, spacing[id] - 1);
+        }
+    }
+}
+
+static void wear_fonts(ThemeFonts *fonts)
+{
+    const Font **fields[] = {&fonts->title, &fonts->body, &fonts->small, &fonts->status};
+    const Font *const builtin[THEME_FONT_COUNT] = {
+#define THEME_FONT(id, name, height) DEFAULT_THEME.fonts.name,
+#include "ui/theme_fonts.def"
+#undef THEME_FONT
+    };
+    for (size_t field = 0; field < sizeof fields / sizeof fields[0]; field++) {
+        for (int id = 0; id < THEME_FONT_COUNT; id++) {
+            const Font *worn = theme_store_font((ThemeFontId)id);
+            if (*fields[field] == builtin[id] && worn != NULL) {
+                *fields[field] = worn;
+                break;
+            }
+        }
+    }
+}
+
+static void wear_theme_file(Theme *theme, Theme *stage)
+{
+    const ThemePackage *package = theme_store_package();
+    if (package != NULL) {
+        wear_fonts(&theme->fonts);
+        wear_fonts(&stage->fonts);
+        theme->icons = theme_store_icons();
+        theme->wallpaper = theme_store_wallpaper(theme_is_portrait(theme));
+        theme->layout = &package->layouts[theme_is_portrait(theme) ? THEME_WALLPAPER_PORTRAIT
+                                                                   : THEME_WALLPAPER_LANDSCAPE];
+        wear_spacing(&theme->metrics, package->spacing);
+    }
+}
+
+static void adopt_face_theme(void)
+{
+    uint8_t *options = app.settings.settings.options;
+    uint8_t face = options[OPTION_NOW_PLAYING_FACE];
+    if (face == NP_FACE_STANDARD) {
+        return;
+    }
+    if (face < NP_FACE_COUNT) {
+        options[OPTION_THEME] = (uint8_t)(THEME_CASSETTE + face - NP_FACE_CASSETTE);
+    }
+    options[OPTION_NOW_PLAYING_FACE] = NP_FACE_STANDARD;
+    (void)settings_store_save(&app.settings);
 }
 
 static void apply_orientation(void)
 {
     const Settings *settings = &app.settings.settings;
     Orientation orientation = settings->orientation;
+    theme_store_follow(settings->options[OPTION_THEME]);
     app.shown_theme = theme_key(settings);
     bool portrait = orientation != ORIENTATION_LANDSCAPE;
-    ThemeChoice choice = {.theme = settings->options[OPTION_THEME],
-                          .accent = settings->options[OPTION_ACCENT],
+    ThemeChoice choice = {.accent = settings->options[OPTION_ACCENT],
                           .flat = settings->options[OPTION_HIGHLIGHT] != 0};
-    app.theme = default_theme_styled(portrait, choice);
-    app.stage_theme = default_theme_stage(portrait, choice);
+    const ThemePackage *package = theme_store_package();
+    app.theme = default_theme_for(portrait);
+    app.stage_theme = app.theme;
+    default_theme_dress(&app.theme, package, choice, &app.colors);
+    default_theme_stage(&app.stage_theme, package, choice, &app.colors);
     if (settings->options[OPTION_STATUS_BAR] == STATUS_BAR_LARGE) {
         default_theme_enlarge_status(&app.theme);
         default_theme_enlarge_status(&app.stage_theme);
     }
+    wear_theme_file(&app.theme, &app.stage_theme);
     hal_display_set_rotation(rotation_for(orientation));
     frame_diff_init(&app.frame_diff, row_hashes, app.theme.metrics.screen_height);
 }
@@ -244,6 +312,10 @@ static void follow_orientation(void)
 {
     if (theme_key(&app.settings.settings) != app.shown_theme) {
         apply_orientation();
+        app.frame_stable = false;
+    }
+    if (theme_store_tend_assets()) {
+        app.frame_stable = false;
     }
     app.power.menu_is_media = app.settings.settings.options[OPTION_MENU_KEY] == MENU_KEY_NEXT;
 }
@@ -611,7 +683,7 @@ static void draw_fade(Canvas *canvas, const Fade *fade, const char *text)
     const Theme *theme = current_theme();
     Rect screen = whole_screen();
     Color color =
-        color_blend(theme->colors.background, theme->colors.text, fade_alpha(fade, app.now_ms));
+        color_blend(theme->colors->background, theme->colors->text, fade_alpha(fade, app.now_ms));
     TextStyle style = {.font = theme->fonts.title, .color = color};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, screen, text), .text = text});
@@ -643,9 +715,10 @@ __attribute__((noinline)) static Theme dressed_theme(const Screen *screen)
     Theme theme = *current_theme();
     const ThemeColors *face = screen == &app.screens.now_playing.screen
                                   ? now_playing_face_colors(&app.screens.now_playing)
-                                  : NULL;
+                              : screen == &app.screens.home.screen ? now_playing_home_colors()
+                                                                   : NULL;
     if (face != NULL) {
-        theme.colors = *face;
+        theme.colors = face;
     }
     return theme;
 }
@@ -773,14 +846,24 @@ static StatusBarState current_status_bar(void)
     };
 }
 
+static void paint_backdrop(void *context, Canvas *canvas)
+{
+    (void)context;
+    backdrop_paint(canvas, current_theme(), canvas->clip);
+}
+
 static void render(FrameDrawer drawer, bool drawer_paints_everything, int strip_height)
 {
+    theme_store_watch_assets();
+    const Wallpaper *wallpaper = current_theme()->wallpaper;
+    bool papered = wallpaper != NULL && wallpaper->ready;
     StripRenderer renderer = {
         .strip_pixels = strip_pixels,
         .screen_width = current_theme()->metrics.screen_width,
         .screen_height = current_theme()->metrics.screen_height,
         .strip_height = strip_height,
-        .background = current_theme()->colors.background,
+        .background = current_theme()->colors->background,
+        .backdrop = {.draw = papered ? paint_backdrop : NULL},
         .drawer_paints_everything = drawer_paints_everything,
     };
     FrameSink sink = {.write = write_to_display, .context = NULL};
@@ -801,7 +884,7 @@ static void render_frame(void)
     frame_stats_record(&app.send_stats, app.send_us);
     frame_stats_record(&app.draw_stats, render_us - app.send_us);
     draw_profile_finish_frame();
-    app.frame_stable = !app.frame_changed;
+    app.frame_stable = !app.frame_changed || marquee_frame_paced();
     app.idle_render_ms = hal_clock_milliseconds() + IDLE_RENDER_MS;
     uint32_t marquee_wait_ms = marquee_frame_wait_ms();
     if (marquee_wait_ms > 0 &&
@@ -906,7 +989,7 @@ static void show_card_setup(void)
     app_show_notice("EchoPod", i18n_text(STR_BOOT_CARD_SETUP));
 }
 
-static void apply_language(Language language)
+ECHO_STARTUP_CODE static void apply_language(Language language)
 {
     const uint8_t *pack;
     uint32_t size;
@@ -915,7 +998,7 @@ static void apply_language(Language language)
     }
 }
 
-void app_start(void)
+ECHO_STARTUP_CODE static void start_up(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
     apply_language(LANGUAGE_ENGLISH);
@@ -924,6 +1007,7 @@ void app_start(void)
     frame_stats_reset(&app.update_stats);
     frame_stats_reset(&app.draw_stats);
     frame_stats_reset(&app.send_stats);
+    draw_profile_use_clock(hal_clock_microseconds);
     app.options = (AppOptions){.show_frame_time = false, .ignore_power_taps = false};
     app.toast = (Toast){.visible = false};
     app.powered_off = false;
@@ -939,6 +1023,8 @@ void app_start(void)
     app.now_ms = now_ms;
     CardFilesReport files = card_files_prepare(show_card_setup);
     settings_store_load(&app.settings);
+    adopt_face_theme();
+    theme_store_start(app.settings.settings.options[OPTION_THEME]);
     hal_power_confirm_start(app.settings.settings.options[OPTION_POWER_ON] == POWER_ON_HOLD);
     clock_store_start(&app.clock, &app.settings.settings, now_ms);
     app.history.clock = &app.clock.clock;
@@ -952,6 +1038,39 @@ void app_start(void)
     report_card_files(files, now_ms);
     if (hal_power_take_usb_start()) {
         start_charging(now_ms);
+    }
+}
+
+ECHO_STARTUP_ENTRY const AppStartup APP_STARTUP = {.magic = APP_STARTUP_MAGIC, .start = start_up};
+
+static void refuse_to_start(void)
+{
+    bool updated = hal_system_restart_pending();
+    app_show_notice("EchoPod", updated ? i18n_text(STR_RESCAN_RESTART_NEEDED) : START_CODE_MISSING);
+    app.now_ms = hal_clock_milliseconds();
+}
+
+static void switch_off_after_refusal(void)
+{
+    if (hal_clock_milliseconds() - app.now_ms < START_REFUSAL_MS) {
+        return;
+    }
+    app.start_refused = false;
+    app.powered_off = true;
+    hal_power_off();
+}
+
+void app_start(void)
+{
+    const AppStartup *startup = hal_system_load_startup();
+    bool usable = startup != NULL && startup->magic == APP_STARTUP_MAGIC;
+    if (usable) {
+        startup->start();
+    }
+    hal_system_release_startup();
+    app.start_refused = !usable;
+    if (!usable) {
+        refuse_to_start();
     }
 }
 
@@ -1300,6 +1419,10 @@ void app_step(void)
     if (app.powered_off) {
         return;
     }
+    if (app.start_refused) {
+        switch_off_after_refusal();
+        return;
+    }
     app.idle = false;
     take_computer_clock();
     if (app.music_check_requested && fade_finished(&app.splash, hal_clock_milliseconds())) {
@@ -1433,6 +1556,11 @@ void app_stop(void)
 PlayerStatus app_player_status(void)
 {
     return player_status(&app.player);
+}
+
+void app_now_playing_layout(ThemeLayout *out)
+{
+    now_playing_builtin_layout(&app.screens.now_playing, out);
 }
 
 const char *app_now_playing_lyric(void)

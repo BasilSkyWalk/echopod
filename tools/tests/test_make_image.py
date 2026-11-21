@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import re
 import subprocess
@@ -684,8 +685,9 @@ class NpFacesTest(unittest.TestCase):
         with self.assertRaises(make_image.ImageError):
             make_image.firmware_from_elf(firmware_elf(parts, [section]))
 
-    def test_the_new_field_is_last_in_the_image_parts(self):
-        self.assertEqual("np_faces", list(make_image.ImageParts.__dataclass_fields__)[-1])
+    def test_the_newest_fields_are_last_in_the_image_parts(self):
+        self.assertEqual(["np_faces", "startup"],
+                         list(make_image.ImageParts.__dataclass_fields__)[-2:])
 
 
 class WindowReferenceTest(unittest.TestCase):
@@ -961,3 +963,107 @@ class GlyphFaceTest(unittest.TestCase):
     def test_the_fw1_end_ignores_the_faces(self):
         self.assertEqual(word(build(), make_image.FW1_END_OFFSET),
                          word(build(glyph_faces=[b"\x01" * 100]), make_image.FW1_END_OFFSET))
+
+
+class StartupCodeTest(unittest.TestCase):
+    def startup(self, body=b"\x7E" * 100):
+        return bytes(16) + body
+
+    def with_startup(self, startup, **options):
+        return dataclasses.replace(firmware(**options), startup=startup)
+
+    def test_the_start_up_code_lands_at_its_offset_with_size_and_both_crcs(self):
+        startup = self.startup()
+        parts = self.with_startup(startup, code_tail=b"!C" * 40)
+        image = build(parts)
+        offset = make_image.STARTUP_OFFSET
+        self.assertEqual(0x215000, offset)
+        self.assertEqual(b"ESTP", image[offset:offset + 4])
+        self.assertEqual(len(startup), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(startup[16:]), word(image, offset + 8))
+        self.assertEqual(make_image.crc32(parts.code), word(image, offset + 12))
+        self.assertEqual(startup[16:], image[offset + 16:offset + len(startup)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_its_room_is_the_gap_between_the_rescan_overlay_and_the_opus_program(self):
+        self.assertEqual(make_image.OVERLAY_OFFSET + make_image.OVERLAY_CAPACITY,
+                         make_image.STARTUP_OFFSET)
+        self.assertEqual(make_image.CORE1_OPUS_OFFSET,
+                         make_image.STARTUP_OFFSET + make_image.STARTUP_CAPACITY)
+        self.assertLessEqual(make_image.STARTUP_CAPACITY, make_image.NP_FACES_CAPACITY)
+
+    def test_the_start_up_code_is_not_loaded_at_start_and_leaves_the_faces_alone(self):
+        faces = bytes(16) + b"\x5A" * 100
+        both = build(self.with_startup(self.startup(), np_faces=faces))
+        without = build(firmware(np_faces=faces))
+        self.assertEqual(row(without, 0), row(both, 0))
+        self.assertEqual(row(without, 1), row(both, 1))
+        offset = make_image.NP_FACES_OFFSET
+        self.assertEqual(without[offset:offset + len(faces)], both[offset:offset + len(faces)])
+
+    def test_start_up_code_bigger_than_its_room_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(self.with_startup(self.startup(bytes(make_image.STARTUP_CAPACITY))))
+
+    def test_start_up_code_without_a_header_or_in_odd_bytes_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(self.with_startup(b"\x01" * 8))
+        with self.assertRaises(make_image.ImageError):
+            build(self.with_startup(self.startup(b"\x01" * 7)))
+
+    def test_the_start_up_code_comes_from_its_section_in_the_faces_window(self):
+        parts = self.with_startup(self.startup(b"\x01\x02\x03\x04"))
+        section = (".startup", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, parts.startup,
+                   len(parts.startup))
+        self.assertEqual(parts, make_image.firmware_from_elf(firmware_elf(parts, [section])))
+
+    def test_a_start_up_section_elsewhere_is_refused(self):
+        parts = self.with_startup(self.startup())
+        section = (".startup", SHT_PROGBITS, SHF_ALLOC, 0x0308C000, parts.startup,
+                   len(parts.startup))
+        with self.assertRaises(make_image.ImageError):
+            make_image.firmware_from_elf(firmware_elf(parts, [section]))
+
+    def test_the_symbols_of_a_section_are_found_by_its_index(self):
+        names = b"\x00start\x00draw\x00"
+        table = (bytes(16) + struct.pack("<IIIBBH", 1, 0x0308BA18, 4, 2, 0, 1)
+                 + struct.pack("<IIIBBH", 7, 0x0308BA18, 4, 2, 0, 2))
+        elf = elf_file([(".startup", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, bytes(32), 32),
+                        (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, bytes(32), 32),
+                        (".symtab", 2, 0, 0, table, len(table)),
+                        (".strtab", SHT_STRTAB, 0, 0, names, len(names))])
+        self.assertEqual(frozenset({"start"}), make_image.section_symbols(elf, ".startup"))
+        self.assertEqual(frozenset({"draw"}), make_image.section_symbols(elf, ".np_faces"))
+        self.assertEqual(frozenset(), make_image.section_symbols(elf, ".missing"))
+
+    def test_start_up_symbols_in_the_shared_window_are_not_judged(self):
+        start = (0x0308BA18, 0x100, "start.lto_priv.1", "/w/src/app/app.c")
+        make_image.check_np_faces_symbols([start], frozenset({"start.lto_priv.1"}))
+        with self.assertRaises(make_image.ImageError):
+            make_image.check_np_faces_symbols([start])
+
+    def test_a_faces_symbol_under_the_start_up_code_is_not_judged_but_one_past_it_is(self):
+        start = (0x0308BA18, 0x100, "start", "/w/src/app/app.c")
+        under = (0x0308BA2C, 12, "has_text.lto_priv.0", "/w/src/app/app.c")
+        past = (0x0308BB18, 12, "helper", "/w/src/gfx/canvas.c")
+        make_image.check_np_faces_symbols([start, under], frozenset({"start"}))
+        with self.assertRaises(make_image.ImageError):
+            make_image.check_np_faces_symbols([start, under, past], frozenset({"start"}))
+
+    def test_the_start_up_loader_table_may_hold_the_window_address(self):
+        rows = [(0x03057000, 0x10, "STARTUP_OVERLAY", ""), (0x03058000, 0x10, "OTHER", "")]
+        self.assertEqual(((0x03057000, 0x03057010),), make_image.sanctioned_ranges(rows))
+
+    def test_the_usb_overlay_must_end_below_the_window_the_start_up_code_is_kept_in(self):
+        content = bytes(16) + b"\x11" * 64
+        room = make_image.USB_OVERLAY_WINDOW - len(content)
+        self.assertEqual(0x11A00, make_image.USB_OVERLAY_WINDOW)
+
+        def overlay_elf(zeroed):
+            return elf_file([(".overlay", SHT_PROGBITS, SHF_ALLOC, 0x0307A000, content, len(content)),
+                             (".bss", SHT_NOBITS, SHF_ALLOC | 1, 0x0307A000 + len(content), b"",
+                              zeroed)])
+
+        self.assertEqual(content, make_image.overlay_from_elf(overlay_elf(room), zeroed=True))
+        with self.assertRaises(make_image.ImageError):
+            make_image.overlay_from_elf(overlay_elf(room + 4), zeroed=True)

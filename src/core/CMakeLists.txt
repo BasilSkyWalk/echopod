@@ -1,5 +1,6 @@
 set(ECHO_CORE_SOURCES
     deadline.c
+    draw_profile.c
     format.c
     frame_stats.c
     hash.c

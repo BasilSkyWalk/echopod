@@ -40,4 +40,4 @@ add_executable(echo_sim
 )
 string(TIMESTAMP ECHO_SIM_BUILD_DATE "%Y%m%d" UTC)
 target_compile_definitions(echo_sim PRIVATE SDL_MAIN_HANDLED ECHO_SIM_BUILD_DATE=${ECHO_SIM_BUILD_DATE})
-target_link_libraries(echo_sim PRIVATE echo_app echo_sim_glyphs echo_sim_language echo_library_scan echo_sim_options echo_sim_decoder echo_sim_storage echo_options SDL2::SDL2)
+target_link_libraries(echo_sim PRIVATE echo_app echo_builtin_themes echo_sim_glyphs echo_sim_language echo_library_scan echo_sim_options echo_sim_decoder echo_sim_storage echo_options SDL2::SDL2)
