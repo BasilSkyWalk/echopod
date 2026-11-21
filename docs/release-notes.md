@@ -4,6 +4,8 @@
 
 Themes you can make yourself. A theme file changes the whole look of the player, from its colours to a Home screen of your own, and a web editor makes one without writing anything. Also Shuffle all in folders, and a fix for going back to FiiO's firmware. Tested on one Echo Mini 8 GB.
 
+**This release is experimental.** Themes and the editor are new and have been tried by one person on one player, so 0.12.0 stays the recommended release until more people have used them. A theme file made now may need opening in the editor and saving again after a later release, so keep an editable copy of what you make. To go back to 0.12.0, choose Dark or Light as the theme first (see When you update). Tell us what breaks or confuses you: https://github.com/BasilSkyWalk/echopod/issues.
+
 ### New
 
 - **Theme files.** Copy a file ending in `.echotheme` into a folder called `Themes` at the top of the microSD card and pick it under Settings → Display → Theme, after the built-in themes. The player lists up to 8. A theme file sets the 16 colours, the shape of the selected row, title bar, messages and bars (fill, border, shine, rounded corners, how see-through), the row height and spacing, the accents offered under Accent color, and can bring its own icons, a wallpaper behind the lists for each way the player is held, and its own fonts for titles, list text and small text. If the file is deleted or damaged, the player goes back to the built-in theme you used last.

@@ -196,6 +196,22 @@ input[type="radio"] {
   background: var(--surface);
 }
 
+.trial {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--warn);
+  background: var(--warn-soft);
+  text-decoration: none;
+}
+
+.trial:hover,
+.trial:focus-visible {
+  text-decoration: underline;
+}
+
 .theme-name {
   flex: 1;
   display: flex;
@@ -910,7 +926,7 @@ details.more summary {
     border-top: 1px solid var(--line);
   }
 
-  .brand span:last-child,
+  .brand span:nth-child(2),
   .link {
     display: none;
   }
@@ -2150,6 +2166,19 @@ details.every-colour > summary {
     width: 100%;
     text-align: left;
     border-color: var(--line);
+  }
+
+  body:not(.gallery) .bar .brand {
+    display: contents;
+  }
+
+  body:not(.gallery) .bar .theme-name {
+    flex: 1 1 60%;
+    min-width: 0;
+  }
+
+  body:not(.gallery) .bar .trial {
+    order: 6;
   }
 
   .app {
