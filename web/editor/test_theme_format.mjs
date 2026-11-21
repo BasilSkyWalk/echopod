@@ -8,7 +8,7 @@ import { arrangeUpright, arrangedBoxes, uprightMatches } from "./arrange.js";
 import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
 import { ACCENT_FAMILY, COLOUR_SETS, mix, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
 import { LIBRARY, VERSION_EVERY_MS, VERSION_LIMIT, addVersion, copyTheme, keep, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
-import { READY, SHELF, SHELF_ART, SHELF_MORE, STARTS, drawingFrom, fromDesign, startDrawing, tilesFor } from "./drawings.js";
+import { READY, SHELF, SHELF_ART, SHELF_MORE, STARTS, drawingFrom, fromDesign, plainPicture, startDrawing, tilesFor } from "./drawings.js";
 import { TILE_ICONS, addTileIcons, starterRows } from "./tile_icons.js";
 import { compileScene } from "./scene_compile.js";
 import { dimmed, fittedSize, quantise } from "./wallpaper_editor.js";
@@ -655,3 +655,9 @@ for (let row = 0; row < 5; row++) {
 for (const box of arrangedBoxes(packedIn).values()) {
   assert.ok(box.y >= 0 && box.y + box.h <= 280, "a packedIn screen is shrunk to fit");
 }
+
+assert.equal(plainPicture("home", "wide", 250, 60), true, "the art beside the Home menu is a picture, not a colour");
+assert.equal(plainPicture("home", "wide", 50, 60), false, "the menu isn't");
+assert.equal(plainPicture("home", "tall", 80, 200), true, "upright, the art is under the menu");
+assert.equal(plainPicture("playing", "wide", 60, 60), true, "and so is the cover on Now Playing");
+assert.equal(plainPicture("playing", "wide", 200, 20), false);

@@ -4,7 +4,7 @@ import { buildFonts } from "./font_editor.js";
 import { buildIcons } from "./icon_editor.js";
 import { AREAS, colorOf, drawingScript, findElement, walk } from "./drawing.js";
 import { drawingEditor } from "./drawing_editor.js";
-import { STARTS, drawingFrom, faceOf, standardDrawing, startDrawing } from "./drawings.js";
+import { STARTS, drawingFrom, faceOf, plainPicture, standardDrawing, startDrawing } from "./drawings.js";
 import { KEY, PLAYBACK, PLAYER, Preview, SONGS } from "./preview_host.js";
 import {
   ACCENT_SHADES,
@@ -20,7 +20,7 @@ import {
   unpack,
 } from "./theme_format.js";
 import { buildWallpapers } from "./wallpaper_editor.js";
-import { ACCENT_FAMILY, COLOUR_SETS, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
+import { ACCENT_FAMILY, COLOUR_SETS, mix, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
 import { addTileIcons } from "./tile_icons.js";
 import { addVersion, copyTheme, emptyLibrary, entryOf, keep, newId, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
 
@@ -1647,10 +1647,38 @@ function partBar() {
   return [...bits, barGap(), ...tools];
 }
 
+function pictureAt(point) {
+  const step = designStep();
+  if (!step || state.designs[step] || handWritten(step)) {
+    return false;
+  }
+  if (step === "home" ? state.theme.home_art === false : SONGS[state.playback.song]?.bare) {
+    return false;
+  }
+  return plainPicture(DESIGNS[step].screen, shape(), point.x, point.y - AREAS[shape()].top);
+}
+
+function pictureBar() {
+  const step = designStep();
+  return [
+    el("span", { class: "bar-name" }, "Album art"),
+    barChip("Make this screen my own", null, () => setMode("design"), "Then you can move it, resize it or take it off"),
+    step === "home" ? barChip("Hide it", null, () => {
+      state.theme.home_art = false;
+      changed({ rebuild: true });
+      restart();
+      say("The menu has the whole Home screen now. Undo brings the art back.");
+    }, "Give the menu the whole screen") : null,
+  ];
+}
+
 function spotBar() {
   const spot = state.spot;
   if (!spot || designing()) {
     return null;
+  }
+  if (spot.picture) {
+    return pictureBar();
   }
   const [kind, step, name] = spot.role.split(":");
   const scene = step ? state.theme[DESIGNS[step]?.key] : null;
@@ -1666,6 +1694,13 @@ function spotBar() {
     value = scene.chrome[name] ?? state.theme.colors[name];
     set = (shade) => {
       scene.chrome[name] = shade;
+      changed();
+    };
+  } else if (spot.role === "header_background") {
+    label = "Title bar";
+    set = (shade) => {
+      state.theme.colors.header_background = shade;
+      state.theme.colors.header_top = mix(shade, shownColour("header_text"), 0.1);
       changed();
     };
   } else if (MAIN_ROLES[spot.role]) {
@@ -2041,7 +2076,12 @@ function scriptRoles(point) {
 function roleAt(point) {
   const own = scriptRoles(point);
   const theme = Object.keys(state.theme.colors).map((role) => [role, shownColour(role)]);
-  return (own.length > 0 && closestRole(point, own)) || closestRole(point, theme);
+  const header = point.y < AREAS[shape()].top ? theme.filter(([role]) => role.startsWith("header_")) : [];
+  const found = (own.length > 0 && closestRole(point, own)) || (header.length > 0 && closestRole(point, header)) || closestRole(point, theme);
+  if (found === "selection_top" || found === "selection_shine") {
+    return "selection_background";
+  }
+  return found === "header_top" ? "header_background" : found;
 }
 
 function channels(value) {
@@ -2335,10 +2375,11 @@ function wireOverlay() {
     const point = pointer(event);
     if (!designing()) {
       event.preventDefault();
-      const role = roleAt(point);
-      state.spot = role ? { role, x: point.x, y: point.y } : null;
+      const picture = pictureAt(point);
+      const role = picture ? null : roleAt(point);
+      state.spot = picture || role ? { role, picture, x: point.x, y: point.y } : null;
       renderBar();
-      if (!role) {
+      if (!state.spot) {
         say("Couldn't tell which colour that is. It may be part of a picture, such as the wallpaper or a cover.");
       }
       canvas.focus({ preventScroll: true });

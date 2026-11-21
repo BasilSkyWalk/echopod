@@ -3,7 +3,7 @@ export const STEP_MS = 16;
 export const PLAYER = { idle: 0, playing: 1, paused: 2 };
 export const SONGS = {
   usual: { label: "A usual song", album: 0, track: 0 },
-  long: { label: "A long title, no cover", album: 2, track: 0 },
+  long: { label: "A long title, no cover", album: 2, track: 0, bare: true },
   lyrics: { label: "A song with lyrics", album: 0, track: 1 },
 };
 export const PLAYBACK = { song: null, paused: false, at: null, volume: null, shuffle: 0, repeat: 0 };

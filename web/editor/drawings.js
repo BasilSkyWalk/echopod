@@ -89,6 +89,13 @@ export function tilesDrawing() {
   };
 }
 
+const pictures = {};
+
+export function plainPicture(screen, shape, x, y) {
+  pictures[screen] ??= standardDrawing(screen).elements.filter((item) => item.kind === "cover" || item.name === "Art panel").map((item) => item.at);
+  return pictures[screen].some((at) => at[shape] && x >= at[shape].x && x < at[shape].x + at[shape].w && y >= at[shape].y && y < at[shape].y + at[shape].h);
+}
+
 function degrees(units) {
   return units * UNITS_TO_DEGREES;
 }
