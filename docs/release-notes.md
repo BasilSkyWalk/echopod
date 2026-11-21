@@ -1,14 +1,22 @@
 # EchoPod release notes
 
-## Unreleased
+## 0.13.0
+
+Themes you can make yourself. A theme file changes the whole look of the player, from its colours to a Home screen of your own, and a web editor makes one without writing anything. Also Shuffle all in folders, and a fix for going back to FiiO's firmware. Tested on one Echo Mini 8 GB.
 
 ### New
 
+- **Theme files.** Copy a file ending in `.echotheme` into a folder called `Themes` at the top of the microSD card and pick it under Settings → Display → Theme, after the built-in themes. The player lists up to 8. A theme file sets the 16 colours, the shape of the selected row, title bar, messages and bars (fill, border, shine, rounded corners, how see-through), the row height and spacing, the accents offered under Accent color, and can bring its own icons, a wallpaper behind the lists for each way the player is held, and its own fonts for titles, list text and small text. If the file is deleted or damaged, the player goes back to the built-in theme you used last.
+- **A theme can draw Home and Now Playing itself.** These screens can be made of parts placed anywhere: boxes, circles, lines, text, the album cover, play marks, big numbers and the menu. Parts can move, grow or change colour with the song's position, the volume and whether a song is playing. Home can show its menu as a list or as tiles with an icon for each item. The buttons still move through the menu in order.
+- **A theme editor in your browser:** https://basilskywalk.github.io/echopod/. The screen in the middle is the player's own code running, so it shows exactly what the player will draw. Three colours set the whole theme, and it says when text would be hard to read and fixes it. Click anything on the screen to change it; add a song title, a cover, a progress bar or menu tiles from a shelf of parts; draw the sideways screen and the upright one arranges itself. Take colours from a picture, drop in a wallpaper, use a font file or draw your own letters and icons. Try the theme playing, paused, part way through a song, with lyrics or a long title. Nothing to install: your themes are kept in the browser, and **Put on my player** saves the file.
+- **A gallery of themes** next to the editor, each to download or open in the editor and change: Aurora, Deck, Glacier, Glass, Millennium, Mosaic, Orbit, Poster, Receipt and Rosewood. `docs/themes.md` covers making and sharing one.
 - **Shuffle all in folders.** Every folder that holds songs, either its own or in its immediate subfolders, starts with **Shuffle all**. It plays those songs shuffled and leaves songs in deeper folders out. The top-level Folders list has no Shuffle all, and audiobooks and podcasts don't get one. The list still opens on the first song.
+- **Diagnostics → Frame time** splits the time each frame takes into covers, reflections, text, the wallpaper or background, boxes, a theme's own shapes, the change check and audio.
 
-## 0.12.1
+### Changed
 
-One fix, for going back to FiiO's firmware.
+- **Cassette, VU meters, Turntable and LCD deck are themes now.** They are under Settings → Display → Theme with the others, and the separate Now Playing setting is gone. A player that showed one of them keeps showing it. Each brings its own colours for the lists as well, so a face can no longer be paired with another built-in theme on the player; to mix them, open the face in the editor and change its colours.
+- **Accent color lists the accents the theme offers**, and is hidden for a theme that offers none. Dark and Light still offer their eight.
 
 ### Fixed
 
@@ -17,12 +25,20 @@ One fix, for going back to FiiO's firmware.
 
 ### Known limits
 
+- **A Home or Now Playing that a theme draws is redrawn about ten times a second while a song plays.** What that costs in battery hasn't been measured. Themes that only change colours, shapes, fonts or the wallpaper redraw as the built-in ones do.
+- **A theme's pictures and fonts share about 27 KB on the player.** A wallpaper the size of the screen takes nearly all of it, so use a small repeating picture to have your own fonts as well. The editor shows how much is used.
+- **A theme's colours, shapes and icons share 3,072 bytes.** Six Home tile icons at their largest take more than half of that; the editor says when it's too much.
+- **Rounded corners on a cover are painted over it in one colour**, so they look right on a plain background and show as that colour over a wallpaper or a top-to-bottom fill.
+- **The editor is tested with a mouse.** Dragging parts with a finger on a phone or tablet hasn't been tried.
+- **Themes you make are kept in that browser only.** Save the file, or an editable copy, to keep one for good.
+- **Home tiles and the parts shelf are new,** and have been tried on one player with two themes.
 - **A power cut near the end of that one-copy install** leaves the player unable to start until FiiO's firmware is written through maskrom. EchoPod's own copy stays usable until the write reaches it, which on a player with 30 MiB slots is the last 2 MiB. Install with the battery charged, and don't unplug or press RST while it runs.
 - **The cause is read from the code and the E6/30 report, not from an affected player.** The one-copy install is tested on a computer; nobody has run it yet on a player that showed E6/30.
 
 ### When you update
 
-- Your settings and library stay.
+- Your settings and library stay. A player that showed Cassette, VU meters, Turntable or LCD deck now has it as its theme.
+- If you pick one of those four and later go back to 0.12.0 or earlier, that firmware resets all settings to their defaults. Choose Dark or Light before you go back.
 - After an update installs, restart the player before connecting it to a computer again.
 - Delete the update file from the player once it has installed, or it installs again.
 
