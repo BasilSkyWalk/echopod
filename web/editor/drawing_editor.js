@@ -1524,34 +1524,6 @@ export function drawingEditor(ctx) {
     return sections;
   }
 
-  function copyOtherSide() {
-    const from = shape() === "wide" ? "tall" : "wide";
-    const [a, b] = [AREAS[from], AREAS[shape()]];
-    const scale = Math.min(b.width / a.width, b.height / a.height);
-    const across = (b.width - a.width * scale) / 2;
-    const down = (b.height - a.height * scale) / 2;
-    const scaleOne = (item, top) => {
-      const box = item.at?.[from];
-      if (!box) {
-        return;
-      }
-      item.at[shape()] = {
-        ...box,
-        x: Math.round(box.x * scale + (top ? across : 0)),
-        y: Math.round(box.y * scale + (top ? down : 0)),
-        w: Math.max(1, Math.round(box.w * scale)),
-        h: Math.max(item.kind === "line" ? 0 : 1, Math.round(box.h * scale)),
-      };
-      for (const child of item.children ?? []) {
-        scaleOne(child, false);
-      }
-    };
-    for (const item of drawing().elements) {
-      scaleOne(item, true);
-    }
-    ctx.changed({ rebuild: true });
-  }
-
   function partList() {
     const list = el("ul", { class: "layers group scroller", role: "listbox", "aria-label": "Parts, back to front", onscroll: () => {
       listScroll = list.scrollTop;
@@ -1580,13 +1552,10 @@ export function drawingEditor(ctx) {
   }
 
   function parts() {
-    const other = shape() === "wide" ? "upright" : "sideways";
     return [
-      el("p", { class: "hint" }, `Back to front, on the ${shape() === "wide" ? "sideways" : "upright"} screen. Turn the player above to draw the ${other} one.`),
+      el("p", { class: "hint" }, ctx.sideNote?.() ?? "Back to front."),
       partList(),
-      el("div", { class: "actions" },
-        heldParts() ? el("button", { type: "button", onclick: () => paste() }, "Paste") : null,
-        el("button", { type: "button", onclick: copyOtherSide }, `Copy the ${other} drawing`)),
+      heldParts() ? el("div", { class: "actions" }, el("button", { type: "button", onclick: () => paste() }, "Paste")) : null,
     ];
   }
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { batteryRows, blankRows, paintedRows, resizedRows, rowsFromPixels } from "./icon_editor.js";
 import { coveredCodes } from "./font_editor.js";
 import { KINDS, drawingScript, element, newElement, readDrawing } from "./drawing.js";
+import { arrangeUpright, arrangedBoxes, uprightMatches } from "./arrange.js";
 import { LETTERS, LETTER_STYLES, letterFont, letterHeight, sheetFont, sheetLayout, sheetOrder, sheetTemplate } from "./pixel_letters.js";
 import { ACCENT_FAMILY, COLOUR_SETS, mix, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
 import { LIBRARY, VERSION_EVERY_MS, VERSION_LIMIT, addVersion, copyTheme, keep, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
@@ -621,3 +622,36 @@ const narrow = tilesFor({ wide: { x: 0, y: 0, w: 176, h: 146 }, tall: null });
 assert.equal(narrow.length, 1, "tiles are made only for the screens the menu was on");
 assert.deepEqual([narrow[0].repeat.columns, narrow[0].repeat.dx, narrow[0].repeat.dy], [2, 90, 73], "tiles fill the place the list had");
 assert.deepEqual(narrow[0].at.wide, { x: 0, y: 0, w: 176, h: 146 });
+
+const plainPlaying = startDrawing("standard", "playing");
+const handMade = Object.fromEntries(plainPlaying.elements.map((item) => [item.name || item.source || item.kind, { ...item.at.tall }]));
+assert.equal(uprightMatches(plainPlaying), false, "the hand-made upright screen isn't quite the arranged one");
+arrangeUpright(plainPlaying);
+assert.equal(uprightMatches(plainPlaying), true);
+const arrangedNow = Object.fromEntries(plainPlaying.elements.map((item) => [item.name || item.source || item.kind, item.at.tall]));
+assert.deepEqual(arrangedNow.cover, { x: 29, y: 8, w: 112, h: 112 }, "the cover is centred at the top");
+assert.deepEqual(arrangedNow.song, { x: 8, y: 126, w: 154, h: 22, align: "center" }, "the title goes under it, across the screen and centred");
+assert.deepEqual([arrangedNow.remaining.align, arrangedNow.elapsed.align], ["right", undefined], "text that was lined up keeps its side");
+assert.ok(arrangedNow.Progress.y > 240 && arrangedNow.elapsed.y > arrangedNow.Progress.y, "the progress bar and times stay at the bottom");
+for (const [name, at] of Object.entries(arrangedNow)) {
+  assert.ok(at.x >= 0 && at.y >= 0 && at.x + at.w <= 170 && at.y + at.h <= 280, `${name} is on the upright screen`);
+  assert.ok(Math.abs(at.y - handMade[name].y) <= 20, `${name} lands near where a person put it`);
+}
+const uprightHome = startDrawing("standard", "home");
+arrangeUpright(uprightHome);
+const homeNow = Object.fromEntries(uprightHome.elements.map((item) => [item.name || item.kind, item.at.tall]));
+assert.deepEqual(homeNow.Menu, { x: 0, y: 0, w: 170, h: 146 }, "the menu takes the top, edge to edge");
+assert.deepEqual([homeNow["Art panel"].x, homeNow["Art panel"].w, homeNow["Art panel"].y], [0, 170, 146], "what was beside it goes below it");
+assert.deepEqual(homeNow.Divider, { x: 0, y: 146, w: 170, h: 1 }, "and the line between them turns to lie between them");
+assert.equal(homeNow["Art panel"].y + homeNow["Art panel"].h, 280);
+compileScene(drawingScript(uprightHome, homeTheme), schema.scene);
+const oneWayTiles = startDrawing("tiles", "home");
+arrangeUpright(oneWayTiles);
+assert.deepEqual(oneWayTiles.elements.map((item) => [Boolean(item.at.wide), Boolean(item.at.tall)]), [[true, true], [true, false], [false, true]], "parts drawn for one way up are left alone");
+const packedIn = startDrawing("empty", "playing");
+for (let row = 0; row < 5; row++) {
+  packedIn.elements.push(element("cover", { x: 10, y: 4 + row * 28, w: 100, h: 100 }, { x: 0, y: 0, w: 10, h: 10 }));
+}
+for (const box of arrangedBoxes(packedIn).values()) {
+  assert.ok(box.y >= 0 && box.y + box.h <= 280, "a packedIn screen is shrunk to fit");
+}

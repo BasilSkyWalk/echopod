@@ -1926,3 +1926,29 @@ details.every-colour > summary {
     white-space: normal;
   }
 }
+
+.upright-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  margin: 10px auto 0;
+  max-width: min(560px, calc(100% - 32px));
+  padding: 7px 12px;
+  border-radius: var(--radius-small);
+  background: var(--sunken);
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-align: center;
+}
+
+.upright-note.following {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.upright-note button {
+  padding: 3px 9px;
+  font-size: 12.5px;
+}

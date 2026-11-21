@@ -1,4 +1,5 @@
 import { buildAccents, shownAccent } from "./accent_editor.js";
+import { arrangeUpright } from "./arrange.js";
 import { buildFonts } from "./font_editor.js";
 import { buildIcons } from "./icon_editor.js";
 import { AREAS, colorOf, drawingScript, findElement, walk } from "./drawing.js";
@@ -120,6 +121,7 @@ const BAR_KEYS = { box: "color", circle: "color", line: "color", text: "color", 
 const BAR_SIZES = [["small", "S", "Small text"], ["medium", "M", "List text"], ["large", "L", "Titles"]];
 const BAR_ALIGN = [["left", "Line up left", "M4 5h12M4 9h7M4 13h10"], ["center", "Line up in the middle", "M4 5h12M6.5 9h7M5 13h10"], ["right", "Line up right", "M4 5h12M9 9h7M6 13h10"]];
 const MAIN_ROLES = { background: "Background", text: "Text", selection_background: "Accent" };
+const FOLLOWING_STARTS = ["standard", "empty", "tiles"];
 const CHROME_ROLES = [["header_top", "Title bar, top"], ["header_background", "Title bar"], ["header_text", "Title"]];
 
 const $ = (id) => document.getElementById(id);
@@ -139,6 +141,7 @@ const state = {
   panel: "look",
   more: false,
   spot: null,
+  tallSeen: null,
   look: new Set(["colours"]),
   screen: "home",
   turn: 0,
@@ -536,7 +539,42 @@ function fits() {
   }
 }
 
+function tallPlaces(design) {
+  const places = {};
+  walk(design.elements, (item) => {
+    const at = item.at?.tall;
+    places[item.id] = at ? [at.x, at.y, at.w, at.h, at.align ?? ""].join(",") : "";
+  });
+  return places;
+}
+
+function followed(design) {
+  design.upright = "auto";
+  arrangeUpright(design);
+  return design;
+}
+
+function settleUpright() {
+  const design = currentDesign();
+  if (!design) {
+    state.tallSeen = null;
+    return;
+  }
+  if (design.upright === "auto") {
+    const now = tallPlaces(design);
+    const seen = state.tallSeen ?? {};
+    if (shape() === "tall" && Object.keys(now).some((id) => id in seen && seen[id] !== now[id])) {
+      design.upright = "own";
+      say("The upright screen is yours now. It no longer follows the sideways one.");
+    } else {
+      arrangeUpright(design);
+    }
+  }
+  state.tallSeen = tallPlaces(design);
+}
+
 function changed({ rebuild = false } = {}) {
+  settleUpright();
   apply();
   remember();
   if (rebuild) {
@@ -851,6 +889,7 @@ const drawer = drawingEditor({
   say: (text, bad) => say(text, bad),
   remember: () => remember(),
   tileIcons: () => tileIcons(),
+  sideNote: () => sideNote(),
   coarse: () => window.matchMedia?.("(pointer: coarse)").matches ?? false,
 });
 
@@ -1281,7 +1320,7 @@ function setMode(mode) {
   if (handWritten(step)) {
     state.stash[step] = state.theme[key];
   }
-  state.designs[step] = mode === "design" ? state.designs[step] ?? designFrom(step) ?? standardDrawing(screen) : null;
+  state.designs[step] = mode === "design" ? state.designs[step] ?? designFrom(step) ?? followed(standardDrawing(screen)) : null;
   if (mode === "standard") {
     state.theme[key] = null;
   } else if (mode === "script") {
@@ -1313,7 +1352,8 @@ function tileIcons() {
 
 function startFrom(step, name, label) {
   const consts = stashColours(step);
-  state.designs[step] = startDrawing(name, DESIGNS[step].screen, faceOf(consts) === name ? consts : {});
+  const made = startDrawing(name, DESIGNS[step].screen, faceOf(consts) === name ? consts : {});
+  state.designs[step] = FOLLOWING_STARTS.includes(name) ? followed(made) : made;
   state.picked = null;
   const icons = name === "tiles" && tileIcons();
   if (!fits()) {
@@ -1422,6 +1462,37 @@ function shelfParts() {
       el("button", { type: "button", onclick: () => startFrom(step, name, label) }, label)), ...modeButtons(step)),
     shortcuts,
   ];
+}
+
+function sideNote() {
+  const design = currentDesign();
+  if (shape() === "tall") {
+    return "Back to front, on the upright screen.";
+  }
+  return design?.upright === "auto"
+    ? "Back to front. The upright screen arranges itself from this one."
+    : "Back to front, on the sideways screen. The upright screen has its own arrangement: turn the player above to change it.";
+}
+
+function renderUpright() {
+  const host = $("upright");
+  const design = currentDesign();
+  host.hidden = !(design && shape() === "tall");
+  if (host.hidden) {
+    return;
+  }
+  const auto = design.upright === "auto";
+  host.className = auto ? "upright-note following" : "upright-note";
+  host.replaceChildren(
+    el("span", {}, auto
+      ? "Arranged for you from the sideways screen. Move anything here and this screen becomes yours."
+      : "This upright screen has its own arrangement."),
+    ...(auto ? [] : [el("button", { type: "button", onclick: () => {
+      followed(design);
+      state.tallSeen = tallPlaces(design);
+      changed({ rebuild: true });
+      say("Arranged from the sideways screen. Undo brings your own back.");
+    } }, "Arrange it from the sideways screen")]));
 }
 
 function renderShelf() {
@@ -1743,6 +1814,8 @@ function render() {
     ? "Click a part to change it. Drag to move, drag the corner to resize; the arrow keys nudge it."
     : "Click anything on the screen to change its colour.";
   overlay.classList.toggle("designing", designing());
+  renderUpright();
+  state.tallSeen = currentDesign() ? tallPlaces(currentDesign()) : null;
   renderBar();
   drawOverlay();
 }
