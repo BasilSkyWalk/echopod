@@ -1,0 +1,77 @@
+name = "Test Send"
+author = "EchoPod test"
+description = "A test of sending. To be closed, not merged."
+selection = "selection_flat"
+
+[colors]
+background = "#000c00"
+text = "#73ff8c"
+text_secondary = "#39cb5a"
+text_tertiary = "#299242"
+selection_background = "#29db63"
+selection_top = "#4afb84"
+selection_shine = "#107131"
+selection_text = "#001408"
+header_background = "#001808"
+header_top = "#003008"
+header_text = "#73ff8c"
+divider = "#185929"
+scrollbar_thumb = "#298a42"
+danger = "#ff7142"
+success = "#d6ff4a"
+chevron = "#31aa52"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+shine = "selection_shine"
+shine_height = 1
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
