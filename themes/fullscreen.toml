@@ -1,0 +1,375 @@
+name = "fullscreen"
+author = "Hejichs"
+description = "a fullscreen theme, not too polished, i made this to test on my player"
+selection = "selection"
+
+[colors]
+background = "#101114"
+text = "#f2f2f5"
+text_secondary = "#aeafb2"
+text_tertiary = "#818285"
+selection_background = "#2f6fdb"
+selection_top = "#4e85e0"
+selection_shine = "#78a1e8"
+selection_text = "#000000"
+header_background = "#222326"
+header_top = "#343538"
+header_text = "#f2f2f5"
+divider = "#393a3d"
+scrollbar_thumb = "#545558"
+danger = "#e5484d"
+success = "#30a46c"
+chevron = "#767679"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+shine = "selection_shine"
+shine_height = 1
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+ink = "header_text"
+opacity = 47
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
+
+[now_playing_scene]
+script = '''
+rect(x, y, width, height, #101114)
+if width > height {
+    let p0_0 = x + 169
+    let p0_1 = y - 26
+    let p0_2 = x + 170
+    let p0_3 = x - 1
+    let p0_4 = y + 26
+    let p0_5 = y + 129
+    if has_cover {
+        cover(p0_3, p0_1, 170)
+    } else {
+        rect(p0_3, p0_1, 170, 170, #393a3d)
+    }
+    line(song, title, p0_0, y, 151, 22, center, #f2f2f5)
+    if present(feedback) {
+        line(feedback, body, p0_2, p0_4, 150, 20, left, #aeafb2)
+    }
+    if !(present(feedback)) {
+        line(artist, body, p0_2, p0_4, 150, 20, center, #aeafb2)
+    }
+    line(album, body, p0_0, y + 50, 151, 20, center, #818285)
+    format(small, p0_0, y + 109, 151, 16, left, #aeafb2)
+    rect(x, p0_5, 320, 3, #393a3d)
+    rect(x, p0_5, (321 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 3, #2f6fdb)
+    text(elapsed, small, x, y + 132, 300, 14, left, #f2f2f5)
+    text(remaining, small, x + 20, y + 132, 300, 14, right, #f2f2f5)
+    backdrop(p0_0, p0_1, 158, 26)
+    line("EchoPod", small, p0_2, y + 89, 55, 20, left, #f2f2f5)
+    if present(lyric) {
+        line(lyric, title, x + 30, y - 23, 218, 23, center, #fff700)
+    } else {
+        line(artist, title, x + 30, y - 23, 218, 23, center, #fff700)
+    }
+} else {
+    let p0_0 = x + 20
+    let p0_1 = y + 176
+    let p0_2 = y + 119
+    let p0_3 = y + 122
+    let p0_4 = x + 43
+    let p0_5 = y + 2
+    if has_cover {
+        cover(p0_0, y, 131)
+    } else {
+        rect(p0_0, y, 131, 131, #393a3d)
+    }
+    line(song, title, x, y + 154, 170, 22, center, #f2f2f5)
+    if present(feedback) {
+        line(feedback, body, x, p0_1, 170, 20, left, #aeafb2)
+    }
+    if !(present(feedback)) {
+        line(artist, body, x, p0_1, 170, 20, center, #aeafb2)
+    }
+    line(album, body, x, y + 196, 170, 20, center, #818285)
+    format(small, x, y + 256, 170, 16, center, #aeafb2)
+    rect(p0_0, p0_2, 130, 2, #393a3d)
+    rect(p0_0, p0_2, (130 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 2, #2f6fdb)
+    text(elapsed, small, p0_0, p0_3, 130, 11, left, #f2f2f5)
+    text(remaining, small, x + 36, p0_3, 115, 11, right, #f2f2f5)
+    backdrop(x, y + 132, 170, 22)
+    line("EchoPod", small, x + 8, y + 222, 154, 20, center, #f2f2f5)
+    if present(lyric) {
+        line(lyric, title, p0_4, p0_5, 107, 18, center, #fff700)
+    } else {
+        line(artist, title, p0_4, p0_5, 107, 18, center, #fff700)
+    }
+}
+'''
+design = "{\"version\":2,\"screen\":\"playing\",\"elements\":[{\"id\":79,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\",\"locked\":true},{\"id\":80,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":-1,\"y\":-26,\"w\":170,\"h\":172},\"tall\":{\"x\":20,\"y\":0,\"w\":131,\"h\":132}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"@divider\",\"reflection\":false,\"corner\":0},{\"id\":81,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":169,\"y\":0,\"w\":151,\"h\":22,\"align\":\"center\"},\"tall\":{\"x\":0,\"y\":154,\"w\":170,\"h\":22,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":82,\"kind\":\"text\",\"name\":\"Messages\",\"hidden\":false,\"at\":{\"wide\":{\"x\":170,\"y\":26,\"w\":150,\"h\":20},\"tall\":{\"x\":0,\"y\":176,\"w\":170,\"h\":20}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\"}}},\"source\":\"feedback\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":83,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":170,\"y\":26,\"w\":150,\"h\":20,\"align\":\"center\"},\"tall\":{\"x\":0,\"y\":176,\"w\":170,\"h\":20,\"align\":\"center\"}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\",\"not\":true}}},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":84,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":169,\"y\":50,\"w\":151,\"h\":20,\"align\":\"center\"},\"tall\":{\"x\":0,\"y\":196,\"w\":170,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":true},{\"id\":85,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":169,\"y\":109,\"w\":151,\"h\":16},\"tall\":{\"x\":0,\"y\":256,\"w\":170,\"h\":16,\"align\":\"center\"}},\"bind\":{},\"source\":\"format\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":false},{\"id\":86,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":129,\"w\":320,\"h\":3},\"tall\":{\"x\":20,\"y\":119,\"w\":130,\"h\":2}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":87,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":129,\"w\":321,\"h\":3},\"tall\":{\"x\":20,\"y\":119,\"w\":130,\"h\":2}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":88,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":132,\"w\":300,\"h\":14},\"tall\":{\"x\":20,\"y\":122,\"w\":130,\"h\":11}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#f2f2f5\",\"scroll\":false},{\"id\":89,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":20,\"y\":132,\"w\":300,\"h\":14,\"align\":\"right\"},\"tall\":{\"x\":36,\"y\":122,\"w\":115,\"h\":11,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#f2f2f5\",\"scroll\":false},{\"id\":91,\"kind\":\"box\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":169,\"y\":-26,\"w\":158,\"h\":26},\"tall\":{\"x\":0,\"y\":132,\"w\":170,\"h\":22}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@header_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":93,\"kind\":\"text\",\"name\":\"Hallo!\",\"hidden\":false,\"at\":{\"wide\":{\"x\":170,\"y\":89,\"w\":55,\"h\":20},\"tall\":{\"x\":8,\"y\":222,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"EchoPod\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":96,\"kind\":\"text\",\"name\":\"Lyrics\",\"hidden\":false,\"at\":{\"wide\":{\"x\":30,\"y\":-23,\"w\":218,\"h\":23,\"align\":\"center\"},\"tall\":{\"x\":43,\"y\":2,\"w\":107,\"h\":18,\"align\":\"center\"}},\"bind\":{},\"source\":\"lyric\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"#fff700\",\"scroll\":true}],\"upright\":\"auto\"}"
+
+[home_scene]
+script = '''
+backdrop(x, y, width, height)
+if width > height {
+    let p0_0 = x + 193
+    let p0_1 = y + 4
+    let p0_2 = x + 303
+    let p0_3 = y + 114
+    let p0_4 = x + 176
+    let p0_5 = x + 195
+    menu(x, y, 176, 146)
+    rect(x + 177, y, 144, 146, #08080a)
+    rect(p0_4, y, 1, 146, #393a3d)
+    if has_cover {
+        cover(p0_0, p0_1, 112)
+        reflect(p0_0, p0_1, 112, 26)
+        clip(p0_0, p0_1, 2, 2)
+        ring((p0_5) * 16, (y + 6) * 16, 48, 32, #08080a)
+        unclip()
+        clip(p0_2, p0_1, 2, 2)
+        ring((p0_2) * 16, (y + 6) * 16, 48, 32, #08080a)
+        unclip()
+        clip(p0_0, p0_3, 2, 2)
+        ring((p0_5) * 16, (p0_3) * 16, 48, 32, #08080a)
+        unclip()
+        clip(p0_2, p0_3, 2, 2)
+        ring((p0_2) * 16, (p0_3) * 16, 48, 32, #08080a)
+        unclip()
+    } else {
+        rounded(p0_0, p0_1, 112, 112, 2, #08080a)
+    }
+    rect(x + 179, y + 129, 141, 3, #393a3d)
+    rect(x + 179, y + 129, (141 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 3, #2f6fdb)
+    text(elapsed, small, p0_4, y + 132, 144, 14, left, #aeafb2)
+    text(remaining, small, p0_4, y + 132, 144, 14, right, #818285)
+} else {
+    let p0_0 = x + 63
+    let p0_1 = y + 208
+    let p0_2 = x + 105
+    let p0_3 = y + 250
+    let p0_4 = x + 57
+    let p0_5 = x + 65
+    menu(x, y, 170, 146)
+    rect(x, y + 207, 170, 57, #08080a)
+    rect(x + 85, y + 152, 0, 49, #393a3d)
+    if has_cover {
+        cover(p0_0, p0_1, 44)
+        reflect(p0_0, p0_1, 44, 10)
+        clip(p0_0, p0_1, 2, 2)
+        ring((p0_5) * 16, (y + 210) * 16, 48, 32, #08080a)
+        unclip()
+        clip(p0_2, p0_1, 2, 2)
+        ring((p0_2) * 16, (y + 210) * 16, 48, 32, #08080a)
+        unclip()
+        clip(p0_0, p0_3, 2, 2)
+        ring((p0_5) * 16, (p0_3) * 16, 48, 32, #08080a)
+        unclip()
+        clip(p0_2, p0_3, 2, 2)
+        ring((p0_2) * 16, (p0_3) * 16, 48, 32, #08080a)
+        unclip()
+    } else {
+        rounded(p0_0, p0_1, 44, 44, 2, #08080a)
+    }
+    rect(p0_4, y + 257, 55, 1, #393a3d)
+    rect(p0_4, y + 257, (55 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 1, #2f6fdb)
+    text(elapsed, small, p0_4, y + 258, 57, 6, left, #aeafb2)
+    text(remaining, small, p0_4, y + 258, 57, 6, right, #818285)
+}
+'''
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":1,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@header_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\",\"locked\":true},{\"id\":57,\"kind\":\"menu\",\"name\":\"Menu\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":176,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":146}},\"bind\":{}},{\"id\":3,\"kind\":\"box\",\"name\":\"Art panel\",\"hidden\":false,\"at\":{\"wide\":{\"x\":177,\"y\":0,\"w\":144,\"h\":146},\"tall\":{\"x\":0,\"y\":207,\"w\":170,\"h\":57}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#08080a\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":4,\"kind\":\"box\",\"name\":\"Divider\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":0,\"w\":1,\"h\":146},\"tall\":{\"x\":85,\"y\":152,\"w\":0,\"h\":49}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":5,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":193,\"y\":4,\"w\":112,\"h\":138},\"tall\":{\"x\":63,\"y\":208,\"w\":44,\"h\":54}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#08080a\",\"reflection\":true,\"corner\":2},{\"id\":51,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":179,\"y\":129,\"w\":141,\"h\":3},\"tall\":{\"x\":57,\"y\":257,\"w\":55,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":52,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":{\"x\":179,\"y\":129,\"w\":141,\"h\":3},\"tall\":{\"x\":57,\"y\":257,\"w\":55,\"h\":1}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":53,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":132,\"w\":144,\"h\":14},\"tall\":{\"x\":57,\"y\":258,\"w\":57,\"h\":6}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":false},{\"id\":54,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":132,\"w\":144,\"h\":14,\"align\":\"right\"},\"tall\":{\"x\":57,\"y\":258,\"w\":57,\"h\":6,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false}],\"upright\":\"auto\"}"
+
+[icons]
+home_music = [
+    "........................",
+    "..................354...",
+    "............358acfff8...",
+    "........4acfffffffff8...",
+    "........8fffffffffff8...",
+    "........8fffffffffff8...",
+    "........8ffffffca8af8...",
+    "........8fc853....8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8...19ffdf8...",
+    "........8f8...cfffff8...",
+    "....19ffdf8..6ffffff8...",
+    "....cfffff8..8ffffff8...",
+    "...6ffffff8..6ffffff6...",
+    "...8ffffff8...cffffc....",
+    "...6ffffff6...19ff91....",
+    "....cffffc..............",
+    "....19ff91..............",
+    "........................",
+    "........................",
+]
+home_audiobooks = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "..da74............47ad..",
+    "..fffffb852..258bfffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..258bfffff..fffffb852..",
+    ".......47ad..da74.......",
+    "........................",
+    "........................",
+    "........................",
+]
+home_podcasts = [
+    "........................",
+    "........................",
+    "..........8ee8..........",
+    ".........8ffff8.........",
+    ".........effffe.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    "....8f4..ffffff..4f8....",
+    "....5f8..cffffc..8f5....",
+    "....1fd..3effe3..df1....",
+    ".....9f8..2772..8f9.....",
+    ".....1ef8......8fe1.....",
+    "......3efd8448dfe3......",
+    ".......19ffffff91.......",
+    ".........15ff51.........",
+    "...........ff...........",
+    ".......1888ff8881.......",
+    ".......8ffffffff8.......",
+    ".......1888888881.......",
+    "........................",
+]
+home_settings = [
+    "........................",
+    ".........288882.........",
+    ".........4ffff4.........",
+    ".....69..4ffff4..96.....",
+    "....6ff9.6ffff6.9ff6....",
+    "...6ffffdffffffdffff6...",
+    "...9ffffffffffffffff9...",
+    "....9ffffffffffffff9....",
+    ".....dfffffbbfffffd.....",
+    ".2446ffffc2..2cffff6442.",
+    ".8fffffff2....2fffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8fffffff2....2fffffff8.",
+    ".2446ffffc2..2cffff6442.",
+    ".....dfffffbbfffffd.....",
+    "....9ffffffffffffff9....",
+    "...9ffffffffffffffff9...",
+    "...6ffffdffffffdffff6...",
+    "....6ff9.6ffff6.9ff6....",
+    ".....69..4ffff4..96.....",
+    ".........4ffff4.........",
+    ".........288882.........",
+    "........................",
+]
+home_diagnostics = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    ".........3b3............",
+    ".........cfb............",
+    "........3fff1...........",
+    "........9fff5...........",
+    ".......1efff9...........",
+    ".......6ffcfd...........",
+    ".......cfc5ff3..........",
+    ".244446ff61ff7..2444442.",
+    "2effffffe1.bfb.2efffffe2",
+    "2effffff8..7ff17ffffffe2",
+    ".2444444...3ff5dfb44442.",
+    "............dfcff5......",
+    "............9fffe.......",
+    "............5fff8.......",
+    "............1fff2.......",
+    ".............bfc........",
+    ".............3b3........",
+    "........................",
+    "........................",
+    "........................",
+]
+home_now_playing = [
+    "........................",
+    ".........368863.........",
+    "......18dffffffd81......",
+    ".....4dffeb88beffd4.....",
+    "....6ffd6......6dff6....",
+    "...4ff91........19ff4...",
+    "..1df9............9fd1..",
+    "..8fd1...94.......1df8..",
+    "..df6....bfa1......6fd..",
+    ".3fe.....bffe7......ef3.",
+    ".6fb.....bffffc4....bf6.",
+    ".8f8.....bffffff91..8f8.",
+    ".8f8.....bffffff91..8f8.",
+    ".6fb.....bffffc4....bf6.",
+    ".3fe.....bffe7......ef3.",
+    "..df6....bfa1......6fd..",
+    "..8fd1...94.......1df8..",
+    "..1df9............9fd1..",
+    "...4ff91........19ff4...",
+    "....6ffd6......6dff6....",
+    ".....4dffeb88beffd4.....",
+    "......18dffffffd81......",
+    ".........368863.........",
+    "........................",
+]
