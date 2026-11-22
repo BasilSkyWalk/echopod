@@ -32,7 +32,16 @@
         player's microSD card, then pick it under Settings, Display, Theme. Or open one in the
         editor and make it yours.
       </p>
-      <p id="status" role="status">Loading the themes…</p>
+      <div class="gallery-tools">
+        <p id="status" role="status">Loading the themes…</p>
+        <label class="sorting" hidden>
+          <span>Show</span>
+          <select id="sorting">
+            <option value="listed">Shared themes first</option>
+            <option value="liked">Most liked first</option>
+          </select>
+        </label>
+      </div>
       <div id="gallery"></div>
     </main>
     <script type="module" src="gallery.js"></script>

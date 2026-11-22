@@ -7,6 +7,7 @@ on:
       - "themes/**"
       - "assets/themes/**"
       - "web/editor/**"
+      - "web/gallery-service/**"
       - "platform/web/**"
       - "src/**"
       - "cmake/wasm32.cmake"
@@ -20,6 +21,7 @@ on:
       - "themes/**"
       - "assets/themes/**"
       - "web/editor/**"
+      - "web/gallery-service/**"
       - "platform/web/**"
       - "src/ui/**"
       - "src/np_faces/**"
@@ -82,6 +84,7 @@ jobs:
           --module build/web/platform/web/echo_preview.wasm
           --themes assets/themes --community themes --definitions src/ui/include/ui
           --glyphs assets/fonts/glyph_pack.json --packs src/fonts/packs
+          --service "${{ vars.GALLERY_SERVICE }}" --turnstile "${{ vars.GALLERY_TURNSTILE }}"
           --output build/web-editor
       - name: Draw every theme
         run: node web/editor/render_theme.mjs build/web-editor
@@ -110,3 +113,90 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  picture:
+    if: >-
+      always() && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    needs: site
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PULL: ${{ github.event.pull_request.number }}
+      REPOSITORY: ${{ github.repository }}
+      SITE_RESULT: ${{ needs.site.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      STORE: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+      STORE_BRANCH: gallery-previews
+    steps:
+      - id: themes
+        name: Find the themes the pull request adds or changes
+        run: |
+          set -euo pipefail
+          files=$(gh api "repos/$REPOSITORY/pulls/$PULL/files" --paginate \
+            --jq '.[] | select(.status != "removed") | .filename' \
+            | sed -nE 's#^themes/([a-z0-9][a-z0-9_-]{0,22})\.toml$#\1#p' | tr '\n' ' ')
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+      - if: steps.themes.outputs.files != '' && needs.site.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: theme-previews
+          path: previews
+      - if: steps.themes.outputs.files != ''
+        name: Show each theme in a comment on the pull request
+        env:
+          FILES: ${{ steps.themes.outputs.files }}
+        run: |
+          set -euo pipefail
+          marker='<!-- theme-picture -->'
+          body="$marker"$'\n'
+          if [ "$SITE_RESULT" = success ]; then
+            git init -q store
+            git -C store config user.name "github-actions[bot]"
+            git -C store config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C store remote add origin "$STORE"
+            kept=""
+            for attempt in 1 2 3 4 5; do
+              if git -C store fetch -q --depth 1 origin "$STORE_BRANCH" 2>/dev/null; then
+                git -C store checkout -q -B "$STORE_BRANCH" FETCH_HEAD
+              else
+                git -C store checkout -q --orphan "$STORE_BRANCH" 2>/dev/null || true
+              fi
+              for file in $FILES; do
+                cp "previews/$file.png" "store/pull-$PULL-$file.png"
+              done
+              git -C store add -A
+              git -C store diff --cached --quiet || git -C store commit -q -m "Theme pictures for pull request $PULL"
+              if git -C store push -q origin "HEAD:refs/heads/$STORE_BRANCH"; then
+                kept=$(git -C store rev-parse HEAD)
+                break
+              fi
+              sleep $((attempt * 3))
+            done
+            if [ -z "$kept" ]; then
+              echo "the pictures could not be stored" >&2
+              exit 1
+            fi
+            for file in $FILES; do
+              body+=$'\n'"**$file**"$'\n\n'"![$file on the player's screens](https://raw.githubusercontent.com/$REPOSITORY/$kept/pull-$PULL-$file.png)"$'\n'
+            done
+            body+=$'\n'"It packs and passes the reading checks."
+          elif [ "$SITE_RESULT" = failure ]; then
+            body+=$'\n'"The \`themes\` check didn't pass, so there is no picture. [See what it found]($RUN_URL)."
+          else
+            exit 0
+          fi
+          shown=$(gh api "repos/$REPOSITORY/issues/$PULL/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- theme-picture -->"))) | .id')
+          shown=${shown%%$'\n'*}
+          if [ -n "$shown" ]; then
+            gh api -X PATCH "repos/$REPOSITORY/issues/comments/$shown" -f body="$body" > /dev/null
+          else
+            gh api "repos/$REPOSITORY/issues/$PULL/comments" -f body="$body" > /dev/null
+          fi

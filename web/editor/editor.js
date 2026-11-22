@@ -23,6 +23,7 @@ import { buildWallpapers } from "./wallpaper_editor.js";
 import { ACCENT_FAMILY, COLOUR_SETS, mix, paletteOf, readableShade, schemeFrom, schemeOf } from "./colour_tools.js";
 import { addTileIcons } from "./tile_icons.js";
 import { addVersion, copyTheme, emptyLibrary, entryOf, keep, newId, readLibrary, removeTheme, versionDue, writeLibrary } from "./library.js";
+import { personCheck, sendTheme, siteSettings } from "./gallery_service.js";
 
 const LOOK = [
   { id: "colours", label: "Colours" },
@@ -100,8 +101,9 @@ const SCRIPT_WORDS = { HI: "highlight", ALU: "metal", DIM: "dim", BG: "backgroun
 const PANEL = "echopod-panel-width";
 const FOLDED = "echopod-folded";
 const LOOK_OPEN = "echopod-look";
-const SHARE_GUIDE = "https://github.com/BasilSkyWalk/echopod/blob/main/docs/themes.md";
+const SHARE_GUIDE = "https://github.com/BasilSkyWalk/echopod/blob/main/docs/themes.md#sharing-a-theme";
 const WELCOMED = "echopod-welcomed";
+const SEND = "Send to the gallery";
 const PANEL_DEFAULT = 420;
 const PANEL_LEAST = 320;
 const PANEL_MOST = 760;
@@ -169,6 +171,8 @@ const state = {
   confirming: null,
   statusAt: 0,
   scrubbing: false,
+  site: { service: "", turnstile: "" },
+  sent: null,
 };
 
 function el(tag, attributes = {}, ...children) {
@@ -1305,15 +1309,23 @@ function withMemory(parts) {
 
 function panelShare() {
   const bytes = apply();
-  const about = el("input", { value: state.theme.description ?? "", maxlength: 120, placeholder: "A line about it" });
+  const online = Boolean(state.site.service && state.site.turnstile);
+  const about = el("input", { id: "share-about", value: state.theme.description ?? "", maxlength: 120, placeholder: "A line about it" });
   about.addEventListener("input", () => {
     state.theme.description = about.value;
     remember();
   });
-  const author = el("input", { value: state.theme.author ?? "", maxlength: 40, placeholder: "Your name" });
+  const author = el("input", { id: "share-author", value: state.theme.author ?? "", maxlength: 40, placeholder: "Your name" });
   author.addEventListener("input", () => {
     state.theme.author = author.value;
     remember();
+  });
+  const name = el("input", { id: "share-name", value: state.theme.name, maxlength: SLUG_LETTERS, autocomplete: "off",
+    spellcheck: "false", placeholder: "What it's called" });
+  name.addEventListener("input", () => {
+    state.theme.name = name.value;
+    $("name").value = name.value;
+    changed();
   });
   return [
     el("h2", {}, "Put it on your player"),
@@ -1326,12 +1338,84 @@ function panelShare() {
       el("button", { type: "button", class: "primary", disabled: !bytes, onclick: download }, "Save the theme file")),
     ...(licenceField() ?? []),
     el("h3", {}, "Share it with everyone"),
-    el("p", { class: "hint" }, "The gallery's themes are kept with the EchoPod project. Save an editable copy and send it there to have yours added."),
-    group(field("Made by", author, "Shown in the gallery"), field("Description", about, "One line for the gallery")),
+    el("p", { class: "hint" }, online
+      ? "Send your theme to the gallery. It doesn't appear there straight away: each theme is approved first."
+      : "The gallery's themes are kept with the EchoPod project. Save an editable copy and send it there to have yours added."),
+    group(field("Name", name, "Also at the top of the page"), field("Made by", author, "Shown in the gallery"),
+      field("Description", about, "One line for the gallery")),
+    online ? el("div", { id: "person-check" }) : null,
     el("div", { class: "actions" },
+      online ? el("button", { type: "button", class: "primary", onclick: sendToGallery }, SEND) : null,
       el("button", { type: "button", onclick: downloadSource }, "Save an editable copy"),
-      el("a", { class: "link", href: SHARE_GUIDE, target: "_blank", rel: "noopener" }, "How to send it in")),
+      el("a", { class: "link", href: SHARE_GUIDE, target: "_blank", rel: "noopener" },
+        online ? "Other ways to share" : "How to send it in")),
+    online ? sentNote() : null,
   ];
+}
+
+function sentNote() {
+  const sent = state.sent?.file === slug(state.theme.name) ? state.sent : null;
+  return el("p", { class: "sent", id: "sent", role: "status", hidden: !sent },
+    sent ? ["Sent, and waiting to be approved. It isn't in the gallery yet: it appears there once it's approved. ",
+      el("a", { href: sent.url, target: "_blank", rel: "noopener" }, "See how it's going")] : null);
+}
+
+function sendProblem() {
+  const blank = (text) => typeof text !== "string" || text.trim() === "";
+  const fonts = Object.values(state.theme.fonts ?? {}).some(Boolean);
+  if (blank(state.theme.name) || state.theme.name.trim() === defaultTheme(state.schema).name) {
+    return ["Give the theme a name of its own first, under Name.", "#share-name"];
+  }
+  if (state.schema.samples.includes(slug(state.theme.name))) {
+    return ["The gallery already has a theme with this name. Give yours another one first, under Name.", "#share-name"];
+  }
+  if (blank(state.theme.author)) {
+    return ["Say who made it first, under Made by.", "#share-author"];
+  }
+  if (blank(state.theme.description)) {
+    return ["Add a line about it first, under Description.", "#share-about"];
+  }
+  if (fonts && blank(state.theme.font_licence)) {
+    return ["Say where the theme's fonts are from first.", null];
+  }
+  if (fonts && state.theme.font_licence === "unsure") {
+    return ["Keep this theme to yourself until you know its fonts may be passed on.", null];
+  }
+  if (lint(state.theme, state.schema).length > 0) {
+    return ["Fix what's hard to read first. The gallery only takes themes that read well.", null];
+  }
+  return null;
+}
+
+async function sendToGallery(event) {
+  const button = event.currentTarget;
+  if (!apply()) {
+    return;
+  }
+  const problem = sendProblem();
+  if (problem) {
+    const [text, place] = problem;
+    say(text, true);
+    const input = place ? inspector.querySelector(place) : null;
+    input?.focus();
+    input?.select();
+    return;
+  }
+  const file = slug(state.theme.name);
+  button.disabled = true;
+  button.textContent = "Sending…";
+  try {
+    const token = await personCheck(inspector.querySelector("#person-check") ?? document.body, state.site.turnstile);
+    const sent = await sendTheme(state.site.service, file, sourceText(), token);
+    state.sent = { file, url: sent.url };
+    inspector.querySelector("#sent")?.replaceWith(sentNote());
+    say("Sent. It's waiting to be approved");
+  } catch (error) {
+    say(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = SEND;
+  }
 }
 
 function shape() {
@@ -2521,11 +2605,15 @@ function download() {
   }
 }
 
-function downloadSource() {
+function sourceText() {
   syncScene();
   const licence = LICENCES.find(([value]) => value && value === state.theme.font_licence);
   const note = licence ? `# Fonts: ${licence[1]}\n` : "";
-  save(`${slug(state.theme.name)}.toml`, note + toToml(state.theme, state.schema), "text/plain");
+  return note + toToml(state.theme, state.schema);
+}
+
+function downloadSource() {
+  save(`${slug(state.theme.name)}.toml`, sourceText(), "text/plain");
 }
 
 function save(name, bytes, type) {
@@ -2595,6 +2683,10 @@ function startOver() {
 function wireControls() {
   $("name").addEventListener("input", (event) => {
     state.theme.name = event.target.value;
+    const shared = inspector.querySelector("#share-name");
+    if (shared) {
+      shared.value = event.target.value;
+    }
     changed();
   });
   $("save").addEventListener("click", () => showPanel("share"));
@@ -2672,6 +2764,7 @@ async function main() {
   } catch {
     state.gallery = [];
   }
+  state.site = await siteSettings();
   state.theme = defaultTheme(state.schema);
   const asked = new URLSearchParams(location.search).get("theme");
   const draft = loadDraft();

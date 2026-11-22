@@ -16,6 +16,7 @@ import theme_pack
 import web_editor
 
 PAGES = REPOSITORY / "web" / "editor"
+SERVICE = REPOSITORY / "web" / "gallery-service"
 THEMES = REPOSITORY / "assets" / "themes"
 SHARED = REPOSITORY / "themes"
 DEFINITIONS = REPOSITORY / "src" / "ui" / "include" / "ui"
@@ -29,7 +30,7 @@ MURKY = ('name = "Murky"\nauthor = "Someone"\ndescription = "Hard to read on pur
          '[wallpaper]\npalette = ["#606060", "#101114"]\nrows = ["0001", "0000"]\n')
 
 
-def build_site(root, community=None, module=None):
+def build_site(root, community=None, module=None, extra=()):
     stand_in = Path(root) / "echo_preview.wasm"
     stand_in.write_bytes(b"\x00asm")
     output = Path(root) / "site"
@@ -38,7 +39,7 @@ def build_site(root, community=None, module=None):
                  "--output", str(output)]
     if community:
         arguments += ["--community", str(community)]
-    return web_editor.main(arguments), output
+    return web_editor.main([*arguments, *extra]), output
 
 
 def shared_folder(root, sources):
@@ -124,10 +125,21 @@ class SiteTest(unittest.TestCase):
             for face in faces:
                 self.assertTrue((output / face["file"]).is_file(), face["file"])
 
+    def test_the_site_says_where_its_gallery_service_is_and_nothing_when_there_is_none(self):
+        with tempfile.TemporaryDirectory() as root:
+            _, output = build_site(root)
+            self.assertEqual({"service": "", "turnstile": ""},
+                             json.loads((output / "site.json").read_text(encoding="utf-8")))
+        with tempfile.TemporaryDirectory() as root:
+            _, output = build_site(root, extra=("--service", "https://gallery.example/",
+                                                "--turnstile", "0x4AAAA"))
+            self.assertEqual({"service": "https://gallery.example", "turnstile": "0x4AAAA"},
+                             json.loads((output / "site.json").read_text(encoding="utf-8")))
+
     def test_every_page_the_site_links_is_one_it_copies(self):
         for name in ("preview_host.js", "icon_editor.js", "tile_icons.js", "wallpaper_editor.js", "font_editor.js",
                      "arrange.js", "drawing.js", "drawings.js", "drawing_editor.js", "scene_compile.js", "colour_tools.js", "library.js", "gallery.html",
-                     "gallery.js"):
+                     "gallery.js", "gallery_service.js"):
             self.assertIn(name, web_editor.PAGE_FILES)
         for name in web_editor.PAGE_FILES:
             self.assertTrue((PAGES / name).is_file(), name)
@@ -253,6 +265,15 @@ class PageTest(unittest.TestCase):
 
     def test_the_drawing_tools_snap_group_line_up_and_copy_between_screens(self):
         result = self.run_node("test_drawing_editor.mjs")
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_the_gallery_service_counts_likes_and_sends_themes_in_as_pull_requests(self):
+        result = subprocess.run(["node", "--no-warnings", str(SERVICE / "test_gallery_service.mjs")],
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_the_pages_reach_the_gallery_service_and_cope_without_it(self):
+        result = self.run_node("test_gallery_service.mjs")
         self.assertEqual(0, result.returncode, result.stderr)
 
     def test_drawing_needs_a_site_folder(self):

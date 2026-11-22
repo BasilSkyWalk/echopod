@@ -13,6 +13,7 @@
   --warn-soft: #fbf1e6;
   --good: #2f7a4b;
   --good-soft: #e8f4ec;
+  --liked: #c2334d;
   --device: #1d1f22;
   --device-edge: #2c2f33;
   --radius: 10px;
@@ -42,6 +43,7 @@
     --warn-soft: #2a2117;
     --good: #7cc495;
     --good-soft: #17251c;
+    --liked: #f07a8f;
     --device: #0d0e0f;
     --device-edge: #26282b;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
@@ -559,6 +561,24 @@ details.dropping .drop-zone {
   margin: 0;
   color: var(--ink-faint);
   font-size: 13px;
+}
+
+.sent {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: 13px;
+}
+
+.sent a {
+  color: inherit;
+  font-weight: 600;
+}
+
+#person-check:not(:empty) {
+  margin-top: 12px;
 }
 
 .inspector {
@@ -2055,8 +2075,26 @@ details.every-colour > summary {
   font-size: 0.93em;
 }
 
-#gallery-page #status {
+.gallery-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-height: 34px;
   margin: 0 0 22px;
+}
+
+.sorting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+#gallery-page #status {
+  margin: 0;
   color: var(--ink-faint);
   font-size: 13px;
 }
@@ -2087,10 +2125,53 @@ details.every-colour > summary {
   background: var(--device);
 }
 
-.card h2 {
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
   margin: 14px 16px 0;
+}
+
+.card h2 {
+  margin: 0;
   font-size: 17px;
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.like {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.like svg {
+  width: 15px;
+  height: 15px;
+}
+
+.like span:empty {
+  display: none;
+}
+
+.like:hover {
+  color: var(--ink);
+}
+
+.like[aria-pressed="true"] {
+  border-color: var(--liked);
+  color: var(--liked);
+}
+
+.like[aria-pressed="true"] svg {
+  fill: currentColor;
 }
 
 .card p {
