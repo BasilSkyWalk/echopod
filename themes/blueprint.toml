@@ -1,0 +1,194 @@
+name = "Blueprint"
+author = "EchoPod"
+description = "A technical drawing: a fine grid, the cover on a measured plate and the song's place read off a ruler"
+selection = "selection"
+
+[spacing]
+row_height = 26
+
+[colors]
+background = "#0d2a4a"
+text = "#e6f6ff"
+text_secondary = "#7fd6ff"
+text_tertiary = "#5fa3cf"
+selection_background = "#7fd6ff"
+selection_top = "#7fd6ff"
+selection_shine = "#ffd84d"
+selection_text = "#0d2a4a"
+header_background = "#0a2038"
+header_top = "#0a2038"
+header_text = "#7fd6ff"
+divider = "#2c5a86"
+scrollbar_thumb = "#7fd6ff"
+danger = "#ff7a6b"
+success = "#7ef0b0"
+chevron = "#7fd6ff"
+
+[boxes.selection]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.header]
+fill = "header_background"
+ink = "header_text"
+border = "chevron"
+border_width = 1
+border_edges = ["bottom"]
+
+[boxes.toast]
+fill = "header_background"
+ink = "header_text"
+border = "chevron"
+border_width = 1
+
+[boxes.section]
+fill = "header_background"
+ink = "header_text"
+border = "chevron"
+border_width = 1
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+
+[boxes.progress_track]
+fill = "divider"
+
+[boxes.progress_fill]
+fill = "selection_background"
+
+[boxes.progress_active]
+fill = "selection_shine"
+
+[wallpaper]
+palette = ["#0d2a4a", "#143a61"]
+rows = [
+    "1111111111111111",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+    "1000000000000000",
+]
+
+[home_scene]
+script = '''
+const LINE = #7fd6ff
+const PAPER = #0d2a4a
+const DIM = #3f7fae
+
+backdrop(x, y, width, height)
+let wide = width > height
+let mx = x + (wide ? 10 : 8)
+let mw = wide ? 170 : 154
+let rows = wide ? 4 : 3
+let chosen = selected()
+let first = chosen >= rows ? chosen - rows + 1 : 0
+repeat row from first to min(items(), first + rows) {
+    let ry = y + 10 + (row - first) * 32
+    if row == chosen {
+        rect(mx, ry, mw, 26, LINE)
+    } else {
+        outline(mx, ry, mw, 26, DIM)
+    }
+    line(item(row), body, mx + 10, ry + 3, mw - 20, 20, left, row == chosen ? PAPER : LINE)
+}
+let side = 96
+let ox = wide ? x + 206 : x + 37
+let oy = wide ? y + 10 : y + 118
+outline(ox, oy, side, side, LINE)
+if has_cover {
+    cover(ox + 4, oy + 4, side - 8)
+} else {
+    let cx = ox + side / 2
+    let cy = oy + side / 2
+    clip(ox + 1, oy + 1, side - 2, side - 2)
+    repeat arm from 0 to 4 {
+        spoke(cx, cy, 32 + arm * 64, 16, 0, 70, DIM)
+    }
+    unclip()
+    ring(cx * 16 + 8, cy * 16 + 8, 28 * 16, 27 * 16, LINE)
+}
+rect(ox - 7, oy, 5, 1, LINE)
+rect(ox, oy - 7, 1, 5, LINE)
+rect(ox + side + 2, oy + side - 1, 5, 1, LINE)
+rect(ox + side - 1, oy + side + 2, 1, 5, LINE)
+rect(ox, oy + side + 12, side, 1, LINE)
+rect(ox, oy + side + 8, 1, 9, LINE)
+rect(ox + side - 1, oy + side + 8, 1, 9, LINE)
+text("96", small, ox, oy + side + 15, side, 15, center, LINE)
+'''
+
+[now_playing_scene]
+script = '''
+const LINE = #7fd6ff
+const PAPER = #0d2a4a
+const DIM = #5fa3cf
+const FAINT = #3f7fae
+const WHITE = #ffffff
+const MARK = #ffd84d
+
+backdrop(x, y, width, height)
+let wide = width > height
+let side = 96
+let ox = wide ? x + 14 : x + 37
+let oy = wide ? y + 8 : y + 10
+let cx = ox + side / 2
+let cy = oy + side / 2
+outline(ox, oy, side, side, LINE)
+if has_cover {
+    cover(ox + 4, oy + 4, side - 8)
+} else {
+    clip(ox + 1, oy + 1, side - 2, side - 2)
+    repeat arm from 0 to 4 {
+        spoke(cx, cy, 32 + arm * 64, 16, 0, 70, FAINT)
+    }
+    unclip()
+    ring(cx * 16 + 8, cy * 16 + 8, 28 * 16, 27 * 16, LINE)
+}
+rect(ox - 7, oy, 5, 1, LINE)
+rect(ox, oy - 7, 1, 5, LINE)
+rect(ox + side + 2, oy + side - 1, 5, 1, LINE)
+rect(ox + side - 1, oy + side + 2, 1, 5, LINE)
+if badge != none {
+    rect(cx - 13, cy - 13, 26, 26, PAPER)
+    outline(cx - 13, cy - 13, 26, 26, LINE)
+    icon(badge, cx - 8, cy - 8, 16, 16, LINE)
+}
+let tx = wide ? x + 126 : x + 8
+let ty = wide ? y + 4 : y + 116
+let tw = wide ? 184 : 154
+let along = wide ? left : center
+text("Title", small, tx, ty, tw, 15, along, DIM)
+line(song, title, tx, ty + 14, tw, 22, along, WHITE)
+text("Artist", small, tx, ty + 38, tw, 15, along, DIM)
+if present(feedback) {
+    text(feedback, body, tx, ty + 52, tw, 20, along, MARK)
+} else if present(lyric) {
+    line(lyric, body, tx, ty + 52, tw, 20, along, LINE)
+} else {
+    line(artist, body, tx, ty + 52, tw, 20, along, LINE)
+}
+format(small, tx, ty + 78, tw, 16, along, DIM)
+let rx = wide ? x + 14 : x + 10
+let rw = width - (wide ? 28 : 20)
+let ry = wide ? y + 126 : y + 252
+rect(rx, ry, rw, 1, LINE)
+repeat notch from 0 to 21 {
+    let long = notch % 5 == 0 ? 8 : 4
+    rect(rx + notch * (rw - 1) / 20, ry - long, 1, long, LINE)
+}
+let at = volume_shown ? volume_width(rw - 1) : progress(rw - 1)
+rect(rx, ry, at, 2, MARK)
+trapezoid(rx + at - 5, ry - 16, 11, 6, 5, MARK)
+times(small, rx, ry + 3, rw, 15, LINE, DIM)
+'''
