@@ -11,7 +11,7 @@
     {
       "binding": "DB",
       "database_name": "echopod-gallery",
-      "database_id": "",
+      "database_id": "91c9f9b6-8784-458e-8cca-e128c522add6",
       "migrations_dir": "migrations"
     }
   ],
@@ -20,7 +20,7 @@
     "GALLERY_INDEX": "https://basilskywalk.github.io/echopod/themes/index.json",
     "GITHUB_REPOSITORY": "BasilSkyWalk/echopod",
     "GITHUB_BRANCH": "main",
-    "GITHUB_APP_ID": "",
-    "GITHUB_INSTALLATION_ID": ""
+    "GITHUB_APP_ID": "5871412",
+    "GITHUB_INSTALLATION_ID": "184578758"
   }
 }

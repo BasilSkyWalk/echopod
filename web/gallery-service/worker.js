@@ -198,7 +198,7 @@ async function person(env, net, token, request) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      secret: env.TURNSTILE_SECRET,
+      secret: env.TURNSTILE_SECRET.trim(),
       response: token,
       remoteip: request.headers.get("CF-Connecting-IP") ?? undefined,
     }),
