@@ -16,9 +16,10 @@ PAGE_FILES = ("index.html", "style.css", "editor.js", "theme_format.js", "previe
               "icon_editor.js", "tile_icons.js", "wallpaper_editor.js", "font_editor.js",
               "accent_editor.js", "arrange.js", "drawing.js", "drawings.js", "drawing_editor.js", "pixel_letters.js", "colour_tools.js", "library.js", "scene_compile.js",
               "gallery.html",
-              "gallery.js")
+              "gallery.js", "gallery_service.js")
 MODULE = "echo_preview.wasm"
 GALLERY = "index.json"
+SITE = "site.json"
 FACE_BYTES_LIMIT = 200_000
 FILE_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,22}$")
 
@@ -140,6 +141,8 @@ def build(arguments):
         shutil.copyfile(arguments.packs / face["file"], output / face["file"])
     described["samples"] += write_themes(arguments, output / "themes")
     write_json(output / "theme_schema.json", described)
+    write_json(output / SITE, {"service": arguments.service.rstrip("/"),
+                               "turnstile": arguments.turnstile})
     return described
 
 
@@ -154,6 +157,10 @@ def parse_arguments(argv):
                         help="folder with the theme .def lists")
     parser.add_argument("--glyphs", type=Path, required=True, help="glyph_pack.json")
     parser.add_argument("--packs", type=Path, required=True, help="folder of packed glyph faces")
+    parser.add_argument("--service", default="",
+                        help="address of the gallery service, for sending themes and likes")
+    parser.add_argument("--turnstile", default="",
+                        help="the Turnstile site key the gallery service checks senders with")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 

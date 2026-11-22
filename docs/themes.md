@@ -66,9 +66,9 @@ The editor is a web page that runs the player's own interface, so the screen in 
 - A note appears when something would be hard to read (see Readability below). Undo and redo are at the top.
 - **My themes**, under Themes, keeps every theme you make in this browser, with earlier versions of the one that's open: one every ten minutes while you work, one before you open another theme over it, and any you keep yourself. "Go back to this" returns to one, and Undo comes back. Download a theme to keep it for good.
 - **Getting around.** Drag the panel's left edge to make it wider, and click a heading to fold that section away. Ctrl and the mouse wheel, or a pinch, zoom the screen; drag the space around it, or scroll, to move about. It works with touch too. The first visit asks what to begin from (the player's dark look, its light look or Paper), then gives a short tour, and "Show me around" under Themes runs it again.
-- **Put on my player**, at the top, has the three steps and **Save the theme file**, which saves the `.echotheme` file. **Save an editable copy** saves the same theme as a `.toml` text file, which is what you share in this repository. When the theme has its own fonts, it asks where they're from.
+- **Put on my player**, at the top, has the three steps and **Save the theme file**, which saves the `.echotheme` file. **Save an editable copy** saves the same theme as a `.toml` text file, which is what you share in this repository. **Send to the gallery** sends that file in for you: give the theme a name of its own, say who made it and add a line about it, and it joins the gallery once it has been approved. When the theme has its own fonts, it asks where they're from.
 
-The gallery page next to it lists the built-in samples and every theme in this repository's `themes` folder, with a picture of each, a download and an "Open in the editor" link.
+The gallery page next to it lists the built-in samples and every theme in this repository's `themes` folder, with a picture of each, a download and an "Open in the editor" link. The heart on a theme likes it, once from each browser, and **Most liked first** puts the best-liked themes at the top.
 
 ### Building the editor yourself
 
@@ -82,7 +82,7 @@ node web/editor/render_theme.mjs build/web-editor
 python -m http.server 8770 --bind 127.0.0.1 --directory build/web-editor
 ```
 
-Then open `http://127.0.0.1:8770`. The `render_theme.mjs` step draws `previews/<file>.png` for the gallery; given a theme and an output as well (`node web/editor/render_theme.mjs build/web-editor my.echotheme my.png`) it draws just that one.
+Then open `http://127.0.0.1:8770`. To try sending a theme and the likes as well, add `--service http://127.0.0.1:8787 --turnstile 1x00000000000000000000AA` to the `web_editor.py` line and run `node web/gallery-service/dev_server.mjs http://127.0.0.1:8770 8787` beside it: a stand-in for the gallery service that keeps what it's sent in memory and opens no pull request. The `render_theme.mjs` step draws `previews/<file>.png` for the gallery; given a theme and an output as well (`node web/editor/render_theme.mjs build/web-editor my.echotheme my.png`) it draws just that one.
 
 ## Writing a theme by hand
 
@@ -519,9 +519,11 @@ For a gradient, the ink is measured against the end it reads worse on. A warning
 
 ## Sharing a theme
 
-**As a file.** The `.echotheme` file is the whole theme. Send it or post it anywhere; whoever gets it copies it into `Themes` on their card. Share the `.toml` as well if you'd like others to build on it: the editor's **Download source** writes it.
+**As a file.** The `.echotheme` file is the whole theme. Send it or post it anywhere; whoever gets it copies it into `Themes` on their card. Share the `.toml` as well if you'd like others to build on it: the editor's **Save an editable copy** writes it.
 
-**In the gallery.** Open a pull request that adds one file, `themes/<file>.toml`:
+**In the gallery, from the editor.** Open **Put on my player**, fill in **Made by** and **Description**, and press **Send to the gallery**. The theme needs a name no other gallery theme has, and nothing the editor marks as hard to read. A theme with its own fonts also needs to say where they're from. Sending opens a pull request in this repository for you, with no account needed; the link under the button shows how it's going. At most three themes can be sent from one place in a day.
+
+**In the gallery, by hand.** Open a pull request that adds one file, `themes/<file>.toml`:
 
 - Name the file with 1 to 23 of `a-z`, `0-9`, `-` and `_`, and not the name of a file in `assets/themes`.
 - Give it a `name`, an `author` and a `description`.
@@ -532,4 +534,6 @@ For a gradient, the ink is measured against the end it reads worse on. A warning
   python tools/theme_pack.py --themes themes --base assets/themes/dark.toml --definitions src/ui/include/ui --output build/themes --strict
   ```
 
-The `themes` workflow runs the same check on the pull request, builds the editor and attaches a picture of every theme to the run (the `theme-previews` artifact). When the pull request is merged the gallery is rebuilt with the new theme in it.
+The `themes` workflow runs the same check on the pull request, builds the editor and attaches a picture of every theme to the run (the `theme-previews` artifact). For a pull request from a branch of this repository, which is what the editor's button opens, it also shows the picture of each theme the pull request adds or changes in a comment, or says there that the check didn't pass. A pull request from a fork gets no comment; its picture is in the artifact. When the pull request is merged the gallery is rebuilt with the new theme in it.
+
+Sending from the editor and the likes go through a small service, kept in `web/gallery-service` with its set-up steps in the `README.md` there. For a like it keeps a random number made in your browser, and for its daily limits a scrambled form of the address the request came from; it keeps no names and no accounts.

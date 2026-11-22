@@ -1,0 +1,26 @@
+{
+  "name": "echopod-gallery",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-22",
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.1 }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "echopod-gallery",
+      "database_id": "",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://basilskywalk.github.io",
+    "GALLERY_INDEX": "https://basilskywalk.github.io/echopod/themes/index.json",
+    "GITHUB_REPOSITORY": "BasilSkyWalk/echopod",
+    "GITHUB_BRANCH": "main",
+    "GITHUB_APP_ID": "",
+    "GITHUB_INSTALLATION_ID": ""
+  }
+}
