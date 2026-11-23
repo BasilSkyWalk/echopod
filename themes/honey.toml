@@ -1,0 +1,77 @@
+name = "Honey"
+author = "t3rr0rz0n3"
+description = "Clean and minimalist"
+selection = "selection"
+
+[colors]
+background = "#1a1a1a"
+text = "#ffffff"
+text_secondary = "#cccccc"
+text_tertiary = "#f6f5f4"
+selection_background = "#e5a50a"
+selection_top = "#e9b32f"
+selection_shine = "#eec560"
+selection_text = "#000000"
+header_background = "#252525"
+header_top = "#252525"
+header_text = "#ffffff"
+divider = "#1a1a1a"
+scrollbar_thumb = "#e5a50a"
+danger = "#e5484d"
+success = "#30a46c"
+chevron = "#e5a50a"
+
+[boxes.selection]
+fill = "selection_background"
+shine = "selection_shine"
+shine_height = 1
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
