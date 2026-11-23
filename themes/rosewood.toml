@@ -1,0 +1,135 @@
+name = "Rosewood"
+author = "EchoPod"
+description = "Deep burgundy with a rounded selection"
+selection = "selection"
+
+[spacing]
+row_height = 26
+
+[colors]
+background = "#1c0f14"
+text = "#f6e6e0"
+text_secondary = "#cfa8a4"
+text_tertiary = "#96706e"
+selection_background = "#7a2338"
+selection_top = "#a83250"
+selection_shine = "#d06a80"
+selection_text = "#fff4f0"
+header_background = "#241218"
+header_top = "#3a1a26"
+header_text = "#f6e6e0"
+divider = "#4a2430"
+scrollbar_thumb = "#8a4a58"
+danger = "#ff7a5c"
+success = "#9bd4a0"
+chevron = "#a07078"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+ink = "selection_text"
+inset = [4, 2]
+radius = 11
+
+[boxes.toast]
+fill = "header_top"
+border = "selection_top"
+border_width = 1
+ink = "header_text"
+radius = 10
+
+[boxes.section]
+fill = "header_top"
+border = "selection_top"
+border_width = 1
+ink = "header_text"
+radius = 12
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+radius = 1
+
+[boxes.progress_fill]
+fill = "selection_shine"
+
+[boxes.progress_active]
+fill = "selection_text"
+
+[icons]
+battery = [
+    "......................",
+    ".2affffffffffffffa2...",
+    "2e61............16e2..",
+    "a6................6a..",
+    "f1................1fdd",
+    "f1................1fdd",
+    "a6................6a..",
+    "2e61............16e2..",
+    ".2affffffffffffffa2...",
+    "......................",
+]
+battery_level = [
+    "......................",
+    "......................",
+    "......................",
+    "..4effffffffffffe4....",
+    "..effffffffffffffe....",
+    "..effffffffffffffe....",
+    "..4effffffffffffe4....",
+    "......................",
+    "......................",
+    "......................",
+]
+chevron = [
+    ".4....",
+    ".d5...",
+    ".4d1..",
+    "..a8..",
+    "..1e2.",
+    "...7b.",
+    "....d5",
+    "....c6",
+    "...6c.",
+    "..1e3.",
+    "..98..",
+    ".4d1..",
+    ".d5...",
+    ".4....",
+]
+battery_large = [
+    "..............................",
+    "...389999999999999999984......",
+    ".1afebbbbbbbbbbbbbbbbbdfc2....",
+    ".be5...................3ce1...",
+    "6f3.....................1d9...",
+    "ca.......................6f263",
+    "f6.......................2fefe",
+    "f6.......................2fefe",
+    "ca.......................6f263",
+    "6f3.....................1d9...",
+    ".be5...................3ce1...",
+    ".1afebbbbbbbbbbbbbbbbbdfc2....",
+    "...389999999999999999984......",
+    "..............................",
+]
+battery_level_large = [
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "...18bbbbbbbbbbbbbbbbba2......",
+    "...bfffffffffffffffffffe1.....",
+    "..3fffffffffffffffffffff7.....",
+    "..3fffffffffffffffffffff7.....",
+    "...bfffffffffffffffffffe1.....",
+    "...18bbbbbbbbbbbbbbbbba2......",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+]
+
+[wallpaper]
+image = "rosewood.png"
+
+[wallpaper_portrait]
+image = "rosewood-tall.png"

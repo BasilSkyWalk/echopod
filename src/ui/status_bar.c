@@ -13,8 +13,27 @@ enum {
     BLUETOOTH_WIDTH_TENTHS = 7,
     TENTHS = 10,
     FULL_PERCENT = 100,
-    CLOCK_TEXT_CAPACITY = 16
+    CLOCK_TEXT_CAPACITY = 16,
+    LARGE_ICONS = THEME_ICON_STATUS_PLAY_LARGE - THEME_ICON_STATUS_PLAY
 };
+
+_Static_assert(THEME_ICON_BATTERY_LEVEL == THEME_ICON_BATTERY + 1 &&
+                   THEME_ICON_BATTERY_LEVEL_LARGE == THEME_ICON_BATTERY_LEVEL + LARGE_ICONS &&
+                   THEME_ICON_STATUS_BOLT_LARGE == THEME_ICON_STATUS_BOLT + LARGE_ICONS,
+               "a status icon's large form and a battery's level follow it at fixed steps");
+
+static ThemeIconId fitting(const Theme *theme, ThemeIconId id)
+{
+    ThemeIconId large = (ThemeIconId)(id + LARGE_ICONS);
+    const IconMask *mask = theme_icon(theme, large);
+    return mask != NULL && mask->height <= theme->metrics.status_icon_size ? large : id;
+}
+
+static void draw_icon(Canvas *canvas, const Theme *theme, ThemeIconId id, Icon icon)
+{
+    icon.id = fitting(theme, id);
+    icon_draw(canvas, theme, icon);
+}
 
 static const Font *status_font(const Theme *theme)
 {
@@ -153,7 +172,7 @@ static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent, bo
     char text[STATUS_BAR_PERCENT_CAPACITY];
     status_bar_percent_text(percent, text, sizeof text);
     Rect area = status_bar_percent_area(theme, text, charging);
-    TextStyle style = {.font = status_font(theme), .color = theme->colors.header_text};
+    TextStyle style = {.font = status_font(theme), .color = theme->colors->header_text};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, area, text), .text = text});
 }
@@ -161,10 +180,10 @@ static void draw_percent(Canvas *canvas, const Theme *theme, uint8_t percent, bo
 static Color fill_color(const Theme *theme, StatusBarState state)
 {
     if (state.charging) {
-        return theme->colors.success;
+        return theme->colors->success;
     }
-    return state.battery_percent <= STATUS_BAR_LOW_BATTERY_PERCENT ? theme->colors.danger
-                                                                   : theme->colors.header_text;
+    return state.battery_percent <= STATUS_BAR_LOW_BATTERY_PERCENT ? theme->colors->danger
+                                                                   : theme->colors->header_text;
 }
 
 static void draw_outline(Canvas *canvas, Rect body, Color color)
@@ -177,8 +196,30 @@ static void draw_outline(Canvas *canvas, Rect body, Color color)
                      color);
 }
 
+static bool draw_battery_icon(Canvas *canvas, const Theme *theme, StatusBarState state)
+{
+    ThemeIconId id = fitting(theme, THEME_ICON_BATTERY);
+    const IconMask *frame = theme_icon(theme, id);
+    const IconMask *level = theme_icon(theme, (ThemeIconId)(id + 1));
+    if (frame == NULL || level == NULL || level->width != frame->width ||
+        level->height != frame->height) {
+        return false;
+    }
+    Icon icon = {id, status_bar_battery_area(theme), theme->colors->header_text};
+    icon_draw(canvas, theme, icon);
+    icon = (Icon){(ThemeIconId)(id + 1), icon.area, fill_color(theme, state)};
+    Rect lit = icon_ink_area(theme, icon);
+    lit.width = status_bar_battery_fill_width(state.battery_percent, lit.width);
+    Canvas shown = canvas_clipped(canvas, lit);
+    icon_draw(&shown, theme, icon);
+    return true;
+}
+
 static void draw_battery(Canvas *canvas, const Theme *theme, StatusBarState state)
 {
+    if (draw_battery_icon(canvas, theme, state)) {
+        return;
+    }
     Rect area = status_bar_battery_area(theme);
     int size = theme->metrics.status_icon_size;
     Rect body = {area.x, area.y, 2 * size, size};
@@ -186,7 +227,7 @@ static void draw_battery(Canvas *canvas, const Theme *theme, StatusBarState stat
     Rect tip = {body.x + body.width, area.y + size / 3, nub, size - 2 * (size / 3)};
     Rect inner = {body.x + FILL_INSET, body.y + FILL_INSET, body.width - 2 * FILL_INSET,
                   body.height - 2 * FILL_INSET};
-    Color color = theme->colors.header_text;
+    Color color = theme->colors->header_text;
     draw_outline(canvas, body, color);
     canvas_fill_rect(canvas, tip, color);
     inner.width = status_bar_battery_fill_width(state.battery_percent, inner.width);
@@ -200,16 +241,17 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
         state.hide_percent = true;
     }
     Rect icon = status_bar_playback_area(theme);
-    Color color = theme->colors.header_text;
+    Color color = theme->colors->header_text;
     if (state.playback == STATUS_PLAYBACK_PLAYING) {
-        icon_draw_play(canvas, icon, color);
+        draw_icon(canvas, theme, THEME_ICON_STATUS_PLAY, (Icon){.area = icon, .color = color});
     } else if (state.playback == STATUS_PLAYBACK_PAUSED) {
-        icon_draw_pause(canvas, icon, color);
+        draw_icon(canvas, theme, THEME_ICON_STATUS_PAUSE, (Icon){.area = icon, .color = color});
     }
     if (state.bluetooth != STATUS_BLUETOOTH_OFF) {
         Color tint =
-            state.bluetooth == STATUS_BLUETOOTH_CONNECTED ? color : theme->colors.text_tertiary;
-        icon_draw_bluetooth(canvas, status_bar_bluetooth_area(theme), tint);
+            state.bluetooth == STATUS_BLUETOOTH_CONNECTED ? color : theme->colors->text_tertiary;
+        Icon rune = {.area = status_bar_bluetooth_area(theme), .color = tint};
+        draw_icon(canvas, theme, THEME_ICON_STATUS_BLUETOOTH, rune);
     }
     Rect clock = status_bar_clock_area(theme, state);
     if (!rect_is_empty(clock)) {
@@ -221,7 +263,8 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
     if (state.battery_known) {
         draw_battery(canvas, theme, state);
         if (state.charging) {
-            icon_draw_bolt(canvas, status_bar_bolt_area(theme), theme->colors.success);
+            Icon bolt = {.area = status_bar_bolt_area(theme), .color = theme->colors->success};
+            draw_icon(canvas, theme, THEME_ICON_STATUS_BOLT, bolt);
         }
         if (!state.hide_percent) {
             draw_percent(canvas, theme, state.battery_percent, state.charging);

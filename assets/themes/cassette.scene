@@ -1,0 +1,143 @@
+const DEEP = #181418
+const SHELL = #484850
+const SHELL_HI = #606068
+const TAPE = #784c30
+const LABEL = #f0e4c8
+const INK = #282020
+const INK_SOFT = #605048
+const RED = #b03020
+const AMBER = #e89828
+const RULE = #b8a888
+
+let icon_kind = badge == none && !playing ? pause : badge
+let turn = (0 - tick * 8) & 255
+
+rect(x, y, width, height, DEEP)
+
+if width > height {
+    rounded(11, 27, 297, 140, 6, SHELL)
+    rect(17, 28, 285, 1, SHELL_HI)
+    ring(18 * 16 + 8, 34 * 16 + 8, 56, 0, RULE)
+    rect(16, 34, 5, 1, DEEP)
+    ring(300 * 16 + 8, 34 * 16 + 8, 56, 0, RULE)
+    rect(298, 34, 5, 1, DEEP)
+    ring(18 * 16 + 8, 159 * 16 + 8, 56, 0, RULE)
+    rect(16, 159, 5, 1, DEEP)
+    ring(300 * 16 + 8, 159 * 16 + 8, 56, 0, RULE)
+    rect(298, 159, 5, 1, DEEP)
+
+    rect(25, 32, 269, 92, LABEL)
+    rect(33, 54, 253, 1, RULE)
+    rect(33, 77, 253, 1, RULE)
+    rect(25, 80, 269, 4, AMBER)
+    rect(25, 84, 269, 31, RED)
+    rect(25, 115, 269, 4, AMBER)
+    text("A", title, 25, 84, 40, 31, center, LABEL)
+    text(codec, small, 254, 84, 40, 31, center, LABEL)
+
+    rounded(65, 80, 189, 39, 5, SHELL)
+    rounded(67, 82, 185, 35, 4, DEEP)
+    let played = progress(424 * 424 - 200 * 200)
+    let left_pack = isqrt(424 * 424 - played) & -16
+    let right_pack = isqrt(200 * 200 + played) & -16
+    clip(67, 82, 185, 35)
+    repeat reel from 0 to 2 {
+        let cx = (reel == 0 ? 99 : 219) * 16 + 8
+        let cy = 99 * 16 + 8
+        ring(cx, cy, reel == 0 ? left_pack : right_pack, 0, TAPE)
+        ring(cx, cy, 168, 0, LABEL)
+        ring(cx, cy, 104, 0, DEEP)
+        let a = turn
+        ring(cx + 88 * sin(a) / 255, cy - 88 * cos(a) / 255, 32, 0, LABEL)
+        a = (turn + 85) & 255
+        ring(cx + 88 * sin(a) / 255, cy - 88 * cos(a) / 255, 32, 0, LABEL)
+        a = (turn + 171) & 255
+        ring(cx + 88 * sin(a) / 255, cy - 88 * cos(a) / 255, 32, 0, LABEL)
+    }
+    unclip()
+    icon(icon_kind, 151, 90, 18, 18, LABEL)
+
+    trapezoid(71, 129, 177, 38, 12, SHELL_HI)
+    ring(103 * 16 + 8, 143 * 16 + 8, 72, 0, DEEP)
+    ring(215 * 16 + 8, 143 * 16 + 8, 72, 0, DEEP)
+    rect(87, 153, 145, 14, DEEP)
+    bar(87, 157, 145, 3, TAPE, AMBER, LABEL)
+
+    line(song, title, 33, 33, 253, 20, left, INK)
+    if present(feedback) {
+        text(feedback, body, 33, 56, 253, 20, left, INK)
+    } else if present(lyric) {
+        line(lyric, body, 33, 56, 253, 20, left, INK)
+    } else {
+        line(artist, body, 33, 56, 253, 20, left, INK_SOFT)
+    }
+    times(small, 17, 129, 286, 16, LABEL, LABEL)
+} else {
+    let top = y + (height - 217) / 2
+    rounded(8, top, 153, 100, 6, SHELL)
+    rect(14, top + 1, 141, 1, SHELL_HI)
+    ring(14 * 16 + 8, (top + 6) * 16 + 8, 40, 0, RULE)
+    rect(13, top + 6, 3, 1, DEEP)
+    ring(154 * 16 + 8, (top + 6) * 16 + 8, 40, 0, RULE)
+    rect(153, top + 6, 3, 1, DEEP)
+    ring(14 * 16 + 8, (top + 92) * 16 + 8, 40, 0, RULE)
+    rect(13, top + 92, 3, 1, DEEP)
+    ring(154 * 16 + 8, (top + 92) * 16 + 8, 40, 0, RULE)
+    rect(153, top + 92, 3, 1, DEEP)
+
+    rect(20, top + 5, 129, 63, LABEL)
+    rect(25, top + 28, 119, 1, RULE)
+    rect(20, top + 31, 129, 3, AMBER)
+    rect(20, top + 34, 129, 27, RED)
+    rect(20, top + 61, 129, 3, AMBER)
+    text("A", title, 25, top + 6, 14, 20, left, RED)
+    text(codec, small, 100, top + 10, 44, 16, right, INK_SOFT)
+
+    rounded(34, top + 30, 101, 35, 5, SHELL)
+    rounded(36, top + 32, 97, 31, 4, DEEP)
+    let played = progress(312 * 312 - 152 * 152)
+    let left_pack = isqrt(312 * 312 - played) & -16
+    let right_pack = isqrt(152 * 152 + played) & -16
+    clip(36, top + 32, 97, 31)
+    repeat reel from 0 to 2 {
+        let cx = (reel == 0 ? 58 : 110) * 16 + 8
+        let cy = (top + 47) * 16 + 8
+        ring(cx, cy, reel == 0 ? left_pack : right_pack, 0, TAPE)
+        ring(cx, cy, 136, 0, LABEL)
+        ring(cx, cy, 88, 0, DEEP)
+        let a = turn
+        ring(cx + 72 * sin(a) / 255, cy - 72 * cos(a) / 255, 24, 0, LABEL)
+        a = (turn + 85) & 255
+        ring(cx + 72 * sin(a) / 255, cy - 72 * cos(a) / 255, 24, 0, LABEL)
+        a = (turn + 171) & 255
+        ring(cx + 72 * sin(a) / 255, cy - 72 * cos(a) / 255, 24, 0, LABEL)
+    }
+    unclip()
+    icon(icon_kind, 76, top + 38, 18, 18, LABEL)
+
+    trapezoid(34, top + 72, 101, 28, 8, SHELL_HI)
+    ring(58 * 16 + 8, (top + 82) * 16 + 8, 56, 0, DEEP)
+    ring(110 * 16 + 8, (top + 82) * 16 + 8, 56, 0, DEEP)
+    rect(46, top + 89, 77, 11, DEEP)
+    bar(46, top + 92, 77, 3, TAPE, AMBER, LABEL)
+
+    let card = top + 108
+    rect(8, card, 153, 109, LABEL)
+    rect(8, card, 153, 2, RED)
+    repeat rule from 0 to 3 {
+        rect(16, card + 24 + rule * 23, 137, 1, RULE)
+    }
+    line(song, title, 16, card + 3, 137, 20, center, INK)
+    line(artist, body, 16, card + 26, 137, 20, center, INK_SOFT)
+    if present(lyric) {
+        line(lyric, body, 16, card + 49, 137, 20, center, INK)
+    } else {
+        line(album, body, 16, card + 49, 137, 20, center, INK_SOFT)
+    }
+    if present(feedback) {
+        text(feedback, small, 16, card + 73, 137, 16, center, INK)
+    } else {
+        text(stream, small, 16, card + 73, 137, 16, center, INK_SOFT)
+    }
+    times(small, 16, card + 90, 137, 16, INK, INK)
+}

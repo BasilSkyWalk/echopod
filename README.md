@@ -5,6 +5,7 @@ Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has 
 - **Installing and using it:** `docs/user-guide.md`.
 - **Read first:** `docs/known-issues.md`. EchoPod is early, and has been tested on one player.
 - **What's new:** `docs/release-notes.md`.
+- **Make a theme:** the [theme editor](https://basilskywalk.github.io/echopod/) runs in your browser with nothing to install, and its [gallery](https://basilskywalk.github.io/echopod/gallery.html) has themes to download. Theme files need EchoPod 0.13.0, which is experimental; `docs/themes.md` has the details.
 
 The hardware knowledge it relies on comes largely from the [ReChord](https://github.com/brnomt/ReChord) project's research (`docs/hardware.md`, `CREDITS.md`).
 
@@ -15,6 +16,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 - **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **echo-sync**.
 - **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.
 - **Equalizer:** FiiO's presets and a 7-band Custom EQ.
+- **Themes:** thirteen built in, four of which (Cassette, VU meters, Turntable and LCD deck) redraw Now Playing. From 0.13.0, a theme file on the card changes the colours, shapes, fonts and wallpaper, and can draw Home and Now Playing itself. Make one in the [theme editor](https://basilskywalk.github.io/echopod/).
 - **Portrait mode:** Settings → Orientation turns the screen upright either way, with layouts made for it. The volume rocker turns with it.
 - **Languages:** Settings → Language: English, Simplified Chinese, Japanese, Korean, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Danish, Norwegian, Finnish, Russian, Ukrainian, Polish and Indonesian. The choice applies after a restart. Titles and artists in Cyrillic, Greek, Polish, Czech, Turkish, Romanian and Vietnamese letters draw too.
 - **Audiobooks and podcasts** on their own shelves, with a bookmark for each.

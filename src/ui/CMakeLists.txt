@@ -1,4 +1,6 @@
 add_library(echo_ui STATIC
+    backdrop.c
+    box.c
     choice_screen.c
     cover_flow.c
     fade.c
@@ -16,6 +18,7 @@ add_library(echo_ui STATIC
     screen_stack.c
     status_bar.c
     theme.c
+    theme_package.c
     toast.c
 )
 target_include_directories(echo_ui PUBLIC include)
@@ -23,3 +26,6 @@ target_link_libraries(echo_ui
     PUBLIC echo_core echo_gfx
     PRIVATE echo_options echo_compact echo_lto
 )
+if(CMAKE_CROSSCOMPILING)
+    set_source_files_properties(theme.c PROPERTIES COMPILE_DEFINITIONS ECHO_RESIDENT_TABLES)
+endif()

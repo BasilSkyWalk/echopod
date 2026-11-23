@@ -59,9 +59,12 @@ static void the_faces_carry_their_magic_and_a_draw(void)
 
 static void every_face_has_chrome_and_standard_has_none(void)
 {
-    CHECK(NOW_PLAYING_FACES.chrome[NP_FACE_STANDARD] == NULL);
+    SceneCode code;
+    const ThemeColors *chrome;
+    CHECK(!np_test_scene_code(NP_FACE_STANDARD, &code, &chrome));
     for (int face = NP_FACE_CASSETTE; face < NP_FACE_COUNT; face++) {
-        CHECK(NOW_PLAYING_FACES.chrome[face] != NULL);
+        CHECK(np_test_scene_code((uint8_t)face, &code, &chrome));
+        CHECK(chrome != NULL);
     }
 }
 

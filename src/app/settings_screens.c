@@ -6,6 +6,7 @@
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
+#include "theme_store.h"
 
 enum {
     BRIGHTNESS_LEVEL_COUNT = SETTINGS_BRIGHTNESS_MAX - SETTINGS_BRIGHTNESS_MIN + 1,
@@ -70,17 +71,16 @@ static const StringId COVER_ORDER_OPTIONS[2] = {STR_SETTINGS_BY_ALBUM_ARTIST,
                                                 STR_SETTINGS_BY_ALBUM_TITLE};
 static const StringId ARTIST_VIEW_OPTIONS[2] = {STR_SETTINGS_LIST, STR_MENU_COVER_FLOW};
 static const StringId BLUETOOTH_LEVEL_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LOUDER};
-ECHO_RESIDENT static const StringId NP_FACE_OPTIONS[NP_FACE_COUNT] = {
-    STR_SETTINGS_STANDARD, STR_SETTINGS_CASSETTE, STR_SETTINGS_VU_METERS, STR_SETTINGS_TURNTABLE,
-    STR_SETTINGS_LCD_DECK};
 static const StringId COVER_COUNT_OPTIONS[2] = {STR_SETTINGS_FIVE_COVERS,
                                                 STR_SETTINGS_THREE_COVERS};
 static const StringId ANIMATION_OPTIONS[ANIMATION_SPEED_COUNT] = {
     STR_SETTINGS_NORMAL, STR_SETTINGS_SLOWER, STR_SETTINGS_FASTER};
 static const StringId THEME_OPTIONS[THEME_COUNT] = {
-    STR_SETTINGS_DARK,  STR_SETTINGS_LIGHT, STR_SETTINGS_FJORD,
-    STR_SETTINGS_DUSK,  STR_SETTINGS_NEON,  STR_SETTINGS_PHOSPHOR,
-    STR_SETTINGS_PAPER, STR_SETTINGS_OLIVE, STR_SETTINGS_HIGH_CONTRAST};
+    STR_SETTINGS_DARK,     STR_SETTINGS_LIGHT,     STR_SETTINGS_FJORD,
+    STR_SETTINGS_DUSK,     STR_SETTINGS_NEON,      STR_SETTINGS_PHOSPHOR,
+    STR_SETTINGS_PAPER,    STR_SETTINGS_OLIVE,     STR_SETTINGS_HIGH_CONTRAST,
+    STR_SETTINGS_CASSETTE, STR_SETTINGS_VU_METERS, STR_SETTINGS_TURNTABLE,
+    STR_SETTINGS_LCD_DECK};
 static const StringId STATUS_BAR_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LARGE};
 static const StringId POWER_ON_OPTIONS[2] = {STR_SETTINGS_PRESS, STR_SETTINGS_HOLD};
 static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
@@ -386,14 +386,90 @@ ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_CLOCK, SWITCH_OPTIONS, OPTION_CLOCK),
     OPTION_CHOICE(STR_SETTINGS_STATUS_BAR, STATUS_BAR_OPTIONS, OPTION_STATUS_BAR),
     OPTION_CHOICE(STR_SETTINGS_POWER_ON, POWER_ON_OPTIONS, OPTION_POWER_ON),
-    OPTION_CHOICE(STR_MENU_NOW_PLAYING, NP_FACE_OPTIONS, OPTION_NOW_PLAYING_FACE),
 };
+
+static int current_theme(const void *context)
+{
+    int file = theme_store_current();
+    return file != THEME_STORE_NONE ? THEME_COUNT + file : current_slot(context);
+}
+
+static void choose_theme(void *context, int index)
+{
+    if (index < THEME_COUNT) {
+        choose_slot(context, index);
+        theme_store_choose_builtin(index);
+        return;
+    }
+    (void)theme_store_choose(index - THEME_COUNT);
+}
+
+static const char *accent_name(int accent)
+{
+    const ThemePackage *package = theme_store_package();
+    int name = package != NULL ? package->accents[accent].name : THEME_ACCENT_CUSTOM;
+    return name < ACCENT_COUNT ? i18n_text(ACCENT_OPTIONS[name]) : theme_store_accent_name(accent);
+}
+
+static int current_accent(const void *context)
+{
+    return default_theme_accent(theme_store_package(), current_slot(context));
+}
+
+static ScreenAction open_accent_choice(SettingsEntry *entry)
+{
+    SettingsScreens *screens = entry->owner;
+    const ThemePackage *package = theme_store_package();
+    const char **options = theme_store_options();
+    int count = package != NULL && options != NULL ? package->accent_count : 0;
+    for (int accent = 0; accent < count; accent++) {
+        options[accent] = accent_name(accent);
+    }
+    ChoiceConfig config = {
+        .title = i18n_text(entry->choice->title),
+        .options = options,
+        .option_count = count,
+        .current = current_accent,
+        .choose = choose_slot,
+        .context = entry,
+        .theme = screens->theme,
+    };
+    return screen_action_push(choice_screen_init(&screens->choice, config));
+}
+
+static ScreenAction open_theme_choice(SettingsEntry *entry)
+{
+    SettingsScreens *screens = entry->owner;
+    const char **options = theme_store_options();
+    int files = options != NULL ? theme_store_scan() : 0;
+    for (int theme = 0; options != NULL && theme < THEME_COUNT + files; theme++) {
+        options[theme] = theme < THEME_COUNT ? i18n_text(THEME_OPTIONS[theme])
+                                             : theme_store_name(theme - THEME_COUNT);
+    }
+    ChoiceConfig config = {
+        .title = i18n_text(entry->choice->title),
+        .options = options,
+        .option_ids = options != NULL ? NULL : entry->choice->options,
+        .option_count = THEME_COUNT + files,
+        .current = current_theme,
+        .choose = choose_theme,
+        .context = entry,
+        .theme = screens->theme,
+    };
+    return screen_action_push(choice_screen_init(&screens->choice, config));
+}
 
 static ScreenAction open_choice(void *context)
 {
     SettingsEntry *entry = context;
     SettingsScreens *screens = entry->owner;
     const SettingChoice *choice = entry->choice;
+    if (choice->slot - 1 == OPTION_THEME) {
+        return open_theme_choice(entry);
+    }
+    if (choice->slot - 1 == OPTION_ACCENT) {
+        return open_accent_choice(entry);
+    }
     bool slot = choice->slot != 0;
     ChoiceConfig config = {
         .title = i18n_text(choice->title),
@@ -413,6 +489,14 @@ static const char *choice_value(const void *context)
     const SettingsEntry *entry = context;
     int current = entry->choice->slot != 0 ? current_slot(entry)
                                            : entry->choice->current(&entry->owner->context);
+    if (entry->choice->slot - 1 == OPTION_THEME && theme_store_card()) {
+        return theme_store_package()->name;
+    }
+    if (entry->choice->slot - 1 == OPTION_ACCENT) {
+        return default_theme_takes_accent(theme_store_package())
+                   ? accent_name(current_accent(entry))
+                   : "";
+    }
     if (current < 0 || current >= entry->choice->option_count) {
         return "";
     }
@@ -468,7 +552,6 @@ enum {
     CHOICE_CLOCK,
     CHOICE_STATUS_BAR,
     CHOICE_POWER_ON,
-    CHOICE_NOW_PLAYING_FACE,
     ROW_BLUETOOTH = SETTINGS_CHOICE_COUNT,
     ROW_EQUALIZER,
     ROW_DATE_TIME,
@@ -497,55 +580,27 @@ ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
     {STR_SETTINGS_RESCAN, request_rescan, NULL},
 };
 
-ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
-                                             CHOICE_REPEAT,
-                                             ROW_BLUETOOTH,
-                                             ROW_EQUALIZER,
-                                             CHOICE_SLEEP,
-                                             ROW_GROUP,
-                                             ROW_GROUP + 1,
-                                             ROW_GROUP + 2,
-                                             ROW_GROUP + 3,
-                                             ROW_GROUP + 4,
-                                             CHOICE_GAIN,
-                                             CHOICE_OUTPUT,
-                                             CHOICE_FILTER,
-                                             CHOICE_BALANCE,
-                                             CHOICE_BLUETOOTH_LEVEL,
-                                             CHOICE_THEME,
-                                             CHOICE_ACCENT,
-                                             CHOICE_HIGHLIGHT,
-                                             CHOICE_NOW_PLAYING_FACE,
-                                             CHOICE_BRIGHTNESS,
-                                             CHOICE_TIMEOUT,
-                                             CHOICE_ORIENTATION,
-                                             CHOICE_ANIMATIONS,
-                                             CHOICE_BATTERY,
-                                             CHOICE_STATUS_BAR,
-                                             CHOICE_CLOCK,
-                                             ROW_FOLDERS,
-                                             ROW_RESCAN,
-                                             CHOICE_START,
-                                             CHOICE_COVERS,
-                                             CHOICE_COVER_ORDER,
-                                             CHOICE_ARTIST_VIEW,
-                                             CHOICE_FOLDER_VIEW,
-                                             CHOICE_LYRICS,
-                                             CHOICE_HISTORY,
-                                             CHOICE_ROCKER,
-                                             CHOICE_SWAP,
-                                             CHOICE_MENU_KEY,
-                                             CHOICE_POWER_ON,
-                                             CHOICE_LANGUAGE,
-                                             ROW_DATE_TIME,
-                                             CHOICE_AUTO_OFF,
-                                             CHOICE_USB_MODE,
-                                             CHOICE_USB_PROMPT};
+ECHO_RESIDENT static const uint8_t ROWS[] = {
+    CHOICE_SHUFFLE,     CHOICE_REPEAT,      ROW_BLUETOOTH,
+    ROW_EQUALIZER,      CHOICE_SLEEP,       ROW_GROUP,
+    ROW_GROUP + 1,      ROW_GROUP + 2,      ROW_GROUP + 3,
+    ROW_GROUP + 4,      CHOICE_GAIN,        CHOICE_OUTPUT,
+    CHOICE_FILTER,      CHOICE_BALANCE,     CHOICE_BLUETOOTH_LEVEL,
+    CHOICE_THEME,       CHOICE_ACCENT,      CHOICE_HIGHLIGHT,
+    CHOICE_BRIGHTNESS,  CHOICE_TIMEOUT,     CHOICE_ORIENTATION,
+    CHOICE_ANIMATIONS,  CHOICE_BATTERY,     CHOICE_STATUS_BAR,
+    CHOICE_CLOCK,       ROW_FOLDERS,        ROW_RESCAN,
+    CHOICE_START,       CHOICE_COVERS,      CHOICE_COVER_ORDER,
+    CHOICE_ARTIST_VIEW, CHOICE_FOLDER_VIEW, CHOICE_LYRICS,
+    CHOICE_HISTORY,     CHOICE_ROCKER,      CHOICE_SWAP,
+    CHOICE_MENU_KEY,    CHOICE_POWER_ON,    CHOICE_LANGUAGE,
+    ROW_DATE_TIME,      CHOICE_AUTO_OFF,    CHOICE_USB_MODE,
+    CHOICE_USB_PROMPT};
 
 enum {
     SOUND_ROWS = 5,
     DISPLAY_FIRST = SETTINGS_TOP_COUNT + SOUND_ROWS,
-    DISPLAY_ROWS = 11,
+    DISPLAY_ROWS = 10,
     LIBRARY_FIRST = DISPLAY_FIRST + DISPLAY_ROWS,
     LIBRARY_ROWS = 9,
     BUTTONS_FIRST = LIBRARY_FIRST + LIBRARY_ROWS,
@@ -573,11 +628,11 @@ static ScreenAction open_group(void *context);
 static bool choice_shown(const void *context)
 {
     const SettingsEntry *entry = context;
-    int theme = settings_of(&entry->owner->context)->options[OPTION_THEME];
+    const ThemePackage *package = theme_store_package();
     if (entry->choice == &CHOICES[CHOICE_ACCENT]) {
-        return default_theme_takes_accent(theme);
+        return default_theme_takes_accent(package);
     }
-    return entry->choice != &CHOICES[CHOICE_HIGHLIGHT] || default_theme_takes_highlight(theme);
+    return entry->choice != &CHOICES[CHOICE_HIGHLIGHT] || default_theme_takes_highlight(package);
 }
 
 static MenuItem row_item(SettingsScreens *screens, int row)

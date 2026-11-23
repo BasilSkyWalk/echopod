@@ -3,6 +3,9 @@
 #include <stddef.h>
 
 #include "gfx/text.h"
+#include "ui/backdrop.h"
+#include "ui/box.h"
+#include "ui/icons.h"
 #include "ui/label.h"
 
 enum {
@@ -237,11 +240,16 @@ static Row draw_chevron(const ListView *view, Canvas *canvas, Row row)
     if (model->opens == NULL || !model->opens(model->context, row.index)) {
         return row;
     }
-    Color color = row.selected ? theme_selected_text(view->theme) : view->theme->colors.chevron;
+    Color color = row.selected ? theme_selected_text(view->theme) : view->theme->colors->chevron;
     TextStyle style = {.font = view->theme->fonts.title, .color = color};
-    int width = text_width(style.font, CHEVRON);
+    const IconMask *mask = theme_icon(view->theme, THEME_ICON_CHEVRON);
+    int width = mask != NULL ? mask->width : text_width(style.font, CHEVRON);
     Rect area = {row.text.x + row.text.width - width, row.text.y, width, row.text.height};
-    label_draw(canvas, style, (Label){.area = area, .text = CHEVRON});
+    if (mask != NULL) {
+        icon_draw(canvas, view->theme, (Icon){THEME_ICON_CHEVRON, area, color});
+    } else {
+        label_draw(canvas, style, (Label){.area = area, .text = CHEVRON});
+    }
     row.text.width -= width + view->theme->metrics.detail_gap;
     return row;
 }
@@ -253,7 +261,7 @@ static Row draw_detail(const ListView *view, Canvas *canvas, Row row)
     if (detail == NULL) {
         return row;
     }
-    TextStyle style = row_style(view, row.selected, view->theme->colors.text_secondary);
+    TextStyle style = row_style(view, row.selected, view->theme->colors->text_secondary);
     bool narrow = theme_is_portrait(view->theme);
     if (narrow) {
         style.font = view->theme->fonts.small;
@@ -279,7 +287,7 @@ static Row draw_detail(const ListView *view, Canvas *canvas, Row row)
 static void draw_label(const ListView *view, Canvas *canvas, Row row, uint32_t now_ms)
 {
     const char *text = view->model->label(view->model->context, row.index);
-    TextStyle style = row_style(view, row.selected, view->theme->colors.text);
+    TextStyle style = row_style(view, row.selected, view->theme->colors->text);
     Label label = {.area = row.text, .text = text};
     int width = text_width(style.font, text);
     if (!row.selected || width <= row.text.width) {
@@ -291,42 +299,10 @@ static void draw_label(const ListView *view, Canvas *canvas, Row row, uint32_t n
     label_draw_scrolling(canvas, style, label, (Marquee){.offset = offset, .gap = timing.gap_px});
 }
 
-static Rect inset_rect(Rect area, int across, int down)
-{
-    return (Rect){area.x + across, area.y + down, area.width - 2 * across, area.height - 2 * down};
-}
-
-static void draw_bar_selection(Canvas *canvas, Rect area, const ThemeColors *colors, bool flat)
-{
-    Color top = flat ? colors->selection_background : colors->selection_top;
-    Rect shine = {area.x, area.y, area.width, SHINE_HEIGHT};
-    Rect bar = {area.x, area.y + SHINE_HEIGHT, area.width, area.height - SHINE_HEIGHT};
-    canvas_fill_rect(canvas, shine, flat ? top : colors->selection_shine);
-    canvas_fill_gradient(canvas, bar, top, colors->selection_background);
-}
-
-static void draw_outline_selection(Canvas *canvas, Rect area, const ThemeColors *colors)
-{
-    Rect frame = inset_rect(area, OUTLINE_SIDE_INSET, OUTLINE_EDGE_INSET);
-    canvas_fill_rect(canvas, frame, colors->selection_top);
-    canvas_fill_rect(canvas, inset_rect(frame, OUTLINE_THICKNESS, OUTLINE_THICKNESS),
-                     colors->background);
-}
-
-static void draw_selection(const ListView *view, Canvas *canvas, Rect area)
-{
-    const ThemeColors *colors = &view->theme->colors;
-    if (view->theme->selection == THEME_SELECTION_OUTLINE) {
-        draw_outline_selection(canvas, area, colors);
-        return;
-    }
-    draw_bar_selection(canvas, area, colors, view->theme->selection == THEME_SELECTION_FLAT);
-}
-
 static void draw_row(const ListView *view, Canvas *canvas, Row row, uint32_t now_ms)
 {
     if (row.selected) {
-        draw_selection(view, canvas, row.area);
+        box_draw(canvas, view->theme->colors, theme_selection_box(view->theme), row.area);
     }
     draw_label(view, canvas, draw_detail(view, canvas, draw_chevron(view, canvas, row)), now_ms);
 }
@@ -342,8 +318,8 @@ static void draw_scrollbar(const ListView *view, Canvas *canvas, Rect area, int 
     int thumb_height = max_of(MIN_THUMB_HEIGHT, track.height * rows / item_count(view));
     int shown = top < hidden ? top : hidden;
     int thumb_top = track.y + (track.height - thumb_height) * shown / hidden;
-    canvas_fill_rect(canvas, (Rect){track.x, thumb_top, track.width, thumb_height},
-                     theme->colors.scrollbar_thumb);
+    Rect thumb = {track.x, thumb_top, track.width, thumb_height};
+    box_draw(canvas, theme->colors, &theme->boxes->scrollbar_thumb, thumb);
 }
 
 static Row make_row(const ListView *view, Rect rows, int top, int position)
@@ -367,9 +343,8 @@ static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32
     int side = tall < wide ? tall : wide;
     Rect box = {area.x + (area.width - side) / 2, area.y + (area.height - side) / 2, side, side};
     Rect inner = {box.x + 1, box.y + 1, side - 2, side - 2};
-    canvas_fill_rect(canvas, box, theme->colors.divider);
-    canvas_fill_rect(canvas, inner, theme->colors.header_background);
-    TextStyle style = {.font = theme->fonts.title, .color = theme->colors.header_text};
+    box_draw(canvas, theme->colors, &theme->boxes->section, box);
+    TextStyle style = {.font = theme->fonts.title, .color = theme->colors->header_text};
     int scale = max_of(1, side / (font_line_height(style.font) + 4));
     const char *label = list_section_label(view->section);
     text_draw_glyph_scaled(canvas, style, inner, (uint32_t)(unsigned char)label[0], scale);
@@ -377,7 +352,7 @@ static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32
 
 void list_view_draw(const ListView *view, Canvas *canvas, Rect area, uint32_t now_ms)
 {
-    canvas_fill_rect(canvas, area, view->theme->colors.background);
+    backdrop_paint(canvas, view->theme, area);
     Rect rows = area;
     int visible = list_view_rows(view);
     int top = top_showing_selection(view);

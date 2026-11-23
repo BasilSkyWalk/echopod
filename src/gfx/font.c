@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "gfx/font_pack.h"
 
@@ -30,9 +31,19 @@ static const Glyph *search(const Font *font, uint32_t codepoint)
     return NULL;
 }
 
+static bool owns(const Font *font, const Glyph *glyph)
+{
+    uintptr_t first = (uintptr_t)font->glyphs;
+    uintptr_t place = (uintptr_t)glyph;
+    return place >= first && place < first + font->glyph_count * sizeof(Glyph);
+}
+
 const Glyph *font_find_glyph(const Font *font, uint32_t codepoint)
 {
     const Glyph *glyph = search(font, codepoint);
+    if (glyph == NULL && font->fallback != NULL) {
+        return font_find_glyph(font->fallback, codepoint);
+    }
     uint8_t face = font->pack_faces[codepoint >= FONT_PACK_CJK_START];
     if (glyph == NULL && face != 0) {
         glyph = font_pack_find(face - 1u, codepoint);
@@ -43,6 +54,9 @@ const Glyph *font_find_glyph(const Font *font, uint32_t codepoint)
 const uint8_t *font_glyph_bitmap(const Font *font, const Glyph *glyph)
 {
     const uint8_t *packed = font_pack_bitmap(glyph);
+    while (packed == NULL && font->fallback != NULL && !owns(font, glyph)) {
+        font = font->fallback;
+    }
     return packed != NULL ? packed : font->bitmap + glyph->bitmap_offset;
 }
 

@@ -18,7 +18,7 @@ A short map of the hardware EchoPod drives, for reading the code in `platform/de
 
 ## Storage
 
-- 8 GB eMMC on the DW-MMC controller. From the start: the ID block, firmware slot 1, firmware slot 2, a SAVE block, then the FAT32 user volume that appears as "ECHO MINI" over USB. EchoPod never writes the ID block, the SAVE block or the gap between them.
+- 8 GB eMMC on the DW-MMC controller. From the start: the ID block, firmware slot 1, firmware slot 2, a SAVE block, then the FAT32 user volume that appears as "ECHO MINI" over USB. EchoPod never writes the ID block, the SAVE block or the gap between them. The ID block gives the size of the firmware area, and each slot is half of it: 68 MiB and 34 MiB slots on the unit tested. A report of `E6/30` (issue 1) means some 8 GB players give 60 MiB, so a slot there is smaller than FiiO's 32 MiB image.
 - Each firmware slot holds the first 5 MiB of a firmware image. On the unit tested, slot 1 is at rockusb sector 0 and slot 2 at rockusb sector 69632.
 - A microSD slot on the same kind of controller, with card detect. EchoPod reads and writes FAT16, FAT32 and exFAT.
 

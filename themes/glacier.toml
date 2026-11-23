@@ -1,0 +1,115 @@
+name = "Glacier"
+author = "EchoPod"
+description = "A light theme with an underlined selection and a centred Now Playing"
+selection = "selection"
+
+[colors]
+background = "#eef4f8"
+text = "#10202c"
+text_secondary = "#48606e"
+text_tertiary = "#6c8290"
+selection_background = "#d4e6f2"
+selection_top = "#2f7fb8"
+selection_shine = "#8cc0e4"
+selection_text = "#0c2a40"
+header_background = "#dfeaf2"
+header_top = "#cfe0ec"
+header_text = "#10202c"
+divider = "#b4c8d6"
+scrollbar_thumb = "#88a4b8"
+danger = "#c0392b"
+success = "#1e8a4c"
+chevron = "#6c8596"
+
+[boxes.selection]
+fill = "selection_background"
+border = "selection_top"
+border_width = 2
+border_edges = ["bottom"]
+ink = "selection_text"
+
+[boxes.toast]
+fill = "background"
+border = "selection_top"
+border_width = 1
+ink = "text"
+radius = 8
+
+[boxes.section]
+fill = "background"
+border = "selection_top"
+border_width = 2
+ink = "text"
+radius = 6
+
+[boxes.progress_fill]
+fill = "selection_top"
+
+[boxes.progress_active]
+fill = "text"
+
+[wallpaper]
+palette = ["#eef4f8", "#dfe9f1"]
+rows = [
+    "00000000",
+    "00000000",
+    "00000000",
+    "00010000",
+    "00000000",
+    "00000000",
+    "00000000",
+    "00000000",
+]
+
+[now_playing.cover]
+x = 124
+y = 30
+size = 72
+
+[now_playing.detail]
+x = 10
+y = 30
+width = 108
+align = "left"
+
+[now_playing.modes]
+x = 202
+y = 30
+width = 108
+align = "right"
+
+[now_playing.title]
+x = 10
+y = 104
+width = 300
+align = "center"
+
+[now_playing.artist]
+x = 10
+y = 124
+width = 300
+align = "center"
+
+[now_playing.album]
+hide = true
+
+[now_playing.format]
+hide = true
+
+[now_playing.progress]
+x = 44
+y = 154
+width = 232
+height = 3
+
+[now_playing.times]
+x = 4
+y = 147
+width = 312
+
+[now_playing.lyrics]
+x = 10
+y = 28
+width = 300
+height = 76
+align = "center"

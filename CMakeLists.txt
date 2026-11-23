@@ -16,7 +16,9 @@ option(ECHO_ADDRESS_SANITIZER "Build host code with AddressSanitizer" OFF)
 option(ECHO_BUILD_SIM "Build the SDL2 simulator" ON)
 option(ECHO_BUILD_TESTS "Build the host tests" ON)
 option(ECHO_BUILD_DEVICE "Build the device firmware with cmake/arm-none-eabi.cmake" OFF)
+option(ECHO_BUILD_WEB "Build the theme editor preview with cmake/wasm32.cmake" OFF)
 option(ECHO_RELEASE "Leave the developer-only Diagnostics rows out of the build" OFF)
+option(ECHO_TEST_SLOT_1_RESTORE "Test builds only: treat the firmware slots as 30 MiB, so a FiiO image goes into slot 1 alone" OFF)
 set(ECHO_APP_RAM_BUDGET_BYTES 131072 CACHE STRING "Static RAM budget for src/ on the device")
 
 include(cmake/project_options.cmake)
@@ -30,6 +32,10 @@ endif()
 
 if(ECHO_BUILD_DEVICE)
     add_subdirectory(platform/device)
+endif()
+
+if(ECHO_BUILD_WEB)
+    add_subdirectory(platform/web)
 endif()
 
 if(ECHO_BUILD_TESTS)

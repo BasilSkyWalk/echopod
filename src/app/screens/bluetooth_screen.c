@@ -4,6 +4,7 @@
 
 #include "core/i18n.h"
 #include "core/string_builder.h"
+#include "ui/backdrop.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/list_navigation.h"
@@ -374,12 +375,12 @@ static void draw(void *context, Canvas *canvas)
     list_view_draw(&bluetooth->list, canvas, list, bluetooth->now_ms);
     Rect footer = {list.x, list.y + list.height, list.width,
                    theme_content_area(theme).height - list.height};
-    canvas_fill_rect(canvas, footer, theme->colors.background);
+    backdrop_paint(canvas, theme, footer);
     for (int index = 0; index < footer_lines(bluetooth); index++) {
         TextStyle style = {.font = theme->fonts.small,
                            .color = index == BLUETOOTH_SCREEN_HINT_LINE
-                                        ? theme->colors.text_secondary
-                                        : theme->colors.text_tertiary};
+                                        ? theme->colors->text_secondary
+                                        : theme->colors->text_tertiary};
         Rect area = {footer.x + theme->metrics.padding,
                      footer.y + FOOTER_GAP + index * FOOTER_LINE_HEIGHT,
                      footer.width - 2 * theme->metrics.padding, FOOTER_LINE_HEIGHT};

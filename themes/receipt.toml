@@ -1,0 +1,576 @@
+name = "Receipt"
+author = "EchoPod"
+description = "Every song printed on a till receipt, with a barcode that prints as it plays"
+selection = "selection"
+
+[spacing]
+row_height = 22
+
+[colors]
+background = "#f3efe6"
+text = "#1c1b19"
+text_secondary = "#4a4743"
+text_tertiary = "#8b867c"
+selection_background = "#1c1b19"
+selection_top = "#1c1b19"
+selection_shine = "#1c1b19"
+selection_text = "#f3efe6"
+header_background = "#f3efe6"
+header_top = "#f3efe6"
+header_text = "#1c1b19"
+divider = "#cfc8b9"
+scrollbar_thumb = "#8b867c"
+danger = "#b3261e"
+success = "#2e7d32"
+chevron = "#4a4743"
+
+[boxes.selection]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.header]
+fill = "header_background"
+ink = "header_text"
+border = "text"
+border_width = 1
+border_edges = ["bottom"]
+
+[boxes.toast]
+fill = "background"
+ink = "text"
+border = "text"
+border_width = 1
+
+[boxes.section]
+fill = "background"
+ink = "text"
+border = "text"
+border_width = 1
+
+[boxes.scrollbar_thumb]
+fill = "text_tertiary"
+ink = "text"
+
+[fonts.title]
+ascent = 16
+descent = 2
+glyphs = [
+  { char = " ", left = 0, top = 14, advance = 13, rows = [] },
+  { char = "!", left = 4, top = 14, advance = 13, rows = ["fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "...", "...", "fff", "fff"] },
+  { char = "\"", left = 2, top = 14, advance = 13, rows = ["fff.fff", "fff.fff", "fff.fff", "fff.fff"] },
+  { char = "#", left = 0, top = 14, advance = 13, rows = ["..fff.fff..", "..fff.fff..", "..fff.fff..", "..fff.fff..", "fffffffffff", "fffffffffff", "..fff.fff..", "..fff.fff..", "fffffffffff", "fffffffffff", "..fff.fff..", "..fff.fff..", "..fff.fff..", "..fff.fff.."] },
+  { char = "$", left = 0, top = 14, advance = 13, rows = ["....fff....", "....fff....", "..fffffffff", "..fffffffff", "fff.fff....", "fff.fff....", "..fffffff..", "..fffffff..", "....fff.fff", "....fff.fff", "fffffffff..", "fffffffff..", "....fff....", "....fff...."] },
+  { char = "%", left = 0, top = 14, advance = 13, rows = ["fffff......", "fffff......", "fffff...fff", "fffff...fff", "......fff..", "......fff..", "....fff....", "....fff....", "..fff......", "..fff......", "fff...fffff", "fff...fffff", "......fffff", "......fffff"] },
+  { char = "&", left = 0, top = 14, advance = 13, rows = ["..fffff....", "..fffff....", "fff...fff..", "fff...fff..", "fff.fff....", "fff.fff....", "..fff......", "..fff......", "fff.fff.fff", "fff.fff.fff", "fff...fff..", "fff...fff..", "..fffff.fff", "..fffff.fff"] },
+  { char = "'", left = 4, top = 14, advance = 13, rows = ["fff", "fff", "fff", "fff"] },
+  { char = "(", left = 2, top = 14, advance = 13, rows = ["....fff", "....fff", "..fff..", "..fff..", "fff....", "fff....", "fff....", "fff....", "fff....", "fff....", "..fff..", "..fff..", "....fff", "....fff"] },
+  { char = ")", left = 2, top = 14, advance = 13, rows = ["fff....", "fff....", "..fff..", "..fff..", "....fff", "....fff", "....fff", "....fff", "....fff", "....fff", "..fff..", "..fff..", "fff....", "fff...."] },
+  { char = "*", left = 0, top = 12, advance = 13, rows = ["....fff....", "....fff....", "fff.fff.fff", "fff.fff.fff", "..fffffff..", "..fffffff..", "fff.fff.fff", "fff.fff.fff", "....fff....", "....fff...."] },
+  { char = "+", left = 0, top = 12, advance = 13, rows = ["....fff....", "....fff....", "....fff....", "....fff....", "fffffffffff", "fffffffffff", "....fff....", "....fff....", "....fff....", "....fff...."] },
+  { char = ",", left = 2, top = 6, advance = 13, rows = ["..fffff", "..fffff", "..fff..", "..fff..", "fff....", "fff...."] },
+  { char = "-", left = 0, top = 8, advance = 13, rows = ["fffffffffff", "fffffffffff"] },
+  { char = ".", left = 2, top = 4, advance = 13, rows = ["fffff", "fffff", "fffff", "fffff"] },
+  { char = "/", left = 0, top = 12, advance = 13, rows = ["........fff", "........fff", "......fff..", "......fff..", "....fff....", "....fff....", "..fff......", "..fff......", "fff........", "fff........"] },
+  { char = "0", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff...fffff", "fff...fffff", "fff.fff.fff", "fff.fff.fff", "fffff...fff", "fffff...fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "1", left = 2, top = 14, advance = 13, rows = ["..fff..", "..fff..", "fffff..", "fffff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "fffffff", "fffffff"] },
+  { char = "2", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "........fff", "........fff", "......fff..", "......fff..", "....fff....", "....fff....", "..fff......", "..fff......", "fffffffffff", "fffffffffff"] },
+  { char = "3", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "......fff..", "......fff..", "....fff....", "....fff....", "......fff..", "......fff..", "........fff", "........fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "4", left = 0, top = 14, advance = 13, rows = ["......fff..", "......fff..", "....fffff..", "....fffff..", "..fff.fff..", "..fff.fff..", "fff...fff..", "fff...fff..", "fffffffffff", "fffffffffff", "......fff..", "......fff..", "......fff..", "......fff.."] },
+  { char = "5", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "fff........", "fff........", "fffffffff..", "fffffffff..", "........fff", "........fff", "........fff", "........fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "6", left = 0, top = 14, advance = 13, rows = ["....fffff..", "....fffff..", "..fff......", "..fff......", "fff........", "fff........", "fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "7", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "........fff", "........fff", "......fff..", "......fff..", "....fff....", "....fff....", "..fff......", "..fff......", "..fff......", "..fff......", "..fff......", "..fff......"] },
+  { char = "8", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "9", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffffff", "..fffffffff", "........fff", "........fff", "......fff..", "......fff..", "..fffff....", "..fffff...."] },
+  { char = ":", left = 2, top = 12, advance = 13, rows = ["fffff", "fffff", "fffff", "fffff", ".....", ".....", "fffff", "fffff", "fffff", "fffff"] },
+  { char = ";", left = 2, top = 12, advance = 13, rows = ["fffff", "fffff", "fffff", "fffff", ".....", ".....", "fffff", "fffff", "..fff", "..fff", "fff..", "fff.."] },
+  { char = "<", left = 0, top = 14, advance = 13, rows = ["......fff", "......fff", "....fff..", "....fff..", "..fff....", "..fff....", "fff......", "fff......", "..fff....", "..fff....", "....fff..", "....fff..", "......fff", "......fff"] },
+  { char = "=", left = 0, top = 10, advance = 13, rows = ["fffffffffff", "fffffffffff", "...........", "...........", "fffffffffff", "fffffffffff"] },
+  { char = ">", left = 2, top = 14, advance = 13, rows = ["fff......", "fff......", "..fff....", "..fff....", "....fff..", "....fff..", "......fff", "......fff", "....fff..", "....fff..", "..fff....", "..fff....", "fff......", "fff......"] },
+  { char = "?", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "........fff", "........fff", "......fff..", "......fff..", "....fff....", "....fff....", "...........", "...........", "....fff....", "....fff...."] },
+  { char = "@", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "........fff", "........fff", "..fffff.fff", "..fffff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "..fffffff..", "..fffffff.."] },
+  { char = "A", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffffff", "fffffffffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "B", left = 0, top = 14, advance = 13, rows = ["fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff.."] },
+  { char = "C", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "D", left = 0, top = 14, advance = 13, rows = ["fffffff....", "fffffff....", "fff...fff..", "fff...fff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff...fff..", "fff...fff..", "fffffff....", "fffffff...."] },
+  { char = "E", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "fff........", "fff........", "fff........", "fff........", "fffffffff..", "fffffffff..", "fff........", "fff........", "fff........", "fff........", "fffffffffff", "fffffffffff"] },
+  { char = "F", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "fff........", "fff........", "fff........", "fff........", "fffffffff..", "fffffffff..", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........"] },
+  { char = "G", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff........", "fff........", "fff.fffffff", "fff.fffffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffffff", "..fffffffff"] },
+  { char = "H", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffffff", "fffffffffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "I", left = 2, top = 14, advance = 13, rows = ["fffffff", "fffffff", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "fffffff", "fffffff"] },
+  { char = "J", left = 0, top = 14, advance = 13, rows = ["....fffffff", "....fffffff", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "fff...fff..", "fff...fff..", "..fffff....", "..fffff...."] },
+  { char = "K", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff...fff..", "fff...fff..", "fff.fff....", "fff.fff....", "fffff......", "fffff......", "fff.fff....", "fff.fff....", "fff...fff..", "fff...fff..", "fff.....fff", "fff.....fff"] },
+  { char = "L", left = 0, top = 14, advance = 13, rows = ["fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fffffffffff", "fffffffffff"] },
+  { char = "M", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fffff.fffff", "fffff.fffff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "N", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffff...fff", "fffff...fff", "fff.fff.fff", "fff.fff.fff", "fff...fffff", "fff...fffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "O", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "P", left = 0, top = 14, advance = 13, rows = ["fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff..", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........"] },
+  { char = "Q", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.fff.fff", "fff.fff.fff", "fff...fff..", "fff...fff..", "..fffff.fff", "..fffff.fff"] },
+  { char = "R", left = 0, top = 14, advance = 13, rows = ["fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff..", "fff.fff....", "fff.fff....", "fff...fff..", "fff...fff..", "fff.....fff", "fff.....fff"] },
+  { char = "S", left = 0, top = 14, advance = 13, rows = ["..fffffffff", "..fffffffff", "fff........", "fff........", "fff........", "fff........", "..fffffff..", "..fffffff..", "........fff", "........fff", "........fff", "........fff", "fffffffff..", "fffffffff.."] },
+  { char = "T", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff...."] },
+  { char = "U", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "V", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fff.fff..", "..fff.fff..", "....fff....", "....fff...."] },
+  { char = "W", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "..fff.fff..", "..fff.fff.."] },
+  { char = "X", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fff.fff..", "..fff.fff..", "....fff....", "....fff....", "..fff.fff..", "..fff.fff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "Y", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fff.fff..", "..fff.fff..", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff...."] },
+  { char = "Z", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "........fff", "........fff", "......fff..", "......fff..", "....fff....", "....fff....", "..fff......", "..fff......", "fff........", "fff........", "fffffffffff", "fffffffffff"] },
+  { char = "[", left = 2, top = 14, advance = 13, rows = ["fffffff", "fffffff", "fff....", "fff....", "fff....", "fff....", "fff....", "fff....", "fff....", "fff....", "fff....", "fff....", "fffffff", "fffffff"] },
+  { char = "\\", left = 0, top = 12, advance = 13, rows = ["fff........", "fff........", "..fff......", "..fff......", "....fff....", "....fff....", "......fff..", "......fff..", "........fff", "........fff"] },
+  { char = "]", left = 2, top = 14, advance = 13, rows = ["fffffff", "fffffff", "....fff", "....fff", "....fff", "....fff", "....fff", "....fff", "....fff", "....fff", "....fff", "....fff", "fffffff", "fffffff"] },
+  { char = "^", left = 0, top = 14, advance = 13, rows = ["....fff....", "....fff....", "..fff.fff..", "..fff.fff..", "fff.....fff", "fff.....fff"] },
+  { char = "_", left = 0, top = 2, advance = 13, rows = ["fffffffffff", "fffffffffff"] },
+  { char = "`", left = 2, top = 14, advance = 13, rows = ["fff..", "fff..", "..fff", "..fff"] },
+  { char = "{", left = 2, top = 14, advance = 13, rows = ["....fff", "....fff", "..fff..", "..fff..", "..fff..", "..fff..", "fff....", "fff....", "..fff..", "..fff..", "..fff..", "..fff..", "....fff", "....fff"] },
+  { char = "|", left = 4, top = 14, advance = 13, rows = ["fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff", "fff"] },
+  { char = "}", left = 2, top = 14, advance = 13, rows = ["fff....", "fff....", "..fff..", "..fff..", "..fff..", "..fff..", "....fff", "....fff", "..fff..", "..fff..", "..fff..", "..fff..", "fff....", "fff...."] },
+  { char = "~", left = 0, top = 10, advance = 13, rows = ["..fff......", "..fff......", "fff.fff.fff", "fff.fff.fff", "......fff..", "......fff.."] },
+  { char = "\u2026", left = 0, top = 2, advance = 13, rows = ["fff.fff.fff", "fff.fff.fff"] },
+  { char = "\u2019", left = 4, top = 14, advance = 13, rows = ["fff", "fff", "fff", "fff"] },
+  { char = "\u2018", left = 4, top = 14, advance = 13, rows = ["fff", "fff", "fff", "fff"] },
+  { char = "\u201c", left = 2, top = 14, advance = 13, rows = ["fff.fff", "fff.fff", "fff.fff", "fff.fff"] },
+  { char = "\u201d", left = 2, top = 14, advance = 13, rows = ["fff.fff", "fff.fff", "fff.fff", "fff.fff"] },
+  { char = "\u2013", left = 0, top = 8, advance = 13, rows = ["fffffffffff", "fffffffffff"] },
+  { char = "\u2014", left = 0, top = 8, advance = 13, rows = ["fffffffffff", "fffffffffff"] },
+  { char = "\u00b7", left = 4, top = 8, advance = 13, rows = ["fff", "fff"] },
+  { char = "\u2022", left = 2, top = 10, advance = 13, rows = ["fffffff", "fffffff", "fffffff", "fffffff", "fffffff", "fffffff"] },
+  { char = "\u2605", left = 0, top = 14, advance = 13, rows = ["....fff....", "....fff....", "....fff....", "....fff....", "fffffffffff", "fffffffffff", "..fffffff..", "..fffffff..", "..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff"] },
+  { char = "\u2713", left = 0, top = 12, advance = 13, rows = ["........fff", "........fff", "......fff..", "......fff..", "fff.fff....", "fff.fff....", "..fff......", "..fff......"] },
+  { char = "a", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffffff", "fffffffffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "b", left = 0, top = 14, advance = 13, rows = ["fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff.."] },
+  { char = "c", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "d", left = 0, top = 14, advance = 13, rows = ["fffffff....", "fffffff....", "fff...fff..", "fff...fff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff...fff..", "fff...fff..", "fffffff....", "fffffff...."] },
+  { char = "e", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "fff........", "fff........", "fff........", "fff........", "fffffffff..", "fffffffff..", "fff........", "fff........", "fff........", "fff........", "fffffffffff", "fffffffffff"] },
+  { char = "f", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "fff........", "fff........", "fff........", "fff........", "fffffffff..", "fffffffff..", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........"] },
+  { char = "g", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff........", "fff........", "fff.fffffff", "fff.fffffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffffff", "..fffffffff"] },
+  { char = "h", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffffff", "fffffffffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "i", left = 2, top = 14, advance = 13, rows = ["fffffff", "fffffff", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "..fff..", "fffffff", "fffffff"] },
+  { char = "j", left = 0, top = 14, advance = 13, rows = ["....fffffff", "....fffffff", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "......fff..", "fff...fff..", "fff...fff..", "..fffff....", "..fffff...."] },
+  { char = "k", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff...fff..", "fff...fff..", "fff.fff....", "fff.fff....", "fffff......", "fffff......", "fff.fff....", "fff.fff....", "fff...fff..", "fff...fff..", "fff.....fff", "fff.....fff"] },
+  { char = "l", left = 0, top = 14, advance = 13, rows = ["fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........", "fffffffffff", "fffffffffff"] },
+  { char = "m", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fffff.fffff", "fffff.fffff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "n", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffff...fff", "fffff...fff", "fff.fff.fff", "fff.fff.fff", "fff...fffff", "fff...fffff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "o", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "p", left = 0, top = 14, advance = 13, rows = ["fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff..", "fff........", "fff........", "fff........", "fff........", "fff........", "fff........"] },
+  { char = "q", left = 0, top = 14, advance = 13, rows = ["..fffffff..", "..fffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.fff.fff", "fff.fff.fff", "fff...fff..", "fff...fff..", "..fffff.fff", "..fffff.fff"] },
+  { char = "r", left = 0, top = 14, advance = 13, rows = ["fffffffff..", "fffffffff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fffffffff..", "fffffffff..", "fff.fff....", "fff.fff....", "fff...fff..", "fff...fff..", "fff.....fff", "fff.....fff"] },
+  { char = "s", left = 0, top = 14, advance = 13, rows = ["..fffffffff", "..fffffffff", "fff........", "fff........", "fff........", "fff........", "..fffffff..", "..fffffff..", "........fff", "........fff", "........fff", "........fff", "fffffffff..", "fffffffff.."] },
+  { char = "t", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff...."] },
+  { char = "u", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fffffff..", "..fffffff.."] },
+  { char = "v", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fff.fff..", "..fff.fff..", "....fff....", "....fff...."] },
+  { char = "w", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "fff.fff.fff", "..fff.fff..", "..fff.fff.."] },
+  { char = "x", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fff.fff..", "..fff.fff..", "....fff....", "....fff....", "..fff.fff..", "..fff.fff..", "fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff"] },
+  { char = "y", left = 0, top = 14, advance = 13, rows = ["fff.....fff", "fff.....fff", "fff.....fff", "fff.....fff", "..fff.fff..", "..fff.fff..", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff....", "....fff...."] },
+  { char = "z", left = 0, top = 14, advance = 13, rows = ["fffffffffff", "fffffffffff", "........fff", "........fff", "......fff..", "......fff..", "....fff....", "....fff....", "..fff......", "..fff......", "fff........", "fff........", "fffffffffff", "fffffffffff"] },
+]
+
+[fonts.body]
+ascent = 16
+descent = 2
+glyphs = [
+  { char = " ", left = 0, top = 14, advance = 12, rows = [] },
+  { char = "!", left = 4, top = 14, advance = 12, rows = ["ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "..", "..", "ff", "ff"] },
+  { char = "\"", left = 2, top = 14, advance = 12, rows = ["ff..ff", "ff..ff", "ff..ff", "ff..ff"] },
+  { char = "#", left = 0, top = 14, advance = 12, rows = ["..ff..ff..", "..ff..ff..", "..ff..ff..", "..ff..ff..", "ffffffffff", "ffffffffff", "..ff..ff..", "..ff..ff..", "ffffffffff", "ffffffffff", "..ff..ff..", "..ff..ff..", "..ff..ff..", "..ff..ff.."] },
+  { char = "$", left = 0, top = 14, advance = 12, rows = ["....ff....", "....ff....", "..ffffffff", "..ffffffff", "ff..ff....", "ff..ff....", "..ffffff..", "..ffffff..", "....ff..ff", "....ff..ff", "ffffffff..", "ffffffff..", "....ff....", "....ff...."] },
+  { char = "%", left = 0, top = 14, advance = 12, rows = ["ffff......", "ffff......", "ffff....ff", "ffff....ff", "......ff..", "......ff..", "....ff....", "....ff....", "..ff......", "..ff......", "ff....ffff", "ff....ffff", "......ffff", "......ffff"] },
+  { char = "&", left = 0, top = 14, advance = 12, rows = ["..ffff....", "..ffff....", "ff....ff..", "ff....ff..", "ff..ff....", "ff..ff....", "..ff......", "..ff......", "ff..ff..ff", "ff..ff..ff", "ff....ff..", "ff....ff..", "..ffff..ff", "..ffff..ff"] },
+  { char = "'", left = 4, top = 14, advance = 12, rows = ["ff", "ff", "ff", "ff"] },
+  { char = "(", left = 2, top = 14, advance = 12, rows = ["....ff", "....ff", "..ff..", "..ff..", "ff....", "ff....", "ff....", "ff....", "ff....", "ff....", "..ff..", "..ff..", "....ff", "....ff"] },
+  { char = ")", left = 2, top = 14, advance = 12, rows = ["ff....", "ff....", "..ff..", "..ff..", "....ff", "....ff", "....ff", "....ff", "....ff", "....ff", "..ff..", "..ff..", "ff....", "ff...."] },
+  { char = "*", left = 0, top = 12, advance = 12, rows = ["....ff....", "....ff....", "ff..ff..ff", "ff..ff..ff", "..ffffff..", "..ffffff..", "ff..ff..ff", "ff..ff..ff", "....ff....", "....ff...."] },
+  { char = "+", left = 0, top = 12, advance = 12, rows = ["....ff....", "....ff....", "....ff....", "....ff....", "ffffffffff", "ffffffffff", "....ff....", "....ff....", "....ff....", "....ff...."] },
+  { char = ",", left = 2, top = 6, advance = 12, rows = ["..ffff", "..ffff", "..ff..", "..ff..", "ff....", "ff...."] },
+  { char = "-", left = 0, top = 8, advance = 12, rows = ["ffffffffff", "ffffffffff"] },
+  { char = ".", left = 2, top = 4, advance = 12, rows = ["ffff", "ffff", "ffff", "ffff"] },
+  { char = "/", left = 0, top = 12, advance = 12, rows = ["........ff", "........ff", "......ff..", "......ff..", "....ff....", "....ff....", "..ff......", "..ff......", "ff........", "ff........"] },
+  { char = "0", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff....ffff", "ff....ffff", "ff..ff..ff", "ff..ff..ff", "ffff....ff", "ffff....ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "1", left = 2, top = 14, advance = 12, rows = ["..ff..", "..ff..", "ffff..", "ffff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "ffffff", "ffffff"] },
+  { char = "2", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "........ff", "........ff", "......ff..", "......ff..", "....ff....", "....ff....", "..ff......", "..ff......", "ffffffffff", "ffffffffff"] },
+  { char = "3", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "......ff..", "......ff..", "....ff....", "....ff....", "......ff..", "......ff..", "........ff", "........ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "4", left = 0, top = 14, advance = 12, rows = ["......ff..", "......ff..", "....ffff..", "....ffff..", "..ff..ff..", "..ff..ff..", "ff....ff..", "ff....ff..", "ffffffffff", "ffffffffff", "......ff..", "......ff..", "......ff..", "......ff.."] },
+  { char = "5", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "ff........", "ff........", "ffffffff..", "ffffffff..", "........ff", "........ff", "........ff", "........ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "6", left = 0, top = 14, advance = 12, rows = ["....ffff..", "....ffff..", "..ff......", "..ff......", "ff........", "ff........", "ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "7", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "........ff", "........ff", "......ff..", "......ff..", "....ff....", "....ff....", "..ff......", "..ff......", "..ff......", "..ff......", "..ff......", "..ff......"] },
+  { char = "8", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "9", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffffff", "..ffffffff", "........ff", "........ff", "......ff..", "......ff..", "..ffff....", "..ffff...."] },
+  { char = ":", left = 2, top = 12, advance = 12, rows = ["ffff", "ffff", "ffff", "ffff", "....", "....", "ffff", "ffff", "ffff", "ffff"] },
+  { char = ";", left = 2, top = 12, advance = 12, rows = ["ffff", "ffff", "ffff", "ffff", "....", "....", "ffff", "ffff", "..ff", "..ff", "ff..", "ff.."] },
+  { char = "<", left = 0, top = 14, advance = 12, rows = ["......ff", "......ff", "....ff..", "....ff..", "..ff....", "..ff....", "ff......", "ff......", "..ff....", "..ff....", "....ff..", "....ff..", "......ff", "......ff"] },
+  { char = "=", left = 0, top = 10, advance = 12, rows = ["ffffffffff", "ffffffffff", "..........", "..........", "ffffffffff", "ffffffffff"] },
+  { char = ">", left = 2, top = 14, advance = 12, rows = ["ff......", "ff......", "..ff....", "..ff....", "....ff..", "....ff..", "......ff", "......ff", "....ff..", "....ff..", "..ff....", "..ff....", "ff......", "ff......"] },
+  { char = "?", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "........ff", "........ff", "......ff..", "......ff..", "....ff....", "....ff....", "..........", "..........", "....ff....", "....ff...."] },
+  { char = "@", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "........ff", "........ff", "..ffff..ff", "..ffff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "..ffffff..", "..ffffff.."] },
+  { char = "A", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffffff", "ffffffffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "B", left = 0, top = 14, advance = 12, rows = ["ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff.."] },
+  { char = "C", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "D", left = 0, top = 14, advance = 12, rows = ["ffffff....", "ffffff....", "ff....ff..", "ff....ff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff....ff..", "ff....ff..", "ffffff....", "ffffff...."] },
+  { char = "E", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "ff........", "ff........", "ff........", "ff........", "ffffffff..", "ffffffff..", "ff........", "ff........", "ff........", "ff........", "ffffffffff", "ffffffffff"] },
+  { char = "F", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "ff........", "ff........", "ff........", "ff........", "ffffffff..", "ffffffff..", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........"] },
+  { char = "G", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff........", "ff........", "ff..ffffff", "ff..ffffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffffff", "..ffffffff"] },
+  { char = "H", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffffff", "ffffffffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "I", left = 2, top = 14, advance = 12, rows = ["ffffff", "ffffff", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "ffffff", "ffffff"] },
+  { char = "J", left = 0, top = 14, advance = 12, rows = ["....ffffff", "....ffffff", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "ff....ff..", "ff....ff..", "..ffff....", "..ffff...."] },
+  { char = "K", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff....ff..", "ff....ff..", "ff..ff....", "ff..ff....", "ffff......", "ffff......", "ff..ff....", "ff..ff....", "ff....ff..", "ff....ff..", "ff......ff", "ff......ff"] },
+  { char = "L", left = 0, top = 14, advance = 12, rows = ["ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ffffffffff", "ffffffffff"] },
+  { char = "M", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ffff..ffff", "ffff..ffff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "N", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffff....ff", "ffff....ff", "ff..ff..ff", "ff..ff..ff", "ff....ffff", "ff....ffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "O", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "P", left = 0, top = 14, advance = 12, rows = ["ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff..", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........"] },
+  { char = "Q", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff..ff..ff", "ff..ff..ff", "ff....ff..", "ff....ff..", "..ffff..ff", "..ffff..ff"] },
+  { char = "R", left = 0, top = 14, advance = 12, rows = ["ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff..", "ff..ff....", "ff..ff....", "ff....ff..", "ff....ff..", "ff......ff", "ff......ff"] },
+  { char = "S", left = 0, top = 14, advance = 12, rows = ["..ffffffff", "..ffffffff", "ff........", "ff........", "ff........", "ff........", "..ffffff..", "..ffffff..", "........ff", "........ff", "........ff", "........ff", "ffffffff..", "ffffffff.."] },
+  { char = "T", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff...."] },
+  { char = "U", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "V", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ff..ff..", "..ff..ff..", "....ff....", "....ff...."] },
+  { char = "W", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "..ff..ff..", "..ff..ff.."] },
+  { char = "X", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ff..ff..", "..ff..ff..", "....ff....", "....ff....", "..ff..ff..", "..ff..ff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "Y", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ff..ff..", "..ff..ff..", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff...."] },
+  { char = "Z", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "........ff", "........ff", "......ff..", "......ff..", "....ff....", "....ff....", "..ff......", "..ff......", "ff........", "ff........", "ffffffffff", "ffffffffff"] },
+  { char = "[", left = 2, top = 14, advance = 12, rows = ["ffffff", "ffffff", "ff....", "ff....", "ff....", "ff....", "ff....", "ff....", "ff....", "ff....", "ff....", "ff....", "ffffff", "ffffff"] },
+  { char = "\\", left = 0, top = 12, advance = 12, rows = ["ff........", "ff........", "..ff......", "..ff......", "....ff....", "....ff....", "......ff..", "......ff..", "........ff", "........ff"] },
+  { char = "]", left = 2, top = 14, advance = 12, rows = ["ffffff", "ffffff", "....ff", "....ff", "....ff", "....ff", "....ff", "....ff", "....ff", "....ff", "....ff", "....ff", "ffffff", "ffffff"] },
+  { char = "^", left = 0, top = 14, advance = 12, rows = ["....ff....", "....ff....", "..ff..ff..", "..ff..ff..", "ff......ff", "ff......ff"] },
+  { char = "_", left = 0, top = 2, advance = 12, rows = ["ffffffffff", "ffffffffff"] },
+  { char = "`", left = 2, top = 14, advance = 12, rows = ["ff..", "ff..", "..ff", "..ff"] },
+  { char = "{", left = 2, top = 14, advance = 12, rows = ["....ff", "....ff", "..ff..", "..ff..", "..ff..", "..ff..", "ff....", "ff....", "..ff..", "..ff..", "..ff..", "..ff..", "....ff", "....ff"] },
+  { char = "|", left = 4, top = 14, advance = 12, rows = ["ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff", "ff"] },
+  { char = "}", left = 2, top = 14, advance = 12, rows = ["ff....", "ff....", "..ff..", "..ff..", "..ff..", "..ff..", "....ff", "....ff", "..ff..", "..ff..", "..ff..", "..ff..", "ff....", "ff...."] },
+  { char = "~", left = 0, top = 10, advance = 12, rows = ["..ff......", "..ff......", "ff..ff..ff", "ff..ff..ff", "......ff..", "......ff.."] },
+  { char = "\u2026", left = 0, top = 2, advance = 12, rows = ["ff..ff..ff", "ff..ff..ff"] },
+  { char = "\u2019", left = 4, top = 14, advance = 12, rows = ["ff", "ff", "ff", "ff"] },
+  { char = "\u2018", left = 4, top = 14, advance = 12, rows = ["ff", "ff", "ff", "ff"] },
+  { char = "\u201c", left = 2, top = 14, advance = 12, rows = ["ff..ff", "ff..ff", "ff..ff", "ff..ff"] },
+  { char = "\u201d", left = 2, top = 14, advance = 12, rows = ["ff..ff", "ff..ff", "ff..ff", "ff..ff"] },
+  { char = "\u2013", left = 0, top = 8, advance = 12, rows = ["ffffffffff", "ffffffffff"] },
+  { char = "\u2014", left = 0, top = 8, advance = 12, rows = ["ffffffffff", "ffffffffff"] },
+  { char = "\u00b7", left = 4, top = 8, advance = 12, rows = ["ff", "ff"] },
+  { char = "\u2022", left = 2, top = 10, advance = 12, rows = ["ffffff", "ffffff", "ffffff", "ffffff", "ffffff", "ffffff"] },
+  { char = "\u2605", left = 0, top = 14, advance = 12, rows = ["....ff....", "....ff....", "....ff....", "....ff....", "ffffffffff", "ffffffffff", "..ffffff..", "..ffffff..", "..ffffff..", "..ffffff..", "ff......ff", "ff......ff"] },
+  { char = "\u2713", left = 0, top = 12, advance = 12, rows = ["........ff", "........ff", "......ff..", "......ff..", "ff..ff....", "ff..ff....", "..ff......", "..ff......"] },
+  { char = "a", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffffff", "ffffffffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "b", left = 0, top = 14, advance = 12, rows = ["ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff.."] },
+  { char = "c", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "d", left = 0, top = 14, advance = 12, rows = ["ffffff....", "ffffff....", "ff....ff..", "ff....ff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff....ff..", "ff....ff..", "ffffff....", "ffffff...."] },
+  { char = "e", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "ff........", "ff........", "ff........", "ff........", "ffffffff..", "ffffffff..", "ff........", "ff........", "ff........", "ff........", "ffffffffff", "ffffffffff"] },
+  { char = "f", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "ff........", "ff........", "ff........", "ff........", "ffffffff..", "ffffffff..", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........"] },
+  { char = "g", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff........", "ff........", "ff..ffffff", "ff..ffffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffffff", "..ffffffff"] },
+  { char = "h", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffffff", "ffffffffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "i", left = 2, top = 14, advance = 12, rows = ["ffffff", "ffffff", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "..ff..", "ffffff", "ffffff"] },
+  { char = "j", left = 0, top = 14, advance = 12, rows = ["....ffffff", "....ffffff", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "......ff..", "ff....ff..", "ff....ff..", "..ffff....", "..ffff...."] },
+  { char = "k", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff....ff..", "ff....ff..", "ff..ff....", "ff..ff....", "ffff......", "ffff......", "ff..ff....", "ff..ff....", "ff....ff..", "ff....ff..", "ff......ff", "ff......ff"] },
+  { char = "l", left = 0, top = 14, advance = 12, rows = ["ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........", "ffffffffff", "ffffffffff"] },
+  { char = "m", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ffff..ffff", "ffff..ffff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "n", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffff....ff", "ffff....ff", "ff..ff..ff", "ff..ff..ff", "ff....ffff", "ff....ffff", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "o", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "p", left = 0, top = 14, advance = 12, rows = ["ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff..", "ff........", "ff........", "ff........", "ff........", "ff........", "ff........"] },
+  { char = "q", left = 0, top = 14, advance = 12, rows = ["..ffffff..", "..ffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff..ff..ff", "ff..ff..ff", "ff....ff..", "ff....ff..", "..ffff..ff", "..ffff..ff"] },
+  { char = "r", left = 0, top = 14, advance = 12, rows = ["ffffffff..", "ffffffff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ffffffff..", "ffffffff..", "ff..ff....", "ff..ff....", "ff....ff..", "ff....ff..", "ff......ff", "ff......ff"] },
+  { char = "s", left = 0, top = 14, advance = 12, rows = ["..ffffffff", "..ffffffff", "ff........", "ff........", "ff........", "ff........", "..ffffff..", "..ffffff..", "........ff", "........ff", "........ff", "........ff", "ffffffff..", "ffffffff.."] },
+  { char = "t", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff...."] },
+  { char = "u", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ffffff..", "..ffffff.."] },
+  { char = "v", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ff..ff..", "..ff..ff..", "....ff....", "....ff...."] },
+  { char = "w", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff......ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "ff..ff..ff", "..ff..ff..", "..ff..ff.."] },
+  { char = "x", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ff..ff..", "..ff..ff..", "....ff....", "....ff....", "..ff..ff..", "..ff..ff..", "ff......ff", "ff......ff", "ff......ff", "ff......ff"] },
+  { char = "y", left = 0, top = 14, advance = 12, rows = ["ff......ff", "ff......ff", "ff......ff", "ff......ff", "..ff..ff..", "..ff..ff..", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff....", "....ff...."] },
+  { char = "z", left = 0, top = 14, advance = 12, rows = ["ffffffffff", "ffffffffff", "........ff", "........ff", "......ff..", "......ff..", "....ff....", "....ff....", "..ff......", "..ff......", "ff........", "ff........", "ffffffffff", "ffffffffff"] },
+]
+
+[fonts.small]
+ascent = 10
+descent = 2
+glyphs = [
+  { char = " ", left = 0, top = 7, advance = 6, rows = [] },
+  { char = "!", left = 2, top = 7, advance = 6, rows = ["f", "f", "f", "f", "f", ".", "f"] },
+  { char = "\"", left = 1, top = 7, advance = 6, rows = ["f.f", "f.f"] },
+  { char = "#", left = 0, top = 7, advance = 6, rows = [".f.f.", ".f.f.", "fffff", ".f.f.", "fffff", ".f.f.", ".f.f."] },
+  { char = "$", left = 0, top = 7, advance = 6, rows = ["..f..", ".ffff", "f.f..", ".fff.", "..f.f", "ffff.", "..f.."] },
+  { char = "%", left = 0, top = 7, advance = 6, rows = ["ff...", "ff..f", "...f.", "..f..", ".f...", "f..ff", "...ff"] },
+  { char = "&", left = 0, top = 7, advance = 6, rows = [".ff..", "f..f.", "f.f..", ".f...", "f.f.f", "f..f.", ".ff.f"] },
+  { char = "'", left = 2, top = 7, advance = 6, rows = ["f", "f"] },
+  { char = "(", left = 1, top = 7, advance = 6, rows = ["..f", ".f.", "f..", "f..", "f..", ".f.", "..f"] },
+  { char = ")", left = 1, top = 7, advance = 6, rows = ["f..", ".f.", "..f", "..f", "..f", ".f.", "f.."] },
+  { char = "*", left = 0, top = 6, advance = 6, rows = ["..f..", "f.f.f", ".fff.", "f.f.f", "..f.."] },
+  { char = "+", left = 0, top = 6, advance = 6, rows = ["..f..", "..f..", "fffff", "..f..", "..f.."] },
+  { char = ",", left = 1, top = 3, advance = 6, rows = [".ff", ".f.", "f.."] },
+  { char = "-", left = 0, top = 4, advance = 6, rows = ["fffff"] },
+  { char = ".", left = 1, top = 2, advance = 6, rows = ["ff", "ff"] },
+  { char = "/", left = 0, top = 6, advance = 6, rows = ["....f", "...f.", "..f..", ".f...", "f...."] },
+  { char = "0", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f..ff", "f.f.f", "ff..f", "f...f", ".fff."] },
+  { char = "1", left = 1, top = 7, advance = 6, rows = [".f.", "ff.", ".f.", ".f.", ".f.", ".f.", "fff"] },
+  { char = "2", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "....f", "...f.", "..f..", ".f...", "fffff"] },
+  { char = "3", left = 0, top = 7, advance = 6, rows = ["fffff", "...f.", "..f..", "...f.", "....f", "f...f", ".fff."] },
+  { char = "4", left = 0, top = 7, advance = 6, rows = ["...f.", "..ff.", ".f.f.", "f..f.", "fffff", "...f.", "...f."] },
+  { char = "5", left = 0, top = 7, advance = 6, rows = ["fffff", "f....", "ffff.", "....f", "....f", "f...f", ".fff."] },
+  { char = "6", left = 0, top = 7, advance = 6, rows = ["..ff.", ".f...", "f....", "ffff.", "f...f", "f...f", ".fff."] },
+  { char = "7", left = 0, top = 7, advance = 6, rows = ["fffff", "....f", "...f.", "..f..", ".f...", ".f...", ".f..."] },
+  { char = "8", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", ".fff.", "f...f", "f...f", ".fff."] },
+  { char = "9", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", ".ffff", "....f", "...f.", ".ff.."] },
+  { char = ":", left = 1, top = 6, advance = 6, rows = ["ff", "ff", "..", "ff", "ff"] },
+  { char = ";", left = 1, top = 6, advance = 6, rows = ["ff", "ff", "..", "ff", ".f", "f."] },
+  { char = "<", left = 0, top = 7, advance = 6, rows = ["...f", "..f.", ".f..", "f...", ".f..", "..f.", "...f"] },
+  { char = "=", left = 0, top = 5, advance = 6, rows = ["fffff", ".....", "fffff"] },
+  { char = ">", left = 1, top = 7, advance = 6, rows = ["f...", ".f..", "..f.", "...f", "..f.", ".f..", "f..."] },
+  { char = "?", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "....f", "...f.", "..f..", ".....", "..f.."] },
+  { char = "@", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "....f", ".ff.f", "f.f.f", "f.f.f", ".fff."] },
+  { char = "A", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", "fffff", "f...f", "f...f", "f...f"] },
+  { char = "B", left = 0, top = 7, advance = 6, rows = ["ffff.", "f...f", "f...f", "ffff.", "f...f", "f...f", "ffff."] },
+  { char = "C", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f....", "f....", "f....", "f...f", ".fff."] },
+  { char = "D", left = 0, top = 7, advance = 6, rows = ["fff..", "f..f.", "f...f", "f...f", "f...f", "f..f.", "fff.."] },
+  { char = "E", left = 0, top = 7, advance = 6, rows = ["fffff", "f....", "f....", "ffff.", "f....", "f....", "fffff"] },
+  { char = "F", left = 0, top = 7, advance = 6, rows = ["fffff", "f....", "f....", "ffff.", "f....", "f....", "f...."] },
+  { char = "G", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f....", "f.fff", "f...f", "f...f", ".ffff"] },
+  { char = "H", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "fffff", "f...f", "f...f", "f...f"] },
+  { char = "I", left = 1, top = 7, advance = 6, rows = ["fff", ".f.", ".f.", ".f.", ".f.", ".f.", "fff"] },
+  { char = "J", left = 0, top = 7, advance = 6, rows = ["..fff", "...f.", "...f.", "...f.", "...f.", "f..f.", ".ff.."] },
+  { char = "K", left = 0, top = 7, advance = 6, rows = ["f...f", "f..f.", "f.f..", "ff...", "f.f..", "f..f.", "f...f"] },
+  { char = "L", left = 0, top = 7, advance = 6, rows = ["f....", "f....", "f....", "f....", "f....", "f....", "fffff"] },
+  { char = "M", left = 0, top = 7, advance = 6, rows = ["f...f", "ff.ff", "f.f.f", "f.f.f", "f...f", "f...f", "f...f"] },
+  { char = "N", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "ff..f", "f.f.f", "f..ff", "f...f", "f...f"] },
+  { char = "O", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", "f...f", "f...f", "f...f", ".fff."] },
+  { char = "P", left = 0, top = 7, advance = 6, rows = ["ffff.", "f...f", "f...f", "ffff.", "f....", "f....", "f...."] },
+  { char = "Q", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", "f...f", "f.f.f", "f..f.", ".ff.f"] },
+  { char = "R", left = 0, top = 7, advance = 6, rows = ["ffff.", "f...f", "f...f", "ffff.", "f.f..", "f..f.", "f...f"] },
+  { char = "S", left = 0, top = 7, advance = 6, rows = [".ffff", "f....", "f....", ".fff.", "....f", "....f", "ffff."] },
+  { char = "T", left = 0, top = 7, advance = 6, rows = ["fffff", "..f..", "..f..", "..f..", "..f..", "..f..", "..f.."] },
+  { char = "U", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "f...f", "f...f", "f...f", ".fff."] },
+  { char = "V", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "f...f", "f...f", ".f.f.", "..f.."] },
+  { char = "W", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "f.f.f", "f.f.f", "f.f.f", ".f.f."] },
+  { char = "X", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", ".f.f.", "..f..", ".f.f.", "f...f", "f...f"] },
+  { char = "Y", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", ".f.f.", "..f..", "..f..", "..f..", "..f.."] },
+  { char = "Z", left = 0, top = 7, advance = 6, rows = ["fffff", "....f", "...f.", "..f..", ".f...", "f....", "fffff"] },
+  { char = "[", left = 1, top = 7, advance = 6, rows = ["fff", "f..", "f..", "f..", "f..", "f..", "fff"] },
+  { char = "\\", left = 0, top = 6, advance = 6, rows = ["f....", ".f...", "..f..", "...f.", "....f"] },
+  { char = "]", left = 1, top = 7, advance = 6, rows = ["fff", "..f", "..f", "..f", "..f", "..f", "fff"] },
+  { char = "^", left = 0, top = 7, advance = 6, rows = ["..f..", ".f.f.", "f...f"] },
+  { char = "_", left = 0, top = 1, advance = 6, rows = ["fffff"] },
+  { char = "`", left = 1, top = 7, advance = 6, rows = ["f.", ".f"] },
+  { char = "{", left = 1, top = 7, advance = 6, rows = ["..f", ".f.", ".f.", "f..", ".f.", ".f.", "..f"] },
+  { char = "|", left = 2, top = 7, advance = 6, rows = ["f", "f", "f", "f", "f", "f", "f"] },
+  { char = "}", left = 1, top = 7, advance = 6, rows = ["f..", ".f.", ".f.", "..f", ".f.", ".f.", "f.."] },
+  { char = "~", left = 0, top = 5, advance = 6, rows = [".f...", "f.f.f", "...f."] },
+  { char = "\u2026", left = 0, top = 1, advance = 6, rows = ["f.f.f"] },
+  { char = "\u2019", left = 2, top = 7, advance = 6, rows = ["f", "f"] },
+  { char = "\u2018", left = 2, top = 7, advance = 6, rows = ["f", "f"] },
+  { char = "\u201c", left = 1, top = 7, advance = 6, rows = ["f.f", "f.f"] },
+  { char = "\u201d", left = 1, top = 7, advance = 6, rows = ["f.f", "f.f"] },
+  { char = "\u2013", left = 0, top = 4, advance = 6, rows = ["fffff"] },
+  { char = "\u2014", left = 0, top = 4, advance = 6, rows = ["fffff"] },
+  { char = "\u00b7", left = 2, top = 4, advance = 6, rows = ["f"] },
+  { char = "\u2022", left = 1, top = 5, advance = 6, rows = ["fff", "fff", "fff"] },
+  { char = "\u2605", left = 0, top = 7, advance = 6, rows = ["..f..", "..f..", "fffff", ".fff.", ".fff.", "f...f"] },
+  { char = "\u2713", left = 0, top = 6, advance = 6, rows = ["....f", "...f.", "f.f..", ".f..."] },
+  { char = "a", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", "fffff", "f...f", "f...f", "f...f"] },
+  { char = "b", left = 0, top = 7, advance = 6, rows = ["ffff.", "f...f", "f...f", "ffff.", "f...f", "f...f", "ffff."] },
+  { char = "c", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f....", "f....", "f....", "f...f", ".fff."] },
+  { char = "d", left = 0, top = 7, advance = 6, rows = ["fff..", "f..f.", "f...f", "f...f", "f...f", "f..f.", "fff.."] },
+  { char = "e", left = 0, top = 7, advance = 6, rows = ["fffff", "f....", "f....", "ffff.", "f....", "f....", "fffff"] },
+  { char = "f", left = 0, top = 7, advance = 6, rows = ["fffff", "f....", "f....", "ffff.", "f....", "f....", "f...."] },
+  { char = "g", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f....", "f.fff", "f...f", "f...f", ".ffff"] },
+  { char = "h", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "fffff", "f...f", "f...f", "f...f"] },
+  { char = "i", left = 1, top = 7, advance = 6, rows = ["fff", ".f.", ".f.", ".f.", ".f.", ".f.", "fff"] },
+  { char = "j", left = 0, top = 7, advance = 6, rows = ["..fff", "...f.", "...f.", "...f.", "...f.", "f..f.", ".ff.."] },
+  { char = "k", left = 0, top = 7, advance = 6, rows = ["f...f", "f..f.", "f.f..", "ff...", "f.f..", "f..f.", "f...f"] },
+  { char = "l", left = 0, top = 7, advance = 6, rows = ["f....", "f....", "f....", "f....", "f....", "f....", "fffff"] },
+  { char = "m", left = 0, top = 7, advance = 6, rows = ["f...f", "ff.ff", "f.f.f", "f.f.f", "f...f", "f...f", "f...f"] },
+  { char = "n", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "ff..f", "f.f.f", "f..ff", "f...f", "f...f"] },
+  { char = "o", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", "f...f", "f...f", "f...f", ".fff."] },
+  { char = "p", left = 0, top = 7, advance = 6, rows = ["ffff.", "f...f", "f...f", "ffff.", "f....", "f....", "f...."] },
+  { char = "q", left = 0, top = 7, advance = 6, rows = [".fff.", "f...f", "f...f", "f...f", "f.f.f", "f..f.", ".ff.f"] },
+  { char = "r", left = 0, top = 7, advance = 6, rows = ["ffff.", "f...f", "f...f", "ffff.", "f.f..", "f..f.", "f...f"] },
+  { char = "s", left = 0, top = 7, advance = 6, rows = [".ffff", "f....", "f....", ".fff.", "....f", "....f", "ffff."] },
+  { char = "t", left = 0, top = 7, advance = 6, rows = ["fffff", "..f..", "..f..", "..f..", "..f..", "..f..", "..f.."] },
+  { char = "u", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "f...f", "f...f", "f...f", ".fff."] },
+  { char = "v", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "f...f", "f...f", ".f.f.", "..f.."] },
+  { char = "w", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", "f...f", "f.f.f", "f.f.f", "f.f.f", ".f.f."] },
+  { char = "x", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", ".f.f.", "..f..", ".f.f.", "f...f", "f...f"] },
+  { char = "y", left = 0, top = 7, advance = 6, rows = ["f...f", "f...f", ".f.f.", "..f..", "..f..", "..f..", "..f.."] },
+  { char = "z", left = 0, top = 7, advance = 6, rows = ["fffff", "....f", "...f.", "..f..", ".f...", "f....", "fffff"] },
+]
+
+
+[home_scene]
+script = '''
+rect(x, y, width, height, #33312d)
+if width > height {
+    rect(x + 36, y, 248, 140, #f3efe6)
+    if 1 {
+        let gx_1 = x + 36
+        let gy_1 = y + 140
+        repeat copy_1 from 0 to 31 {
+            let cx_1 = gx_1 + copy_1 * 8
+            trapezoid(cx_1, gy_1, 8, 5, 4, #f3efe6)
+        }
+    }
+    text("MENU", title, x + 46, y + 3, 228, 18, center, #1c1b19)
+    if 1 {
+        let gx_1 = x + 46
+        let gy_1 = y + 24
+        repeat copy_1 from 0 to 38 {
+            let cx_1 = gx_1 + copy_1 * 6
+            rect(cx_1, gy_1, 3, 1, #1c1b19)
+        }
+    }
+    menu(x + 38, y + 28, 244, 110)
+} else {
+    rect(x + 6, y, 158, 272, #f3efe6)
+    if 1 {
+        let gx_1 = x + 6
+        let gy_1 = y + 272
+        repeat copy_1 from 0 to 20 {
+            let cx_1 = gx_1 + copy_1 * 8
+            trapezoid(cx_1, gy_1, 8, 5, 4, #f3efe6)
+        }
+    }
+    text("MENU", title, x + 12, y + 6, 146, 18, center, #1c1b19)
+    if 1 {
+        let gx_1 = x + 12
+        let gy_1 = y + 28
+        repeat copy_1 from 0 to 25 {
+            let cx_1 = gx_1 + copy_1 * 6
+            rect(cx_1, gy_1, 3, 1, #1c1b19)
+        }
+    }
+    menu(x + 8, y + 32, 154, 238)
+}
+'''
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":253,\"kind\":\"box\",\"name\":\"Counter\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#33312d\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":254,\"kind\":\"box\",\"name\":\"Paper\",\"hidden\":false,\"at\":{\"wide\":{\"x\":36,\"y\":0,\"w\":248,\"h\":140},\"tall\":{\"x\":6,\"y\":0,\"w\":158,\"h\":272}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":256,\"kind\":\"group\",\"name\":\"Torn edge\",\"hidden\":false,\"at\":{\"wide\":{\"x\":36,\"y\":140,\"w\":248,\"h\":5},\"tall\":null},\"bind\":{},\"children\":[{\"id\":255,\"kind\":\"box\",\"name\":\"Tooth\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5},\"tall\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":4,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":31,\"columns\":31,\"dx\":8,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":258,\"kind\":\"group\",\"name\":\"Torn edge\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":272,\"w\":158,\"h\":5}},\"bind\":{},\"children\":[{\"id\":257,\"kind\":\"box\",\"name\":\"Tooth\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5},\"tall\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":4,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":20,\"columns\":20,\"dx\":8,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":259,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":3,\"w\":228,\"h\":18,\"align\":\"center\"},\"tall\":{\"x\":12,\"y\":6,\"w\":146,\"h\":18,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"MENU\",\"size\":\"large\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":261,\"kind\":\"group\",\"name\":\"Dashes\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":24,\"w\":228,\"h\":1},\"tall\":null},\"bind\":{},\"children\":[{\"id\":260,\"kind\":\"box\",\"name\":\"Dash\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1},\"tall\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":38,\"columns\":38,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":263,\"kind\":\"group\",\"name\":\"Dashes\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":28,\"w\":146,\"h\":1}},\"bind\":{},\"children\":[{\"id\":262,\"kind\":\"box\",\"name\":\"Dash\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1},\"tall\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":25,\"columns\":25,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":264,\"kind\":\"menu\",\"name\":\"Menu\",\"hidden\":false,\"at\":{\"wide\":{\"x\":38,\"y\":28,\"w\":244,\"h\":110},\"tall\":{\"x\":8,\"y\":32,\"w\":154,\"h\":238}},\"bind\":{}}]}"
+
+[now_playing_scene]
+script = '''
+rect(x, y, width, height, #33312d)
+if width > height {
+    let p0_0 = x + 46
+    let p0_1 = y + 79
+    let p0_2 = x + 90
+    let p0_3 = y + 91
+    let p0_4 = y + 108
+    rect(x + 36, y, 248, 140, #f3efe6)
+    if 1 {
+        let gx_1 = x + 36
+        let gy_1 = y + 140
+        repeat copy_1 from 0 to 31 {
+            let cx_1 = gx_1 + copy_1 * 8
+            trapezoid(cx_1, gy_1, 8, 5, 4, #f3efe6)
+        }
+    }
+    text("ECHOPOD", title, p0_0, y + 3, 228, 18, center, #1c1b19)
+    text("RECEIPT OF PLAY", small, p0_0, y + 22, 228, 10, center, #8b867c)
+    if 1 {
+        let gx_1 = x + 46
+        let gy_1 = y + 35
+        repeat copy_1 from 0 to 38 {
+            let cx_1 = gx_1 + copy_1 * 6
+            rect(cx_1, gy_1, 3, 1, #1c1b19)
+        }
+    }
+    line(song, body, p0_0, y + 40, 228, 18, left, #1c1b19)
+    line(artist, body, p0_0, y + 58, 228, 18, left, #4a4743)
+    text("ALBUM", small, p0_0, p0_1, 40, 10, left, #8b867c)
+    line(album, small, p0_2, p0_1, 184, 10, left, #1c1b19)
+    text("FORMAT", small, p0_0, p0_3, 40, 10, left, #8b867c)
+    text(stream, small, p0_2, p0_3, 184, 10, left, #1c1b19)
+    if 1 {
+        let gx_1 = x + 46
+        let gy_1 = y + 104
+        repeat copy_1 from 0 to 38 {
+            let cx_1 = gx_1 + copy_1 * 6
+            rect(cx_1, gy_1, 3, 1, #1c1b19)
+        }
+    }
+    text("PLAYED", body, p0_0, p0_4, 120, 18, left, #1c1b19)
+    text(elapsed, body, x + 154, p0_4, 120, 18, right, #1c1b19)
+    if 1 {
+        let gx_1 = x + 86
+        let gy_1 = y + 126
+        if 1 {
+            let lit_2_progress = progress(1000) * 25 / 1000
+            repeat copy_2 from 0 to 25 {
+                let cx_2 = gx_1 + copy_2 * 6
+                rect(cx_2, gy_1, 2, 14, (copy_2 < lit_2_progress ? #1c1b19 : #cfc8b9))
+            }
+        }
+        if 1 {
+            let gx_2 = gx_1 + 3
+            let lit_2_progress = progress(1000) * 19 / 1000
+            repeat copy_2 from 0 to 19 {
+                let cx_2 = gx_2 + copy_2 * 8
+                rect(cx_2, gy_1, 1, 14, (copy_2 < lit_2_progress ? #1c1b19 : #cfc8b9))
+            }
+        }
+    }
+} else {
+    let p0_0 = x + 12
+    let p0_1 = y + 174
+    let p0_2 = x + 82
+    let p0_3 = y + 192
+    rect(x + 6, y, 158, 272, #f3efe6)
+    if 1 {
+        let gx_1 = x + 6
+        let gy_1 = y + 272
+        repeat copy_1 from 0 to 20 {
+            let cx_1 = gx_1 + copy_1 * 8
+            trapezoid(cx_1, gy_1, 8, 5, 4, #f3efe6)
+        }
+    }
+    text("ECHOPOD", title, p0_0, y + 6, 146, 18, center, #1c1b19)
+    text("RECEIPT OF PLAY", small, p0_0, y + 24, 146, 10, center, #8b867c)
+    if 1 {
+        let gx_1 = x + 12
+        let gy_1 = y + 38
+        repeat copy_1 from 0 to 25 {
+            let cx_1 = gx_1 + copy_1 * 6
+            rect(cx_1, gy_1, 3, 1, #1c1b19)
+        }
+    }
+    line(song, body, p0_0, y + 44, 146, 18, left, #1c1b19)
+    line(artist, small, p0_0, y + 64, 146, 12, left, #4a4743)
+    text("ALBUM", small, p0_0, y + 88, 40, 10, left, #8b867c)
+    line(album, small, p0_0, y + 100, 146, 10, left, #1c1b19)
+    text("FORMAT", small, p0_0, y + 114, 40, 10, left, #8b867c)
+    text(stream, small, p0_0, y + 126, 146, 10, left, #1c1b19)
+    text("MODE", small, p0_0, y + 140, 40, 10, left, #8b867c)
+    text(modes, small, p0_0, y + 152, 146, 10, left, #1c1b19)
+    if 1 {
+        let gx_1 = x + 12
+        let gy_1 = y + 168
+        repeat copy_1 from 0 to 25 {
+            let cx_1 = gx_1 + copy_1 * 6
+            rect(cx_1, gy_1, 3, 1, #1c1b19)
+        }
+    }
+    text("PLAYED", body, p0_0, p0_1, 90, 18, left, #1c1b19)
+    text(elapsed, body, p0_2, p0_1, 76, 18, right, #1c1b19)
+    text("LEFT", body, p0_0, p0_3, 90, 18, left, #1c1b19)
+    text(remaining, body, p0_2, p0_3, 76, 18, right, #1c1b19)
+    if 1 {
+        let gx_1 = x + 12
+        let gy_1 = y + 214
+        repeat copy_1 from 0 to 25 {
+            let cx_1 = gx_1 + copy_1 * 6
+            rect(cx_1, gy_1, 3, 1, #1c1b19)
+        }
+    }
+    if 1 {
+        let gx_1 = x + 22
+        let gy_1 = y + 222
+        if 1 {
+            let lit_2_progress = progress(1000) * 21 / 1000
+            repeat copy_2 from 0 to 21 {
+                let cx_2 = gx_1 + copy_2 * 6
+                rect(cx_2, gy_1, 2, 14, (copy_2 < lit_2_progress ? #1c1b19 : #cfc8b9))
+            }
+        }
+        if 1 {
+            let gx_2 = gx_1 + 3
+            let lit_2_progress = progress(1000) * 16 / 1000
+            repeat copy_2 from 0 to 16 {
+                let cx_2 = gx_2 + copy_2 * 8
+                rect(cx_2, gy_1, 1, 14, (copy_2 < lit_2_progress ? #1c1b19 : #cfc8b9))
+            }
+        }
+    }
+    text("NO RETURNS", small, p0_0, y + 244, 146, 10, center, #8b867c)
+    text("THANK YOU", small, p0_0, y + 256, 146, 10, center, #8b867c)
+}
+'''
+design = "{\"version\":2,\"screen\":\"playing\",\"elements\":[{\"id\":210,\"kind\":\"box\",\"name\":\"Counter\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#33312d\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":211,\"kind\":\"box\",\"name\":\"Paper\",\"hidden\":false,\"at\":{\"wide\":{\"x\":36,\"y\":0,\"w\":248,\"h\":140},\"tall\":{\"x\":6,\"y\":0,\"w\":158,\"h\":272}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":213,\"kind\":\"group\",\"name\":\"Torn edge\",\"hidden\":false,\"at\":{\"wide\":{\"x\":36,\"y\":140,\"w\":248,\"h\":5},\"tall\":null},\"bind\":{},\"children\":[{\"id\":212,\"kind\":\"box\",\"name\":\"Tooth\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5},\"tall\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":4,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":31,\"columns\":31,\"dx\":8,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":215,\"kind\":\"group\",\"name\":\"Torn edge\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":272,\"w\":158,\"h\":5}},\"bind\":{},\"children\":[{\"id\":214,\"kind\":\"box\",\"name\":\"Tooth\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5},\"tall\":{\"x\":0,\"y\":0,\"w\":8,\"h\":5}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":4,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":20,\"columns\":20,\"dx\":8,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":216,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":3,\"w\":228,\"h\":18,\"align\":\"center\"},\"tall\":{\"x\":12,\"y\":6,\"w\":146,\"h\":18,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"ECHOPOD\",\"size\":\"large\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":217,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":22,\"w\":228,\"h\":10,\"align\":\"center\"},\"tall\":{\"x\":12,\"y\":24,\"w\":146,\"h\":10,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"RECEIPT OF PLAY\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false},{\"id\":219,\"kind\":\"group\",\"name\":\"Dashes\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":35,\"w\":228,\"h\":1},\"tall\":null},\"bind\":{},\"children\":[{\"id\":218,\"kind\":\"box\",\"name\":\"Dash\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1},\"tall\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":38,\"columns\":38,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":221,\"kind\":\"group\",\"name\":\"Dashes\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":38,\"w\":146,\"h\":1}},\"bind\":{},\"children\":[{\"id\":220,\"kind\":\"box\",\"name\":\"Dash\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1},\"tall\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":25,\"columns\":25,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":222,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":40,\"w\":228,\"h\":18},\"tall\":{\"x\":12,\"y\":44,\"w\":146,\"h\":18}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":223,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":58,\"w\":228,\"h\":18},\"tall\":null},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":224,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":64,\"w\":146,\"h\":12}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":225,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":79,\"w\":40,\"h\":10},\"tall\":{\"x\":12,\"y\":88,\"w\":40,\"h\":10}},\"bind\":{},\"source\":\"custom\",\"custom\":\"ALBUM\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false},{\"id\":226,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":90,\"y\":79,\"w\":184,\"h\":10},\"tall\":{\"x\":12,\"y\":100,\"w\":146,\"h\":10}},\"bind\":{},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":227,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":91,\"w\":40,\"h\":10},\"tall\":{\"x\":12,\"y\":114,\"w\":40,\"h\":10}},\"bind\":{},\"source\":\"custom\",\"custom\":\"FORMAT\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false},{\"id\":228,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":90,\"y\":91,\"w\":184,\"h\":10},\"tall\":{\"x\":12,\"y\":126,\"w\":146,\"h\":10}},\"bind\":{},\"source\":\"stream\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":229,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":140,\"w\":40,\"h\":10}},\"bind\":{},\"source\":\"custom\",\"custom\":\"MODE\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false},{\"id\":230,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":152,\"w\":146,\"h\":10}},\"bind\":{},\"source\":\"modes\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":232,\"kind\":\"group\",\"name\":\"Dashes\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":104,\"w\":228,\"h\":1},\"tall\":null},\"bind\":{},\"children\":[{\"id\":231,\"kind\":\"box\",\"name\":\"Dash\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1},\"tall\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":38,\"columns\":38,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":234,\"kind\":\"group\",\"name\":\"Dashes\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":168,\"w\":146,\"h\":1}},\"bind\":{},\"children\":[{\"id\":233,\"kind\":\"box\",\"name\":\"Dash\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1},\"tall\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":25,\"columns\":25,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":235,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":46,\"y\":108,\"w\":120,\"h\":18},\"tall\":{\"x\":12,\"y\":174,\"w\":90,\"h\":18}},\"bind\":{},\"source\":\"custom\",\"custom\":\"PLAYED\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":236,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":154,\"y\":108,\"w\":120,\"h\":18,\"align\":\"right\"},\"tall\":{\"x\":82,\"y\":174,\"w\":76,\"h\":18,\"align\":\"right\"}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":237,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":192,\"w\":90,\"h\":18}},\"bind\":{},\"source\":\"custom\",\"custom\":\"LEFT\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":238,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":82,\"y\":192,\"w\":76,\"h\":18,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":false},{\"id\":240,\"kind\":\"group\",\"name\":\"Dashes\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":214,\"w\":146,\"h\":1}},\"bind\":{},\"children\":[{\"id\":239,\"kind\":\"box\",\"name\":\"Dash\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1},\"tall\":{\"x\":0,\"y\":0,\"w\":3,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":25,\"columns\":25,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":245,\"kind\":\"group\",\"name\":\"Barcode\",\"hidden\":false,\"at\":{\"wide\":{\"x\":86,\"y\":126,\"w\":150,\"h\":14},\"tall\":null},\"bind\":{},\"children\":[{\"id\":242,\"kind\":\"group\",\"name\":\"Thick bars\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":150,\"h\":14},\"tall\":{\"x\":0,\"y\":0,\"w\":150,\"h\":14}},\"bind\":{},\"children\":[{\"id\":241,\"kind\":\"box\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":2,\"h\":14},\"tall\":{\"x\":0,\"y\":0,\"w\":2,\"h\":14}},\"bind\":{\"color\":{\"when\":{\"on\":\"lit\",\"source\":\"progress\"},\"color\":\"@text\"}},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":25,\"columns\":25,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":244,\"kind\":\"group\",\"name\":\"Thin bars\",\"hidden\":false,\"at\":{\"wide\":{\"x\":3,\"y\":0,\"w\":150,\"h\":14},\"tall\":{\"x\":3,\"y\":0,\"w\":150,\"h\":14}},\"bind\":{},\"children\":[{\"id\":243,\"kind\":\"box\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":1,\"h\":14},\"tall\":{\"x\":0,\"y\":0,\"w\":1,\"h\":14}},\"bind\":{\"color\":{\"when\":{\"on\":\"lit\",\"source\":\"progress\"},\"color\":\"@text\"}},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":19,\"columns\":19,\"dx\":8,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}}],\"clip\":false,\"repeat\":null},{\"id\":250,\"kind\":\"group\",\"name\":\"Barcode\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":22,\"y\":222,\"w\":126,\"h\":14}},\"bind\":{},\"children\":[{\"id\":247,\"kind\":\"group\",\"name\":\"Thick bars\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":126,\"h\":14},\"tall\":{\"x\":0,\"y\":0,\"w\":126,\"h\":14}},\"bind\":{},\"children\":[{\"id\":246,\"kind\":\"box\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":2,\"h\":14},\"tall\":{\"x\":0,\"y\":0,\"w\":2,\"h\":14}},\"bind\":{\"color\":{\"when\":{\"on\":\"lit\",\"source\":\"progress\"},\"color\":\"@text\"}},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":21,\"columns\":21,\"dx\":6,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":249,\"kind\":\"group\",\"name\":\"Thin bars\",\"hidden\":false,\"at\":{\"wide\":{\"x\":3,\"y\":0,\"w\":126,\"h\":14},\"tall\":{\"x\":3,\"y\":0,\"w\":126,\"h\":14}},\"bind\":{},\"children\":[{\"id\":248,\"kind\":\"box\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":1,\"h\":14},\"tall\":{\"x\":0,\"y\":0,\"w\":1,\"h\":14}},\"bind\":{\"color\":{\"when\":{\"on\":\"lit\",\"source\":\"progress\"},\"color\":\"@text\"}},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":16,\"columns\":16,\"dx\":8,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}}],\"clip\":false,\"repeat\":null},{\"id\":251,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":244,\"w\":146,\"h\":10,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"NO RETURNS\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false},{\"id\":252,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":256,\"w\":146,\"h\":10,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"THANK YOU\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false}]}"

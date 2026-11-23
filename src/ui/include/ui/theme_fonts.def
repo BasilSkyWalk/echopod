@@ -1,0 +1,3 @@
+THEME_FONT(TITLE, title, 20)
+THEME_FONT(BODY, body, 20)
+THEME_FONT(SMALL, small, 15)

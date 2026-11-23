@@ -109,6 +109,18 @@ static void a_request_shares_the_minimum_with_a_scrolling_line(void)
     CHECK_EQUAL(10u, marquee_frame_wait_ms());
 }
 
+static void a_paced_frame_is_forgotten_when_the_next_frame_starts(void)
+{
+    marquee_frame_start();
+    CHECK(!marquee_frame_paced());
+    marquee_frame_pace(60);
+    CHECK(marquee_frame_paced());
+    CHECK_EQUAL(60u, marquee_frame_wait_ms());
+    marquee_frame_start();
+    CHECK(!marquee_frame_paced());
+    CHECK_EQUAL(0u, marquee_frame_wait_ms());
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -123,6 +135,7 @@ int main(void)
         TEST_CASE(a_frame_remembers_the_soonest_wait),
         TEST_CASE(a_request_keeps_the_soonest_wait),
         TEST_CASE(a_request_shares_the_minimum_with_a_scrolling_line),
+        TEST_CASE(a_paced_frame_is_forgotten_when_the_next_frame_starts),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

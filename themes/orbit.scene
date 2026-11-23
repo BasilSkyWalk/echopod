@@ -1,0 +1,43 @@
+const SPACE = #0b0e19
+const TRACK = #232a42
+const LIT = #7fd3ff
+const GLOW = #c8eeff
+const TEXT = #eef1fa
+const SOFT = #8e97b4
+
+rect(x, y, width, height, SPACE)
+let wide = width > height
+let cx = wide ? 84 : width / 2
+let cy = wide ? y + height / 2 : y + 88
+let lit = progress(48)
+repeat mark from 0 to 48 {
+    spoke(cx, cy, mark * 16 / 3, 40, 60, 68, mark < lit ? LIT : TRACK)
+}
+if has_cover {
+    round_cover(cx, cy, 52)
+} else {
+    ring(cx * 16 + 8, cy * 16 + 8, 52 * 16, 0, TRACK)
+    ring(cx * 16 + 8, cy * 16 + 8, 6 * 16, 0, SOFT)
+}
+if playing {
+    spoke(cx, cy, (tick * 3) & 255, 24, 63, 66, GLOW)
+}
+if badge != none {
+    ring(cx * 16 + 8, cy * 16 + 8, 20 * 16, 0, SPACE)
+    icon(badge, cx - 9, cy - 9, 18, 18, LIT)
+}
+
+let tx = wide ? 168 : 10
+let ty = wide ? y + 26 : y + 168
+let tw = wide ? 142 : width - 20
+let along = wide ? left : center
+line(song, title, tx, ty, tw, 22, along, TEXT)
+if present(feedback) {
+    text(feedback, body, tx, ty + 24, tw, 20, along, LIT)
+} else if present(lyric) {
+    line(lyric, body, tx, ty + 24, tw, 20, along, LIT)
+} else {
+    line(artist, body, tx, ty + 24, tw, 20, along, SOFT)
+}
+text(stream, small, tx, ty + 50, tw, 16, along, SOFT)
+times(small, tx, ty + 72, tw, 16, TEXT, SOFT)

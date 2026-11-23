@@ -1,6 +1,7 @@
 #include "ui/icons.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 
 enum {
     PAUSE_BAR_TENTHS = 3,
@@ -113,4 +114,85 @@ void icon_draw_bluetooth(Canvas *canvas, Rect area, Color color)
             }
         }
     }
+}
+
+typedef void (*Shape)(Canvas *canvas, Rect area, Color color);
+
+static const Shape SHAPES[THEME_ICON_COUNT] = {
+    [THEME_ICON_STATUS_PLAY] = icon_draw_play,
+    [THEME_ICON_STATUS_PAUSE] = icon_draw_pause,
+    [THEME_ICON_STATUS_BLUETOOTH] = icon_draw_bluetooth,
+    [THEME_ICON_STATUS_BOLT] = icon_draw_bolt,
+    [THEME_ICON_BADGE_PLAY] = icon_draw_play,
+    [THEME_ICON_BADGE_PAUSE] = icon_draw_pause,
+    [THEME_ICON_BADGE_NEXT] = icon_draw_next,
+    [THEME_ICON_BADGE_PREVIOUS] = icon_draw_previous,
+    [THEME_ICON_STATUS_PLAY_LARGE] = icon_draw_play,
+    [THEME_ICON_STATUS_PAUSE_LARGE] = icon_draw_pause,
+    [THEME_ICON_STATUS_BLUETOOTH_LARGE] = icon_draw_bluetooth,
+    [THEME_ICON_STATUS_BOLT_LARGE] = icon_draw_bolt,
+};
+
+static uint8_t mask_level(const IconMask *mask, int column, int row)
+{
+    uint8_t pair = mask->levels[row * ((mask->width + 1) / 2) + column / 2];
+    return column % 2 == 0 ? pair >> 4 : pair & 0x0F;
+}
+
+static Point mask_origin(const IconMask *mask, Rect area)
+{
+    return (Point){area.x + (area.width - mask->width) / 2,
+                   area.y + (area.height - mask->height) / 2};
+}
+
+static void draw_mask(Canvas *canvas, const IconMask *mask, Icon icon)
+{
+    Point origin = mask_origin(mask, icon.area);
+    for (int row = 0; row < mask->height; row++) {
+        for (int column = 0; column < mask->width; column++) {
+            uint8_t level = mask_level(mask, column, row);
+            if (level > 0) {
+                Point point = {origin.x + column, origin.y + row};
+                canvas_blend_pixel(canvas, point, icon.color, level);
+            }
+        }
+    }
+}
+
+void icon_draw(Canvas *canvas, const Theme *theme, Icon icon)
+{
+    const IconMask *mask = theme_icon(theme, icon.id);
+    if (mask != NULL) {
+        draw_mask(canvas, mask, icon);
+    } else if (SHAPES[icon.id] != NULL) {
+        SHAPES[icon.id](canvas, icon.area, icon.color);
+    }
+}
+
+static bool column_inked(const IconMask *mask, int column)
+{
+    for (int row = 0; row < mask->height; row++) {
+        if (mask_level(mask, column, row) > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+Rect icon_ink_area(const Theme *theme, Icon icon)
+{
+    const IconMask *mask = theme_icon(theme, icon.id);
+    if (mask == NULL) {
+        return (Rect){0, 0, 0, 0};
+    }
+    Point origin = mask_origin(mask, icon.area);
+    int first = 0;
+    int last = mask->width - 1;
+    while (first < last && !column_inked(mask, first)) {
+        first++;
+    }
+    while (last > first && !column_inked(mask, last)) {
+        last--;
+    }
+    return (Rect){origin.x + first, origin.y, last - first + 1, mask->height};
 }

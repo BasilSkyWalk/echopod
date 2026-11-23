@@ -1,4 +1,5 @@
 #include "favorites_store.h"
+#include "core/resident.h"
 
 #include "core/i18n.h"
 #include "hal/storage.h"
@@ -17,7 +18,7 @@ static bool read_favorites(uint8_t *bytes, uint32_t *length)
     return read;
 }
 
-void favorites_store_load(FavoritesStore *store, const Library *library)
+ECHO_STARTUP_CODE void favorites_store_load(FavoritesStore *store, const Library *library)
 {
     uint8_t bytes[FAVORITES_FILE_CAPACITY];
     uint32_t length = 0;

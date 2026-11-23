@@ -1,4 +1,5 @@
 #include "player.h"
+#include "core/resident.h"
 
 #include <stddef.h>
 
@@ -617,7 +618,7 @@ static void load_up_next(Player *player)
     }
 }
 
-bool player_restore(Player *player)
+ECHO_STARTUP_CODE bool player_restore(Player *player)
 {
     ResumeState state;
     load_up_next(player);

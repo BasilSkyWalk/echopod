@@ -35,7 +35,7 @@ static void draw_outline(Canvas *canvas, Rect body, Color color)
 
 static void draw_battery(Canvas *canvas, const Theme *theme, Rect body, HalBattery battery)
 {
-    Color outline = theme->colors.text;
+    Color outline = theme->colors->text;
     draw_outline(canvas, body, outline);
     canvas_fill_rect(
         canvas,
@@ -45,13 +45,13 @@ static void draw_battery(Canvas *canvas, const Theme *theme, Rect body, HalBatte
     Rect inner = {body.x + edge, body.y + edge, body.width - 2 * edge, body.height - 2 * edge};
     int percent = battery.known ? battery.percent : 0;
     percent = percent < FULL_PERCENT ? percent : FULL_PERCENT;
-    Color fill = battery.charging ? theme->colors.success : theme->colors.text;
+    Color fill = battery.charging ? theme->colors->success : theme->colors->text;
     canvas_fill_rect(
         canvas, (Rect){inner.x, inner.y, inner.width * percent / FULL_PERCENT, inner.height}, fill);
     if (battery.charging) {
         Rect bolt = {body.x + (body.width - BOLT_WIDTH) / 2,
                      body.y + (body.height - BOLT_HEIGHT) / 2, BOLT_WIDTH, BOLT_HEIGHT};
-        icon_draw_bolt(canvas, bolt, theme->colors.background);
+        icon_draw_bolt(canvas, bolt, theme->colors->background);
     }
 }
 
@@ -78,7 +78,7 @@ void charge_screen_draw(Canvas *canvas, const Theme *theme, HalBattery battery)
 {
     int width = theme->metrics.screen_width;
     int height = theme->metrics.screen_height;
-    canvas_fill_rect(canvas, (Rect){0, 0, width, height}, theme->colors.background);
+    canvas_fill_rect(canvas, (Rect){0, 0, width, height}, theme->colors->background);
     int block = BODY_HEIGHT + TEXT_GAP + TEXT_HEIGHT;
     Rect body = {(width - BODY_WIDTH - NUB_WIDTH) / 2, (height - block) / 2, BODY_WIDTH,
                  BODY_HEIGHT};
@@ -86,12 +86,12 @@ void charge_screen_draw(Canvas *canvas, const Theme *theme, HalBattery battery)
     char text[TEXT_CAPACITY];
     charge_screen_text(battery, text, sizeof text);
     Rect line = {0, body.y + BODY_HEIGHT + TEXT_GAP, width, TEXT_HEIGHT};
-    TextStyle style = {.font = theme->fonts.body, .color = theme->colors.text};
+    TextStyle style = {.font = theme->fonts.body, .color = theme->colors->text};
     label_draw(canvas, style,
                (Label){.area = label_centered_area(style.font, line, text), .text = text});
     const char *hint_text = i18n_text(STR_CHARGE_HINT);
     Rect hint = {0, height - HINT_BOTTOM - HINT_HEIGHT, width, HINT_HEIGHT};
-    TextStyle small = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
+    TextStyle small = {.font = theme->fonts.small, .color = theme->colors->text_tertiary};
     label_draw(
         canvas, small,
         (Label){.area = label_centered_area(small.font, hint, hint_text), .text = hint_text});

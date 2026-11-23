@@ -7,6 +7,7 @@ enum {
 };
 
 static uint32_t frame_wait_ms;
+static bool frame_paced;
 
 static bool scrolls(MarqueeTiming timing, int text_width, int view_width)
 {
@@ -57,9 +58,21 @@ int marquee_offset(MarqueeTiming timing, int text_width, int view_width, uint32_
     return (int)pixels_after(timing, elapsed_ms % cycle_ms(timing, text_width));
 }
 
+void marquee_frame_pace(uint32_t wait_ms)
+{
+    marquee_frame_request(wait_ms);
+    frame_paced = true;
+}
+
+bool marquee_frame_paced(void)
+{
+    return frame_paced;
+}
+
 void marquee_frame_start(void)
 {
     frame_wait_ms = 0;
+    frame_paced = false;
 }
 
 uint32_t marquee_frame_wait_ms(void)

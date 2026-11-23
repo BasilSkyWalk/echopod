@@ -1,5 +1,7 @@
 #include "gfx/strip_renderer.h"
 
+#include <stddef.h>
+
 static int min_of(int first, int second)
 {
     return first < second ? first : second;
@@ -9,7 +11,10 @@ static void render_strip(const StripRenderer *renderer, Rect strip, FrameDrawer 
                          FrameSink sink)
 {
     Canvas canvas = canvas_make(renderer->strip_pixels, strip);
-    if (!renderer->drawer_paints_everything) {
+    if (!renderer->drawer_paints_everything && renderer->backdrop.draw != NULL) {
+        renderer->backdrop.draw(renderer->backdrop.context, &canvas);
+        canvas.backdrop_painted = true;
+    } else if (!renderer->drawer_paints_everything) {
         canvas_clear(&canvas, renderer->background);
     }
     drawer.draw(drawer.context, &canvas);

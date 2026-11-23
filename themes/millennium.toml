@@ -1,0 +1,266 @@
+name = "Millennium"
+author = "EchoPod"
+description = "An early-2000s desktop: rolling hills, blue title bars and a taskbar"
+selection = "selection"
+
+[spacing]
+row_height = 24
+
+[colors]
+background = "#ece9d8"
+text = "#000000"
+text_secondary = "#3b3b3b"
+text_tertiary = "#6e6e6e"
+selection_background = "#316ac5"
+selection_top = "#316ac5"
+selection_shine = "#5a8be0"
+selection_text = "#ffffff"
+header_background = "#0b4ad1"
+header_top = "#2a70e0"
+header_text = "#ffffff"
+divider = "#aca899"
+scrollbar_thumb = "#9fb8ee"
+danger = "#d9512c"
+success = "#2e7d32"
+chevron = "#3b3b3b"
+
+[boxes.selection]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+ink = "header_text"
+shine = "selection_shine"
+shine_height = 1
+
+[boxes.toast]
+fill = "background"
+ink = "text"
+border = "text"
+border_width = 1
+
+[boxes.section]
+fill = "selection_background"
+ink = "selection_text"
+radius = 4
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "text"
+radius = 2
+
+[home_scene]
+script = '''
+if width > height {
+    let p0_0 = y + 22
+    let p0_1 = y + 4
+    let p0_2 = y + 26
+    let p0_3 = x + 6
+    let p0_4 = y + 128
+    let p0_5 = y + 6
+    gradient(x, y, width, height, #2c6de0, #a9d0f5)
+    ring((x + 55) * 16 + 8, (y + 25) * 16 + 8, 240, 0, #ffffff)
+    ring((x + 78) * 16 + 8, (p0_0) * 16 + 8, 288, 0, #ffffff)
+    ring((x + 102) * 16 + 8, (p0_2) * 16 + 8, 224, 0, #ffffff)
+    ring((x + 239) * 16 + 8, (y + 35) * 16 + 8, 208, 0, #ffffff)
+    ring((x + 262) * 16 + 8, (y + 30) * 16 + 8, 256, 0, #ffffff)
+    ring((x + 284) * 16 + 8, (y + 36) * 16 + 8, 192, 0, #ffffff)
+    ring((x + 60) * 16 + 8, (y + 236) * 16 + 8, 2400, 0, #5aad38)
+    ring((x + 340) * 16 + 8, (y + 306) * 16 + 8, 3360, 0, #3f922b)
+    rounded(p0_3, p0_1, 196, 120, 6, #0b4ad1)
+    gradient(p0_3, p0_1, 196, 18, #3d8bf0, #0b4ad1)
+    text("EchoPod", small, x + 12, p0_5, 150, 14, left, #ffffff)
+    if 1 {
+        let bx = x + 182
+        let by = y + 6
+        let bw = 16
+        let bh = 14
+        rounded(bx, by, bw, bh, 3, #ffffff)
+        rounded(bx + 1, by + 1, bw - 2, bh - 2, 2, #d9512c)
+    }
+    text("x", small, x + 182, y + 5, 16, 14, center, #ffffff)
+    rect(x + 9, p0_0, 190, 99, #ece9d8)
+    menu(x + 9, p0_0, 190, 99)
+    rounded(x + 208, p0_1, 106, 120, 6, #0b4ad1)
+    gradient(x + 208, p0_1, 106, 18, #3d8bf0, #0b4ad1)
+    text("Playing", small, x + 214, p0_5, 60, 14, left, #ffffff)
+    if 1 {
+        let bx = x + 294
+        let by = y + 6
+        let bw = 16
+        let bh = 14
+        rounded(bx, by, bw, bh, 3, #ffffff)
+        rounded(bx + 1, by + 1, bw - 2, bh - 2, 2, #d9512c)
+    }
+    text("x", small, x + 294, y + 5, 16, 14, center, #ffffff)
+    rect(x + 211, p0_0, 100, 99, #ece9d8)
+    if has_cover {
+        cover(x + 222, p0_2, 78)
+    } else {
+        rect(x + 222, p0_2, 78, 78, #aca899)
+    }
+    line(song, small, x + 213, y + 106, 96, 14, center, #000000)
+    gradient(x, p0_4, 320, 18, #3b80ec, #1d55d0)
+    gradient(x, p0_4, 66, 18, #4fbf4a, #2f8f2a)
+    icon(play, p0_3, y + 132, 10, 10, #ffffff)
+    text("music", small, x + 18, y + 130, 46, 14, left, #ffffff)
+    rect(x + 264, p0_4, 56, 18, #129ae8)
+    text(elapsed, small, x + 266, y + 130, 52, 14, center, #ffffff)
+} else {
+    let p0_0 = x + 6
+    let p0_1 = y + 22
+    let p0_2 = x + 9
+    let p0_3 = y + 262
+    let p0_4 = x + 50
+    let p0_5 = y + 4
+    gradient(x, y, width, height, #2c6de0, #a9d0f5)
+    ring((x + 29) * 16 + 8, (y + 25) * 16 + 8, 208, 0, #ffffff)
+    ring((p0_4) * 16 + 8, (p0_1) * 16 + 8, 256, 0, #ffffff)
+    ring((x + 72) * 16 + 8, (y + 26) * 16 + 8, 192, 0, #ffffff)
+    ring((x + 121) * 16 + 8, (y + 51) * 16 + 8, 176, 0, #ffffff)
+    ring((x + 140) * 16 + 8, (y + 48) * 16 + 8, 224, 0, #ffffff)
+    ring((p0_4) * 16 + 8, (y + 316) * 16 + 8, 1920, 0, #5aad38)
+    ring((x + 210) * 16 + 8, (y + 366) * 16 + 8, 2560, 0, #3f922b)
+    rounded(p0_0, p0_5, 158, 154, 6, #0b4ad1)
+    gradient(p0_0, p0_5, 158, 18, #3d8bf0, #0b4ad1)
+    text("EchoPod", small, x + 12, y + 6, 112, 14, left, #ffffff)
+    if 1 {
+        let bx = x + 144
+        let by = y + 6
+        let bw = 16
+        let bh = 14
+        rounded(bx, by, bw, bh, 3, #ffffff)
+        rounded(bx + 1, by + 1, bw - 2, bh - 2, 2, #d9512c)
+    }
+    text("x", small, x + 144, y + 5, 16, 14, center, #ffffff)
+    rect(p0_2, p0_1, 152, 133, #ece9d8)
+    menu(p0_2, p0_1, 152, 133)
+    rounded(p0_0, y + 164, 158, 94, 6, #0b4ad1)
+    gradient(p0_0, y + 164, 158, 18, #3d8bf0, #0b4ad1)
+    text("Now Playing", small, x + 12, y + 166, 112, 14, left, #ffffff)
+    if 1 {
+        let bx = x + 144
+        let by = y + 166
+        let bw = 16
+        let bh = 14
+        rounded(bx, by, bw, bh, 3, #ffffff)
+        rounded(bx + 1, by + 1, bw - 2, bh - 2, 2, #d9512c)
+    }
+    text("x", small, x + 144, y + 165, 16, 14, center, #ffffff)
+    rect(p0_2, y + 182, 152, 73, #ece9d8)
+    if has_cover {
+        cover(x + 14, y + 188, 62)
+    } else {
+        rect(x + 14, y + 188, 62, 62, #aca899)
+    }
+    line(song, body, x + 82, y + 192, 76, 18, left, #000000)
+    line(artist, small, x + 82, y + 212, 76, 14, left, #3b3b3b)
+    gradient(x, p0_3, 170, 18, #3b80ec, #1d55d0)
+    gradient(x, p0_3, 66, 18, #4fbf4a, #2f8f2a)
+    icon(play, p0_0, y + 266, 10, 10, #ffffff)
+    text("music", small, x + 18, y + 264, 46, 14, left, #ffffff)
+    rect(x + 114, p0_3, 56, 18, #129ae8)
+    text(elapsed, small, x + 116, y + 264, 52, 14, center, #ffffff)
+}
+'''
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":128,\"kind\":\"box\",\"name\":\"Sky\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#2c6de0\",\"bottom\":\"#a9d0f5\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":129,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":40,\"y\":10,\"w\":30,\"h\":30},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":130,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":60,\"y\":4,\"w\":36,\"h\":36},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":131,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":88,\"y\":12,\"w\":28,\"h\":28},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":132,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":226,\"y\":22,\"w\":26,\"h\":26},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":133,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":246,\"y\":14,\"w\":32,\"h\":32},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":134,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":272,\"y\":24,\"w\":24,\"h\":24},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":135,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":{\"x\":-90,\"y\":86,\"w\":300,\"h\":300},\"tall\":null},\"bind\":{},\"color\":\"#5aad38\",\"thickness\":0},{\"id\":136,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":{\"x\":130,\"y\":96,\"w\":420,\"h\":420},\"tall\":null},\"bind\":{},\"color\":\"#3f922b\",\"thickness\":0},{\"id\":137,\"kind\":\"box\",\"name\":\"Window\",\"hidden\":false,\"at\":{\"wide\":{\"x\":6,\"y\":4,\"w\":196,\"h\":120},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0b4ad1\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":138,\"kind\":\"box\",\"name\":\"Title bar\",\"hidden\":false,\"at\":{\"wide\":{\"x\":6,\"y\":4,\"w\":196,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3d8bf0\",\"bottom\":\"#0b4ad1\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":139,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":12,\"y\":6,\"w\":150,\"h\":14},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"EchoPod\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":140,\"kind\":\"box\",\"name\":\"Close\",\"hidden\":false,\"at\":{\"wide\":{\"x\":182,\"y\":6,\"w\":16,\"h\":14},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#d9512c\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":3,\"border\":1,\"borderColor\":\"#ffffff\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":141,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":182,\"y\":5,\"w\":16,\"h\":14,\"align\":\"center\"},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"x\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":142,\"kind\":\"box\",\"name\":\"Window body\",\"hidden\":false,\"at\":{\"wide\":{\"x\":9,\"y\":22,\"w\":190,\"h\":99},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":143,\"kind\":\"menu\",\"name\":\"Menu\",\"hidden\":false,\"at\":{\"wide\":{\"x\":9,\"y\":22,\"w\":190,\"h\":99},\"tall\":null},\"bind\":{}},{\"id\":144,\"kind\":\"box\",\"name\":\"Window\",\"hidden\":false,\"at\":{\"wide\":{\"x\":208,\"y\":4,\"w\":106,\"h\":120},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0b4ad1\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":145,\"kind\":\"box\",\"name\":\"Title bar\",\"hidden\":false,\"at\":{\"wide\":{\"x\":208,\"y\":4,\"w\":106,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3d8bf0\",\"bottom\":\"#0b4ad1\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":146,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":214,\"y\":6,\"w\":60,\"h\":14},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"Playing\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":147,\"kind\":\"box\",\"name\":\"Close\",\"hidden\":false,\"at\":{\"wide\":{\"x\":294,\"y\":6,\"w\":16,\"h\":14},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#d9512c\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":3,\"border\":1,\"borderColor\":\"#ffffff\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":148,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":294,\"y\":5,\"w\":16,\"h\":14,\"align\":\"center\"},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"x\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":149,\"kind\":\"box\",\"name\":\"Window body\",\"hidden\":false,\"at\":{\"wide\":{\"x\":211,\"y\":22,\"w\":100,\"h\":99},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":150,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":222,\"y\":26,\"w\":78,\"h\":78},\"tall\":null},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#aca899\",\"reflection\":false},{\"id\":151,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":213,\"y\":106,\"w\":96,\"h\":14,\"align\":\"center\"},\"tall\":null},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#000000\",\"scroll\":true},{\"id\":152,\"kind\":\"box\",\"name\":\"Taskbar\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":128,\"w\":320,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3b80ec\",\"bottom\":\"#1d55d0\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":153,\"kind\":\"box\",\"name\":\"Music button\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":128,\"w\":66,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#4fbf4a\",\"bottom\":\"#2f8f2a\",\"radius\":8,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":154,\"kind\":\"symbol\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":6,\"y\":132,\"w\":10,\"h\":10},\"tall\":null},\"bind\":{},\"mark\":\"play\",\"color\":\"#ffffff\"},{\"id\":155,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":18,\"y\":130,\"w\":46,\"h\":14},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"music\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":156,\"kind\":\"box\",\"name\":\"Tray\",\"hidden\":false,\"at\":{\"wide\":{\"x\":264,\"y\":128,\"w\":56,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#129ae8\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":157,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":266,\"y\":130,\"w\":52,\"h\":14,\"align\":\"center\"},\"tall\":null},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":158,\"kind\":\"box\",\"name\":\"Sky\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#2c6de0\",\"bottom\":\"#a9d0f5\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":159,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":16,\"y\":12,\"w\":26,\"h\":26}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":160,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":34,\"y\":6,\"w\":32,\"h\":32}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":161,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":60,\"y\":14,\"w\":24,\"h\":24}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":162,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":110,\"y\":40,\"w\":22,\"h\":22}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":163,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":126,\"y\":34,\"w\":28,\"h\":28}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":164,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":-70,\"y\":196,\"w\":240,\"h\":240}},\"bind\":{},\"color\":\"#5aad38\",\"thickness\":0},{\"id\":165,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":50,\"y\":206,\"w\":320,\"h\":320}},\"bind\":{},\"color\":\"#3f922b\",\"thickness\":0},{\"id\":166,\"kind\":\"box\",\"name\":\"Window\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":4,\"w\":158,\"h\":154}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0b4ad1\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":167,\"kind\":\"box\",\"name\":\"Title bar\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":4,\"w\":158,\"h\":18}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3d8bf0\",\"bottom\":\"#0b4ad1\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":168,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":6,\"w\":112,\"h\":14}},\"bind\":{},\"source\":\"custom\",\"custom\":\"EchoPod\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":169,\"kind\":\"box\",\"name\":\"Close\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":144,\"y\":6,\"w\":16,\"h\":14}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#d9512c\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":3,\"border\":1,\"borderColor\":\"#ffffff\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":170,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":144,\"y\":5,\"w\":16,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"x\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":171,\"kind\":\"box\",\"name\":\"Window body\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":9,\"y\":22,\"w\":152,\"h\":133}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":172,\"kind\":\"menu\",\"name\":\"Menu\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":9,\"y\":22,\"w\":152,\"h\":133}},\"bind\":{}},{\"id\":173,\"kind\":\"box\",\"name\":\"Window\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":164,\"w\":158,\"h\":94}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0b4ad1\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":174,\"kind\":\"box\",\"name\":\"Title bar\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":164,\"w\":158,\"h\":18}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3d8bf0\",\"bottom\":\"#0b4ad1\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":175,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":12,\"y\":166,\"w\":112,\"h\":14}},\"bind\":{},\"source\":\"custom\",\"custom\":\"Now Playing\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":176,\"kind\":\"box\",\"name\":\"Close\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":144,\"y\":166,\"w\":16,\"h\":14}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#d9512c\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":3,\"border\":1,\"borderColor\":\"#ffffff\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":177,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":144,\"y\":165,\"w\":16,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"x\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":178,\"kind\":\"box\",\"name\":\"Window body\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":9,\"y\":182,\"w\":152,\"h\":73}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":179,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":14,\"y\":188,\"w\":62,\"h\":62}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#aca899\",\"reflection\":false},{\"id\":180,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":82,\"y\":192,\"w\":76,\"h\":18}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"#000000\",\"scroll\":true},{\"id\":181,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":82,\"y\":212,\"w\":76,\"h\":14}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#3b3b3b\",\"scroll\":true},{\"id\":182,\"kind\":\"box\",\"name\":\"Taskbar\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":262,\"w\":170,\"h\":18}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3b80ec\",\"bottom\":\"#1d55d0\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":183,\"kind\":\"box\",\"name\":\"Music button\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":262,\"w\":66,\"h\":18}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#4fbf4a\",\"bottom\":\"#2f8f2a\",\"radius\":8,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":184,\"kind\":\"symbol\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":266,\"w\":10,\"h\":10}},\"bind\":{},\"mark\":\"play\",\"color\":\"#ffffff\"},{\"id\":185,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":18,\"y\":264,\"w\":46,\"h\":14}},\"bind\":{},\"source\":\"custom\",\"custom\":\"music\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":186,\"kind\":\"box\",\"name\":\"Tray\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":114,\"y\":262,\"w\":56,\"h\":18}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#129ae8\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":187,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":116,\"y\":264,\"w\":52,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false}]}"
+
+[now_playing_scene]
+script = '''
+if width > height {
+    let p0_0 = x + 132
+    let p0_1 = y + 130
+    let p0_2 = y + 128
+    let p0_3 = y + 30
+    let p0_4 = x + 34
+    let p0_5 = y + 6
+    gradient(x, y, width, height, #2c6de0, #a9d0f5)
+    ring((x + 55) * 16 + 8, (y + 25) * 16 + 8, 240, 0, #ffffff)
+    ring((x + 78) * 16 + 8, (y + 22) * 16 + 8, 288, 0, #ffffff)
+    ring((x + 102) * 16 + 8, (y + 26) * 16 + 8, 224, 0, #ffffff)
+    ring((x + 239) * 16 + 8, (y + 35) * 16 + 8, 208, 0, #ffffff)
+    ring((x + 262) * 16 + 8, (p0_3) * 16 + 8, 256, 0, #ffffff)
+    ring((x + 284) * 16 + 8, (y + 36) * 16 + 8, 192, 0, #ffffff)
+    ring((x + 60) * 16 + 8, (y + 236) * 16 + 8, 2400, 0, #5aad38)
+    ring((x + 340) * 16 + 8, (y + 306) * 16 + 8, 3360, 0, #3f922b)
+    rounded(p0_4, p0_5, 252, 116, 6, #0b4ad1)
+    gradient(p0_4, p0_5, 252, 18, #3d8bf0, #0b4ad1)
+    text("Media Player", small, x + 40, y + 8, 206, 14, left, #ffffff)
+    if 1 {
+        let bx = x + 266
+        let by = y + 8
+        let bw = 16
+        let bh = 14
+        rounded(bx, by, bw, bh, 3, #ffffff)
+        rounded(bx + 1, by + 1, bw - 2, bh - 2, 2, #d9512c)
+    }
+    text("x", small, x + 266, y + 7, 16, 14, center, #ffffff)
+    gradient(x + 37, y + 24, 246, 95, #5a8be8, #1d4fc9)
+    rect(x + 43, p0_3, 82, 82, #ffffff)
+    if has_cover {
+        cover(x + 44, y + 31, 80)
+    } else {
+        rect(x + 44, y + 31, 80, 80, #9cbcf2)
+    }
+    line(song, title, p0_0, y + 32, 146, 22, left, #ffffff)
+    line(artist, body, p0_0, y + 54, 146, 20, left, #dbe6ff)
+    line(album, small, p0_0, y + 74, 146, 16, left, #c7d6ff)
+    rounded(p0_0, y + 98, 146, 8, 4, #0d3a9e)
+    rounded(p0_0, y + 98, (146 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 8, 4, #7fe07a)
+    gradient(x, p0_2, 320, 18, #3b80ec, #1d55d0)
+    gradient(x, p0_2, 66, 18, #4fbf4a, #2f8f2a)
+    icon(play, x + 6, y + 132, 10, 10, #ffffff)
+    text("music", small, x + 18, p0_1, 46, 14, left, #ffffff)
+    rounded(x + 72, p0_1, 150, 14, 3, #3d7ff0)
+    line(song, small, x + 76, p0_1, 142, 14, left, #ffffff)
+    rect(x + 264, p0_2, 56, 18, #129ae8)
+    text(elapsed, small, x + 266, p0_1, 52, 14, center, #ffffff)
+} else {
+    let p0_0 = x + 14
+    let p0_1 = y + 262
+    let p0_2 = x + 50
+    let p0_3 = y + 26
+    let p0_4 = x + 8
+    let p0_5 = y + 8
+    gradient(x, y, width, height, #2c6de0, #a9d0f5)
+    ring((x + 29) * 16 + 8, (y + 25) * 16 + 8, 208, 0, #ffffff)
+    ring((p0_2) * 16 + 8, (y + 22) * 16 + 8, 256, 0, #ffffff)
+    ring((x + 72) * 16 + 8, (p0_3) * 16 + 8, 192, 0, #ffffff)
+    ring((x + 121) * 16 + 8, (y + 51) * 16 + 8, 176, 0, #ffffff)
+    ring((x + 140) * 16 + 8, (y + 48) * 16 + 8, 224, 0, #ffffff)
+    ring((p0_2) * 16 + 8, (y + 316) * 16 + 8, 1920, 0, #5aad38)
+    ring((x + 210) * 16 + 8, (y + 366) * 16 + 8, 2560, 0, #3f922b)
+    rounded(p0_4, p0_5, 154, 210, 6, #0b4ad1)
+    gradient(p0_4, p0_5, 154, 18, #3d8bf0, #0b4ad1)
+    text("Media Player", small, p0_0, y + 10, 108, 14, left, #ffffff)
+    if 1 {
+        let bx = x + 142
+        let by = y + 10
+        let bw = 16
+        let bh = 14
+        rounded(bx, by, bw, bh, 3, #ffffff)
+        rounded(bx + 1, by + 1, bw - 2, bh - 2, 2, #d9512c)
+    }
+    text("x", small, x + 142, y + 9, 16, 14, center, #ffffff)
+    gradient(x + 11, p0_3, 148, 189, #5a8be8, #1d4fc9)
+    rect(x + 36, y + 34, 98, 98, #ffffff)
+    if has_cover {
+        cover(x + 37, y + 35, 96)
+    } else {
+        rect(x + 37, y + 35, 96, 96, #9cbcf2)
+    }
+    line(song, title, p0_0, y + 138, 142, 22, center, #ffffff)
+    line(artist, body, p0_0, y + 160, 142, 20, center, #dbe6ff)
+    line(album, small, p0_0, y + 180, 142, 16, center, #c7d6ff)
+    rounded(x + 20, y + 202, 130, 8, 4, #0d3a9e)
+    rounded(x + 20, y + 202, (130 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 8, 4, #7fe07a)
+    gradient(x, p0_1, 170, 18, #3b80ec, #1d55d0)
+    gradient(x, p0_1, 66, 18, #4fbf4a, #2f8f2a)
+    icon(play, x + 6, y + 266, 10, 10, #ffffff)
+    text("music", small, x + 18, y + 264, 46, 14, left, #ffffff)
+    rect(x + 114, p0_1, 56, 18, #129ae8)
+    text(elapsed, small, x + 116, y + 264, 52, 14, center, #ffffff)
+}
+'''
+design = "{\"version\":2,\"screen\":\"playing\",\"elements\":[{\"id\":71,\"kind\":\"box\",\"name\":\"Sky\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#2c6de0\",\"bottom\":\"#a9d0f5\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":72,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":40,\"y\":10,\"w\":30,\"h\":30},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":73,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":60,\"y\":4,\"w\":36,\"h\":36},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":74,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":88,\"y\":12,\"w\":28,\"h\":28},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":75,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":226,\"y\":22,\"w\":26,\"h\":26},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":76,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":246,\"y\":14,\"w\":32,\"h\":32},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":77,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":{\"x\":272,\"y\":24,\"w\":24,\"h\":24},\"tall\":null},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":78,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":{\"x\":-90,\"y\":86,\"w\":300,\"h\":300},\"tall\":null},\"bind\":{},\"color\":\"#5aad38\",\"thickness\":0},{\"id\":79,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":{\"x\":130,\"y\":96,\"w\":420,\"h\":420},\"tall\":null},\"bind\":{},\"color\":\"#3f922b\",\"thickness\":0},{\"id\":80,\"kind\":\"box\",\"name\":\"Window\",\"hidden\":false,\"at\":{\"wide\":{\"x\":34,\"y\":6,\"w\":252,\"h\":116},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0b4ad1\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":81,\"kind\":\"box\",\"name\":\"Title bar\",\"hidden\":false,\"at\":{\"wide\":{\"x\":34,\"y\":6,\"w\":252,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3d8bf0\",\"bottom\":\"#0b4ad1\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":82,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":40,\"y\":8,\"w\":206,\"h\":14},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"Media Player\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":83,\"kind\":\"box\",\"name\":\"Close\",\"hidden\":false,\"at\":{\"wide\":{\"x\":266,\"y\":8,\"w\":16,\"h\":14},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#d9512c\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":3,\"border\":1,\"borderColor\":\"#ffffff\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":84,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":266,\"y\":7,\"w\":16,\"h\":14,\"align\":\"center\"},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"x\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":85,\"kind\":\"box\",\"name\":\"Panel\",\"hidden\":false,\"at\":{\"wide\":{\"x\":37,\"y\":24,\"w\":246,\"h\":95},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#5a8be8\",\"bottom\":\"#1d4fc9\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":86,\"kind\":\"box\",\"name\":\"Frame\",\"hidden\":false,\"at\":{\"wide\":{\"x\":43,\"y\":30,\"w\":82,\"h\":82},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#ffffff\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":87,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":44,\"y\":31,\"w\":80,\"h\":80},\"tall\":null},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#9cbcf2\",\"reflection\":false},{\"id\":88,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":32,\"w\":146,\"h\":22},\"tall\":null},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":true},{\"id\":89,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":54,\"w\":146,\"h\":20},\"tall\":null},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"#dbe6ff\",\"scroll\":true},{\"id\":90,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":74,\"w\":146,\"h\":16},\"tall\":null},\"bind\":{},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#c7d6ff\",\"scroll\":true},{\"id\":91,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":98,\"w\":146,\"h\":8},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0d3a9e\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":4,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":92,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":98,\"w\":146,\"h\":8},\"tall\":null},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"#7fe07a\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":4,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":93,\"kind\":\"box\",\"name\":\"Taskbar\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":128,\"w\":320,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3b80ec\",\"bottom\":\"#1d55d0\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":94,\"kind\":\"box\",\"name\":\"Music button\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":128,\"w\":66,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#4fbf4a\",\"bottom\":\"#2f8f2a\",\"radius\":8,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":95,\"kind\":\"symbol\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":6,\"y\":132,\"w\":10,\"h\":10},\"tall\":null},\"bind\":{},\"mark\":\"play\",\"color\":\"#ffffff\"},{\"id\":96,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":18,\"y\":130,\"w\":46,\"h\":14},\"tall\":null},\"bind\":{},\"source\":\"custom\",\"custom\":\"music\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":97,\"kind\":\"box\",\"name\":\"Song button\",\"hidden\":false,\"at\":{\"wide\":{\"x\":72,\"y\":130,\"w\":150,\"h\":14},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#3d7ff0\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":3,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":98,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":76,\"y\":130,\"w\":142,\"h\":14},\"tall\":null},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":true},{\"id\":99,\"kind\":\"box\",\"name\":\"Tray\",\"hidden\":false,\"at\":{\"wide\":{\"x\":264,\"y\":128,\"w\":56,\"h\":18},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"#129ae8\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":100,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":266,\"y\":130,\"w\":52,\"h\":14,\"align\":\"center\"},\"tall\":null},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":101,\"kind\":\"box\",\"name\":\"Sky\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#2c6de0\",\"bottom\":\"#a9d0f5\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":102,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":16,\"y\":12,\"w\":26,\"h\":26}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":103,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":34,\"y\":6,\"w\":32,\"h\":32}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":104,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":60,\"y\":14,\"w\":24,\"h\":24}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":105,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":110,\"y\":40,\"w\":22,\"h\":22}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":106,\"kind\":\"circle\",\"name\":\"Cloud\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":126,\"y\":34,\"w\":28,\"h\":28}},\"bind\":{},\"color\":\"#ffffff\",\"thickness\":0},{\"id\":107,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":-70,\"y\":196,\"w\":240,\"h\":240}},\"bind\":{},\"color\":\"#5aad38\",\"thickness\":0},{\"id\":108,\"kind\":\"circle\",\"name\":\"Hill\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":50,\"y\":206,\"w\":320,\"h\":320}},\"bind\":{},\"color\":\"#3f922b\",\"thickness\":0},{\"id\":109,\"kind\":\"box\",\"name\":\"Window\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":8,\"y\":8,\"w\":154,\"h\":210}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0b4ad1\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":110,\"kind\":\"box\",\"name\":\"Title bar\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":8,\"y\":8,\"w\":154,\"h\":18}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3d8bf0\",\"bottom\":\"#0b4ad1\",\"radius\":6,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":111,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":14,\"y\":10,\"w\":108,\"h\":14}},\"bind\":{},\"source\":\"custom\",\"custom\":\"Media Player\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":112,\"kind\":\"box\",\"name\":\"Close\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":142,\"y\":10,\"w\":16,\"h\":14}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#d9512c\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":3,\"border\":1,\"borderColor\":\"#ffffff\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":113,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":142,\"y\":9,\"w\":16,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"custom\",\"custom\":\"x\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":114,\"kind\":\"box\",\"name\":\"Panel\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":11,\"y\":26,\"w\":148,\"h\":189}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#5a8be8\",\"bottom\":\"#1d4fc9\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":115,\"kind\":\"box\",\"name\":\"Frame\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":36,\"y\":34,\"w\":98,\"h\":98}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#ffffff\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":116,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":37,\"y\":35,\"w\":96,\"h\":96}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#9cbcf2\",\"reflection\":false},{\"id\":117,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":14,\"y\":138,\"w\":142,\"h\":22,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":true},{\"id\":118,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":14,\"y\":160,\"w\":142,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"#dbe6ff\",\"scroll\":true},{\"id\":119,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":14,\"y\":180,\"w\":142,\"h\":16,\"align\":\"center\"}},\"bind\":{},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#c7d6ff\",\"scroll\":true},{\"id\":120,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":20,\"y\":202,\"w\":130,\"h\":8}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#0d3a9e\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":4,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":121,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":20,\"y\":202,\"w\":130,\"h\":8}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"#7fe07a\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":4,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":122,\"kind\":\"box\",\"name\":\"Taskbar\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":262,\"w\":170,\"h\":18}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#3b80ec\",\"bottom\":\"#1d55d0\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":123,\"kind\":\"box\",\"name\":\"Music button\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":262,\"w\":66,\"h\":18}},\"bind\":{},\"fill\":\"gradient\",\"color\":\"@header_background\",\"top\":\"#4fbf4a\",\"bottom\":\"#2f8f2a\",\"radius\":8,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":124,\"kind\":\"symbol\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":6,\"y\":266,\"w\":10,\"h\":10}},\"bind\":{},\"mark\":\"play\",\"color\":\"#ffffff\"},{\"id\":125,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":18,\"y\":264,\"w\":46,\"h\":14}},\"bind\":{},\"source\":\"custom\",\"custom\":\"music\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false},{\"id\":126,\"kind\":\"box\",\"name\":\"Tray\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":114,\"y\":262,\"w\":56,\"h\":18}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#129ae8\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":127,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":116,\"y\":264,\"w\":52,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":false}]}"

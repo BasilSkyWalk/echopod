@@ -119,6 +119,22 @@ HalHighRamTest hal_system_high_ram_test(void);
 bool hal_system_restart_pending(void);
 const void *hal_system_load_rescan_code(void);
 const void *hal_system_load_faces(void);
+const void *hal_system_load_startup(void);
+void hal_system_release_startup(void);
+enum {
+    HAL_THEME_MEMORY_BYTES = 4608,
+    HAL_THEME_ASSET_BYTES = 28224,
+    HAL_SCENE_MEMORY_BYTES = 7424
+};
+
+void *hal_system_theme_memory(uint32_t *size);
+uint32_t hal_system_builtin_theme_size(uint32_t theme);
+bool hal_system_builtin_theme_read(uint32_t theme, uint32_t offset, void *target, uint32_t length);
+
+void *hal_system_theme_assets(uint32_t *size);
+void *hal_system_scene_memory(uint32_t *size);
+uint32_t hal_system_scene_wipes(void);
+uint32_t hal_system_theme_asset_wipes(void);
 void *hal_system_borrow_scratch(uint32_t *size);
 void *hal_system_borrow_listing(uint32_t *size);
 void hal_system_return_scratch(void);

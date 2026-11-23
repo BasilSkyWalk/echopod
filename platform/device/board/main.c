@@ -76,6 +76,7 @@ static const UsbOverlayEntry *load_usb_code(void)
     app_release_audio();
     board_audio_shut_down();
     bool restart_pending = hal_system_restart_pending();
+    (void)board_startup_keep();
     const UsbOverlayEntry *entry = board_usb_overlay_load();
     if (entry != NULL && entry->magic == USB_OVERLAY_MAGIC) {
         return entry;

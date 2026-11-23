@@ -277,6 +277,9 @@ ECHO_NP_FACES_CODE static int format_origin(const FaceLine *line, int box_width,
     if (line->align == FACE_ALIGN_CENTRE && total < line->area.width) {
         return line->area.x + (line->area.width - total) / HALF;
     }
+    if (line->align == FACE_ALIGN_RIGHT && total < line->area.width) {
+        return line->area.x + line->area.width - total;
+    }
     return line->area.x;
 }
 

@@ -25,21 +25,33 @@ typedef struct MenuPanel {
     void *context;
 } MenuPanel;
 
+typedef struct MenuScreen MenuScreen;
+
+typedef struct MenuScene {
+    bool (*update)(void *context, uint32_t now_ms);
+    bool (*draw)(void *context, Canvas *canvas, MenuScreen *menu);
+    void *context;
+    bool on;
+} MenuScene;
+
 typedef struct MenuConfig {
     const char *title;
     const MenuItem *items;
     int item_count;
     const Theme *theme;
     MenuPanel panel;
+    MenuScene *scene;
 } MenuConfig;
 
-typedef struct MenuScreen {
+struct MenuScreen {
     Screen screen;
     MenuConfig config;
     ListModel model;
     ListView list;
     uint32_t now_ms;
-} MenuScreen;
+};
 
 Screen *menu_screen_init(MenuScreen *menu, MenuConfig config);
 ScreenAction menu_open_screen(void *screen);
+void menu_screen_scene_list(void *context, Canvas *canvas, Rect area);
+int menu_screen_scene_slot(void *context, int position);

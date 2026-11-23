@@ -8,6 +8,7 @@
 #include "gfx/rect.h"
 #include "playback/player_status.h"
 #include "settings/settings.h"
+#include "ui/list_view.h"
 #include "ui/theme.h"
 
 enum {
@@ -23,6 +24,23 @@ typedef enum NowPlayingFeedback {
     NOW_PLAYING_FEEDBACK_PAUSE,
     NOW_PLAYING_FEEDBACK_PLAY
 } NowPlayingFeedback;
+
+typedef struct SceneCode {
+    const uint8_t *code;
+    uint32_t code_size;
+    const char *strings;
+    uint32_t strings_size;
+    void *work;
+    uint32_t work_size;
+} SceneCode;
+
+typedef struct SceneMenu {
+    const ListModel *model;
+    int selected;
+    void (*draw)(void *context, Canvas *canvas, Rect area);
+    int (*slot)(void *context, int position);
+    void *context;
+} SceneMenu;
 
 typedef struct NowPlayingFrame {
     const Theme *theme;
@@ -43,6 +61,8 @@ typedef struct NowPlayingFrame {
     uint32_t shown_ms;
     uint32_t tick;
     NowPlayingFeedback feedback;
+    SceneCode scene;
+    const SceneMenu *menu;
     uint8_t face;
     bool playing;
     bool scrubbing;
@@ -52,5 +72,4 @@ typedef struct NowPlayingFrame {
 typedef struct NowPlayingFaces {
     uint32_t magic;
     void (*draw)(const NowPlayingFrame *frame, Canvas *canvas);
-    const ThemeColors *chrome[NP_FACE_COUNT];
 } NowPlayingFaces;

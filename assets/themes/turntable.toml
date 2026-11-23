@@ -1,0 +1,34 @@
+name = "Turntable"
+author = "EchoPod"
+description = "A record spinning on a walnut deck, the tonearm crossing it as the track plays"
+
+[colors]
+background = "#301c10"
+text = "#f8ecd0"
+text_secondary = "#c8a878"
+text_tertiary = "#a88860"
+selection_background = "#989890"
+selection_top = "#a8a8a0"
+selection_shine = "#e0e0d8"
+selection_text = "#201810"
+header_background = "#180c10"
+header_top = "#483c40"
+header_text = "#f8ecd0"
+divider = "#503828"
+scrollbar_thumb = "#a88860"
+danger = "#f86048"
+success = "#78c860"
+chevron = "#a88860"
+
+[now_playing_scene]
+file = "turntable.scene"
+
+[now_playing_scene.chrome]
+background = "#482c18"
+header_top = "#281410"
+header_background = "#180c10"
+divider = "#686860"
+header_text = "#f8ecd0"
+text_tertiary = "#c0a078"
+success = "#78c860"
+danger = "#f86048"

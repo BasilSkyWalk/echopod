@@ -85,6 +85,7 @@ typedef struct AppScreens {
     Core1AccelOption core1_accel;
     MenuItem home_items[HOME_ITEM_COUNT];
     HomeArt home_art;
+    MenuScene home_scene;
     MenuItem music_items[MUSIC_ITEM_COUNT];
     MenuItem diagnostics_items[DIAGNOSTICS_ITEM_COUNT];
 } AppScreens;

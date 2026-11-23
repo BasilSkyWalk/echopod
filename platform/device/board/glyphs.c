@@ -6,6 +6,7 @@
 #include "emmc.h"
 #include "gfx/font_pack.h"
 #include "hal/system.h"
+#include "settings/settings.h"
 
 #define GLYPH_TABLE_OFFSET 0x2C0000u
 #define GLYPH_TABLE_MAGIC 0x54504745u
@@ -16,7 +17,9 @@ enum {
     SECTOR_WORDS = SECTOR_BYTES / 4,
     GLYPH_RAM_BYTES = 0x8800,
     CACHE_WORDS = (GLYPH_RAM_BYTES - 2 * SECTOR_BYTES) / 4,
-    MAX_ENTRIES = (SECTOR_BYTES - 8) / 8
+    MAX_ENTRIES = (SECTOR_BYTES - 8) / 8,
+    FIRST_THEME_ENTRY = FONT_PACK_FACES + LANGUAGE_COUNT,
+    BUILTIN_THEMES = THEME_COUNT
 };
 
 static uint32_t table[SECTOR_WORDS] __attribute__((section(".glyph_ram")));
@@ -40,14 +43,13 @@ static bool read_sector(uint32_t lba)
     return true;
 }
 
-static bool read_face(void *context, uint32_t face, uint32_t offset, void *buffer, uint32_t length)
+static bool read_entry(uint32_t entry, uint32_t offset, void *buffer, uint32_t length)
 {
-    (void)context;
-    if (hal_system_restart_pending() || face >= face_count) {
+    if (hal_system_restart_pending() || entry >= entry_count) {
         return false;
     }
-    uint32_t start = table[2 + 2 * face];
-    uint32_t size = table[3 + 2 * face];
+    uint32_t start = table[2 + 2 * entry];
+    uint32_t size = table[3 + 2 * entry];
     if (offset > size || length > size - offset) {
         return false;
     }
@@ -68,6 +70,23 @@ static bool read_face(void *context, uint32_t face, uint32_t offset, void *buffe
         length -= chunk;
     }
     return true;
+}
+
+static bool read_face(void *context, uint32_t face, uint32_t offset, void *buffer, uint32_t length)
+{
+    (void)context;
+    return face < face_count && read_entry(face, offset, buffer, length);
+}
+
+uint32_t hal_system_builtin_theme_size(uint32_t theme)
+{
+    uint32_t entry = FIRST_THEME_ENTRY + theme;
+    return theme < BUILTIN_THEMES && entry < entry_count ? table[3 + 2 * entry] : 0;
+}
+
+bool hal_system_builtin_theme_read(uint32_t theme, uint32_t offset, void *target, uint32_t length)
+{
+    return theme < BUILTIN_THEMES && read_entry(FIRST_THEME_ENTRY + theme, offset, target, length);
 }
 
 bool board_glyphs_entry(uint32_t entry, uint32_t *offset, uint32_t *size)

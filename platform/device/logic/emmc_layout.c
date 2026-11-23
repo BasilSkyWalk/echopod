@@ -88,9 +88,9 @@ static bool inside(uint32_t start, uint32_t length, uint32_t lba, uint32_t count
 
 bool emmc_layout_allows_write(const EmmcLayout *layout, uint32_t lba, uint32_t count)
 {
+    uint32_t firmware_sectors = layout->firmware_end - layout->slot_1;
     return count > 0 && (inside(layout->volume_start, layout->volume_sectors, lba, count) ||
-                         inside(layout->slot_1, layout->slot_sectors, lba, count) ||
-                         inside(layout->slot_2, layout->slot_sectors, lba, count));
+                         inside(layout->slot_1, firmware_sectors, lba, count));
 }
 
 static bool read_image_header(const BlockDevice *device, uint32_t lba, uint32_t *image_bytes,

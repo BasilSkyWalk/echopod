@@ -11,4 +11,7 @@ enum {
     TEST_VISIBLE_ROWS = 3
 };
 
+extern const ThemeColors TEST_COLORS;
 extern const Theme TEST_THEME;
+
+ThemeColors *ui_test_colors(Theme *theme);

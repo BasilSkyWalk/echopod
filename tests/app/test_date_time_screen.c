@@ -220,19 +220,19 @@ static void the_screen_draws_every_field_and_the_hint(void)
     Screen *screen = open_screen(running_chip());
     static Color pixels[HAL_DISPLAY_WIDTH * HAL_DISPLAY_HEIGHT];
     Canvas canvas = canvas_make(pixels, (Rect){0, 0, HAL_DISPLAY_WIDTH, HAL_DISPLAY_HEIGHT});
-    canvas_clear(&canvas, DEFAULT_THEME.colors.background);
+    canvas_clear(&canvas, DEFAULT_THEME.colors->background);
     screen->draw(screen->context, &canvas);
     Rect content = theme_content_area(&DEFAULT_THEME);
-    CHECK_EQUAL(DEFAULT_THEME.colors.header_top,
+    CHECK_EQUAL(DEFAULT_THEME.colors->header_top,
                 canvas_pixel_at(&canvas, content.x + content.width / 2, content.y + 2));
     tap(screen, KEY_PLAY);
     screen->draw(screen->context, &canvas);
-    CHECK_EQUAL(DEFAULT_THEME.colors.selection_background,
+    CHECK_EQUAL(DEFAULT_THEME.colors->selection_background,
                 canvas_pixel_at(&canvas, content.x + content.width / 2, content.y + 2));
     bool text_drawn = false;
     for (int y = content.y; y < content.y + content.height; y++) {
         for (int x = content.x; x < content.x + content.width; x++) {
-            text_drawn |= canvas_pixel_at(&canvas, x, y) == DEFAULT_THEME.colors.text;
+            text_drawn |= canvas_pixel_at(&canvas, x, y) == DEFAULT_THEME.colors->text;
         }
     }
     CHECK(text_drawn);

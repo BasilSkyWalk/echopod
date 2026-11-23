@@ -1,0 +1,298 @@
+name = "Fjord tweak"
+author = "hejichs"
+description = "fjord adjusted"
+selection = "selection"
+
+[colors]
+background = "#182029"
+text = "#efeff7"
+text_secondary = "#adb6c6"
+text_tertiary = "#848ea5"
+selection_background = "#84aace"
+selection_top = "#9cc3e7"
+selection_shine = "#e7f3ff"
+selection_text = "#182029"
+header_background = "#212c39"
+header_top = "#313c4a"
+header_text = "#efeff7"
+divider = "#424d63"
+scrollbar_thumb = "#6b7994"
+danger = "#f77973"
+success = "#8cd3a5"
+chevron = "#7b8aa5"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+shine = "selection_shine"
+shine_height = 1
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
+
+[home_scene]
+script = '''
+backdrop(x, y, width, height)
+if width > height {
+    let p0_0 = x + 108
+    let p0_1 = x + 201
+    let p0_2 = y + 8
+    let p0_3 = y + 127
+    let p0_4 = y + 132
+    let p0_5 = y + 103
+    menu(x, y, 103, 146)
+    rect(x + 104, y, 216, 146, #030b11)
+    rect(x + 176, y, 1, 146, #424d63)
+    if has_cover {
+        cover(p0_1, p0_2, 112)
+        reflect(p0_1, p0_2, 112, 26)
+    } else {
+        rect(p0_1, p0_2, 112, 112, #08080a)
+    }
+    rect(p0_0, p0_3, 209, 2, #424d63)
+    rect(p0_0, p0_3, (209 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 2, #84aace)
+    text(elapsed, small, p0_0, p0_4, 150, 14, left, #adb6c6)
+    text(remaining, small, x + 167, p0_4, 150, 14, right, #848ea5)
+    if present(lyric) {
+        line(lyric, small, p0_0, p0_5, 89, 17, center, #ffffff)
+    } else {
+        line(artist, small, p0_0, p0_5, 89, 17, center, #ffffff)
+    }
+    line(song, title, p0_0, y + 17, 89, 17, center, #efeff7)
+    line(artist, body, p0_0, y + 40, 89, 18, center, #adb6c6)
+    line(album, body, p0_0, y + 63, 89, 21, left, #848ea5)
+} else {
+    let p0_0 = x + 3
+    let p0_1 = x + 76
+    let p0_2 = y + 152
+    let p0_3 = y + 146
+    let p0_4 = y + 246
+    let p0_5 = y + 250
+    menu(x, y, 170, 146)
+    rect(x, p0_3, 170, 115, #030b11)
+    rect(x, p0_3, 170, 1, #424d63)
+    if has_cover {
+        cover(p0_1, p0_2, 88)
+        reflect(p0_1, p0_2, 88, 21)
+    } else {
+        rect(p0_1, p0_2, 88, 88, #08080a)
+    }
+    rect(p0_0, p0_4, 164, 2, #424d63)
+    rect(p0_0, p0_4, (164 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 2, #84aace)
+    text(elapsed, small, p0_0, p0_5, 118, 11, left, #adb6c6)
+    text(remaining, small, x + 50, p0_5, 118, 11, right, #848ea5)
+    if present(lyric) {
+        line(lyric, small, p0_0, y + 227, 70, 13, center, #ffffff)
+    } else {
+        line(artist, small, p0_0, y + 227, 70, 13, center, #ffffff)
+    }
+    line(song, title, p0_0, y + 159, 70, 13, center, #efeff7)
+    line(artist, body, p0_0, y + 177, 70, 14, center, #adb6c6)
+    line(album, body, p0_0, y + 196, 70, 17, left, #848ea5)
+}
+'''
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":102,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@header_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\",\"locked\":true},{\"id\":169,\"kind\":\"menu\",\"name\":\"Menu\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":103,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":146}},\"bind\":{}},{\"id\":104,\"kind\":\"box\",\"name\":\"Art panel\",\"hidden\":false,\"at\":{\"wide\":{\"x\":104,\"y\":0,\"w\":216,\"h\":146},\"tall\":{\"x\":0,\"y\":146,\"w\":170,\"h\":115}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#030b11\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":105,\"kind\":\"box\",\"name\":\"Divider\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":0,\"w\":1,\"h\":146},\"tall\":{\"x\":0,\"y\":146,\"w\":170,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":106,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":201,\"y\":8,\"w\":112,\"h\":138},\"tall\":{\"x\":76,\"y\":152,\"w\":88,\"h\":109}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"#08080a\",\"reflection\":true,\"corner\":0},{\"id\":129,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":108,\"y\":127,\"w\":209,\"h\":2},\"tall\":{\"x\":3,\"y\":246,\"w\":164,\"h\":2}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":130,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":{\"x\":108,\"y\":127,\"w\":209,\"h\":2},\"tall\":{\"x\":3,\"y\":246,\"w\":164,\"h\":2}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":131,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":108,\"y\":132,\"w\":150,\"h\":14},\"tall\":{\"x\":3,\"y\":250,\"w\":118,\"h\":11}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":false},{\"id\":132,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":167,\"y\":132,\"w\":150,\"h\":14,\"align\":\"right\"},\"tall\":{\"x\":50,\"y\":250,\"w\":118,\"h\":11,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false},{\"id\":134,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":108,\"y\":103,\"w\":89,\"h\":17,\"align\":\"center\"},\"tall\":{\"x\":3,\"y\":227,\"w\":70,\"h\":13,\"align\":\"center\"}},\"bind\":{},\"source\":\"lyric\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"#ffffff\",\"scroll\":true},{\"id\":146,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":108,\"y\":17,\"w\":89,\"h\":17,\"align\":\"center\"},\"tall\":{\"x\":3,\"y\":159,\"w\":70,\"h\":13,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":147,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":108,\"y\":40,\"w\":89,\"h\":18,\"align\":\"center\"},\"tall\":{\"x\":3,\"y\":177,\"w\":70,\"h\":14,\"align\":\"center\"}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":148,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":108,\"y\":63,\"w\":89,\"h\":21},\"tall\":{\"x\":3,\"y\":196,\"w\":70,\"h\":17}},\"bind\":{},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":true}],\"upright\":\"auto\"}"
+
+[icons]
+home_music = [
+    "........................",
+    "..................354...",
+    "............358acfff8...",
+    "........4acfffffffff8...",
+    "........8fffffffffff8...",
+    "........8fffffffffff8...",
+    "........8ffffffca8af8...",
+    "........8fc853....8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8...19ffdf8...",
+    "........8f8...cfffff8...",
+    "....19ffdf8..6ffffff8...",
+    "....cfffff8..8ffffff8...",
+    "...6ffffff8..6ffffff6...",
+    "...8ffffff8...cffffc....",
+    "...6ffffff6...19ff91....",
+    "....cffffc..............",
+    "....19ff91..............",
+    "........................",
+    "........................",
+]
+home_audiobooks = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "..da74............47ad..",
+    "..fffffb852..258bfffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..258bfffff..fffffb852..",
+    ".......47ad..da74.......",
+    "........................",
+    "........................",
+    "........................",
+]
+home_podcasts = [
+    "........................",
+    "........................",
+    "..........8ee8..........",
+    ".........8ffff8.........",
+    ".........effffe.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    "....8f4..ffffff..4f8....",
+    "....5f8..cffffc..8f5....",
+    "....1fd..3effe3..df1....",
+    ".....9f8..2772..8f9.....",
+    ".....1ef8......8fe1.....",
+    "......3efd8448dfe3......",
+    ".......19ffffff91.......",
+    ".........15ff51.........",
+    "...........ff...........",
+    ".......1888ff8881.......",
+    ".......8ffffffff8.......",
+    ".......1888888881.......",
+    "........................",
+]
+home_settings = [
+    "........................",
+    ".........288882.........",
+    ".........4ffff4.........",
+    ".....69..4ffff4..96.....",
+    "....6ff9.6ffff6.9ff6....",
+    "...6ffffdffffffdffff6...",
+    "...9ffffffffffffffff9...",
+    "....9ffffffffffffff9....",
+    ".....dfffffbbfffffd.....",
+    ".2446ffffc2..2cffff6442.",
+    ".8fffffff2....2fffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8fffffff2....2fffffff8.",
+    ".2446ffffc2..2cffff6442.",
+    ".....dfffffbbfffffd.....",
+    "....9ffffffffffffff9....",
+    "...9ffffffffffffffff9...",
+    "...6ffffdffffffdffff6...",
+    "....6ff9.6ffff6.9ff6....",
+    ".....69..4ffff4..96.....",
+    ".........4ffff4.........",
+    ".........288882.........",
+    "........................",
+]
+home_diagnostics = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    ".........3b3............",
+    ".........cfb............",
+    "........3fff1...........",
+    "........9fff5...........",
+    ".......1efff9...........",
+    ".......6ffcfd...........",
+    ".......cfc5ff3..........",
+    ".244446ff61ff7..2444442.",
+    "2effffffe1.bfb.2efffffe2",
+    "2effffff8..7ff17ffffffe2",
+    ".2444444...3ff5dfb44442.",
+    "............dfcff5......",
+    "............9fffe.......",
+    "............5fff8.......",
+    "............1fff2.......",
+    ".............bfc........",
+    ".............3b3........",
+    "........................",
+    "........................",
+    "........................",
+]
+home_now_playing = [
+    "........................",
+    ".........368863.........",
+    "......18dffffffd81......",
+    ".....4dffeb88beffd4.....",
+    "....6ffd6......6dff6....",
+    "...4ff91........19ff4...",
+    "..1df9............9fd1..",
+    "..8fd1...94.......1df8..",
+    "..df6....bfa1......6fd..",
+    ".3fe.....bffe7......ef3.",
+    ".6fb.....bffffc4....bf6.",
+    ".8f8.....bffffff91..8f8.",
+    ".8f8.....bffffff91..8f8.",
+    ".6fb.....bffffc4....bf6.",
+    ".3fe.....bffe7......ef3.",
+    "..df6....bfa1......6fd..",
+    "..8fd1...94.......1df8..",
+    "..1df9............9fd1..",
+    "...4ff91........19ff4...",
+    "....6ffd6......6dff6....",
+    ".....4dffeb88beffd4.....",
+    "......18dffffffd81......",
+    ".........368863.........",
+    "........................",
+]
