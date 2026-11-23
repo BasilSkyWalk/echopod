@@ -22,7 +22,8 @@
 #define OCR_ARGUMENT 0x40FF8000u
 #define OCR_READY (1u << 31)
 #define OCR_SECTOR_MODE (1u << 30)
-#define RCA_ARGUMENT 0x00020000u
+#define EMMC_RCA 2u
+#define RCA_ARGUMENT (EMMC_RCA << 16)
 #define SWITCH_BUS_WIDTH_8 0x03B70200u
 #define STATUS_READY_FOR_DATA (1u << 8)
 #define STATUS_STATE_SHIFT 9
@@ -58,7 +59,7 @@ static const MmcHost EMMC_HOST = {EMMC_BASE, CRU_EMMC_IDENTIFY, CRU_EMMC_TRANSFE
                                   &emmc_fifo_depth};
 static EmmcInfo emmc;
 static bool started;
-static SdCard sd_nand;
+static SdCard card;
 
 typedef enum OcrResult {
     OCR_SECTOR_MODE_READY,
@@ -86,7 +87,7 @@ static void power_controller(void)
     mmc_power_cycle(&EMMC_HOST);
 }
 
-static OcrResult wait_for_ocr(void)
+static OcrResult wait_for_ocr(int silent_tries)
 {
     uint32_t words[4] = {0, 0, 0, 0};
     bool answered = false;
@@ -96,7 +97,7 @@ static OcrResult wait_for_ocr(void)
             if ((words[0] & OCR_READY) != 0) {
                 return (words[0] & OCR_SECTOR_MODE) != 0 ? OCR_SECTOR_MODE_READY : OCR_UNUSABLE;
             }
-        } else if (!answered && attempt + 1 >= OCR_SILENT_TRIES) {
+        } else if (!answered && attempt + 1 >= silent_tries) {
             return OCR_NO_ANSWER;
         }
         board_delay_ms(1);
@@ -109,13 +110,14 @@ static uint32_t cid_serial(const uint32_t cid[4])
     return (cid[1] & 0xFFFFu) << 16 | cid[0] >> 16;
 }
 
-static bool identify(bool *no_answer)
+static bool identify(int silent_tries, bool *no_answer)
 {
     uint32_t words[4] = {0, 0, 0, 0};
     uint32_t none[4] = {0, 0, 0, 0};
+    card = (SdCard){.high_capacity = true, .rca = EMMC_RCA};
     mmc_command(&EMMC_HOST, (SdCommand){CMD_GO_IDLE, 0, SD_RESPONSE_NONE, true}, none);
     board_delay_us(IDLE_SETTLE_US);
-    OcrResult ocr = wait_for_ocr();
+    OcrResult ocr = wait_for_ocr(silent_tries);
     *no_answer = ocr == OCR_NO_ANSWER;
     if (ocr != OCR_SECTOR_MODE_READY || !command(CMD_ALL_SEND_CID, 0, SD_RESPONSE_LONG, words)) {
         return false;
@@ -125,21 +127,11 @@ static bool identify(bool *no_answer)
            command(CMD_SEND_CSD, RCA_ARGUMENT, SD_RESPONSE_LONG, words);
 }
 
-static uint32_t rca_argument(void)
-{
-    return emmc.sd_nand ? sd_card_rca_argument(&sd_nand) : RCA_ARGUMENT;
-}
-
-static uint32_t card_address(uint32_t lba)
-{
-    return emmc.sd_nand ? sd_card_address(&sd_nand, lba) : lba;
-}
-
 static bool wait_for_transfer_state(void)
 {
     uint32_t words[4] = {0, 0, 0, 0};
     for (int attempt = 0; attempt < STATUS_TRIES; attempt++) {
-        if (command(CMD_SEND_STATUS, rca_argument(), SD_RESPONSE_SHORT, words) &&
+        if (command(CMD_SEND_STATUS, sd_card_rca_argument(&card), SD_RESPONSE_SHORT, words) &&
             (words[0] & STATUS_READY_FOR_DATA) != 0 &&
             ((words[0] >> STATUS_STATE_SHIFT) & STATUS_STATE_MASK) == STATE_TRANSFER) {
             return true;
@@ -221,9 +213,28 @@ static const SdHost SD_NAND_HOST = {
 static bool start_sd_nand(void)
 {
     mmc_set_clock(&EMMC_HOST, SD_CLOCK_IDENTIFY);
-    emmc.sd_nand = sd_card_init(&sd_nand, &SD_NAND_HOST);
-    emmc.sector_count = emmc.sd_nand ? sd_nand.sector_count : 0;
-    return emmc.sector_count != 0;
+    emmc.sd_nand = sd_card_init(&card, &SD_NAND_HOST) && card.sector_count != 0;
+    emmc.sector_count = emmc.sd_nand ? card.sector_count : 0;
+    return emmc.sd_nand;
+}
+
+static bool start_card(void)
+{
+    int silent_tries = OCR_SILENT_TRIES;
+    for (;;) {
+        bool no_answer = false;
+        if (identify(silent_tries, &no_answer) && select_and_widen()) {
+            return true;
+        }
+        if (!no_answer || silent_tries == OCR_TRIES) {
+            return false;
+        }
+        if (start_sd_nand()) {
+            return true;
+        }
+        silent_tries = OCR_TRIES;
+        mmc_set_clock(&EMMC_HOST, SD_CLOCK_IDENTIFY);
+    }
 }
 
 bool emmc_read(void *context, uint32_t lba, uint32_t count, void *buffer)
@@ -232,7 +243,7 @@ bool emmc_read(void *context, uint32_t lba, uint32_t count, void *buffer)
     uint32_t *words = buffer;
     for (uint32_t index = 0; index < count; index++) {
         if (!started || lba >= emmc.sector_count || index >= emmc.sector_count - lba ||
-            !mmc_read_block(&EMMC_HOST, CMD_READ_SINGLE_BLOCK, card_address(lba + index),
+            !mmc_read_block(&EMMC_HOST, CMD_READ_SINGLE_BLOCK, sd_card_address(&card, lba + index),
                             words + index * (BLOCK_LENGTH / 4))) {
             return false;
         }
@@ -250,7 +261,7 @@ static bool write_data(void *context, uint8_t command, uint32_t address, uint32_
 static bool stop_writing(void *context)
 {
     (void)context;
-    return mmc_stop(&EMMC_HOST, rca_argument());
+    return mmc_stop(&EMMC_HOST, sd_card_rca_argument(&card));
 }
 
 static bool wait_until_ready(void *context)
@@ -271,7 +282,7 @@ bool emmc_write(void *context, uint32_t lba, uint32_t count, const void *buffer)
     if (!started || !emmc_layout_allows_write(&emmc.layout, lba, count)) {
         return false;
     }
-    return card_write(&WRITER, card_address(lba), count, buffer);
+    return card_write(&WRITER, sd_card_address(&card, lba), count, buffer);
 }
 
 uint32_t emmc_fifo_depth_words(void)
@@ -304,7 +315,8 @@ bool emmc_volume_write(void *context, uint32_t lba, uint32_t count, const void *
 bool emmc_status(uint32_t *status)
 {
     uint32_t words[4] = {0, 0, 0, 0};
-    if (!started || !command(CMD_SEND_STATUS, rca_argument(), SD_RESPONSE_SHORT, words)) {
+    if (!started ||
+        !command(CMD_SEND_STATUS, sd_card_rca_argument(&card), SD_RESPONSE_SHORT, words)) {
         return false;
     }
     *status = words[0];
@@ -315,11 +327,7 @@ bool emmc_start(EmmcInfo *info)
 {
     if (!started) {
         power_controller();
-        bool no_answer = false;
-        started = identify(&no_answer) && select_and_widen();
-        if (!started && no_answer) {
-            started = start_sd_nand();
-        }
+        started = start_card();
         BlockDevice device = emmc_device();
         started = started && emmc_layout_read(&emmc.layout, &device, emmc.sector_count);
     }
