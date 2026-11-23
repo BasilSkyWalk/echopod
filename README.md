@@ -2,10 +2,25 @@
 
 Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has an iPod-style Cover Flow browser, a music library built on the player, album favorites, M3U playlists and an Up Next queue. It isn't made or supported by FiiO.
 
+<p align="center">
+  <a href="https://basilskywalk.github.io/echopod/"><img src="docs/images/theme-editor.gif" alt="The theme editor with the Aurora theme open: its colours change with one click, then Home, then the Capsule, Deck and Millennium themes on Now Playing"></a>
+</p>
+
+**[Make your own theme](https://basilskywalk.github.io/echopod/)** in the browser, with nothing to install, or take one from the **[gallery](https://basilskywalk.github.io/echopod/gallery.html)**. Theme files need EchoPod 0.13.0, which is experimental.
+
+<p align="center">
+  <a href="https://basilskywalk.github.io/echopod/gallery.html"><img src="docs/images/themes/aurora.png" alt="Aurora" width="32%"></a>
+  <a href="https://basilskywalk.github.io/echopod/gallery.html"><img src="docs/images/themes/blueprint.png" alt="Blueprint" width="32%"></a>
+  <a href="https://basilskywalk.github.io/echopod/gallery.html"><img src="docs/images/themes/capsule.png" alt="Capsule" width="32%"></a>
+  <a href="https://basilskywalk.github.io/echopod/gallery.html"><img src="docs/images/themes/deck.png" alt="Deck" width="32%"></a>
+  <a href="https://basilskywalk.github.io/echopod/gallery.html"><img src="docs/images/themes/millennium.png" alt="Millennium" width="32%"></a>
+  <a href="https://basilskywalk.github.io/echopod/gallery.html"><img src="docs/images/themes/receipt.png" alt="Receipt" width="32%"></a>
+</p>
+
 - **Installing and using it:** `docs/user-guide.md`.
 - **Read first:** `docs/known-issues.md`. EchoPod is early, and has been tested on one player.
 - **What's new:** `docs/release-notes.md`.
-- **Make a theme:** the [theme editor](https://basilskywalk.github.io/echopod/) runs in your browser with nothing to install, and its [gallery](https://basilskywalk.github.io/echopod/gallery.html) has themes to download. Theme files need EchoPod 0.13.0, which is experimental; `docs/themes.md` has the details.
+- **How theme files work:** `docs/themes.md`.
 
 The hardware knowledge it relies on comes largely from the [ReChord](https://github.com/brnomt/ReChord) project's research (`docs/hardware.md`, `CREDITS.md`).
 
