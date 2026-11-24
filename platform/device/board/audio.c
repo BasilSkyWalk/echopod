@@ -469,13 +469,15 @@ static bool ensure_path(uint32_t rate)
     if (path_up && path_rate == rate) {
         return true;
     }
-    stop_path();
-    if (dac_path_start(rate) != HAL_TONE_PLAYED) {
-        return false;
+    if (!dac_path_is_up() || dac_path_start(rate) != HAL_TONE_PLAYED) {
+        stop_path();
+        if (dac_path_start(rate) != HAL_TONE_PLAYED) {
+            return false;
+        }
+        path_up = true;
+        dac_path_output_on();
     }
-    path_up = true;
     path_rate = rate;
-    dac_path_output_on();
     return true;
 }
 

@@ -11,6 +11,8 @@ enum {
     SERIAL_PORT_BIT = 0x40,
     HEADPHONE_BIT = 0x10,
     RELEASE_WAIT_US = 100,
+    RATE_MAP = 0x01000B,
+    RATE_SETTLE_MS = 10,
     MONO_GROUPS = 4,
     MONO_ITEMS = 6
 };
@@ -195,6 +197,20 @@ static bool set_up_blocks(const DacBus *bus)
     return write_all(bus, AFTER_MONO, sizeof AFTER_MONO / sizeof AFTER_MONO[0]);
 }
 
+static bool write_rate(const DacBus *bus, uint8_t rate_byte)
+{
+    if (!write_both(bus, RATE_MAP, rate_byte)) {
+        return false;
+    }
+    wait_ms(bus, RATE_SETTLE_MS);
+    return true;
+}
+
+bool dac_set_rate(const DacBus *bus, uint8_t rate_byte)
+{
+    return write_channel_values(bus) && write_rate(bus, rate_byte);
+}
+
 static bool release_outputs(const DacBus *bus, uint8_t rate_byte)
 {
     if (!release_power_bit(bus, SERIAL_PORT_BIT) || !write_both(bus, 0x010010, 0x99) ||
@@ -202,12 +218,8 @@ static bool release_outputs(const DacBus *bus, uint8_t rate_byte)
         return false;
     }
     wait_ms(bus, 10);
-    if (!write_both(bus, 0x080032, 0x00) || !write_both(bus, 0x010010, 0x00) ||
-        !write_both(bus, 0x01000B, rate_byte)) {
-        return false;
-    }
-    wait_ms(bus, 10);
-    return true;
+    return write_both(bus, 0x080032, 0x00) && write_both(bus, 0x010010, 0x00) &&
+           write_rate(bus, rate_byte);
 }
 
 DacResult dac_configure(const DacBus *bus, uint8_t rate_byte)

@@ -237,6 +237,20 @@ static void the_register_sequence_follows_the_facts(void)
     CHECK_EQUAL(0xA6, fake.power_control[1]);
 }
 
+static void a_new_rate_writes_the_channel_values_and_the_rate_byte_and_nothing_else(void)
+{
+    DacBus bus = fresh_bus();
+    cursor = 0;
+    CHECK(dac_set_rate(&bus, 2));
+    CHECK(next_one(LEFT, 0x05000A, 0x07));
+    CHECK(next_one(LEFT, 0x05000B, 0x07));
+    CHECK(next_one(RIGHT, 0x05000A, 0x0F));
+    CHECK(next_one(RIGHT, 0x05000B, 0x0F));
+    CHECK(next_both(0x01000B, 0x02));
+    CHECK(next_delay_ms(10));
+    CHECK_EQUAL(cursor, fake.count);
+}
+
 static void both_chips_reporting_not_ready_stops_the_sequence(void)
 {
     DacBus bus = fresh_bus();
@@ -427,6 +441,7 @@ int main(void)
         TEST_CASE(the_probe_writes_map_zero_to_both_chips),
         TEST_CASE(a_silent_bus_fails_the_probe),
         TEST_CASE(the_register_sequence_follows_the_facts),
+        TEST_CASE(a_new_rate_writes_the_channel_values_and_the_rate_byte_and_nothing_else),
         TEST_CASE(both_chips_reporting_not_ready_stops_the_sequence),
         TEST_CASE(one_chip_reporting_not_ready_carries_on),
         TEST_CASE(a_silent_bus_reports_no_reply),
