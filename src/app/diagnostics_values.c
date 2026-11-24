@@ -526,6 +526,8 @@ void diagnostics_power_text(HalPowerInfo info, char *text, size_t capacity)
     append_flag(&builder, info.core1_on, 'C');
     string_builder_append(&builder, " u");
     string_builder_append_unsigned(&builder, info.underruns);
+    string_builder_append(&builder, " d");
+    string_builder_append_unsigned(&builder, info.dark_sleep_percent);
 }
 
 typedef struct SavingsPreset {

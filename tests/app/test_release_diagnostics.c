@@ -117,7 +117,7 @@ static void the_savings_row_cycles_the_presets_and_the_power_row_reads_the_hal(v
     CHECK_EQUAL(SCREEN_ACTION_NONE, savings->select(savings->context).type);
     CHECK(strcmp("No core 1 sleep", savings->value(savings->context)) == 0);
     CHECK_EQUAL(HAL_SAVINGS_DEFAULT & ~HAL_SAVING_CORE1_SLEEP, hal_system_power_savings());
-    CHECK(strcmp("24 MHz s0% c0% pdac u0", power->value(power->context)) == 0);
+    CHECK(strcmp("24 MHz s0% c0% pdac u0 d0", power->value(power->context)) == 0);
 }
 
 int main(void)

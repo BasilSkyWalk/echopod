@@ -522,6 +522,7 @@ static void the_power_row_shows_the_clock_the_sleep_share_and_what_is_powered(vo
     char text[DIAGNOSTICS_VALUE_CAPACITY];
     HalPowerInfo info = {.clock_mhz = 200,
                          .sleep_percent = 37,
+                         .dark_sleep_percent = 93,
                          .core1_load = 45,
                          .panel_on = true,
                          .dac_on = true,
@@ -529,9 +530,9 @@ static void the_power_row_shows_the_clock_the_sleep_share_and_what_is_powered(vo
                          .core1_on = true,
                          .underruns = 3};
     diagnostics_power_text(info, text, sizeof text);
-    CHECK(text_is("200 MHz s37% c45% PDaC u3", text));
+    CHECK(text_is("200 MHz s37% c45% PDaC u3 d93", text));
     diagnostics_power_text((HalPowerInfo){.clock_mhz = 96}, text, sizeof text);
-    CHECK(text_is("96 MHz s0% c0% pdac u0", text));
+    CHECK(text_is("96 MHz s0% c0% pdac u0 d0", text));
 }
 
 static void the_savings_row_names_each_preset_and_cycles_through_them(void)

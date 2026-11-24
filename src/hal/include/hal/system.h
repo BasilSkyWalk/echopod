@@ -21,6 +21,7 @@ enum {
 typedef struct HalPowerInfo {
     uint32_t clock_mhz;
     uint8_t sleep_percent;
+    uint8_t dark_sleep_percent;
     uint8_t core1_load;
     bool panel_on;
     bool dac_on;

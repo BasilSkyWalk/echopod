@@ -572,10 +572,10 @@ AudioEngineStatus audio_engine_status(const AudioEngine *engine)
     const AudioSegment *segment = &engine->segments[0];
     uint32_t played =
         (int32_t)(engine->consumed - segment->start) > 0 ? engine->consumed - segment->start : 0;
-    uint32_t position =
-        segment->rate == 0 ? segment->base_ms
-                           : segment->base_ms + (uint32_t)((uint64_t)played *
-                                                           MILLISECONDS_PER_SECOND / segment->rate);
+    uint32_t rate = segment->rate;
+    uint32_t position = rate == 0 ? segment->base_ms
+                                  : segment->base_ms + played / rate * MILLISECONDS_PER_SECOND +
+                                        played % rate * MILLISECONDS_PER_SECOND / rate;
     return (AudioEngineStatus){.state = engine->state,
                                .token = segment->token,
                                .position_ms = position,

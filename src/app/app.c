@@ -61,6 +61,7 @@ enum {
     BATTERY_CHECK_MS = 250,
     CHARGE_LIT_MS = 5000,
     IDLE_RENDER_MS = 100,
+    MARQUEE_STEP_LIMIT_MS = 50,
     NUMBER_CAPACITY = 12,
     PROGRESS_TEXT_CAPACITY = 64,
     MESSAGE_TEXT_CAPACITY = 64,
@@ -643,7 +644,7 @@ static bool battery_empty(uint32_t now_ms)
 
 static void keep_awake_while_busy(uint32_t now_ms)
 {
-    if (app.usb_power || player_status(&app.player).state == PLAYER_PLAYING) {
+    if (app.usb_power || app.player.state == PLAYER_PLAYING) {
         power_policy_stay_awake(&app.power, now_ms);
     }
 }
@@ -884,9 +885,10 @@ static void render_frame(void)
     frame_stats_record(&app.send_stats, app.send_us);
     frame_stats_record(&app.draw_stats, render_us - app.send_us);
     draw_profile_finish_frame();
-    app.frame_stable = !app.frame_changed || marquee_frame_paced();
-    app.idle_render_ms = hal_clock_milliseconds() + IDLE_RENDER_MS;
     uint32_t marquee_wait_ms = marquee_frame_wait_ms();
+    bool scrolling = marquee_wait_ms > 0 && marquee_wait_ms <= MARQUEE_STEP_LIMIT_MS;
+    app.frame_stable = !app.frame_changed || marquee_frame_paced() || scrolling;
+    app.idle_render_ms = hal_clock_milliseconds() + IDLE_RENDER_MS;
     if (marquee_wait_ms > 0 &&
         !deadline_reached(app.now_ms + marquee_wait_ms, app.idle_render_ms)) {
         app.idle_render_ms = app.now_ms + marquee_wait_ms;
@@ -1480,7 +1482,9 @@ void app_step(void)
         use_wanted_clock();
     }
     toast_update(&app.toast, now_ms);
-    update_screen(now_ms);
+    if (app.display_on) {
+        update_screen(now_ms);
+    }
     frame_stats_record(&app.update_stats, hal_clock_microseconds() - started_us);
     if (app.display_on && frame_needed(now_ms)) {
         app.now_ms = hal_clock_milliseconds();

@@ -112,6 +112,11 @@ bool hal_input_next_transition(HalKeyTransition *transition)
     return found;
 }
 
+bool board_input_pending(void)
+{
+    return scanner.count != 0;
+}
+
 void hal_input_drop_presses(void)
 {
     uint32_t primask = irq_save();

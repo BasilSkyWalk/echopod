@@ -4,6 +4,12 @@
 
 #include "core/utf8.h"
 
+enum {
+    LEVELS_PER_BYTE = 2,
+    HIGH_LEVEL_SHIFT = 4,
+    LEVEL_MASK = 0x0F
+};
+
 static Rect glyph_area(const Glyph *glyph, Point pen)
 {
     return (Rect){pen.x + glyph->left, pen.y - glyph->top, glyph->width, glyph->height};
@@ -20,15 +26,19 @@ static void draw_glyph(Canvas *canvas, TextStyle style, const Glyph *glyph, Poin
     int stride = canvas->bounds.width;
     Color *row =
         &canvas->pixels[(visible.y - canvas->bounds.y) * stride + (visible.x - canvas->bounds.x)];
-    for (int y = visible.y; y < visible.y + visible.height; y++) {
-        Color *pixel = row;
-        for (int x = visible.x; x < visible.x + visible.width; x++) {
-            uint8_t level = font_bitmap_level(bitmap, glyph, x - area.x, y - area.y);
-            if (level > 0) {
-                *pixel = color_blend(*pixel, style.color, level);
+    unsigned first = (unsigned)(visible.y - area.y) * glyph->width + (unsigned)(visible.x - area.x);
+    for (int line = 0; line < visible.height; line++) {
+        unsigned index = first;
+        for (int column = 0; column < visible.width; column++, index++) {
+            unsigned shift = index % LEVELS_PER_BYTE == 0 ? HIGH_LEVEL_SHIFT : 0;
+            unsigned level = bitmap[index / LEVELS_PER_BYTE] >> shift & LEVEL_MASK;
+            if (level == COLOR_ALPHA_OPAQUE) {
+                row[column] = style.color;
+            } else if (level > 0) {
+                row[column] = color_blend(row[column], style.color, (uint8_t)level);
             }
-            pixel++;
         }
+        first += glyph->width;
         row += stride;
     }
 }

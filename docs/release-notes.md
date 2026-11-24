@@ -1,5 +1,31 @@
 # EchoPod release notes
 
+## 0.13.1
+
+Bluetooth headphones no longer crackle between tracks of different sample rates, and the player does less work while the screen is off and when it draws. Tested on one Echo Mini 8 GB.
+
+**Themes and the editor are still experimental**, as in 0.13.0, so 0.12.0 stays the recommended release until more people have used them.
+
+### Fixed
+
+- **Crackle between tracks over Bluetooth** (issue 21). When the next track had a different sample rate, 44.1 and 48 kHz for example, the player switched its DAC off and on again for the new rate. On wired headphones that was muted; over Bluetooth nothing muted it, and the headphones played it as a crackle. The DAC now stays on and only changes its rate, so the change is silent over Bluetooth and a little quicker on wired headphones.
+
+### Changed
+
+- **Less work with the screen off.** While the screen is off the player now looks after its keys and the audio every 4 ms instead of every millisecond and sleeps in between, and it no longer prepares a screen nobody is looking at: a track change in the dark reads no cover and no lyrics until the screen comes on. Key presses are as quick as before.
+- **Drawing takes fewer steps for the same picture.** Backgrounds and boxes are filled two pixels at a time, text is drawn with less work per pixel, and a long title that scrolls no longer makes the player draw every frame twice.
+- **Diagnostics → Power** ends with `d` and a number, for example `d93`: the share of time the processor slept, as last read while the screen was off.
+
+### Known limits
+
+- **What the screen-off changes save in battery hasn't been measured.**
+
+### When you update
+
+- Your settings and library stay.
+- After an update installs, restart the player before connecting it to a computer again.
+- Delete the update file from the player once it has installed, or it installs again.
+
 ## 0.13.0
 
 Themes you can make yourself. A theme file changes the whole look of the player, from its colours to a Home screen of your own, and a web editor makes one without writing anything. Also Shuffle all in folders, and a fix for going back to FiiO's firmware. Tested on one Echo Mini 8 GB.

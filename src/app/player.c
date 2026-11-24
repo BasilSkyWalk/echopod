@@ -638,35 +638,34 @@ ECHO_STARTUP_CODE bool player_restore(Player *player)
     return true;
 }
 
-static HalAudioFormat current_format(const Player *player)
-{
-    HalAudioFormat unknown = {.codec = HAL_AUDIO_CODEC_UNKNOWN};
-    if (!player->loaded) {
-        return unknown;
-    }
-    HalAudioStatus status = hal_audio_status();
-    return status.token == player->current_token ? status.format : unknown;
-}
-
 PlayerStatus player_status(const Player *player)
 {
     LibraryTrack record;
     bool known = player->has_track && library_read_track(player->library, player->track, &record);
+    HalAudioFormat format = {.codec = HAL_AUDIO_CODEC_UNKNOWN};
+    uint32_t position_ms = player->paused_position_ms;
+    if (player->loaded) {
+        HalAudioStatus audio = hal_audio_status();
+        position_ms = audio.position_ms;
+        if (audio.token == player->current_token) {
+            format = audio.format;
+        }
+    }
     return (PlayerStatus){
         .state = player->state,
         .has_track = player->has_track,
         .track = player->track,
-        .position_ms = current_position(player),
+        .position_ms = position_ms,
         .duration_ms = known ? record.duration_ms : 0,
         .volume = player->volume,
         .shuffle = player->shuffle,
         .repeat = player->repeat,
         .place = player->has_track ? play_queue_place(&player->queue) : (PlayQueuePlace){0, 0},
-        .format = current_format(player),
+        .format = format,
         .spoken = player->has_track && player->spoken,
         .chapters = player->has_track ? player->chapters.count : 0,
         .chapter = player->has_track && player->chapters.count > 0
-                       ? mp4_chapter_at(&player->chapters, current_position(player))
+                       ? mp4_chapter_at(&player->chapters, position_ms)
                        : 0,
     };
 }

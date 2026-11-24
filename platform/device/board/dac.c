@@ -354,17 +354,23 @@ static const AudioRate *rate_of(uint32_t rate)
 static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, uint32_t format,
                                       uint32_t interrupts, bool transfer)
 {
-    cru_gate(GATE_GPIO1, true);
-    use_dac_pins_as_gpio();
-    dac_power_pins(&BUS);
-    start_soc_clocks();
-    start_i2c();
-    if (!dac_probe(&BUS)) {
-        dac_output_off(&BUS);
-        return HAL_TONE_NO_DAC;
+    bool powered = dac_up;
+    if (!powered) {
+        cru_gate(GATE_GPIO1, true);
+        use_dac_pins_as_gpio();
+        dac_power_pins(&BUS);
+        start_soc_clocks();
+        start_i2c();
+        if (!dac_probe(&BUS)) {
+            dac_output_off(&BUS);
+            return HAL_TONE_NO_DAC;
+        }
     }
     start_acodec(rate->acodec);
     start_i2s(divider, format, interrupts, transfer);
+    if (powered) {
+        return dac_set_rate(&BUS, rate->dac_byte) ? HAL_TONE_PLAYED : HAL_TONE_SETUP_FAILED;
+    }
     DacResult configured = dac_configure(&BUS, rate->dac_byte);
     if (configured != DAC_READY) {
         dac_output_off(&BUS);
@@ -394,6 +400,7 @@ static void stop_audio_path(void)
 HalToneResult hal_audio_test_tone(void)
 {
     hal_audio_dma_tone_stop();
+    dac_path_stop_if_up();
     const AudioRate *rate = rate_of(TONE_RATE_HZ);
     HalToneResult result = start_audio_path(rate, i2s_divider_truncated(rate->mclk, rate->rate),
                                             I2S_FORMAT_16_BIT_STEREO, I2S_INTERRUPTS, true);

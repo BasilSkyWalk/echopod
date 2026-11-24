@@ -45,10 +45,20 @@ void canvas_fill_rect(Canvas *canvas, Rect area, Color color)
     if (rect_is_empty(visible)) {
         return;
     }
+    uint32_t pair = (uint32_t)color << 16 | color;
     for (int y = visible.y; y < visible.y + visible.height; y++) {
         Color *row = pixel_address(canvas, visible.x, y);
-        for (int column = 0; column < visible.width; column++) {
-            row[column] = color;
+        int count = visible.width;
+        if (((uintptr_t)row & sizeof(Color)) != 0) {
+            *row++ = color;
+            count--;
+        }
+        for (; count >= 2; count -= 2) {
+            __builtin_memcpy(row, &pair, sizeof pair);
+            row += 2;
+        }
+        if (count > 0) {
+            *row = color;
         }
     }
 }

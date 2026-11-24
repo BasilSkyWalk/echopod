@@ -42,11 +42,6 @@ typedef struct ClockOption {
     bool failed;
 } ClockOption;
 
-typedef struct Core1Option {
-    bool run;
-    HalCore1Test test;
-} Core1Option;
-
 typedef struct Core1AccelOption {
     bool run;
     HalCore1Accel result;
@@ -81,7 +76,6 @@ typedef struct AppScreens {
     DateTimeScreen date_time;
     FoldersScreen folders;
     ClockOption clock;
-    Core1Option core1;
     Core1AccelOption core1_accel;
     MenuItem home_items[HOME_ITEM_COUNT];
     HomeArt home_art;
