@@ -52,23 +52,6 @@ static const char *clock_value(const void *context)
     return clock_text;
 }
 
-static char core1_text[DIAGNOSTICS_VALUE_CAPACITY];
-
-static ScreenAction run_core1_test(void *context)
-{
-    Core1Option *core1 = context;
-    core1->test = hal_system_core1_test();
-    core1->run = true;
-    return screen_action_none();
-}
-
-static const char *core1_value(const void *context)
-{
-    const Core1Option *core1 = context;
-    diagnostics_core1_text(core1->run, core1->test, core1_text, sizeof core1_text);
-    return core1_text;
-}
-
 static char core1_accel_text[DIAGNOSTICS_VALUE_CAPACITY];
 
 static ScreenAction run_core1_accel_test(void *context)
@@ -112,7 +95,6 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
 {
     MenuItem *items = screens->diagnostics_items;
     screens->clock = (ClockOption){.failed = false};
-    screens->core1 = (Core1Option){.run = false};
     screens->core1_accel = (Core1AccelOption){.run = false};
     int count = 0;
     items[count++] = app_screens_open_item(i18n_text(STR_DIAG_KEY_TEST),
@@ -120,7 +102,6 @@ void diagnostics_menu_build(AppScreens *screens, AppOptions *options, const Them
     items[count++] = action_item(STR_DIAG_FRAME_TIME, toggle_frame_time, options, frame_time_value);
     items[count++] = value_item(STR_DIAG_FIRMWARE, diagnostics_row_firmware);
     items[count++] = action_item(STR_DIAG_CPU_CLOCK, cycle_clock, &screens->clock, clock_value);
-    items[count++] = action_item(STR_DIAG_CORE1, run_core1_test, &screens->core1, core1_value);
     items[count++] = value_item(STR_DIAG_BATTERY, diagnostics_row_battery);
     items[count++] = value_item(STR_DIAG_BOOT_HOLD, boot_hold_value);
     items[count++] = value_item(STR_DIAG_LAST_START, diagnostics_row_start);

@@ -19,6 +19,7 @@ enum {
     HOST_WAIT_MS = 3000,
     ASK_TIMEOUT_MS = 5000,
     EMPTY_NOTICE_MS = 2000,
+    DARK_PASS_MS = 4,
     USB_CHOICE_STORAGE = 0,
     USB_CHOICE_DAC = 1,
     USB_CHOICE_CHARGE_ONLY = 2,
@@ -42,6 +43,8 @@ static HalUsbMode usb_mode;
 static bool usb_prompt;
 static bool dac_session;
 static SleepMeter sleep_meter;
+static uint8_t dark_sleep_percent;
+static uint8_t dark_mhz;
 static bool resume_storage;
 
 void hal_system_set_usb_mode(HalUsbMode mode)
@@ -66,6 +69,7 @@ bool board_usb_listening(void)
 
 static void raise_clock_for_usb(void)
 {
+    board_core_halve(false);
     if (hal_system_clock_mhz() < START_CLOCK_MHZ) {
         hal_system_set_clock_mhz(START_CLOCK_MHZ);
     }
@@ -249,19 +253,46 @@ static void switch_off_when_empty(uint32_t boot_millivolts)
     hal_power_off();
 }
 
-static void sleep_while_idle(void)
+static void doze(void)
+{
+    uint32_t before_us = hal_clock_microseconds();
+    __asm__ volatile("wfi" ::: "memory");
+    sleep_meter_slept(&sleep_meter, hal_clock_microseconds() - before_us);
+}
+
+static bool dark_pass_over(uint32_t pass_started_ms)
+{
+    return hal_clock_milliseconds() - pass_started_ms >= DARK_PASS_MS || board_input_pending() ||
+           usb_state == USB_STATE_LISTENING;
+}
+
+static void sleep_while_idle(uint32_t pass_started_ms)
 {
     sleep_meter_advance(&sleep_meter, hal_clock_microseconds());
-    if (!board_display_lit() || app_idle()) {
-        uint32_t before_us = hal_clock_microseconds();
-        __asm__ volatile("wfi" ::: "memory");
-        sleep_meter_slept(&sleep_meter, hal_clock_microseconds() - before_us);
+    if (!board_display_lit()) {
+        dark_sleep_percent = sleep_meter_percent(&sleep_meter);
+        dark_mhz = (uint8_t)board_core_mhz();
+        do {
+            doze();
+        } while (!dark_pass_over(pass_started_ms));
+    } else if (app_idle()) {
+        doze();
     }
 }
 
 uint8_t board_sleep_percent(void)
 {
     return sleep_meter_percent(&sleep_meter);
+}
+
+uint8_t board_dark_sleep_percent(void)
+{
+    return dark_sleep_percent;
+}
+
+uint8_t board_dark_mhz(void)
+{
+    return dark_mhz;
 }
 
 void board_main(void)
@@ -285,12 +316,13 @@ void board_main(void)
     app_show_splash();
     board_stall_pause(false);
     for (;;) {
+        uint32_t pass_started_ms = hal_clock_milliseconds();
         board_stall_beat();
         if (usb_state != USB_STATE_ASKING) {
             app_step();
         }
         board_display_service();
         check_usb();
-        sleep_while_idle();
+        sleep_while_idle(pass_started_ms);
     }
 }

@@ -14,6 +14,7 @@ enum {
     HAL_SAVING_PAUSE_OFF = 1u << 2,
     HAL_SAVING_PANEL_SLEEP = 1u << 3,
     HAL_SAVING_AMP_OFF = 1u << 4,
+    HAL_SAVING_HALF_CORE = 1u << 5,
     HAL_SAVINGS_DEFAULT = HAL_SAVING_CORE1_SLEEP | HAL_SAVING_SLOW_CLOCK | HAL_SAVING_PAUSE_OFF |
         HAL_SAVING_PANEL_SLEEP
 };
@@ -21,6 +22,8 @@ enum {
 typedef struct HalPowerInfo {
     uint32_t clock_mhz;
     uint8_t sleep_percent;
+    uint8_t dark_sleep_percent;
+    uint8_t dark_mhz;
     uint8_t core1_load;
     bool panel_on;
     bool dac_on;

@@ -45,6 +45,8 @@ HalPowerInfo hal_system_power_info(void)
 {
     return (HalPowerInfo){.clock_mhz = hal_system_clock_mhz(),
                           .sleep_percent = board_sleep_percent(),
+                          .dark_sleep_percent = board_dark_sleep_percent(),
+                          .dark_mhz = board_dark_mhz(),
                           .core1_load = board_core1_load_percent(),
                           .panel_on = board_display_awake(),
                           .dac_on = dac_path_is_up(),

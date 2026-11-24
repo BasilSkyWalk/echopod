@@ -29,6 +29,9 @@
 #define MODE_CLEAR_DIVIDER 0x3F000000u
 #define MODE_ON_PLL 0x1u
 #define CLOCK_SELECT_UNDIVIDED 0xFFFF0000u
+#define CORE_UNDIVIDED 0x00070000u
+#define CORE_HALVED 0x00070001u
+#define PCLK_SHIFT_STEP 0x100u
 #define PCLK_UNDIVIDED 0x03000000u
 #define CORE_SPEED_SLOW 0x30400000u
 #define BUS_SPEED_SLOW 0xC0000000u
@@ -42,6 +45,7 @@ enum {
 };
 
 static uint32_t current_mhz;
+static bool core_halved;
 static HalBootClocks boot_clocks;
 
 static void leave_pll(void)
@@ -167,6 +171,30 @@ uint32_t hal_system_clock_mhz(void)
     return current_mhz != 0 ? current_mhz : board_boot_ticks_per_microsecond();
 }
 
+uint32_t board_core_mhz(void)
+{
+    return core_halved ? current_mhz / 2 : hal_system_clock_mhz();
+}
+
+void board_core_halve(bool halve)
+{
+    PllSetting setting;
+    if (halve == core_halved || !pll_setting_for(current_mhz, &setting)) {
+        return;
+    }
+    uint32_t primask = irq_save();
+    if (halve) {
+        register_write(CRU_CLOCK_SELECT, CORE_HALVED);
+        register_write(CRU_PCLK_SELECT, setting.pclk_select - PCLK_SHIFT_STEP);
+    } else {
+        register_write(CRU_PCLK_SELECT, setting.pclk_select);
+        register_write(CRU_CLOCK_SELECT, CORE_UNDIVIDED);
+    }
+    core_halved = halve;
+    board_clock_set_rate(board_core_mhz());
+    irq_restore(primask);
+}
+
 static bool switch_clock(uint32_t mhz)
 {
     if (mhz == CRYSTAL_MHZ) {
@@ -184,6 +212,7 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     if (mhz == hal_system_clock_mhz()) {
         return true;
     }
+    board_core_halve(false);
     board_audio_before_clock_change();
     dmac_suspend();
     board_start_record_step(HAL_START_STEP_CLOCK_SWITCH);

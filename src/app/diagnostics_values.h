@@ -9,7 +9,7 @@
 #include "hal/time.h"
 
 enum {
-    DIAGNOSTICS_VALUE_CAPACITY = 32
+    DIAGNOSTICS_VALUE_CAPACITY = 36
 };
 
 typedef struct DmaToneView {

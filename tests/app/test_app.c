@@ -87,9 +87,8 @@ enum {
     IDLE_MS = 20000,
     DIAGNOSTICS_KEY_TEST_INDEX = 0,
     DIAGNOSTICS_CPU_CLOCK_INDEX = 3,
-    DIAGNOSTICS_CORE1_INDEX = 4,
-    DIAGNOSTICS_POWER_TAPS_INDEX = 11,
-    DIAGNOSTICS_ACCEL_INDEX = 14,
+    DIAGNOSTICS_POWER_TAPS_INDEX = 10,
+    DIAGNOSTICS_ACCEL_INDEX = 13,
     FIFTEEN_MINUTES_MS = 15 * 60 * 1000,
     GOODBYE_MS = 1000,
     SPLASH_FADE_MS = 300,
@@ -2355,16 +2354,6 @@ static void ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off
     CHECK_EQUAL(1, fake_hal_power_off_count());
 }
 
-static void the_core_1_test_runs_once_per_press(void)
-{
-    start_app();
-    open_diagnostics_row(DIAGNOSTICS_CORE1_INDEX);
-    CHECK_EQUAL(0, fake_hal_core1_test_count());
-    tap(KEY_PLAY);
-    CHECK_EQUAL(1, fake_hal_core1_test_count());
-    CHECK(title_is("Diagnostics"));
-}
-
 static void the_accelerator_test_runs_once_per_press(void)
 {
     start_app();
@@ -4069,7 +4058,6 @@ int main(void)
         TEST_CASE(waking_while_paused_keeps_the_screen),
         TEST_CASE(the_cpu_clock_cycles_through_24_96_and_200_mhz),
         TEST_CASE(ignored_power_taps_leave_the_screen_on_but_a_hold_still_switches_off),
-        TEST_CASE(the_core_1_test_runs_once_per_press),
         TEST_CASE(the_accelerator_test_runs_once_per_press),
         TEST_CASE(a_clock_that_does_not_lock_stays_where_it_was),
         TEST_CASE(menu_does_nothing_while_nothing_plays),

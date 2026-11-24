@@ -526,6 +526,10 @@ void diagnostics_power_text(HalPowerInfo info, char *text, size_t capacity)
     append_flag(&builder, info.core1_on, 'C');
     string_builder_append(&builder, " u");
     string_builder_append_unsigned(&builder, info.underruns);
+    string_builder_append(&builder, " d");
+    string_builder_append_unsigned(&builder, info.dark_sleep_percent);
+    string_builder_append_char(&builder, '@');
+    string_builder_append_unsigned(&builder, info.dark_mhz);
 }
 
 typedef struct SavingsPreset {
@@ -541,6 +545,7 @@ static const SavingsPreset SAVINGS_PRESETS[] = {
     {HAL_SAVINGS_DEFAULT & ~HAL_SAVING_PANEL_SLEEP, "No panel sleep"},
     {0, "None"},
     {HAL_SAVINGS_DEFAULT | HAL_SAVING_AMP_OFF, "All + amp off"},
+    {HAL_SAVINGS_DEFAULT | HAL_SAVING_HALF_CORE, "All + half core"},
 };
 
 enum {
