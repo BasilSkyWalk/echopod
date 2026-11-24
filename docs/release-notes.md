@@ -14,13 +14,11 @@ Bluetooth headphones no longer crackle between tracks of different sample rates,
 
 - **Less work with the screen off.** While the screen is off the player now looks after its keys and the audio every 4 ms instead of every millisecond and sleeps in between, and it no longer prepares a screen nobody is looking at: a track change in the dark reads no cover and no lyrics until the screen comes on. Key presses are as quick as before.
 - **Drawing takes fewer steps for the same picture.** Backgrounds and boxes are filled two pixels at a time, text is drawn with less work per pixel, and a long title that scrolls no longer makes the player draw every frame twice.
-- **Diagnostics → Power** ends with `d` and two numbers, for example `d93@96`: the share of time the processor slept and its speed in MHz, as last read while the screen was off.
-- **Diagnostics → Savings** has one more choice to try, **All + half core**. With it, the main processor runs at half speed while the screen is off and a track of 48 kHz or less plays. It is off by default and is forgotten when the player restarts.
+- **Diagnostics → Power** ends with `d` and a number, for example `d93`: the share of time the processor slept, as last read while the screen was off.
 
 ### Known limits
 
 - **What the screen-off changes save in battery hasn't been measured.**
-- **All + half core is new and has had little testing.** If playback stutters with it, pick All again or restart the player.
 
 ### When you update
 

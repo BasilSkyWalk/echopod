@@ -434,18 +434,8 @@ static void set_muted(bool mute)
     }
 }
 
-static void follow_core_speed(void)
-{
-    bool light = transferring && stream_service == NULL &&
-                 (using_core1 || source_kind == SOURCE_WAV) &&
-                 audio_engine_rate(&engine) <= SLOW_CLOCK_MAX_RATE;
-    board_core_halve(light && slow_allowed && board_saving(HAL_SAVING_HALF_CORE) &&
-                     !board_usb_listening());
-}
-
 static void stop_transfer(void)
 {
-    board_core_halve(false);
     if (!transferring) {
         return;
     }
@@ -655,7 +645,6 @@ void hal_audio_allow_slow_clock(bool allowed)
         return;
     }
     slow_allowed = allowed;
-    follow_core_speed();
     if (deferred || (engine_ready && audio_engine_next_pending(&engine))) {
         follow_queue();
     }
@@ -959,7 +948,6 @@ static void poll_jack(void)
 
 void hal_audio_service(void)
 {
-    follow_core_speed();
     poll_jack();
     if ((transferring || tone_active) && dac_path_take_underrun()) {
         stats.output_underruns++;

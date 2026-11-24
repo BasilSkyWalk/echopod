@@ -44,7 +44,6 @@ static bool usb_prompt;
 static bool dac_session;
 static SleepMeter sleep_meter;
 static uint8_t dark_sleep_percent;
-static uint8_t dark_mhz;
 static bool resume_storage;
 
 void hal_system_set_usb_mode(HalUsbMode mode)
@@ -69,7 +68,6 @@ bool board_usb_listening(void)
 
 static void raise_clock_for_usb(void)
 {
-    board_core_halve(false);
     if (hal_system_clock_mhz() < START_CLOCK_MHZ) {
         hal_system_set_clock_mhz(START_CLOCK_MHZ);
     }
@@ -271,7 +269,6 @@ static void sleep_while_idle(uint32_t pass_started_ms)
     sleep_meter_advance(&sleep_meter, hal_clock_microseconds());
     if (!board_display_lit()) {
         dark_sleep_percent = sleep_meter_percent(&sleep_meter);
-        dark_mhz = (uint8_t)board_core_mhz();
         do {
             doze();
         } while (!dark_pass_over(pass_started_ms));
@@ -288,11 +285,6 @@ uint8_t board_sleep_percent(void)
 uint8_t board_dark_sleep_percent(void)
 {
     return dark_sleep_percent;
-}
-
-uint8_t board_dark_mhz(void)
-{
-    return dark_mhz;
 }
 
 void board_main(void)
