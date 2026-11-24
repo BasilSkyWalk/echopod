@@ -1,0 +1,190 @@
+name = "Capsule-BO"
+author = "salehin"
+description = "it's black and orange"
+selection = "selection"
+cover_flow = "dark"
+
+[spacing]
+row_height = 28
+padding = 10
+
+[colors]
+background = "#000000"
+text = "#e38444"
+text_secondary = "#9f5c30"
+text_tertiary = "#754626"
+selection_background = "#000000"
+selection_top = "#262626"
+selection_shine = "#595959"
+selection_text = "#ffffff"
+header_background = "#120b05"
+header_top = "#24150b"
+header_text = "#e38444"
+divider = "#29180c"
+scrollbar_thumb = "#442814"
+danger = "#e5484d"
+success = "#30a46c"
+chevron = "#693f23"
+
+[boxes.selection]
+fill = "selection_background"
+ink = "selection_text"
+inset = [6, 2]
+radius = 16
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "background"]
+ink = "header_text"
+opacity = 20
+
+[boxes.toast]
+fill = "header_background"
+border = "text"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+radius = 14
+
+[boxes.section]
+fill = "header_background"
+border = "text"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+radius = 16
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+radius = 2
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_shine"
+ink = "background"
+
+[now_playing_scene]
+script = '''
+const PAPER = #000000
+const PILL = #111111
+const WHITE = #ffffff
+const SOFT = #b8b0a4
+const HOT = #ff6a3d
+const HOLE = #2c2c2c
+const INK = #3f3f3f
+const MUTED = #a05b16
+
+rect(x, y, width, height, PAPER)
+let wide = width > height
+let px = wide ? x + 16 : x + 35
+let py = wide ? y + 26 : y + 12
+let cx = wide ? px + 36 : x + 85
+let cy = wide ? py + 34 : py + 52
+let reach = wide ? 23 : 38
+if wide {
+    rounded(px, py, 288, 68, 34, PILL)
+} else {
+    rounded(px, py, 100, 176, 50, PILL)
+}
+let lit = volume_shown ? volume_width(40) : progress(40)
+repeat mark from 0 to 40 {
+    spoke(cx, cy, mark * 32 / 5, 28, reach + 4, reach + 7, mark < lit ? (volume_shown ? WHITE : HOT) : HOLE)
+}
+if has_cover {
+    round_cover(cx, cy, reach)
+} else {
+    ring(cx * 16 + 8, cy * 16 + 8, reach * 16, 0, HOLE)
+    ring(cx * 16 + 8, cy * 16 + 8, 64, 0, SOFT)
+}
+if badge != none {
+    ring(cx * 16 + 8, cy * 16 + 8, 14 * 16, 0, PILL)
+    icon(badge, cx - 8, cy - 8, 16, 16, WHITE)
+}
+let bx = wide ? px + 222 : cx - 25
+let by = wide ? cy : py + 136
+repeat stick from 0 to 6 {
+    let tall = playing ? 6 + abs(sin(tick * (29 + stick * 6) + stick * 70)) * 26 / 255 : 4
+    rounded(bx + stick * 9, by - tall / 2, 5, tall, 2, HOT)
+}
+let tx = wide ? px + 76 : x + 8
+let ty = wide ? py + 13 : y + 196
+let tw = wide ? 136 : 154
+let along = wide ? left : center
+line(song, title, tx, ty, tw, 22, along, wide ? WHITE : INK)
+if present(feedback) {
+    text(feedback, body, tx, ty + 23, tw, 20, along, HOT)
+} else if present(lyric) {
+    line(lyric, body, tx, ty + 23, tw, 20, along, wide ? SOFT : MUTED)
+} else {
+    line(artist, body, tx, ty + 23, tw, 20, along, wide ? SOFT : MUTED)
+}
+let sy = wide ? y + 108 : y + 244
+text(stream, small, x + (wide ? 70 : 8), sy, width - (wide ? 140 : 16), 16, center, MUTED)
+if wide {
+    times(small, x + 30, sy, 260, 16, INK, MUTED)
+} else {
+    times(small, x + 10, sy + 18, 150, 16, INK, MUTED)
+}
+'''
+
+[home_scene]
+script = '''
+const PAPER = #000000
+const PILL = #111111
+const WHITE = #ffffff
+const SOFT = #ffffff
+const FAINT = #ffffff
+const HOLE = #2c2c2c
+
+rect(x, y, width, height, PAPER)
+let wide = width > height
+let pw = wide ? 240 : 158
+let ph = wide ? 56 : 52
+let px = x + (width - pw) / 2
+let py = y + (height - ph) / 2
+let chosen = selected()
+if chosen > 0 {
+    text(item(chosen - 1), body, px, py - 30, pw, 20, center, FAINT)
+}
+if chosen + 1 < items() {
+    text(item(chosen + 1), body, px, py + ph + 10, pw, 20, center, FAINT)
+}
+rounded(px, py, pw, ph, ph / 2, PILL)
+let cx = px + ph / 2
+let cy = py + ph / 2
+if has_cover {
+    round_cover(cx, cy, ph / 2 - 6)
+} else {
+    ring(cx * 16 + 8, cy * 16 + 8, (ph / 2 - 6) * 16, 0, HOLE)
+    ring(cx * 16 + 8, cy * 16 + 8, 64, 0, SOFT)
+}
+let tx = px + ph + 2
+let tw = pw - ph - 30
+if present(song) {
+    line(item(chosen), body, tx, cy - 20, tw, 20, left, WHITE)
+    line(song, small, tx, cy + 2, tw, 15, left, SOFT)
+} else {
+    line(item(chosen), body, tx, cy - 10, tw, 20, left, WHITE)
+}
+spoke(px + pw - 18, cy, 224, 28, 0, 8, WHITE)
+spoke(px + pw - 18, cy, 160, 28, 0, 8, WHITE)
+'''
