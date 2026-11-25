@@ -1012,6 +1012,41 @@ details.moves summary {
   height: 14px;
 }
 
+.layers .grip {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0 2px 0 -8px;
+  color: var(--ink-faint);
+  cursor: grab;
+  touch-action: none;
+}
+
+.layers .grip svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.4;
+}
+
+.layers.dragging-parts,
+.layers.dragging-parts li,
+.layers.dragging-parts .grip {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.layers li.drop-before {
+  box-shadow: inset 0 2px 0 var(--focus);
+}
+
+.layers li.drop-after {
+  box-shadow: inset 0 -2px 0 var(--focus);
+}
+
+.layers li.drop-inside {
+  background: var(--focus-soft);
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
 .layers.scroller {
   position: relative;
   max-height: 360px;

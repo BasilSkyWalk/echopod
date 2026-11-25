@@ -126,7 +126,7 @@ export function readDrawing(text) {
     const drawing = JSON.parse(text);
     if (drawing?.version === 2 && Array.isArray(drawing.elements)) {
       bumpIds(drawing.elements);
-      return drawing;
+      return fitStretched(drawing);
     }
   } catch {
     return null;
@@ -160,6 +160,116 @@ export function findElement(drawing, id) {
     }
   });
   return found;
+}
+
+export function pathOf(drawing, id) {
+  const search = (items, chain) => {
+    for (const item of items) {
+      if (item.id === id) {
+        return chain;
+      }
+      if (item.kind === "group") {
+        const found = search(item.children ?? [], [...chain, item]);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return null;
+  };
+  return search(drawing.elements, []);
+}
+
+function offsetOf(chain, shape) {
+  let x = 0;
+  let y = 0;
+  for (const outer of chain) {
+    const at = outer.at?.[shape];
+    if (!at) {
+      return null;
+    }
+    x += Number(at.x) || 0;
+    y += Number(at.y) || 0;
+  }
+  return { x, y };
+}
+
+export function canMoveParts(drawing, ids, targetId, where) {
+  const targetPath = pathOf(drawing, targetId);
+  if (!targetPath || ids.length === 0 || !["before", "after", "inside"].includes(where)) {
+    return false;
+  }
+  const target = findElement(drawing, targetId).item;
+  if (where === "inside" && target.kind !== "group") {
+    return false;
+  }
+  const blocked = new Set(ids);
+  if ([...targetPath, target].some((item) => blocked.has(item.id))) {
+    return false;
+  }
+  return ids.every((id) => pathOf(drawing, id));
+}
+
+export function moveParts(drawing, ids, targetId, where) {
+  if (!canMoveParts(drawing, ids, targetId, where)) {
+    return false;
+  }
+  const order = [];
+  walk(drawing.elements, (item) => order.push(item.id));
+  const moving = [...new Set(ids)].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((id) => {
+    const chain = pathOf(drawing, id);
+    const item = findElement(drawing, id).item;
+    return { item, from: Object.fromEntries(Object.keys(AREAS).map((shape) => [shape, offsetOf(chain, shape)])), list: chain.length ? chain.at(-1).children : drawing.elements };
+  });
+  for (const { item, list } of moving) {
+    list.splice(list.indexOf(item), 1);
+  }
+  const target = findElement(drawing, targetId).item;
+  const chain = where === "inside" ? [...pathOf(drawing, targetId), target] : pathOf(drawing, targetId);
+  const list = where === "inside" ? (target.children ??= []) : chain.length ? chain.at(-1).children : drawing.elements;
+  const at = where === "inside" ? list.length : list.indexOf(target) + (where === "after" ? 1 : 0);
+  list.splice(at, 0, ...moving.map(({ item }) => item));
+  for (const { item, from } of moving) {
+    for (const shape of Object.keys(AREAS)) {
+      const own = item.at?.[shape];
+      const to = offsetOf(chain, shape);
+      if (own && from[shape] && to) {
+        own.x = (Number(own.x) || 0) + from[shape].x - to.x;
+        own.y = (Number(own.y) || 0) + from[shape].y - to.y;
+      }
+    }
+  }
+  fitStretched(drawing);
+  return true;
+}
+
+export function canStretch(item, chain) {
+  return item.kind !== "line" && !item.repeat && !chain.some((outer) => outer.repeat);
+}
+
+export function fitStretched(drawing) {
+  const screens = Object.fromEntries(Object.entries(AREAS).map(([shape, area]) => [shape, { w: area.width, h: area.height }]));
+  const visit = (items, frames, chain) => {
+    for (const item of items) {
+      if (item.stretch && canStretch(item, chain)) {
+        for (const shape of Object.keys(AREAS)) {
+          const own = item.at?.[shape];
+          if (own && frames[shape]) {
+            Object.assign(own, { x: 0, y: 0, w: frames[shape].w, h: frames[shape].h });
+          }
+        }
+      }
+      if (item.kind === "group") {
+        const inner = Object.fromEntries(Object.keys(AREAS).map((shape) => {
+          const own = item.at?.[shape];
+          return [shape, own ? { w: Math.max(1, Number(own.w) || 0), h: Math.max(1, Number(own.h) || 0) } : null];
+        }));
+        visit(item.children ?? [], inner, [...chain, item]);
+      }
+    }
+  };
+  visit(drawing.elements ?? [], screens, []);
+  return drawing;
 }
 
 export function colorOf(value, theme) {
@@ -390,6 +500,11 @@ function placed(item, scope) {
   const at = item.at[scope.shape];
   if (fillsScreen(item, at, scope)) {
     return { at, x: "0", y: "0", w: "width", h: "height" };
+  }
+  if (item.stretch && item.kind !== "line") {
+    const w = numberOf(item, "w", Math.max(0, whole(at.w)), scope);
+    const h = numberOf(item, "h", Math.max(0, whole(at.h)), scope);
+    return { at, x: "0", y: "0", w, h };
   }
   const x = numberOf(item, "x", whole(at.x), scope);
   const y = numberOf(item, "y", whole(at.y), scope);
@@ -684,8 +799,8 @@ function beatOf(name, count) {
 }
 
 function groupLines(item, scope, theme) {
-  const { at } = placed(item, scope);
-  const [gx, gy] = anchor(scope, numberOf(item, "x", whole(at.x), scope), numberOf(item, "y", whole(at.y), scope));
+  const { at, x, y } = placed(item, scope);
+  const [gx, gy] = anchor(scope, x, y);
   const depth = (scope.depth ?? 0) + 1;
   const simple = (value) => NUMBER.test(value) || TAIL.test(value) || /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
   const atZero = (key) => (item.children ?? []).some((child) => child.at?.[scope.shape] && whole(child.at[scope.shape][key]) === 0);
@@ -868,6 +983,7 @@ function sameBothWays(item, theme) {
 }
 
 export function drawingScript(drawing, theme) {
+  fitStretched(drawing);
   backdrops = backdropsOf(drawing);
   const body = [];
   let levels = false;
