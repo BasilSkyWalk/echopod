@@ -25,6 +25,7 @@ import {
   pack,
   rgb565,
   seeThroughOf,
+  textReadsInCoverFlow,
   toToml,
   unpack,
 } from "./theme_format.js";
@@ -721,3 +722,9 @@ arrangeUpright(crossed);
 const crossedNow = Object.fromEntries(crossed.elements.map((item) => [item.name || item.source || item.kind, item.at.tall]));
 assert.deepEqual([crossedNow.album.w, crossedNow.format.w, crossedNow.format.h], [154, 154, 16], "a small part dropped over some text doesn't squeeze the text into its own box");
 assert.ok(crossedNow.circle.w === crossedNow.circle.h && crossedNow.circle.w >= 20 && crossedNow.circle.w <= 28, "and stays round");
+
+const coverFlowText = (text, text_secondary) => textReadsInCoverFlow({ colors: { text, text_secondary } });
+assert.equal(coverFlowText("#000000", "#3b3b3b"), false, "black text can't be read on Cover Flow's black wall");
+assert.equal(coverFlowText("#ffffff", "#505050"), false, "nor can dim secondary text under light titles");
+assert.equal(coverFlowText("#ff8647", "#b36132"), true, "amber text reads on black");
+assert.equal(coverFlowText("#f2f2f5", "#8e8e96"), true, "the player's own Dark text reads on black");

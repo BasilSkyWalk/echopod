@@ -95,6 +95,17 @@ export function contrast(first, second) {
   return (Math.max(...lights) + 0.05) / (Math.min(...lights) + 0.05);
 }
 
+const COVER_FLOW_BACKDROP = "#000000";
+const COVER_FLOW_TEXT_FLOOR = 7;
+const COVER_FLOW_SECONDARY_FLOOR = 4.5;
+
+export function textReadsInCoverFlow(theme) {
+  return (
+    contrast(theme.colors.text, COVER_FLOW_BACKDROP) >= COVER_FLOW_TEXT_FLOOR &&
+    contrast(theme.colors.text_secondary, COVER_FLOW_BACKDROP) >= COVER_FLOW_SECONDARY_FLOOR
+  );
+}
+
 function wallpaperContrast(color, theme, share) {
   let lowest = 21;
   for (const paper of Object.values(theme.wallpapers ?? {})) {
