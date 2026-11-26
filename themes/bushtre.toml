@@ -1,0 +1,715 @@
+# Fonts: From a font with an open licence, like the SIL Open Font License
+name = "Bushtre"
+author = "Bush_King"
+description = "purple neon theme to fit my desktop music setup"
+selection = "selection_outline"
+
+[colors]
+background = "#000000"
+text = "#d2c8e1"
+text_secondary = "#d2c8ff"
+text_tertiary = "#696471"
+selection_background = "#6e00ff"
+selection_top = "#8426ff"
+selection_shine = "#a159ff"
+selection_text = "#ffffff"
+header_background = "#111012"
+header_top = "#222024"
+header_text = "#d2c8e1"
+divider = "#262429"
+scrollbar_thumb = "#3f3c44"
+danger = "#e5484d"
+success = "#30a46c"
+chevron = "#5e5a65"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+shine = "selection_shine"
+shine_height = 1
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
+
+[fonts.title]
+ascent = 15
+descent = 5
+glyphs = [
+    { char = " ", left = 0, top = 0, advance = 3, rows = [] },
+    { char = "!", left = 1, top = 11, advance = 6, rows = ["9ddc2", "affe2", "9ffd1", "9ffd1", "9ffd1", "9ffd1", "7ffb1", ".....", "9ffe2", "9ffe3", "9ffe2"] },
+    { char = "\"", left = 0, top = 11, advance = 10, rows = ["4ddd48ddb1", "5fff59ffd1", "5fff59ffd1", "3eff59ffd1", "3eff47ffb1", "2cdc36dda1"] },
+    { char = "#", left = 0, top = 11, advance = 11, rows = ["..2cd5.9d9.", "..4ff51dfa.", "1beffeefff8", "1dffffffff9", "1bfffdeffe8", ".1bfb17fe3.", "4dfffdfffb2", "7ffffffffe3", "7ffffffffe3", ".6fe32ef8..", ".8fd23ef6.."] },
+    { char = "$", left = 0, top = 13, advance = 10, rows = ["....11....", "...9ff9...", ".29efffd7.", "1cffffff9.", "3effffff9.", "3eff3.....", "3efffec81.", "2dffffffc1", ".3cfffffe3", "....16ffe3", "3cdddeffe3", "3effffffc1", "3efffffb2.", "...9ff9...", "...2552..."] },
+    { char = "%", left = 0, top = 11, advance = 15, rows = ["18ddc4.3dd4.....", "4ffffd17fe3.....", "5fc5ed2afc1.....", "5fb4ed3df9......", "5fd8fd5ff5.352..", "3ffffb8fe6efff9.", ".27951afc6fecfd1", ".....2df95fb4ed1", ".....4ff65fb4ed1", ".....7fe35ffffd1", ".....9fc11cfff7."] },
+    { char = "&", left = 0, top = 11, advance = 11, rows = ["..4bdddc2...", ".3fffffe3...", ".7fffffe3...", ".6ffb1......", ".2dffc2.....", "1bfffe4bffe3", "5fffec3bffe3", "7ffb1.1bffa1", "7fffedefff4.", "3ffffffffd2.", ".6efffffe4.."] },
+    { char = "'", left = 0, top = 11, advance = 5, rows = ["2cdd5", "3eff7", "3eff7", "3eff7", "1dff5", "1bdd4"] },
+    { char = "(", left = 0, top = 12, advance = 6, rows = [".2bffb.", "1cfffb1", "4ffff9.", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "4fffb6.", "2dfffb1", ".4effb1", "...111."] },
+    { char = ")", left = 0, top = 12, advance = 6, rows = ["4ffd6.", "5ffff5", "4dfff9", "..aff9", "..9ff9", "..9ff9", "..9ff9", "..9ff9", "..9ff9", "..9ff9", "29eff9", "5ffff6", "5fffa1", ".11..."] },
+    { char = "*", left = 0, top = 11, advance = 11, rows = ["...1bda1..", "...1cfa...", ".7c4bf86d4", "1cfffffff9", "2cfffffff9", "...afff7..", "..9ffcff6.", ".2dfb3dfb1", "..194.671."] },
+    { char = "+", left = 0, top = 10, advance = 11, rows = ["...1bdb1...", "...1dfd1...", "...1dfd1...", "1bdefffedb1", "1dfffffffd1", "1dfffffffd1", "...1dfd1...", "...1dfd1...", "...1dfd1..."] },
+    { char = ",", left = 0, top = 5, advance = 6, rows = [".1111.", "3effd1", "3effd1", "3effd1", ".25ed1", "1dff9.", ".6841."] },
+    { char = "-", left = 0, top = 7, advance = 6, rows = ["4ffff9", "5ffff9", "5ffff9", ".11111"] },
+    { char = ".", left = 0, top = 5, advance = 6, rows = [".1111.", "3effd1", "3effd1", "3effd1", "3effd1"] },
+    { char = "/", left = -1, top = 13, advance = 5, rows = ["...111.", "..3efe2", "..4ffd1", "..6ffb1", "..8ff9.", "..aff7.", ".1bff5.", ".1dff4.", ".3efe2.", ".4ffd1.", ".6ffb1.", ".9ff9..", ".aff7..", "1bff5..", ".3551.."] },
+    { char = "0", left = 0, top = 11, advance = 11, rows = [".18efffe81.", "1bfffffff9.", "2efffffffd1", "3eff5.5ffd1", "3eff5.5ffd1", "3eff5.5ffd1", "3eff5.5ffd1", "3eff5.5ffd1", "3effeaeffd1", "1cfffffffb1", ".2cfffffb2.", "....111...."] },
+    { char = "1", left = 0, top = 11, advance = 9, rows = ["1bdddd5..", "1dffff7..", "1dffff7..", "..1dff7..", "..1dff7..", "..1dff7..", "..1dff7..", "..1dff7..", "4defffed5", "5fffffff7", "4fffffff6"] },
+    { char = "2", left = 0, top = 11, advance = 10, rows = [".9ddddd71.", "1bffffff8.", "1bffffffb1", ".....affb1", "..28efffb.", ".9ffffff6.", "4fffffc4..", "5ffe5.....", "5fffeddd9.", "5fffffffb1", "4fffffffb1"] },
+    { char = "3", left = 0, top = 11, advance = 10, rows = ["3ddddd92..", "5ffffffa..", "4ffffffd1.", "....5ffc1.", ".1bdeff7..", ".1dfffff7.", ".1bddfffb1", ".....5ffd1", "3ddddeffd1", "5fffffffa.", "4ffffffb2."] },
+    { char = "4", left = 0, top = 11, advance = 11, rows = ["1bdd4.9dd7", "1dff51bff9", "1dff51bff9", "1dff51bff9", "1dff51bff9", "1dffc9eff9", "1dfffffff9", ".afffffff9", "..4699eff9", ".....1bff9", ".....1bff9"] },
+    { char = "5", left = 0, top = 11, advance = 10, rows = ["1bdddddd5.", "1dffffff7.", "1dffffff7.", "1dff5.....", "1dfffffc4.", "1dffffffd1", "1bdddfffd1", ".....5ffd1", "2cdddeffd1", "3effffffc1", "3efffffc2."] },
+    { char = "6", left = 0, top = 11, advance = 10, rows = [".16cdddd5.", ".9ffffff7.", "2effffff7.", "3eff5.....", "3effeffd71", "3efffffff6", "3effc9eff9", "3eff5.9ff9", "3effa7eff9", "1cfffffff6", ".3dfffff81", "...1111..."] },
+    { char = "7", left = 0, top = 11, advance = 9, rows = ["5ddddddd8", "7fffffff9", "7fffffff9", "....1bff9", "....4dff9", "..7fffff7", ".3effffe2", ".5fffc51.", ".5ffe3...", ".5ffe3...", ".4ffe3..."] },
+    { char = "8", left = 0, top = 11, advance = 11, rows = [".17efffd4..", ".6ffffffe2.", ".9ffdaeff4.", ".8ff5.9fe3.", ".3efdaefb1.", "1bfffffff7.", "4fffedeffc1", "5ffd1.5ffd1", "5fff85affd1", "3efffffffb.", ".5efffffc2.", "...1111...."] },
+    { char = "9", left = 0, top = 11, advance = 10, rows = [".2bffffc4.", "1cfffffff3", "4fffdbfff7", "5ffe31bff7", "5fff76dff7", "3efffffff7", ".6effffff7", "...111bff7", ".2cddefff7", ".3effffff3", ".3effffd4."] },
+    { char = ":", left = 0, top = 10, advance = 6, rows = [".1111.", "3effd1", "3effd1", "3effd1", "3effd1", ".1111.", "3effd1", "3effd1", "3effd1", "3effd1"] },
+    { char = ";", left = 0, top = 10, advance = 6, rows = [".1111.", "3effd1", "3effd1", "3effd1", "3effd1", ".1111.", "3effd1", "3effd1", "3effd1", ".25ed1", "1dff9.", ".6841."] },
+    { char = "<", left = 0, top = 10, advance = 11, rows = ["......27c4", "...4affff5", ".5fffffff5", ".bffffd82.", "1bff7.....", "1bfffd83..", ".7fffffff4", "..39effff5", ".....16cf5"] },
+    { char = "=", left = 0, top = 9, advance = 11, rows = ["1dfffffffd1", "1dfffffffd1", "1addddddda1", "...........", ".799999997.", "1dfffffffd1", "1dfffffffd1", ".111111111."] },
+    { char = ">", left = 1, top = 10, advance = 11, rows = ["9b61.....", "9fffd83..", "9ffffffc2", ".49effff7", "....1aff7", ".15aefff7", "8ffffffe3", "9ffffd71.", "9fa41....", "1........"] },
+    { char = "?", left = 0, top = 11, advance = 10, rows = ["4dddddd81.", "5fffffffb1", "4fffffffe3", ".....4ffe3", ".18cefffe3", ".2dfffffd2", ".1cffffc3.", "..352.....", ".3eff9....", ".3eff9....", ".3eff9...."] },
+    { char = "@", left = 0, top = 13, advance = 13, rows = [".....111.....", "..6dfffffd6..", ".8fb64146bf8.", "1d9.......9d1", "3e518dddd85e3", "3e58fffff95e3", "3e59fb2cf95e3", "3e59f91bf95e3", "3e59f91bf95e3", "3e59feaefaad1", "3e56fffffff8.", "1d8.3699853..", ".af821.......", ".1affffffb1..", "....255553..."] },
+    { char = "A", left = 0, top = 11, advance = 11, rows = ["..3ddddd3..", "..9fffff8..", ".2dfffffd1.", ".5ffc3eff5.", ".bff9.bffa.", "2eff85affd2", "3efffffffe3", "3efffffffe3", "3eff758ffe3", "3efe3.5ffe3", "3efe2.3ffe3"] },
+    { char = "B", left = 0, top = 11, advance = 11, rows = ["1bdddddb3..", "1dffffffd2.", "1dffedffe3.", "1dff51bfe3.", "1dffbaefb1.", "1dfffffffb1", "1dffb9bffe3", "1dff5.1dff4", "1dffb9afff4", "1dfffffffe2", "1dffffffe5."] },
+    { char = "C", left = 0, top = 11, advance = 9, rows = [".15cdddd9.", ".9ffffffb1", "2effffffb1", "3eff6.....", "3eff5.....", "3eff5.....", "3eff5.....", "3eff5.....", "2efffddd9.", "1bffffffb1", ".1afffffb."] },
+    { char = "D", left = 0, top = 11, advance = 11, rows = ["1bdddddc71.", "1dfffffffb1", "1dffffffff4", "1dff7.3eff5", "1dff7.1dff5", "1dff7.1dff5", "1dff7.1dff5", "1dff7.2eff5", "1dffedefff4", "1dfffffffd2", "1dffffffb2."] },
+    { char = "E", left = 0, top = 11, advance = 10, rows = ["1bddddddb1", "1dffffffd1", "1dffffffd1", "1dff5.....", "1dffedd9..", "1dfffffb1.", "1dffedda1.", "1dff5.....", "1dffedddb1", "1dffffffd1", "1dffffffd1"] },
+    { char = "F", left = 0, top = 11, advance = 9, rows = ["1bdddddd9.", "1dffffffb1", "1dffffffb1", "1dff7.....", "1dffa552..", "1dfffff9..", "1dfffff9..", "1dffc993..", "1dff7.....", "1dff7.....", "1dff6....."] },
+    { char = "G", left = 0, top = 11, advance = 11, rows = [".15cdddd9..", ".9ffffffb1.", "2effffffb1.", "3eff6......", "3eff5......", "3eff5.5dd9.", "3eff5.7ffb1", "3eff5.7ffb1", "2efffdeffb1", "1bfffffffb1", ".1affffffb1"] },
+    { char = "H", left = 0, top = 11, advance = 11, rows = ["1bdd5.1bdd4", "1dff7.1dff5", "1dff7.1dff5", "1dff7.1dff5", "1dffffffff5", "1dffffffff5", "1dffffffff5", "1dff813dff5", "1dff7.1dff5", "1dff7.1dff5", "1dff6.1dff4"] },
+    { char = "I", left = 0, top = 11, advance = 9, rows = ["2cdddddd3", "3effffff5", "3effffff4", "..3eff5..", "..3eff5..", "..3eff5..", "..3eff5..", "..3eff5..", "3cefffed3", "3effffff5", "3effffff4"] },
+    { char = "J", left = 0, top = 11, advance = 10, rows = [".....1bdd4", ".....1dff5", ".....1dff5", ".....1dff5", ".....1dff5", "4dd9.1dff5", "5ffb11dff5", "5ffb12eff5", "5fffeefff5", "3effffffe2", ".5effffe4.", "...1111..."] },
+    { char = "K", left = 0, top = 11, advance = 11, rows = ["1bdd5.4ddb1", "1dff71bff9.", "1dff73fff3.", "1dff79ffa..", "1dffefffe6.", "1dfffffffe3", "1dffffffff5", "1dff7.3eff5", "1dff7.3eff5", "1dff7.3eff5", "1dff6.2eff4"] },
+    { char = "L", left = 0, top = 11, advance = 10, rows = ["1bdd5......", "1dff7......", "1dff7......", "1dff7......", "1dff7......", "1dff7.5dd9.", "1dff7.7ffb1", "1dff7.7ffb1", "1dffedeffb1", "1dfffffffb1", "1dfffffffa."] },
+    { char = "M", left = 0, top = 11, advance = 13, rows = ["1bdd7..1add8", "1dffe3.6fff9", "1dfffa2cfff9", "1dffffdffff9", "1dfffffffff9", "1dffcffedff9", "1dff6cf8aff9", "1dff511.9ff9", "1dff5...9ff9", "1dff5...9ff9", "1dff4...9ff9"] },
+    { char = "N", left = 0, top = 11, advance = 11, rows = ["1bdb1.1bdd3", "1dffb11dff5", "1dfff92dff5", "1dffff9dff5", "1dffffffff5", "1dffefffff5", "1dff5bffff5", "1dff52dfff5", "1dff5.3eff5", "1dff5.1dff5", "1dff4.1dff4"] },
+    { char = "O", left = 0, top = 11, advance = 11, rows = [".18efffe81.", "1bfffffffb1", "2efffffffe3", "3eff5.4ffe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "3effeadffe3", "1cfffffffc1", ".2cfffffc3.", "....111...."] },
+    { char = "P", left = 0, top = 11, advance = 10, rows = ["1bddddda4.", "1dfffffff5", "1dfffffff9", "1dff5.8ff9", "1dff5.7ff9", "1dffedfff9", "1dfffffff6", "1dfffffd6.", "1dff7.....", "1dff7.....", "1dff6....."] },
+    { char = "Q", left = 0, top = 11, advance = 11, rows = [".18efffe81.", "1bfffffffb1", "2efffffffe3", "3eff5.4ffe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "2effc9cffe3", "1bfffffffc1", ".19fffffa2.", "...3efe3...", "...14541..."] },
+    { char = "R", left = 0, top = 11, advance = 11, rows = ["1bdddddc5..", "1dfffffff4.", "1dfffffff7.", "1dff71bff7.", "1dff82cff4.", "1dfffffff81", "1dffffffff5", "1dffc9afff7", "1dff7.1bff7", "1dff7.1bff7", "1dff6.1bff7"] },
+    { char = "S", left = 0, top = 11, advance = 10, rows = [".29ddddd7.", "1cffffff9.", "3effffff9.", "3eff3.....", "3efffec81.", "2dffffffc1", ".3cfffffe3", "....16ffe3", "3cdddeffe3", "3effffffc1", "3efffffb2."] },
+    { char = "T", left = 0, top = 11, advance = 10, rows = ["5dddddddd4", "7ffffffff7", "7ffffffff6", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9..."] },
+    { char = "U", left = 0, top = 11, advance = 11, rows = ["1bdd4.2cdc2", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dfffdeffe3", "1bfffffffd1", ".2bfffffd4.", "....111...."] },
+    { char = "V", left = 0, top = 11, advance = 11, rows = ["2cdd4.4ddc2", "3eff5.5ffe3", "3eff5.5ffe3", "3eff5.5ffe3", "3eff5.5ffe3", "3eff6.6ffe2", "1bffb1bffb1", ".6ffe6eff5.", ".2dfffffd1.", "..9fffff9..", "..3ffffe3.."] },
+    { char = "W", left = 0, top = 11, advance = 12, rows = ["2cdd4...8dd5", "3eff5..1bff7", "3eff5..1bff7", "3eff5..1bff7", "3eff5cf7bff7", "3effaffddff7", "3efffffffff7", "1dfffffffff7", "1bfffb5ffff4", ".6fff72effc1", ".2dff3.aff8."] },
+    { char = "X", left = 0, top = 11, advance = 11, rows = ["2cdd4.2cdc2", "3eff5.3efe3", "2eff7.5ffe3", ".9ffe8effa.", ".2dfffffd2.", "..6fffff8..", ".3efffffe3.", "1bffd4dffc1", "2eff5.4ffe3", "3eff5.3efe3", "2eff4.3efe3"] },
+    { char = "Y", left = 0, top = 11, advance = 11, rows = ["4ddb1.4dd9.", "5ffd1.7ffb1", "5ffd1.7ffb1", "5ffe2.7ffb1", "4fff92dffb1", ".9fffefff5.", ".2dfffff8..", "..4ffffb1..", "...8ffe3...", "...7ffd1...", "...7ffd1..."] },
+    { char = "Z", left = 0, top = 11, advance = 10, rows = ["1bddddddb1", "1dffffffd1", "1dffffffd1", "....9fffb1", "...7fffe3.", "..5ffff5..", ".3efff7...", "2dfff9....", "5ffffeddc3", "5fffffffe3", "4fffffffe3"] },
+    { char = "[", left = 0, top = 12, advance = 6, rows = ["4ffffb.", "5ffffb1", "5fffe9.", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "5ffe3..", "5fffa6.", "5ffffb1", "4ffffb1", ".11111."] },
+    { char = "\\", left = -1, top = 13, advance = 5, rows = [".111...", "1cff5..", ".bff7..", ".9ff9..", ".7ffb..", ".5ffd1.", ".3efe2.", ".2dfe3.", ".1cff5.", "..aff7.", "..9ff9.", "..7ffb1", "..5ffd1", "..3efe2", "...4541"] },
+    { char = "]", left = 0, top = 12, advance = 6, rows = ["4ffff9", "5ffff9", "4dfff9", "..9ff9", "..9ff9", "..9ff9", "..9ff9", "..9ff9", "..9ff9", "..9ff9", "29dff9", "5ffff9", "5ffff9", ".11111"] },
+    { char = "^", left = 0, top = 11, advance = 11, rows = ["..18dd91..", "..8ffffa..", ".1cffffe2.", ".3efccff5.", ".6ff85ff9.", ".aff42efc1", "2dfd21bfe3", "4ffb..8ff6", "2553..2553"] },
+    { char = "_", left = 0, top = 2, advance = 11, rows = [".799999997.", "1dfffffffd1", "1dfffffffd1", ".799999997."] },
+    { char = "`", left = 0, top = 15, advance = 8, rows = ["2521....", "5ffffe9.", "5fffffb1", ".125697."] },
+    { char = "a", left = 0, top = 11, advance = 11, rows = ["..3ddddd3..", "..9fffff8..", ".2dfffffd1.", ".5ffc3eff5.", ".bff9.bffa.", "2eff85affd2", "3efffffffe3", "3efffffffe3", "3eff758ffe3", "3efe3.5ffe3", "3efe2.3ffe3"] },
+    { char = "b", left = 0, top = 11, advance = 11, rows = ["1bdddddb3..", "1dffffffd2.", "1dffedffe3.", "1dff51bfe3.", "1dffbaefb1.", "1dfffffffb1", "1dffb9bffe3", "1dff5.1dff4", "1dffb9afff4", "1dfffffffe2", "1dffffffe5."] },
+    { char = "c", left = 0, top = 11, advance = 9, rows = [".15cdddd9.", ".9ffffffb1", "2effffffb1", "3eff6.....", "3eff5.....", "3eff5.....", "3eff5.....", "3eff5.....", "2efffddd9.", "1bffffffb1", ".1afffffb."] },
+    { char = "d", left = 0, top = 11, advance = 11, rows = ["1bdddddc71.", "1dfffffffb1", "1dffffffff4", "1dff7.3eff5", "1dff7.1dff5", "1dff7.1dff5", "1dff7.1dff5", "1dff7.2eff5", "1dffedefff4", "1dfffffffd2", "1dffffffb2."] },
+    { char = "e", left = 0, top = 11, advance = 10, rows = ["1bddddddb1", "1dffffffd1", "1dffffffd1", "1dff5.....", "1dffedd9..", "1dfffffb1.", "1dffedda1.", "1dff5.....", "1dffedddb1", "1dffffffd1", "1dffffffd1"] },
+    { char = "f", left = 0, top = 11, advance = 9, rows = ["1bdddddd9.", "1dffffffb1", "1dffffffb1", "1dff7.....", "1dffa552..", "1dfffff9..", "1dfffff9..", "1dffc993..", "1dff7.....", "1dff7.....", "1dff6....."] },
+    { char = "g", left = 0, top = 11, advance = 11, rows = [".15cdddd9..", ".9ffffffb1.", "2effffffb1.", "3eff6......", "3eff5......", "3eff5.5dd9.", "3eff5.7ffb1", "3eff5.7ffb1", "2efffdeffb1", "1bfffffffb1", ".1affffffb1"] },
+    { char = "h", left = 0, top = 11, advance = 11, rows = ["1bdd5.1bdd4", "1dff7.1dff5", "1dff7.1dff5", "1dff7.1dff5", "1dffffffff5", "1dffffffff5", "1dffffffff5", "1dff813dff5", "1dff7.1dff5", "1dff7.1dff5", "1dff6.1dff4"] },
+    { char = "i", left = 0, top = 11, advance = 9, rows = ["2cdddddd3", "3effffff5", "3effffff4", "..3eff5..", "..3eff5..", "..3eff5..", "..3eff5..", "..3eff5..", "3cefffed3", "3effffff5", "3effffff4"] },
+    { char = "j", left = 0, top = 11, advance = 10, rows = [".....1bdd4", ".....1dff5", ".....1dff5", ".....1dff5", ".....1dff5", "4dd9.1dff5", "5ffb11dff5", "5ffb12eff5", "5fffeefff5", "3effffffe2", ".5effffe4.", "...1111..."] },
+    { char = "k", left = 0, top = 11, advance = 11, rows = ["1bdd5.4ddb1", "1dff71bff9.", "1dff73fff3.", "1dff79ffa..", "1dffefffe6.", "1dfffffffe3", "1dffffffff5", "1dff7.3eff5", "1dff7.3eff5", "1dff7.3eff5", "1dff6.2eff4"] },
+    { char = "l", left = 0, top = 11, advance = 10, rows = ["1bdd5......", "1dff7......", "1dff7......", "1dff7......", "1dff7......", "1dff7.5dd9.", "1dff7.7ffb1", "1dff7.7ffb1", "1dffedeffb1", "1dfffffffb1", "1dfffffffa."] },
+    { char = "m", left = 0, top = 11, advance = 13, rows = ["1bdd7..1add8", "1dffe3.6fff9", "1dfffa2cfff9", "1dffffdffff9", "1dfffffffff9", "1dffcffedff9", "1dff6cf8aff9", "1dff511.9ff9", "1dff5...9ff9", "1dff5...9ff9", "1dff4...9ff9"] },
+    { char = "n", left = 0, top = 11, advance = 11, rows = ["1bdb1.1bdd3", "1dffb11dff5", "1dfff92dff5", "1dffff9dff5", "1dffffffff5", "1dffefffff5", "1dff5bffff5", "1dff52dfff5", "1dff5.3eff5", "1dff5.1dff5", "1dff4.1dff4"] },
+    { char = "o", left = 0, top = 11, advance = 11, rows = [".18efffe81.", "1bfffffffb1", "2efffffffe3", "3eff5.4ffe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "3effeadffe3", "1cfffffffc1", ".2cfffffc3.", "....111...."] },
+    { char = "p", left = 0, top = 11, advance = 10, rows = ["1bddddda4.", "1dfffffff5", "1dfffffff9", "1dff5.8ff9", "1dff5.7ff9", "1dffedfff9", "1dfffffff6", "1dfffffd6.", "1dff7.....", "1dff7.....", "1dff6....."] },
+    { char = "q", left = 0, top = 11, advance = 11, rows = [".18efffe81.", "1bfffffffb1", "2efffffffe3", "3eff5.4ffe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "3eff5.3efe3", "2effc9cffe3", "1bfffffffc1", ".19fffffa2.", "...3efe3...", "...14541..."] },
+    { char = "r", left = 0, top = 11, advance = 11, rows = ["1bdddddc5..", "1dfffffff4.", "1dfffffff7.", "1dff71bff7.", "1dff82cff4.", "1dfffffff81", "1dffffffff5", "1dffc9afff7", "1dff7.1bff7", "1dff7.1bff7", "1dff6.1bff7"] },
+    { char = "s", left = 0, top = 11, advance = 10, rows = [".29ddddd7.", "1cffffff9.", "3effffff9.", "3eff3.....", "3efffec81.", "2dffffffc1", ".3cfffffe3", "....16ffe3", "3cdddeffe3", "3effffffc1", "3efffffb2."] },
+    { char = "t", left = 0, top = 11, advance = 10, rows = ["5dddddddd4", "7ffffffff7", "7ffffffff6", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9...", "..1bff9..."] },
+    { char = "u", left = 0, top = 11, advance = 11, rows = ["1bdd4.2cdc2", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dff5.3efe3", "1dfffdeffe3", "1bfffffffd1", ".2bfffffd4.", "....111...."] },
+    { char = "v", left = 0, top = 11, advance = 11, rows = ["2cdd4.4ddc2", "3eff5.5ffe3", "3eff5.5ffe3", "3eff5.5ffe3", "3eff5.5ffe3", "3eff6.6ffe2", "1bffb1bffb1", ".6ffe6eff5.", ".2dfffffd1.", "..9fffff9..", "..3ffffe3.."] },
+    { char = "w", left = 0, top = 11, advance = 12, rows = ["2cdd4...8dd5", "3eff5..1bff7", "3eff5..1bff7", "3eff5..1bff7", "3eff5cf7bff7", "3effaffddff7", "3efffffffff7", "1dfffffffff7", "1bfffb5ffff4", ".6fff72effc1", ".2dff3.aff8."] },
+    { char = "x", left = 0, top = 11, advance = 11, rows = ["2cdd4.2cdc2", "3eff5.3efe3", "2eff7.5ffe3", ".9ffe8effa.", ".2dfffffd2.", "..6fffff8..", ".3efffffe3.", "1bffd4dffc1", "2eff5.4ffe3", "3eff5.3efe3", "2eff4.3efe3"] },
+    { char = "y", left = 0, top = 11, advance = 11, rows = ["4ddb1.4dd9.", "5ffd1.7ffb1", "5ffd1.7ffb1", "5ffe2.7ffb1", "4fff92dffb1", ".9fffefff5.", ".2dfffff8..", "..4ffffb1..", "...8ffe3...", "...7ffd1...", "...7ffd1..."] },
+    { char = "z", left = 0, top = 11, advance = 10, rows = ["1bddddddb1", "1dffffffd1", "1dffffffd1", "....9fffb1", "...7fffe3.", "..5ffff5..", ".3efff7...", "2dfff9....", "5ffffeddc3", "5fffffffe3", "4fffffffe3"] },
+    { char = "{", left = 0, top = 12, advance = 7, rows = ["..6dfe3", ".6fffe3", ".9fffd2", ".9ffa..", ".9ff9..", "5fff9..", "9ff92..", "8fff9..", ".aff9..", ".9ff9..", ".9ffe91", ".7fffe3", ".1affe3", "....11."] },
+    { char = "|", left = 0, top = 13, advance = 5, rows = [".111.", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", "1dfe3", ".4541"] },
+    { char = "}", left = 0, top = 12, advance = 7, rows = ["4ffd5..", "5ffff3.", "4efff7.", ".1bff7.", ".1bff7.", ".1bffe3", "..2aff7", ".1bfff6", ".1bff7.", ".1bff7.", "2afff7.", "5ffff5.", "5fff8..", ".11...."] },
+    { char = "~", left = 0, top = 8, advance = 11, rows = ["...1.......", "1affffdded1", "1dfffffffd1", "1dc9cefff81"] },
+    { char = "–", left = 0, top = 7, advance = 11, rows = ["1cfffffffc1", "1dfffffffd1", "1dfffffffd1", ".111111111."] },
+    { char = "—", left = 0, top = 7, advance = 17, rows = ["1cfffffffffffffc1", "1dfffffffffffffd1", "1dfffffffffffffd1", ".111111111111111."] },
+    { char = "‘", left = 0, top = 11, advance = 6, rows = [".3bd8.", "2dfe8.", "3ed54.", "3effd1", "3effd1", "2cddb1"] },
+    { char = "’", left = 0, top = 11, advance = 6, rows = ["2cddb1", "3effd1", "3effd1", "17afd1", "1befb.", "1bdb2."] },
+    { char = "“", left = 0, top = 11, advance = 10, rows = [".5cd6.6dd4", "3efd75ffd4", "5fb537f852", "5fffb8fff7", "5fffb8fff7", "4ddd96ddd6"] },
+    { char = "”", left = 0, top = 11, advance = 10, rows = ["4ddd96ddd5", "5fffb8fff7", "5fffb8fff7", "18afb49bf7", "2cef94def6", "2cda14dd81"] },
+    { char = "•", left = 0, top = 8, advance = 7, rows = ["4ffffd1", "5ffffd1", "5ffffd1", "5ffffd1", "5ffffd1", ".11111."] },
+    { char = "…", left = 0, top = 5, advance = 17, rows = [".1111..111..1111.", "3effd19fff54fffb1", "3effd19fff55fffb1", "3effd19fff55fffb1", "3effd19fff44fffb1"] },
+    { char = "›", left = 0, top = 9, advance = 8, rows = ["1ac841..", "1bffffc2", "1bfffff7", "..24aff7", ".5aefff7", "1bfffff5", "1bffea4.", ".33....."] },
+    { char = "€", left = 0, top = 11, advance = 10, rows = ["..4addddb1", ".5ffffffd1", ".bffffffd1", "2dffa552..", "5ffffff7..", "2cffa552..", "5ffffff7..", "4fffedd5..", "1bfffdddb1", ".7ffffffd1", ".17effffd1"] },
+    { char = "™", left = -1, top = 11, advance = 14, rows = [".9dddd88d8.6d9.", "1bffff99ff6dfb1", "..3ed1.9fffffb1", "..3ed1.9fefefb1", "..3ed1.9f866fb1", "..3ed1.9f7.5fb1", "..2981.594.397."] },
+]
+
+[fonts.body]
+ascent = 13
+descent = 4
+glyphs = [
+    { char = " ", left = 0, top = 0, advance = 3, rows = [] },
+    { char = "!", left = 0, top = 10, advance = 6, rows = [".4552", "1dff6", "1bff5", "1bff5", "1bff5", "1bff5", ".6992", ".7993", "1bff7", "1bff6"] },
+    { char = "\"", left = 0, top = 10, advance = 8, rows = ["25531553.", "5ffb5ffb1", "5ff95ffb1", "5ff95ff9.", "5ff95ff9.", "28952895."] },
+    { char = "#", left = 0, top = 10, advance = 10, rows = ["..253.352.", "..9fa1bf7.", "18dfcaffb2", "1dfffffff5", "19ffabff92", ".3ee35fc1.", "7fffffffb1", "7fffffffb1", "1afa2cf71.", ".af71df4.."] },
+    { char = "$", left = 0, top = 11, advance = 8, rows = ["..1895...", "..4ffb52.", "1bfffff7.", "4ffffff7.", "5ffa211..", "5ffffeb2.", "2dfffffb.", ".159bffd1", "25556efd1", "5ffffffb1", "4fffffc3.", "..3ef9...", "...111..."] },
+    { char = "%", left = 0, top = 10, advance = 13, rows = [".2551.154.....", "5fffd26fb1....", "7f9be3af9.....", "7f79e4df5.....", "7fcde6ee34551.", "3effb7fc9fffc1", "..11.9f99f6dd1", "....1df59e5dd1", "....3ee29fbfd1", "....5fc15eff8."] },
+    { char = "&", left = 0, top = 10, advance = 10, rows = ["..15554...", ".5ffffd1..", ".9ffffd1..", ".9fe3.....", ".4ffe41111", "3efff5bff9", "7ff952bff9", "7ff956dfc1", "5fffffffb.", "1afffffd3."] },
+    { char = "'", left = 0, top = 10, advance = 5, rows = ["1554.", "4ffb1", "3efb1", "3efb1", "3efb1", "1895."] },
+    { char = "(", left = 0, top = 11, advance = 6, rows = ["..254.", "1bffd1", "4fffd1", "5ffa1.", "5ff9..", "5ff9..", "5ff9..", "5ff9..", "5ff9..", "5ffc4.", "3fffd1", ".6efd1"] },
+    { char = ")", left = 0, top = 11, advance = 6, rows = ["2551..", "7fff6.", "7fffb1", ".3efd1", ".1dfd1", ".1dfd1", ".1dfd1", ".1dfd1", ".1dfd1", "26efd1", "7fffb.", "6ffc2."] },
+    { char = "*", left = 0, top = 10, advance = 9, rows = ["...254...", "...7fb1..", ".965fa3a2", "2dffffff5", "2aefffec5", "..5fff91.", ".5ff8ef9.", ".19c18c2."] },
+    { char = "+", left = 0, top = 9, advance = 10, rows = ["...4971..", "...7fd1..", "...7fd1..", "2cdeffed8", "3effffff9", "189cffa95", "...7fd1..", "...7fd1..", "....11..."] },
+    { char = ",", left = 0, top = 4, advance = 5, rows = ["29992", "5fff5", "5fff5", ".37f4", "3efd2", ".11.."] },
+    { char = "-", left = 0, top = 6, advance = 5, rows = ["7fffd1", "7fffd1", "499971"] },
+    { char = ".", left = 0, top = 4, advance = 5, rows = ["29992", "5fff5", "5fff5", "4fff4"] },
+    { char = "/", left = -1, top = 11, advance = 5, rows = ["..2993", "..7ff5", "..9ff4", "..afe2", ".1cfd1", ".2dfb1", ".3ef9.", ".5ff7.", ".7ff5.", ".9fe3.", ".bfe2.", "1cfd1.", ".111.."] },
+    { char = "0", left = 0, top = 10, advance = 9, rows = ["..379951.", "1bfffffe3", "3effffff9", "4ffa.4ff9", "5ff9.3ef9", "5ff9.3ef9", "5ff9.3ef9", "4ffc58ff9", "2effffff8", ".5effffa1", "...111..."] },
+    { char = "1", left = 0, top = 10, advance = 8, rows = [".45552..", "3efff9..", "3efff9..", ".18ff9..", "..7ff9..", "..7ff9..", "..7ff9..", "29cffd92", "5ffffff5", "4ffffff4"] },
+    { char = "2", left = 0, top = 10, advance = 8, rows = [".455551.", "1dfffff4", "1dfffff9", "....6ff9", ".18dfff8", "3effffd3", "6fffa4..", "7ffa5553", "7ffffff9", "7ffffff9"] },
+    { char = "3", left = 0, top = 10, advance = 8, rows = ["155552..", "5fffff8.", "5fffffb1", ".113dfb1", ".4ffff7.", ".5fffff8", ".1557ff9", "25557ff9", "5ffffff9", "4fffffb2"] },
+    { char = "4", left = 0, top = 10, advance = 9, rows = ["1453.3551", "3efb19ff5", "3efb19ff5", "3efb19ff5", "3efb19ff5", "3effefff5", "2effffff5", ".5cddfff5", ".....9ff5", ".....9ff4"] },
+    { char = "5", left = 0, top = 10, advance = 8, rows = ["14555551.", "3efffff5.", "3efffff5.", "3efc211..", "3effffe4.", "3efffffb1", "14557ffb1", "15557ffb1", "5ffffffb.", "4fffffc2."] },
+    { char = "6", left = 0, top = 10, advance = 9, rows = ["..255551.", ".9fffff5.", "3efffff5.", "4ffb211..", "5ffffff8.", "5fffffff4", "5ffb28ff5", "4ffb28ff5", "2effffff4", ".6effff8.", "...111..."] },
+    { char = "7", left = 0, top = 10, advance = 8, rows = ["25555552", "7ffffff7", "7ffffff7", ".1118ff7", "..15cff7", ".3effff5", ".7fffe7.", ".7ff8...", ".7ff7...", ".7ff7..."] },
+    { char = "8", left = 0, top = 10, advance = 9, rows = ["..37984..", ".7fffffb1", "1bffdffd1", ".bfb17fd1", ".6ffeff9.", "3effffff5", "5ffa37ff9", "5ff8.4ff9", "4fffffff8", ".8fffffa1", "...111..."] },
+    { char = "9", left = 0, top = 10, advance = 9, rows = [".148973..", "2cfffffb1", "4fffdffe3", "5ff7.9ff5", "5ffc7dff5", "3effffff5", ".2899dff5", ".2556dff4", ".5fffffd2", ".5ffffd4."] },
+    { char = ":", left = 0, top = 9, advance = 5, rows = ["29992", "5fff5", "5fff5", "4fff4", ".....", "29992", "5fff5", "5fff5", "4fff4"] },
+    { char = ";", left = 0, top = 9, advance = 5, rows = ["29992", "5fff5", "5fff5", "4fff4", ".....", "29992", "5fff5", "5fff5", ".37f4", "3efd2", ".11.."] },
+    { char = "<", left = 0, top = 9, advance = 9, rows = ["......261", "..15affe3", ".7fffffe3", "1dfffa51.", "1dfc3....", "1cffffc61", ".3cffffe3", "....49ee3", ".......1."] },
+    { char = "=", left = 0, top = 8, advance = 10, rows = ["2cdddddd8", "3effffff9", "189999995", ".........", "2effffff9", "3effffff9", "145555553"] },
+    { char = ">", left = 0, top = 9, advance = 9, rows = [".63......", "1bffc62..", "1bfffffb1", "..39dffe3", "....29fe3", ".4aefffe3", "1bffffd5.", "1bfb51...", ".1......."] },
+    { char = "?", left = 0, top = 10, advance = 9, rows = ["1555551..", "7ffffff7.", "7ffffffc1", ".1113efd1", ".3dffffd1", ".4fffff9.", ".2dda74..", ".39971...", ".5ffd1...", ".4ffd1..."] },
+    { char = "@", left = 0, top = 11, advance = 11, rows = ["..1479852..", ".6ffdddef9.", "2d7.....4e5", "3d2399994b7", "3c3dffff5b7", "3c5ed29f5b7", "3c5ed19f5b7", "3c5ed29f5b7", "3c3dffffee3", "3d349ddc94.", "1cc41......", ".2bfffff7..", "....11111.."] },
+    { char = "A", left = 0, top = 10, advance = 9, rows = ["..25554...", ".1bffff4..", ".3fffffa..", ".9ff6cfe2.", "1dfd18ff6.", "4ffd9bffa.", "5fffffffb1", "5ffedeffb1", "5ff7.3efb1", "4ff7.3efb1"] },
+    { char = "B", left = 0, top = 10, advance = 9, rows = [".455552...", "3efffffa..", "3effdffd1.", "3efb17fd1.", "3effdff9..", "3effffff8.", "3efc23efb1", "3efc23efb1", "3effffffb1", "3efffffd4."] },
+    { char = "C", left = 0, top = 10, advance = 8, rows = ["..255552", ".9fffff9", "3efffff9", "4ffb211.", "5ff9....", "5ff9....", "5ff9....", "4ffe6553", "2dfffff9", ".4dffff9"] },
+    { char = "D", left = 0, top = 10, advance = 10, rows = [".4555541..", "3effffff5.", "3effffffb1", "3efc23efd1", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1", "3efd57ffd1", "3effffffa.", "3efffffa2."] },
+    { char = "E", left = 0, top = 10, advance = 9, rows = [".4555553.", "3efffffb1", "3efffffb1", "3efb1....", "3effffb1.", "3effffb1.", "3efd553..", "3efd5554.", "3efffffb1", "3efffffb1"] },
+    { char = "F", left = 0, top = 10, advance = 8, rows = [".4555553", "3efffff9", "3efffff9", "3efc211.", "3efe994.", "3effff7.", "3effff7.", "3efb1...", "3efb1...", "3efb1..."] },
+    { char = "G", left = 0, top = 10, advance = 9, rows = ["..255553.", ".9fffff9.", "3efffff9.", "4ffb2111.", "5ff9.....", "5ff9.6ff7", "5ff9.7ff7", "4ffd6aff7", "2dffffff7", ".4dfffff7"] },
+    { char = "H", left = 0, top = 10, advance = 10, rows = [".453..454.", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1", "3effffffd1", "3effffffd1", "3efe9affd1", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1"] },
+    { char = "I", left = 0, top = 10, advance = 8, rows = ["15555541", "5fffffe3", "5fffffe3", ".18ff81.", "..7ff7..", "..7ff7..", "..7ff7..", "15affa51", "5fffffe3", "4fffffe3"] },
+    { char = "J", left = 0, top = 10, advance = 9, rows = [".....354.", "....1bfe3", "....1bfe3", "....1bfe3", "....1bfe3", "7ff51bfe3", "7ff51bfe3", "7ff96dfe3", "5ffffffd1", ".8ffffe4.", "...111..."] },
+    { char = "K", left = 0, top = 10, advance = 10, rows = [".453.1453.", "3efb16ff6.", "3efb2dfd2.", "3efb6ff8..", "3efffffd4.", "3effffffc1", "3efe9affd1", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1"] },
+    { char = "L", left = 0, top = 10, advance = 9, rows = [".453.....", "3efb1....", "3efb1....", "3efb1....", "3efb1....", "3efb15ff7", "3efb15ff7", "3efd58ff7", "3effffff7", "3effffff7"] },
+    { char = "M", left = 0, top = 10, advance = 11, rows = [".454...4541", "3eff5.4ffe3", "3effc2bffe3", "3efffdfffe3", "3efffffffe3", "3efddfddfe3", "3efb6d6bfe3", "3efb1.1bfe3", "3efb1.1bfe3", "3efb..1bfe3"] },
+    { char = "N", left = 0, top = 10, advance = 10, rows = [".451..453.", "3efd21dfb1", "3effb2dfb1", "3efffbefb1", "3effffffb1", "3efeefffb1", "3efb4effb1", "3efb15ffb1", "3efb11dfb1", "3efb11dfb1"] },
+    { char = "O", left = 0, top = 10, advance = 10, rows = ["..379951..", "1affffff5.", "3effffffb.", "4ffa.3efb1", "5ff9.3efb1", "5ff9.3efb1", "5ff9.3efb1", "4ffc57ffb1", "2effffff9.", ".5effffb2.", "...111...."] },
+    { char = "P", left = 0, top = 10, advance = 9, rows = [".455552..", "3efffffb1", "3effffff4", "3efb16ff5", "3efb15ff5", "3effffff4", "3efffffc1", "3efd553..", "3efb1....", "3efb1...."] },
+    { char = "Q", left = 0, top = 10, advance = 10, rows = ["..379951..", "1affffff5.", "3effffffb.", "4ffa.3efb1", "5ff9.3efb1", "5ff9.3efb1", "5ff9.3efb1", "4ffc25ffb1", "2dffffff9.", ".4cffff91.", "...9ff4...", "...111...."] },
+    { char = "R", left = 0, top = 10, advance = 10, rows = [".455553...", "3efffffc1.", "3efffffe3.", "3efb1aff4.", "3efd6cfd2.", "3effffff9.", "3effffffe2", "3efb11bfe3", "3efb11bfe3", "3efb11bfe2"] },
+    { char = "S", left = 0, top = 10, advance = 8, rows = ["..355552.", "1bfffff7.", "4ffffff7.", "5ffa211..", "5ffffeb2.", "2dfffffb.", ".159bffd1", "25556efd1", "5ffffffb1", "4fffffc3."] },
+    { char = "T", left = 0, top = 10, advance = 9, rows = ["355555541", "9ffffffe3", "9ffffffe3", "116ffc21.", "..5ffb1..", "..5ffb1..", "..5ffb1..", "..5ffb1..", "..5ffb1..", "..4ffb1.."] },
+    { char = "U", left = 0, top = 10, advance = 10, rows = ["1453..453.", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efd67ffb1", "2dffffffa.", ".4effffc2.", "...111...."] },
+    { char = "V", left = 0, top = 10, advance = 9, rows = ["1553.1453.", "5ffb13efb1", "5ffb13efb1", "5ffb13efb1", "5ffb13efb1", "3efd15ff9.", "1bff4aff5.", ".6fffffd1.", ".2dffff8..", "..8fffe3.."] },
+    { char = "W", left = 0, top = 10, advance = 11, rows = ["1453...354.", "3ef9..1bfd1", "3ef9..1bfd1", "3ef9.11bfd1", "3efa9f8bfd1", "3efdefedfd1", "3efffffffd1", "2effe8fffc1", ".affb2dff8.", ".5ff8.afe3."] },
+    { char = "X", left = 0, top = 10, advance = 10, rows = ["1453..453.", "3ef9.3efb1", "3efb14ffb1", "1bff9dff6.", ".3effff9..", ".2dffff7..", ".9ffceff5.", "3efd25ffb.", "3ef9.3efb1", "3ef9.3efb1"] },
+    { char = "Y", left = 0, top = 10, advance = 9, rows = ["1552.1552", "7ff7.5ff7", "7ff7.5ff7", "7ff8.5ff7", "4ffe3bff6", ".9fffffb1", ".2dfffe3.", "..3eff5..", "..1dfe3..", "..1dfe3.."] },
+    { char = "Z", left = 0, top = 10, advance = 9, rows = ["14555553.", "3efffffb1", "3efffffb1", ".115fff8.", "..2dffb1.", ".1bffd2..", ".9ffe3...", "4fffb5541", "5ffffffd1", "5ffffffd1"] },
+    { char = "[", left = 0, top = 11, advance = 6, rows = ["15554.", "5fffd1", "5fffd1", "5ffa1.", "5ff9..", "5ff9..", "5ff9..", "5ff9..", "5ff9..", "5ffb4.", "5fffd1", "5fffd1"] },
+    { char = "\\", left = -1, top = 11, advance = 5, rows = ["1796..", "1bfd1.", ".afe3.", ".8ff4.", ".6ff5.", ".4ff7.", ".3efa.", ".1dfb1", ".1bfd1", "..afe3", "..7ff4", "..5ff6", "...11."] },
+    { char = "]", left = 0, top = 11, advance = 6, rows = ["25554.", "7fffd1", "7fffd1", ".3dfd1", ".1dfd1", ".1dfd1", ".1dfd1", ".1dfd1", ".1dfd1", "26efd1", "7fffd1", "6fffd1"] },
+    { char = "^", left = 0, top = 10, advance = 9, rows = ["...352...", "..afff8..", ".2efffd1.", ".5ffaff4.", ".9fd4ef7.", "2df91bfb.", "4ff5.8fe2", "5dc2.4dd4"] },
+    { char = "_", left = 0, top = 2, advance = 10, rows = [".45555552", "3effffff9", "3effffff9", ".45555552"] },
+    { char = "`", left = 0, top = 13, advance = 7, rows = ["3531...", "7ffffd1", "4ceffd1", "....11."] },
+    { char = "a", left = 0, top = 10, advance = 9, rows = ["..25554...", ".1bffff4..", ".3fffffa..", ".9ff6cfe2.", "1dfd18ff6.", "4ffd9bffa.", "5fffffffb1", "5ffedeffb1", "5ff7.3efb1", "4ff7.3efb1"] },
+    { char = "b", left = 0, top = 10, advance = 9, rows = [".455552...", "3efffffa..", "3effdffd1.", "3efb17fd1.", "3effdff9..", "3effffff8.", "3efc23efb1", "3efc23efb1", "3effffffb1", "3efffffd4."] },
+    { char = "c", left = 0, top = 10, advance = 8, rows = ["..255552", ".9fffff9", "3efffff9", "4ffb211.", "5ff9....", "5ff9....", "5ff9....", "4ffe6553", "2dfffff9", ".4dffff9"] },
+    { char = "d", left = 0, top = 10, advance = 10, rows = [".4555541..", "3effffff5.", "3effffffb1", "3efc23efd1", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1", "3efd57ffd1", "3effffffa.", "3efffffa2."] },
+    { char = "e", left = 0, top = 10, advance = 9, rows = [".4555553.", "3efffffb1", "3efffffb1", "3efb1....", "3effffb1.", "3effffb1.", "3efd553..", "3efd5554.", "3efffffb1", "3efffffb1"] },
+    { char = "f", left = 0, top = 10, advance = 8, rows = [".4555553", "3efffff9", "3efffff9", "3efc211.", "3efe994.", "3effff7.", "3effff7.", "3efb1...", "3efb1...", "3efb1..."] },
+    { char = "g", left = 0, top = 10, advance = 9, rows = ["..255553.", ".9fffff9.", "3efffff9.", "4ffb2111.", "5ff9.....", "5ff9.6ff7", "5ff9.7ff7", "4ffd6aff7", "2dffffff7", ".4dfffff7"] },
+    { char = "h", left = 0, top = 10, advance = 10, rows = [".453..454.", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1", "3effffffd1", "3effffffd1", "3efe9affd1", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1"] },
+    { char = "i", left = 0, top = 10, advance = 8, rows = ["15555541", "5fffffe3", "5fffffe3", ".18ff81.", "..7ff7..", "..7ff7..", "..7ff7..", "15affa51", "5fffffe3", "4fffffe3"] },
+    { char = "j", left = 0, top = 10, advance = 9, rows = [".....354.", "....1bfe3", "....1bfe3", "....1bfe3", "....1bfe3", "7ff51bfe3", "7ff51bfe3", "7ff96dfe3", "5ffffffd1", ".8ffffe4.", "...111..."] },
+    { char = "k", left = 0, top = 10, advance = 10, rows = [".453.1453.", "3efb16ff6.", "3efb2dfd2.", "3efb6ff8..", "3efffffd4.", "3effffffc1", "3efe9affd1", "3efb11dfd1", "3efb11dfd1", "3efb11dfd1"] },
+    { char = "l", left = 0, top = 10, advance = 9, rows = [".453.....", "3efb1....", "3efb1....", "3efb1....", "3efb1....", "3efb15ff7", "3efb15ff7", "3efd58ff7", "3effffff7", "3effffff7"] },
+    { char = "m", left = 0, top = 10, advance = 11, rows = [".454...4541", "3eff5.4ffe3", "3effc2bffe3", "3efffdfffe3", "3efffffffe3", "3efddfddfe3", "3efb6d6bfe3", "3efb1.1bfe3", "3efb1.1bfe3", "3efb..1bfe3"] },
+    { char = "n", left = 0, top = 10, advance = 10, rows = [".451..453.", "3efd21dfb1", "3effb2dfb1", "3efffbefb1", "3effffffb1", "3efeefffb1", "3efb4effb1", "3efb15ffb1", "3efb11dfb1", "3efb11dfb1"] },
+    { char = "o", left = 0, top = 10, advance = 10, rows = ["..379951..", "1affffff5.", "3effffffb.", "4ffa.3efb1", "5ff9.3efb1", "5ff9.3efb1", "5ff9.3efb1", "4ffc57ffb1", "2effffff9.", ".5effffb2.", "...111...."] },
+    { char = "p", left = 0, top = 10, advance = 9, rows = [".455552..", "3efffffb1", "3effffff4", "3efb16ff5", "3efb15ff5", "3effffff4", "3efffffc1", "3efd553..", "3efb1....", "3efb1...."] },
+    { char = "q", left = 0, top = 10, advance = 10, rows = ["..379951..", "1affffff5.", "3effffffb.", "4ffa.3efb1", "5ff9.3efb1", "5ff9.3efb1", "5ff9.3efb1", "4ffc25ffb1", "2dffffff9.", ".4cffff91.", "...9ff4...", "...111...."] },
+    { char = "r", left = 0, top = 10, advance = 10, rows = [".455553...", "3efffffc1.", "3efffffe3.", "3efb1aff4.", "3efd6cfd2.", "3effffff9.", "3effffffe2", "3efb11bfe3", "3efb11bfe3", "3efb11bfe2"] },
+    { char = "s", left = 0, top = 10, advance = 8, rows = ["..355552.", "1bfffff7.", "4ffffff7.", "5ffa211..", "5ffffeb2.", "2dfffffb.", ".159bffd1", "25556efd1", "5ffffffb1", "4fffffc3."] },
+    { char = "t", left = 0, top = 10, advance = 9, rows = ["355555541", "9ffffffe3", "9ffffffe3", "116ffc21.", "..5ffb1..", "..5ffb1..", "..5ffb1..", "..5ffb1..", "..5ffb1..", "..4ffb1.."] },
+    { char = "u", left = 0, top = 10, advance = 10, rows = ["1453..453.", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efb11dfb1", "3efd67ffb1", "2dffffffa.", ".4effffc2.", "...111...."] },
+    { char = "v", left = 0, top = 10, advance = 9, rows = ["1553.1453.", "5ffb13efb1", "5ffb13efb1", "5ffb13efb1", "5ffb13efb1", "3efd15ff9.", "1bff4aff5.", ".6fffffd1.", ".2dffff8..", "..8fffe3.."] },
+    { char = "w", left = 0, top = 10, advance = 11, rows = ["1453...354.", "3ef9..1bfd1", "3ef9..1bfd1", "3ef9.11bfd1", "3efa9f8bfd1", "3efdefedfd1", "3efffffffd1", "2effe8fffc1", ".affb2dff8.", ".5ff8.afe3."] },
+    { char = "x", left = 0, top = 10, advance = 10, rows = ["1453..453.", "3ef9.3efb1", "3efb14ffb1", "1bff9dff6.", ".3effff9..", ".2dffff7..", ".9ffceff5.", "3efd25ffb.", "3ef9.3efb1", "3ef9.3efb1"] },
+    { char = "y", left = 0, top = 10, advance = 9, rows = ["1552.1552", "7ff7.5ff7", "7ff7.5ff7", "7ff8.5ff7", "4ffe3bff6", ".9fffffb1", ".2dfffe3.", "..3eff5..", "..1dfe3..", "..1dfe3.."] },
+    { char = "z", left = 0, top = 10, advance = 9, rows = ["14555553.", "3efffffb1", "3efffffb1", ".115fff8.", "..2dffb1.", ".1bffd2..", ".9ffe3...", "4fffb5541", "5ffffffd1", "5ffffffd1"] },
+    { char = "{", left = 0, top = 11, advance = 6, rows = ["..1451", ".5fff5", "1bfff5", "1bfe3.", "1bfd1.", "8ffd1.", "9fe5..", "4efd1.", "1bfd1.", "1bff71", ".afff5", ".2bff4"] },
+    { char = "|", left = 0, top = 11, advance = 5, rows = ["1895", "3ef9", "3ef9", "3ef9", "3ef9", "3ef9", "3ef9", "3ef9", "3ef9", "3ef9", "3ef9", "3ef9", ".111"] },
+    { char = "}", left = 0, top = 11, advance = 6, rows = ["2541..", "7fff5.", "7fffb.", ".4efb1", ".3efb1", ".3eff7", "..6ef9", ".3efe4", ".3efb1", "27ffb1", "7fff9.", "6ffa1."] },
+    { char = "~", left = 0, top = 7, advance = 10, rows = ["..11....1", "2dffffdf9", "3effffff9", "163257971"] },
+    { char = "–", left = 0, top = 6, advance = 10, rows = ["2effffff9", "3effffff9", "189999995"] },
+    { char = "—", left = 0, top = 6, advance = 15, rows = ["2efffffffffffb1", "3efffffffffffb1", "18999999999996."] },
+    { char = "‘", left = 0, top = 10, advance = 5, rows = [".154.", "2dfe3", "4f941", "5fff5", "5fff5", "28982"] },
+    { char = "’", left = 0, top = 10, advance = 5, rows = ["15551", "5fff5", "5fff5", "18bf5", "2efe2", "1882."] },
+    { char = "“", left = 0, top = 10, advance = 9, rows = [".154.1441", "3efd3dfe3", "6f844fa51", "7ffe8fff5", "7ffe8fff5", "399838992"] },
+    { char = "”", left = 0, top = 10, advance = 9, rows = ["155414551", "7ffe8fff5", "7ffe8fff5", "29ce48bf5", "3ffc4efe3", "18711882."] },
+    { char = "•", left = 0, top = 7, advance = 6, rows = ["6fffe3", "7fffe3", "7fffe3", "7fffe3", "399981"] },
+    { char = "…", left = 0, top = 4, advance = 14, rows = ["29992499716995", "5fff57ffd2bff9", "5fff57ffd2bff9", "4fff47ffd2bff9"] },
+    { char = "›", left = 0, top = 8, advance = 7, rows = ["1a831..", "1dfffc2", "1bffff7", "..16ff7", "1cffff7", "1dfffb2", "1762..."] },
+    { char = "€", left = 0, top = 10, advance = 8, rows = ["..145553.", ".6fffffb1", "1cfffffb1", "3efe652..", "7fffff7..", "3efd552..", "7fffff7..", "2dfe7763.", ".bfffffb1", ".2bffffb1"] },
+    { char = "™", left = -1, top = 10, advance = 12, rows = [".35554252.341", "1bfffd9fb4fe3", ".16f817ffffe3", "..5f7.7feffe3", "..5f7.7f64be3", "..5f7.7f51be3", "...11.11..11."] },
+]
+
+[fonts.small]
+ascent = 12
+descent = 3
+glyphs = [
+    { char = " ", left = 0, top = 0, advance = 3, rows = [] },
+    { char = "!", left = 0, top = 9, advance = 3, rows = ["5b1", "5b1", "5b1", "5b1", "5b1", "5b1", "5b1", "...", "59."] },
+    { char = "\"", left = 0, top = 8, advance = 5, rows = ["593c1", "593a1", "593a1"] },
+    { char = "#", left = -1, top = 8, advance = 9, rows = ["....97.1c3.", "...1c3.5b1.", ".5ffffffff5", "...77.1a3..", "..1a3.3c1..", "1bfffffffb1", "..79..95...", ".1a3.1b1..."] },
+    { char = "$", left = 0, top = 9, advance = 8, rows = ["..1c3..", ".1dffe3", "1b6c3..", "1b3c3..", ".7fff9.", "..1c4b7", "..1c379", "..1c5d5", "5ffff7.", "..1c3..", "..1c3.."] },
+    { char = "%", left = 0, top = 9, advance = 9, rows = [".....39..", ".7f7.95..", "3c3b5c1..", "3c3ca7...", ".9fbb1...", "...775fe3", "..1b2a379", "..791a379", ".1a3.7fd1"] },
+    { char = "&", left = 0, top = 8, advance = 7, rows = ["..1be3..", "..5997..", "..3ed1..", ".1df539.", "1d53a59.", "77..9f7.", "79..5f5.", ".9ffb4c1"] },
+    { char = "'", left = 1, top = 8, advance = 4, rows = ["5b1", "79.", "59."] },
+    { char = "(", left = 0, top = 9, advance = 4, rows = ["..7b1", ".5d1.", "1b5..", "3c1..", "5b1..", "59...", "59...", "3a1..", "1c3..", ".7b1.", "..99."] },
+    { char = ")", left = 0, top = 9, advance = 4, rows = ["79..", "1b7.", ".3c1", ".1b5", "..97", "..77", "..77", "..95", ".1c3", ".99.", "7b1."] },
+    { char = "*", left = 0, top = 8, advance = 6, rows = [".1a3..", "9fffe3", ".5fd1.", "5d179."] },
+    { char = "+", left = 0, top = 6, advance = 5, rows = [".1c3..", ".1b1..", "9fffb1", ".1b1..", ".1b1.."] },
+    { char = ",", left = 0, top = 1, advance = 3, rows = [".59", "1a3"] },
+    { char = "-", left = 0, top = 3, advance = 5, rows = ["5ffe3"] },
+    { char = ".", left = 0, top = 1, advance = 3, rows = ["5d1"] },
+    { char = "/", left = 0, top = 9, advance = 6, rows = ["...1a3", "...59.", "...95.", "..3a1.", "..95..", ".3a1..", ".95...", "3a1...", "77...."] },
+    { char = "0", left = 0, top = 8, advance = 7, rows = [".9fff5.", "5b1.3a1", "97..1a3", "95..1a3", "95..1a3", "97..1b1", "5b1.5b1", "1bffe3."] },
+    { char = "1", left = 0, top = 8, advance = 5, rows = [".1b5.", "1df5.", ".1b5.", ".1a3.", ".1a3.", ".1c3.", ".1a3.", "1dff5"] },
+    { char = "2", left = 0, top = 8, advance = 7, rows = [".1dfe3.", "3e5.5b1", "....5b1", "...5f5.", ".1bd1..", "1b7....", "3c1....", "3efffd1"] },
+    { char = "3", left = 0, top = 8, advance = 7, rows = [".3efd1.", "1b5.79.", "....79.", ".1bfb1.", "...1b9.", "....3a1", "3c1.79.", ".7ffb1."] },
+    { char = "4", left = 0, top = 8, advance = 7, rows = ["...5e3.", "..1de3.", "..98a3.", ".5b1a3.", "1c31a3.", "9fffff5", "...1a3.", "...1a3."] },
+    { char = "5", left = 0, top = 8, advance = 7, rows = ["3efffd1", "1b1....", "3efff5.", "3d3.3c1", "....1a3", "....1a3", "59..5b1", ".9ffb1."] },
+    { char = "6", left = 0, top = 8, advance = 7, rows = ["..1b5..", ".1d7...", ".97....", "3effe3.", "5b1.5b1", "59..1b1", "3d3.7b1", ".5ffd1."] },
+    { char = "7", left = 0, top = 8, advance = 7, rows = ["9fffff7", "....99.", "...5b1.", "..1b5..", "..3c1..", "..97...", ".1b1...", ".79...."] },
+    { char = "8", left = 0, top = 8, advance = 7, rows = [".3efe3.", "1a3.79.", "1c3.79.", ".3efb1.", "1c3.5b1", "3a1.1b1", "3d3.5d1", ".7ffe3."] },
+    { char = "9", left = 0, top = 8, advance = 7, rows = [".5ffe3.", "3a1.3c1", "59..1a3", "3a1.1a3", ".7fffd1", "....97.", "..1bb1.", "1be3..."] },
+    { char = ":", left = 0, top = 6, advance = 3, rows = ["1c3", "...", "...", "...", "1a3"] },
+    { char = ";", left = 0, top = 6, advance = 3, rows = ["1a3", "...", "...", "...", "...", "3c1", "95."] },
+    { char = "<", left = -1, top = 6, advance = 4, rows = ["..1c3", ".1b7.", "1d7..", ".1d5.", "..3c1"] },
+    { char = "=", left = 0, top = 6, advance = 6, rows = ["7fffb1", "......", "......", "5fff9."] },
+    { char = ">", left = 0, top = 6, advance = 4, rows = ["79...", ".9b1.", "..7d1", ".9d1.", "99..."] },
+    { char = "?", left = 0, top = 8, advance = 6, rows = ["7ffd1.", "...5d1", "...1a3", "...9b1", ".1dd1.", ".7b1..", "......", "1c3..."] },
+    { char = "@", left = 0, top = 9, advance = 10, rows = ["..3efff5..", ".5b1...99.", "1c35f9.1a3", "5b4d393.97", "59593d31b5", "5b1bb2df9.", "1c3.......", ".3c1..5d1.", "..1dfff5.."] },
+    { char = "A", left = 0, top = 8, advance = 8, rows = ["....79..", "...3eb1.", "..1a5b1.", "..791a3.", ".1dfff7.", ".77..79.", "1c3..3c1", "5b1..1a3"] },
+    { char = "B", left = 0, top = 8, advance = 7, rows = [".9ffb1.", "1b5.99.", "1b5.3c1", "1b5.99.", "1dffe3.", "1b1.1d7", "1b1.5f5", "1dffd1."] },
+    { char = "C", left = 0, top = 8, advance = 7, rows = ["..1bff5", ".1d7.77", ".99....", "3c1....", "79.....", "77.....", "3c1.5e3", ".5ffd1."] },
+    { char = "D", left = 0, top = 8, advance = 8, rows = ["1bd1....", "1b3de3..", "191.1d5.", "191..1b1", "191..1b5", "1b1..1c3", "1b1..99.", ".9fff9.."] },
+    { char = "E", left = 0, top = 8, advance = 7, rows = ["3effff7", "1b1....", "191....", "3efffe3", "3a1....", "3a1....", "3a1....", "1bfffd1"] },
+    { char = "F", left = 0, top = 8, advance = 7, rows = ["1dffff7", "1b1....", "1b1....", "1dfffb1", "1b1....", "1b1....", "1b1....", "1b1...."] },
+    { char = "G", left = 0, top = 8, advance = 7, rows = ["..3efb1.", ".3c1.77.", "1b5.....", "3a1.....", "777ffff5", "77...3a1", "59..1b5.", ".9ffe3.."] },
+    { char = "H", left = 0, top = 8, advance = 8, rows = ["1b1...3a1", "1b1...5b1", "191...59.", "1b5efff9.", "1de3..77.", "1b1...77.", "3a1...79.", "3a1...59."] },
+    { char = "I", left = 0, top = 8, advance = 6, rows = ["9ffff9", "..95..", ".1b5..", ".1b5..", ".1b5..", "..95..", "..95..", "7ffff5"] },
+    { char = "J", left = 0, top = 8, advance = 7, rows = [".3efffd1", "...1c3..", "...1c3..", "...1c3..", "...1b1..", "77.191..", "5b139...", ".3ef5..."] },
+    { char = "K", left = 0, top = 8, advance = 7, rows = [".95.1b5", ".951b9.", ".959b1.", ".9f9...", "1bf5...", "1b8e5..", "1b53e7.", "1b5.1d9"] },
+    { char = "L", left = 0, top = 8, advance = 6, rows = ["3a1...", "3a1...", "3a1...", "3a1...", "5b1...", "59....", "59....", "5ffff7"] },
+    { char = "M", left = 0, top = 8, advance = 10, rows = ["..97..79..", ".1d9..9d1.", ".3eb11cc3.", ".5bb13995.", ".95957577.", "1c378a359.", "3c13ca13c1", "5b11d7.1d5"] },
+    { char = "N", left = 0, top = 8, advance = 9, rows = ["5d1...3c1", "5f9...1c3", "3bc7..1b5", "3a2d5.1b5", "3a13d31b5", "3a1.3d4b5", "3a1..5ff5", "5b1...3d3"] },
+    { char = "O", left = 0, top = 8, advance = 9, rows = ["..1dffd1.", ".3e5..5d1", "1b5...1b5", "3a1...1b5", "59....1c3", "5b1...5b1", "1b9..3d3.", "..9ffe3.."] },
+    { char = "P", left = 0, top = 8, advance = 6, rows = ["3efe3.", "5b15e3", "5b1.97", "5b1.95", "59.3c1", "7ffd1.", "79....", "79...."] },
+    { char = "Q", left = 0, top = 8, advance = 10, rows = ["..1dffe3..", ".7e3..3e5.", "3c1....5b1", "77.....1b1", "77.....1c3", "5b11b5.3c1", ".9b13e8b7.", "..5ffffb1.", "......1bb1", ".......1b7"] },
+    { char = "R", left = 0, top = 8, advance = 7, rows = ["3eff5..", "3a11d9.", "3c1.1c3", "3a1.7d1", "5fff9..", "591bd1.", "59..7e3", "39...79"] },
+    { char = "S", left = 0, top = 8, advance = 8, rows = ["..3eff9.", ".5b1....", ".97.....", ".1dffd1.", ".....9b1", ".....1b1", "5b1..59.", ".9fff9.."] },
+    { char = "T", left = 0, top = 8, advance = 7, rows = ["5ffffff9", "...97...", "...77...", "...77...", "...59...", "...59...", "...59...", "...59..."] },
+    { char = "U", left = 0, top = 8, advance = 8, rows = ["191...77", "3c1...97", "3c1...97", "3c1...95", "3c1..1b5", "1b1..1b1", ".95..59.", ".1dffd1."] },
+    { char = "V", left = 0, top = 8, advance = 7, rows = ["3a1..1c3", "1c3..79.", ".95.1b5.", ".79.5b1.", ".3c197..", ".1b6b1..", "..7f9...", "..3d3..."] },
+    { char = "W", left = 0, top = 8, advance = 11, rows = ["3c1..99..1c3", "1b5.1db1.5b1", ".77.5dc1.77.", ".5b198911a3.", ".1b2a39359..", ".1a69.7795..", "..7c5.5b91..", "..5d1.3e7..."] },
+    { char = "X", left = 0, top = 8, advance = 8, rows = ["5d1...97", ".7b1.7b1", "..995e3.", "..1bf5..", "..1df5..", ".1d75d1.", "1b9..7b1", "99...1b7"] },
+    { char = "Y", left = -1, top = 8, advance = 7, rows = ["1b5...79", ".5d1.1c3", "..99.79.", "..1c4b5.", "...7fb1.", "...1b7..", "...5d1..", "..1b5..."] },
+    { char = "Z", left = 0, top = 8, advance = 8, rows = ["7ffffff7", "....3e7.", "...3e5..", "..1d5...", "..99....", ".5b1....", "3d3.....", "9ffffff7"] },
+    { char = "[", left = 0, top = 9, advance = 4, rows = ["1df9.", "1a3..", "1a3..", "1a3..", "1a3..", "1c3..", "1c3..", "1c3..", "1c3..", "1b1..", "1dfd1"] },
+    { char = "\\", left = 0, top = 8, advance = 6, rows = ["1b1...", ".79...", ".1b1..", "..97..", "..3a1.", "..1b5.", "...59.", "...1c3", "....97"] },
+    { char = "]", left = 0, top = 9, advance = 4, rows = ["1df9", "..79", "..77", "..77", "..79", "..79", "..79", "..59", "..59", "..59", "3ef9"] },
+    { char = "^", left = 0, top = 9, advance = 6, rows = ["..5d1.", ".3dab1", "1d5.97"] },
+    { char = "_", left = -1, top = -1, advance = 7, rows = ["3efffffd1"] },
+    { char = "`", left = 0, top = 9, advance = 6, rows = ["3d3.", ".1c3"] },
+    { char = "a", left = 0, top = 6, advance = 6, rows = [".5ffb1", "5b13c1", "95.3a1", "95.3a1", "99.3c1", "1dfb87"] },
+    { char = "b", left = 0, top = 9, advance = 7, rows = ["3c1....", "3a1....", "3a1....", "3bcfd1.", "3d3.5b1", "3a1.1b1", "3a1.1b1", "3a1.59.", "3effb1."] },
+    { char = "c", left = 0, top = 6, advance = 6, rows = ["..9e3.", ".971a3", "3a1...", "59....", "3c11a3", ".7ff9."] },
+    { char = "d", left = 0, top = 9, advance = 6, rows = ["....3a1", "....3a1", "....3a1", ".5ffd9.", "3c1.79.", "79..59.", "77..59.", "3c1.7b1", ".7fffb1"] },
+    { char = "e", left = 0, top = 6, advance = 6, rows = [".5ffb1.", "3d3.93.", "797f7..", "7f9....", "5d1.3a1", ".7ffd1."] },
+    { char = "f", left = 0, top = 9, advance = 6, rows = ["..5fd1", ".1a3..", ".191..", "7fffd1", ".3a1..", ".3a1..", ".3a1..", ".3a1..", ".5b1.."] },
+    { char = "g", left = 0, top = 6, advance = 6, rows = [".1bf7.", "3d3.97", "77.1b5", "95.1c3", "79.6c3", "1bf9b1", "...3c1", "...79.", "9ffd1."] },
+    { char = "h", left = 0, top = 9, advance = 6, rows = ["3a1...", "1b1...", "3c1...", "3c9fe3", "3eb195", "3d3.97", "3c1.97", "3c1.79", "5b1.59"] },
+    { char = "i", left = 0, top = 8, advance = 3, rows = ["1c3", "...", "1b1", "1b1", "1b1", "1b1", "1b1", "1b1"] },
+    { char = "j", left = -1, top = 8, advance = 4, rows = ["..1c3", ".....", "..1a3", "..1a3", "..1b5", "...95", "...95", "...97", "...77", "3d397", ".5fb1"] },
+    { char = "k", left = 0, top = 9, advance = 6, rows = ["1b1...", "1c3...", "1c3...", "1b11b9", "1b19b1", "1cdb1.", "1dab7.", "3c13d3", "3c1.79"] },
+    { char = "l", left = 0, top = 9, advance = 3, rows = ["1c3", "1c3", "1c3", "1c3", "1c3", "1c3", "1c3", "1c3", "1c3"] },
+    { char = "m", left = 0, top = 6, advance = 9, rows = ["5b1a37b1.", "5dd8f777.", "5d159.59.", "5b15b13a1", "59.3a13c1", "5b13c11b1"] },
+    { char = "n", left = 0, top = 6, advance = 6, rows = ["599fb1", "5f91c3", "5e31a3", "5b11c3", "59.1b5", "59.1b5"] },
+    { char = "o", left = 0, top = 6, advance = 6, rows = [".5ff7.", "3c11b1", "77.1a3", "77.1a3", "59.3c1", ".9fe3."] },
+    { char = "p", left = 0, top = 6, advance = 6, rows = ["5fff9.", "5e31c3", "5b1.95", "5b1.95", "5b11c3", "5fff7.", "5b1...", "5b1...", "3a1..."] },
+    { char = "q", left = 0, top = 6, advance = 6, rows = [".3efd1", "3a11b1", "77.3c1", "95.3c1", "79.5b1", ".9ff9.", "...79.", "...77.", "...77."] },
+    { char = "r", left = 0, top = 6, advance = 5, rows = ["3a8fb1", "3e73c1", "5b1...", "5b1...", "5b1...", "3a1..."] },
+    { char = "s", left = 0, top = 6, advance = 5, rows = ["..7fb1", "3e7...", "5fd1..", "..3e7.", "...59.", "9ffe3."] },
+    { char = "t", left = 0, top = 8, advance = 5, rows = [".3c1..", ".1b1..", "9fffb1", ".1b1..", ".1c3..", ".1c3..", ".1c3..", ".1b1.."] },
+    { char = "u", left = 0, top = 6, advance = 6, rows = ["59.1a3", "59.1c3", "79.1c3", "59.1c3", "5b11c3", "1bffe3"] },
+    { char = "v", left = 0, top = 6, advance = 5, rows = ["95.1a3", "59.3a1", "1b197.", ".96c3.", ".5f9..", ".1d5.."] },
+    { char = "w", left = 0, top = 6, advance = 8, rows = ["77.971a3", "791d91b1", "5b5da4a1", "3aa6b97.", "1db1ac3.", ".97.7b1."] },
+    { char = "x", left = 0, top = 6, advance = 6, rows = ["3c1.1c3", ".7b2d7.", "..9f7..", ".1df5..", "1d73d3.", "97..5b1"] },
+    { char = "y", left = -1, top = 6, advance = 6, rows = ["191..77", "1b5.1d5", ".3c15b1", "..95b5.", "..3ed1.", "...97..", "..3c1..", "..79...", ".1a3..."] },
+    { char = "z", left = 0, top = 6, advance = 6, rows = ["3efff9", "...5d1", "..1b5.", "..79..", ".5d1..", "5ffff7"] },
+    { char = "{", left = -1, top = 9, advance = 4, rows = ["..5f9", ".1a3.", ".1b1.", ".1a3.", ".1a3.", "1d9..", ".7b1.", ".1b1.", ".3c1.", ".1a3.", "..5f7"] },
+    { char = "|", left = 1, top = 9, advance = 5, rows = ["3c1", "3c1", "3c1", "3c1", "3c1", "3c1", "3c1", "3c1", "3c1", "3c1", "1b1"] },
+    { char = "}", left = -1, top = 9, advance = 4, rows = ["1dd1.", "..77.", "..79.", "..77.", "..77.", "..1d7", "..3d3", "..59.", "..59.", "..97.", "1dd1."] },
+    { char = "~", left = 0, top = 6, advance = 7, rows = [".7f7.93", "3c5d5b1", "77.9f9."] },
+    { char = "–", left = 0, top = 4, advance = 5, rows = ["9fff7"] },
+    { char = "—", left = 0, top = 4, advance = 10, rows = ["9fffffffe3"] },
+    { char = "‘", left = 0, top = 8, advance = 2, rows = ["75", "77", "57"] },
+    { char = "’", left = 0, top = 8, advance = 2, rows = ["57", "75", "93"] },
+    { char = "“", left = 0, top = 8, advance = 4, rows = ["9595.", "7979.", "3a4a1"] },
+    { char = "”", left = 0, top = 8, advance = 4, rows = ["3a4a1", "7979.", "9595."] },
+    { char = "•", left = 0, top = 6, advance = 4, rows = [".9b1", "1de3", ".9b1"] },
+    { char = "…", left = 0, top = 1, advance = 7, rows = ["1b2b559"] },
+    { char = "›", left = 0, top = 6, advance = 4, rows = ["79...", ".99..", "..9b1", ".7b1.", "5b1.."] },
+    { char = "€", left = -1, top = 8, advance = 7, rows = ["...1dff9", "..3d3.59", "3effff7.", ".1c3....", "3efff7..", ".1b1....", ".1b5.3d3", "..1dfe3."] },
+    { char = "™", left = 0, top = 9, advance = 10, rows = ["7fffec375.", ".1911d8b9.", "..8159b781", "..9492a375"] },
+]
+
+[now_playing_scene]
+script = '''
+rect(x, y, width, height, #000000)
+if width > height {
+    let p0_0 = x + 10
+    let p0_1 = x + 132
+    let p0_2 = y + 8
+    let p0_3 = y + 128
+    let p0_4 = y + 132
+    if has_cover {
+        cover(p0_0, p0_2, 112)
+    } else {
+        rect(p0_0, p0_2, 112, 112, #262429)
+    }
+    line(song, title, p0_1, p0_2, 180, 22, left, #d2c8e1)
+    if present(feedback) {
+        line(feedback, body, p0_1, y + 32, 180, 20, left, #d2c8ff)
+    }
+    if !(present(feedback)) {
+        line(album, body, p0_1, y + 58, 180, 20, left, #d2c8ff)
+    }
+    line(artist, body, p0_1, y + 30, 180, 20, left, #696471)
+    rect(p0_0, p0_3, 300, 3, #262429)
+    rect(p0_0, p0_3, (300 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 3, #6e00ff)
+    text(elapsed, small, p0_0, p0_4, 300, 14, left, #d2c8ff)
+    text(remaining, small, p0_0, p0_4, 300, 14, right, #696471)
+} else {
+    let p0_0 = x + 8
+    let p0_1 = x + 31
+    let p0_2 = y + 8
+    let p0_3 = y + 249
+    let p0_4 = y + 258
+    if has_cover {
+        cover(p0_1, p0_2, 109)
+    } else {
+        rect(p0_1, p0_2, 109, 109, #262429)
+    }
+    line(song, title, p0_0, y + 123, 154, 22, center, #d2c8e1)
+    if present(feedback) {
+        line(feedback, body, p0_0, y + 153, 154, 20, center, #d2c8ff)
+    }
+    if !(present(feedback)) {
+        line(album, body, p0_0, y + 179, 154, 20, center, #d2c8ff)
+    }
+    line(artist, body, p0_0, y + 151, 154, 20, center, #696471)
+    rect(p0_0, p0_3, 154, 3, #262429)
+    rect(p0_0, p0_3, (154 * (volume_shown ? volume_width(1000) : progress(1000)) / 1000), 3, #6e00ff)
+    text(elapsed, small, p0_0, p0_4, 154, 14, left, #d2c8ff)
+    text(remaining, small, p0_0, p0_4, 154, 14, right, #696471)
+}
+if 1 {
+    let at_x = width > height ? x + 132 : x - 4
+    let at_y = width > height ? y + 82 : y + 205
+    repeat copy_1 from 0 to 20 {
+        let cx_1 = at_x + copy_1 * 9
+        let beat_copy_1 = 0
+        if playing {
+            beat_copy_1 = -100
+            repeat back_copy_1 from 0 to 3 {
+                let f = tick - back_copy_1
+                let v = f * 0x9E3779B1 + copy_1 * 0x85EBCA6B
+                v = v ^ (v >>> 15)
+                v = v * 0x2C1B3C6D
+                v = v ^ (v >>> 12)
+                let phase = (f >>> 1) % 3 * 2 + (f & 1)
+                let pulse = phase == 0 ? 3 : phase == 1 ? 1 : 0
+                beat_copy_1 = max(beat_copy_1, 5 - 4 * copy_1 / 20 + (copy_1 < 20 / 2 ? pulse : 0) + (v >>> 30) - ((v >>> 28) & 3) / 2 - 2 * back_copy_1)
+            }
+            beat_copy_1 = min(max(beat_copy_1, 0), 8)
+        }
+        if 1 {
+            let gy_2 = at_y + 35
+            repeat copy_2 from 0 to 8 {
+                let cy_2 = gy_2 + copy_2 * -5
+                rect(cx_1, cy_2, 7, 3, (copy_2 < (beat_copy_1 * 125) * 8 / 1000 ? #6e00ff : #262429))
+            }
+        }
+    }
+}
+'''
+design = "{\"version\":2,\"screen\":\"playing\",\"elements\":[{\"id\":572,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\",\"locked\":true},{\"id\":573,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":8,\"w\":112,\"h\":112},\"tall\":{\"x\":31,\"y\":8,\"w\":109,\"h\":109}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"@divider\",\"reflection\":false,\"corner\":0},{\"id\":574,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":8,\"w\":180,\"h\":22},\"tall\":{\"x\":8,\"y\":123,\"w\":154,\"h\":22,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"large\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":575,\"kind\":\"text\",\"name\":\"Messages\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":32,\"w\":180,\"h\":20},\"tall\":{\"x\":8,\"y\":153,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\"}}},\"source\":\"feedback\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":576,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":58,\"w\":180,\"h\":20},\"tall\":{\"x\":8,\"y\":179,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{\"show\":{\"when\":{\"on\":\"feedback\",\"not\":true}}},\"source\":\"album\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":true},{\"id\":577,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":30,\"w\":180,\"h\":20},\"tall\":{\"x\":8,\"y\":151,\"w\":154,\"h\":20,\"align\":\"center\"}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":true},{\"id\":579,\"kind\":\"box\",\"name\":\"Progress track\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":128,\"w\":300,\"h\":3},\"tall\":{\"x\":8,\"y\":249,\"w\":154,\"h\":3}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":580,\"kind\":\"box\",\"name\":\"Progress\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":128,\"w\":300,\"h\":3},\"tall\":{\"x\":8,\"y\":249,\"w\":154,\"h\":3}},\"bind\":{\"w\":{\"source\":\"progress_volume\",\"from\":0,\"to\":100}},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":581,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":132,\"w\":300,\"h\":14},\"tall\":{\"x\":8,\"y\":258,\"w\":154,\"h\":14}},\"bind\":{},\"source\":\"elapsed\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_secondary\",\"scroll\":false},{\"id\":582,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":10,\"y\":132,\"w\":300,\"h\":14,\"align\":\"right\"},\"tall\":{\"x\":8,\"y\":258,\"w\":154,\"h\":14,\"align\":\"right\"}},\"bind\":{},\"source\":\"remaining\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":false},{\"id\":587,\"kind\":\"group\",\"name\":\"Level bars\",\"hidden\":false,\"at\":{\"wide\":{\"x\":132,\"y\":82,\"w\":178,\"h\":38},\"tall\":{\"x\":-4,\"y\":205,\"w\":178,\"h\":38}},\"bind\":{},\"children\":[{\"id\":586,\"kind\":\"group\",\"name\":\"Bar\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":35,\"w\":7,\"h\":3},\"tall\":{\"x\":0,\"y\":35,\"w\":7,\"h\":3}},\"bind\":{},\"children\":[{\"id\":585,\"kind\":\"box\",\"name\":\"Cell\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":7,\"h\":3},\"tall\":{\"x\":0,\"y\":0,\"w\":7,\"h\":3}},\"bind\":{\"color\":{\"when\":{\"on\":\"lit\",\"source\":\"beat\"},\"color\":\"@selection_background\"}},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"}],\"clip\":false,\"repeat\":{\"count\":8,\"columns\":1,\"dx\":0,\"dy\":-5,\"turn\":0,\"start\":0,\"spin\":0}}],\"clip\":false,\"repeat\":{\"count\":20,\"columns\":20,\"dx\":9,\"dy\":0,\"turn\":0,\"start\":0,\"spin\":0}}],\"upright\":\"auto\"}"
+
+[home_scene]
+script = '''
+backdrop(x, y, width, height)
+if width > height {
+    let p0_0 = y + 2
+    let p0_1 = x + 176
+    let p0_2 = x + 192
+    let p0_3 = x + 179
+    if 1 {
+        let chosen_1 = selected()
+        let first_1 = max(0, chosen_1 / 4 - 0) * 4
+        repeat copy_1 from first_1 to min(items(), first_1 + 4) {
+            let cx_1 = x + (copy_1 - first_1) * 45
+            if copy_1 == chosen_1 {
+                rect(cx_1, y, 41, 143, #d2c8e1)
+            }
+            rect(cx_1 + 2, p0_0, 37, 139, #6e00ff)
+            item_icon(copy_1, cx_1 + 8, y + 52, 24, 24, #ffffff)
+            line(item(copy_1), small, cx_1 + 7, y + 120, 27, 16, left, #ffffff)
+        }
+    }
+    rect(p0_1, y, 144, 146, #08080a)
+    rect(p0_1, y, 1, 146, #262429)
+    if has_cover {
+        cover(p0_2, p0_0, 113)
+    } else {
+        rect(p0_2, p0_0, 113, 113, #262429)
+    }
+    line(song, body, p0_3, y + 115, 139, 15, center, #d2c8e1)
+    line(artist, small, p0_3, y + 128, 139, 15, center, #696471)
+} else {
+    let p0_0 = x + 19
+    let p0_1 = y + 2
+    let p0_2 = x + 4
+    if 1 {
+        let chosen_1 = selected()
+        let first_1 = max(0, chosen_1 / 2 - 1) * 2
+        repeat copy_1 from first_1 to min(items(), first_1 + 4) {
+            let cx_1 = x + (copy_1 - first_1) % 2 * 87
+            let cy_1 = y + (copy_1 - first_1) / 2 * 73
+            if copy_1 == chosen_1 {
+                rect(cx_1, cy_1, 83, 69, #d2c8e1)
+            }
+            rect(cx_1 + 2, cy_1 + 2, 79, 65, #6e00ff)
+            item_icon(copy_1, cx_1 + 29, cy_1 + 15, 24, 24, #ffffff)
+            line(item(copy_1), small, cx_1 + 7, cy_1 + 46, 69, 16, left, #ffffff)
+        }
+    }
+    rect(x, y, 170, 172, #08080a)
+    rect(x, y, 170, 1, #262429)
+    if has_cover {
+        cover(p0_0, p0_1, 133)
+    } else {
+        rect(p0_0, p0_1, 133, 133, #262429)
+    }
+    line(song, body, p0_2, y + 136, 164, 18, center, #d2c8e1)
+    line(artist, small, p0_2, y + 151, 164, 18, center, #696471)
+}
+'''
+design = "{\"version\":2,\"screen\":\"home\",\"elements\":[{\"id\":211,\"kind\":\"box\",\"name\":\"Background\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":320,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":280}},\"bind\":{},\"fill\":\"wallpaper\",\"color\":\"@header_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\",\"locked\":true},{\"id\":603,\"kind\":\"group\",\"name\":\"Menu tiles, sideways\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":176,\"h\":146},\"tall\":null},\"bind\":{},\"children\":[{\"id\":599,\"kind\":\"box\",\"name\":\"Highlight\",\"hidden\":false,\"at\":{\"wide\":{\"x\":0,\"y\":0,\"w\":41,\"h\":143},\"tall\":null},\"bind\":{\"show\":{\"when\":{\"on\":\"highlighted\"}}},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":600,\"kind\":\"box\",\"name\":\"Tile\",\"hidden\":false,\"at\":{\"wide\":{\"x\":2,\"y\":2,\"w\":37,\"h\":139},\"tall\":null},\"bind\":{},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":601,\"kind\":\"symbol\",\"name\":\"Icon\",\"hidden\":false,\"at\":{\"wide\":{\"x\":8,\"y\":52,\"w\":24,\"h\":24},\"tall\":null},\"bind\":{},\"mark\":\"item\",\"color\":\"@selection_text\"},{\"id\":602,\"kind\":\"text\",\"name\":\"Name\",\"hidden\":false,\"at\":{\"wide\":{\"x\":7,\"y\":120,\"w\":27,\"h\":16},\"tall\":null},\"bind\":{},\"source\":\"item\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@selection_text\",\"scroll\":true}],\"clip\":false,\"repeat\":{\"count\":\"items\",\"columns\":4,\"rows\":1,\"dx\":45,\"dy\":147,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":608,\"kind\":\"group\",\"name\":\"Menu tiles, upright\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":146}},\"bind\":{},\"children\":[{\"id\":604,\"kind\":\"box\",\"name\":\"Highlight\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":0,\"y\":0,\"w\":83,\"h\":69}},\"bind\":{\"show\":{\"when\":{\"on\":\"highlighted\"}}},\"fill\":\"solid\",\"color\":\"@text\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":605,\"kind\":\"box\",\"name\":\"Tile\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":2,\"y\":2,\"w\":79,\"h\":65}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@selection_background\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":606,\"kind\":\"symbol\",\"name\":\"Icon\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":29,\"y\":15,\"w\":24,\"h\":24}},\"bind\":{},\"mark\":\"item\",\"color\":\"@selection_text\"},{\"id\":607,\"kind\":\"text\",\"name\":\"Name\",\"hidden\":false,\"at\":{\"wide\":null,\"tall\":{\"x\":7,\"y\":46,\"w\":69,\"h\":16}},\"bind\":{},\"source\":\"item\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@selection_text\",\"scroll\":true}],\"clip\":false,\"repeat\":{\"count\":\"items\",\"columns\":2,\"rows\":2,\"dx\":87,\"dy\":73,\"turn\":0,\"start\":0,\"spin\":0}},{\"id\":213,\"kind\":\"box\",\"name\":\"Art panel\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":0,\"w\":144,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":172}},\"bind\":{},\"fill\":\"solid\",\"color\":\"#08080a\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":214,\"kind\":\"box\",\"name\":\"Divider\",\"hidden\":false,\"at\":{\"wide\":{\"x\":176,\"y\":0,\"w\":1,\"h\":146},\"tall\":{\"x\":0,\"y\":0,\"w\":170,\"h\":1}},\"bind\":{},\"fill\":\"solid\",\"color\":\"@divider\",\"top\":\"@header_top\",\"bottom\":\"@header_background\",\"radius\":0,\"border\":0,\"borderColor\":\"@divider\",\"taper\":0,\"grid\":0,\"gridColor\":\"@background\"},{\"id\":216,\"kind\":\"cover\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":192,\"y\":2,\"w\":113,\"h\":113},\"tall\":{\"x\":19,\"y\":2,\"w\":133,\"h\":133}},\"bind\":{},\"shape\":\"square\",\"placeholder\":\"@divider\",\"reflection\":false,\"corner\":0},{\"id\":217,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":179,\"y\":115,\"w\":139,\"h\":15,\"align\":\"center\"},\"tall\":{\"x\":4,\"y\":136,\"w\":164,\"h\":18,\"align\":\"center\"}},\"bind\":{},\"source\":\"song\",\"custom\":\"Hello\",\"size\":\"medium\",\"align\":\"left\",\"color\":\"@text\",\"scroll\":true},{\"id\":609,\"kind\":\"text\",\"name\":\"\",\"hidden\":false,\"at\":{\"wide\":{\"x\":179,\"y\":128,\"w\":139,\"h\":15,\"align\":\"center\"},\"tall\":{\"x\":4,\"y\":151,\"w\":164,\"h\":18,\"align\":\"center\"}},\"bind\":{},\"source\":\"artist\",\"custom\":\"Hello\",\"size\":\"small\",\"align\":\"left\",\"color\":\"@text_tertiary\",\"scroll\":true,\"locked\":false}],\"upright\":\"auto\"}"
+
+[icons]
+home_music = [
+    "........................",
+    "..................354...",
+    "............358acfff8...",
+    "........4acfffffffff8...",
+    "........8fffffffffff8...",
+    "........8fffffffffff8...",
+    "........8ffffffca8af8...",
+    "........8fc853....8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8...19ffdf8...",
+    "........8f8...cfffff8...",
+    "....19ffdf8..6ffffff8...",
+    "....cfffff8..8ffffff8...",
+    "...6ffffff8..6ffffff6...",
+    "...8ffffff8...cffffc....",
+    "...6ffffff6...19ff91....",
+    "....cffffc..............",
+    "....19ff91..............",
+    "........................",
+    "........................",
+]
+home_audiobooks = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "..da74............47ad..",
+    "..fffffb852..258bfffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..258bfffff..fffffb852..",
+    ".......47ad..da74.......",
+    "........................",
+    "........................",
+    "........................",
+]
+home_podcasts = [
+    "........................",
+    "........................",
+    "..........8ee8..........",
+    ".........8ffff8.........",
+    ".........effffe.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    "....8f4..ffffff..4f8....",
+    "....5f8..cffffc..8f5....",
+    "....1fd..3effe3..df1....",
+    ".....9f8..2772..8f9.....",
+    ".....1ef8......8fe1.....",
+    "......3efd8448dfe3......",
+    ".......19ffffff91.......",
+    ".........15ff51.........",
+    "...........ff...........",
+    ".......1888ff8881.......",
+    ".......8ffffffff8.......",
+    ".......1888888881.......",
+    "........................",
+]
+home_settings = [
+    "........................",
+    ".........288882.........",
+    ".........4ffff4.........",
+    ".....69..4ffff4..96.....",
+    "....6ff9.6ffff6.9ff6....",
+    "...6ffffdffffffdffff6...",
+    "...9ffffffffffffffff9...",
+    "....9ffffffffffffff9....",
+    ".....dfffffbbfffffd.....",
+    ".2446ffffc2..2cffff6442.",
+    ".8fffffff2....2fffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8fffffff2....2fffffff8.",
+    ".2446ffffc2..2cffff6442.",
+    ".....dfffffbbfffffd.....",
+    "....9ffffffffffffff9....",
+    "...9ffffffffffffffff9...",
+    "...6ffffdffffffdffff6...",
+    "....6ff9.6ffff6.9ff6....",
+    ".....69..4ffff4..96.....",
+    ".........4ffff4.........",
+    ".........288882.........",
+    "........................",
+]
+home_diagnostics = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    ".........3b3............",
+    ".........cfb............",
+    "........3fff1...........",
+    "........9fff5...........",
+    ".......1efff9...........",
+    ".......6ffcfd...........",
+    ".......cfc5ff3..........",
+    ".244446ff61ff7..2444442.",
+    "2effffffe1.bfb.2efffffe2",
+    "2effffff8..7ff17ffffffe2",
+    ".2444444...3ff5dfb44442.",
+    "............dfcff5......",
+    "............9fffe.......",
+    "............5fff8.......",
+    "............1fff2.......",
+    ".............bfc........",
+    ".............3b3........",
+    "........................",
+    "........................",
+    "........................",
+]
+home_now_playing = [
+    "........................",
+    ".........368863.........",
+    "......18dffffffd81......",
+    ".....4dffeb88beffd4.....",
+    "....6ffd6......6dff6....",
+    "...4ff91........19ff4...",
+    "..1df9............9fd1..",
+    "..8fd1...94.......1df8..",
+    "..df6....bfa1......6fd..",
+    ".3fe.....bffe7......ef3.",
+    ".6fb.....bffffc4....bf6.",
+    ".8f8.....bffffff91..8f8.",
+    ".8f8.....bffffff91..8f8.",
+    ".6fb.....bffffc4....bf6.",
+    ".3fe.....bffe7......ef3.",
+    "..df6....bfa1......6fd..",
+    "..8fd1...94.......1df8..",
+    "..1df9............9fd1..",
+    "...4ff91........19ff4...",
+    "....6ffd6......6dff6....",
+    ".....4dffeb88beffd4.....",
+    "......18dffffffd81......",
+    ".........368863.........",
+    "........................",
+]
