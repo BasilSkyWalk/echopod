@@ -245,7 +245,7 @@ static UsbSessionEnd run(void)
     return end;
 }
 
-static bool card_changed(void)
+bool usb_session_card_changed(void)
 {
     MscStats stats = msc_stats(&msc);
     return stats.lun_sectors_written[CARD_LUN] > 0 || stats.lun_sectors_written[INTERNAL_LUN] > 0 ||
@@ -264,5 +264,6 @@ UsbStorageOutcome usb_storage_session(UsbShared *state)
     if (end == USB_SESSION_EJECTED || end == USB_SESSION_UNPLUGGED) {
         update_after_usb(shared);
     }
-    return (UsbStorageOutcome){.cable_back = cable_back, .card_changed = card_changed()};
+    return (UsbStorageOutcome){.cable_back = cable_back,
+                               .card_changed = usb_session_card_changed()};
 }

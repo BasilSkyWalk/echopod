@@ -115,7 +115,9 @@ static HalUpdateRecord outcome(HalUpdateResult result, uint8_t detail)
 static void remember(HalUpdateRecord record)
 {
     board_start_record_update(record);
-    storage_reset();
+    if (usb_session_card_changed()) {
+        storage_reset();
+    }
     (void)update_record_save(record);
 }
 

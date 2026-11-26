@@ -51,6 +51,7 @@ const UsbReport *usb_session_report(void);
 UsbShared *usb_session_shared(void);
 
 UsbStorageOutcome usb_storage_session(UsbShared *shared);
+bool usb_session_card_changed(void);
 void usb_dac_session(UsbShared *shared);
 uint32_t *usb_session_buffer(void);
 void update_after_usb(UsbShared *shared);
