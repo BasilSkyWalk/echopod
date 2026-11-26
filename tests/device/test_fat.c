@@ -593,6 +593,58 @@ static void exfat_times_become_utc_half_seconds_from_their_offset(void)
     CHECK_EQUAL(2051222399u, fat_exfat_utc_stamp(0xEF9FBF7Du, 0x00));
 }
 
+static uint8_t short_name_checksum(const uint8_t *name)
+{
+    uint8_t sum = 0;
+    for (int index = 0; index < 11; index++) {
+        sum = (uint8_t)(((sum & 1) << 7) + (sum >> 1) + name[index]);
+    }
+    return sum;
+}
+
+static void put_long_name_entry(uint8_t *entry, uint8_t ordinal, uint8_t checksum)
+{
+    memset(entry, 0x5A, 32);
+    entry[0] = ordinal;
+    entry[11] = 0x0F;
+    entry[12] = 0;
+    entry[13] = checksum;
+    put16(entry + 26, 0);
+}
+
+static void a_long_name_entry_numbered_zero_overwrites_nothing(void)
+{
+    enum {
+        ROOT_SECTOR = 21,
+        LAST_FIRST_ENTRY = 0x41,
+        NUMBERED_ZERO = 0x20,
+        ENTRY_UNITS_BYTES = 26
+    };
+    static FatVolume volume;
+    static FatDirEntry entry;
+    SparseCard sparse;
+    uint8_t *bytes = looped_volume(&sparse);
+    uint8_t *root = bytes + 512 * ROOT_SECTOR;
+    memcpy(root + 96, "TRACK   MP3", 11);
+    root[96 + 11] = 0x20;
+    put_long_name_entry(root + 32, LAST_FIRST_ENTRY, short_name_checksum(root + 96));
+    put_long_name_entry(root + 64, NUMBERED_ZERO, short_name_checksum(root + 96));
+    CHECK(fat_mount(&volume, sparse_card_device(&sparse)));
+    memset(volume.fat_sector, 0xA5, sizeof volume.fat_sector);
+    FatDirCursor cursor;
+    CHECK(fat_open_directory(&volume, "/", &cursor));
+    bool listed = false;
+    while (fat_next_entry(&volume, &cursor, &entry)) {
+        listed = listed || strcmp(entry.name, "TRACK.MP3") == 0;
+    }
+    CHECK(listed);
+    const uint8_t *end = (const uint8_t *)volume.fat_sector + sizeof volume.fat_sector;
+    for (int index = 1; index <= ENTRY_UNITS_BYTES; index++) {
+        CHECK_EQUAL(0xA5, end[-index]);
+    }
+    free(bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -609,6 +661,7 @@ int main(void)
         TEST_CASE(fat16_files_read_back_from_the_root_and_subfolders),
         TEST_CASE(a_blank_device_does_not_mount),
         TEST_CASE(a_folder_whose_clusters_loop_ends_the_search),
+        TEST_CASE(a_long_name_entry_numbered_zero_overwrites_nothing),
         TEST_CASE(the_exfat_card_mounts_from_its_mbr_partition),
         TEST_CASE(exfat_files_read_back_their_bytes),
         TEST_CASE(an_exfat_folder_with_a_cluster_chain_is_searched_to_its_end),

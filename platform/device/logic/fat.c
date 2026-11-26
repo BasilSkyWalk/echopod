@@ -48,7 +48,8 @@ static void collect_long_name(FatVolume *volume, LongName *name, const uint8_t *
         *name = (LongName){ordinal >= 1 && ordinal <= LONG_NAME_MAX_ENTRIES,
                            entry[LONG_NAME_CHECKSUM], ordinal, ordinal};
     }
-    if (!name->valid || ordinal != name->expected || entry[LONG_NAME_CHECKSUM] != name->checksum) {
+    if (ordinal == 0 || !name->valid || ordinal != name->expected ||
+        entry[LONG_NAME_CHECKSUM] != name->checksum) {
         name->valid = false;
         return;
     }
