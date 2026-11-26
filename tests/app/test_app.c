@@ -2849,6 +2849,59 @@ static void cover_flow_keeps_a_dark_themes_text_and_falls_back_to_dark_for_light
     }
 }
 
+static ThemePackage theme_file_with_text(Color text, Color text_secondary)
+{
+    ThemePackage package = {.colors = DEFAULT_THEME_DARK_COLORS, .boxes = THEME_STANDARD_BOXES};
+    package.colors.background = COLOR_RGB(236, 233, 216);
+    package.colors.text = text;
+    package.colors.text_secondary = text_secondary;
+    package.colors.divider = COLOR_RGB(172, 168, 153);
+    return package;
+}
+
+static Theme staged_file_theme(const ThemePackage *package)
+{
+    Theme theme = default_theme_for(false);
+    default_theme_stage(&theme, package, (ThemeChoice){0}, &tinted_colors[0]);
+    return theme;
+}
+
+static void cover_flow_falls_back_to_dark_for_a_theme_file_with_dark_text(void)
+{
+    ThemePackage package = theme_file_with_text(COLOR_RGB(0, 0, 0), COLOR_RGB(59, 59, 59));
+    Theme stage = staged_file_theme(&package);
+    CHECK(!default_theme_stage_keeps_colors(&package));
+    CHECK_EQUAL(DEFAULT_THEME_DARK_COLORS.text, stage.colors->text);
+    CHECK_EQUAL(DEFAULT_THEME_DARK_COLORS.text_secondary, stage.colors->text_secondary);
+    CHECK_EQUAL(DEFAULT_THEME_DARK_COLORS.divider, stage.colors->divider);
+}
+
+static void cover_flow_falls_back_to_dark_when_only_the_secondary_text_is_too_dim(void)
+{
+    ThemePackage package = theme_file_with_text(COLOR_RGB(255, 255, 255), COLOR_RGB(80, 80, 80));
+    Theme stage = staged_file_theme(&package);
+    CHECK(!default_theme_stage_keeps_colors(&package));
+    CHECK_EQUAL(DEFAULT_THEME_DARK_COLORS.text_secondary, stage.colors->text_secondary);
+}
+
+static void cover_flow_keeps_a_theme_files_colours_when_its_text_reads_on_black(void)
+{
+    ThemePackage package = theme_file_with_text(COLOR_RGB(255, 134, 71), COLOR_RGB(179, 97, 50));
+    Theme stage = staged_file_theme(&package);
+    CHECK(default_theme_stage_keeps_colors(&package));
+    CHECK_EQUAL(package.colors.text, stage.colors->text);
+    CHECK_EQUAL(package.colors.text_secondary, stage.colors->text_secondary);
+}
+
+static void cover_flow_follows_a_theme_files_dark_choice_even_with_light_text(void)
+{
+    ThemePackage package = theme_file_with_text(COLOR_RGB(255, 255, 255), COLOR_RGB(200, 200, 200));
+    package.flags = THEME_FLAG_DARK_COVER_FLOW;
+    Theme stage = staged_file_theme(&package);
+    CHECK(!default_theme_stage_keeps_colors(&package));
+    CHECK_EQUAL(DEFAULT_THEME_DARK_COLORS.text_secondary, stage.colors->text_secondary);
+}
+
 static void an_unknown_theme_falls_back_to_dark(void)
 {
     Theme unknown = styled_theme(false, (StyledChoice){.theme = THEME_COUNT + 3});
@@ -4192,6 +4245,10 @@ int main(void)
         TEST_CASE(the_flat_highlight_changes_only_gradient_themes),
         TEST_CASE(choosing_a_theme_leaves_the_stored_accent_and_highlight_untouched),
         TEST_CASE(cover_flow_keeps_a_dark_themes_text_and_falls_back_to_dark_for_light_themes),
+        TEST_CASE(cover_flow_falls_back_to_dark_for_a_theme_file_with_dark_text),
+        TEST_CASE(cover_flow_falls_back_to_dark_when_only_the_secondary_text_is_too_dim),
+        TEST_CASE(cover_flow_keeps_a_theme_files_colours_when_its_text_reads_on_black),
+        TEST_CASE(cover_flow_follows_a_theme_files_dark_choice_even_with_light_text),
         TEST_CASE(an_unknown_theme_falls_back_to_dark),
         TEST_CASE(a_large_status_bar_grows_the_portrait_status_band),
         TEST_CASE(power_on_hold_is_asked_for_at_the_next_start),

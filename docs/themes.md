@@ -125,7 +125,7 @@ This packs every `.toml` in `my-themes` to `my-themes/packed/<file>.echotheme` a
 | `author` | Who made it, one line of at most 40 characters. Shown in the gallery. |
 | `description` | One line of at most 120 characters. Shown in the gallery. |
 | `selection` | Which box draws the selected row: `selection`, `selection_flat`, `selection_outline` or any other box name. |
-| `cover_flow` | `"theme"` (the default) draws Cover Flow in the theme's colours; `"dark"` draws it in the player's dark look, which suits light themes. |
+| `cover_flow` | Cover Flow's album wall is always black. `"theme"` (the default) writes its titles in the theme's `text` and `text_secondary`; `"dark"` uses the player's own light text instead. A theme whose `text` is below 7:1 or whose `text_secondary` is below 4.5:1 against black always gets the player's text there, whatever this says, so a light theme stays readable. |
 | `home_art` | `true` (the default) shows album art beside the Home menu, or below it when the player is upright; `false` gives the menu the whole screen. |
 
 ### `[colors]`

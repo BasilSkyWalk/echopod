@@ -62,6 +62,24 @@ static void half_light_halves_each_channel(void)
     CHECK_EQUAL(COLOR_RGB(120, 64, 32), color_scale(COLOR_RGB(255, 128, 64), COLOR_LIGHT_FULL / 2));
 }
 
+static void luminance_runs_from_black_to_white(void)
+{
+    CHECK_EQUAL(0, color_luminance(COLOR_RGB(0, 0, 0)));
+    CHECK_EQUAL(COLOR_LUMINANCE_FULL, color_luminance(COLOR_RGB(255, 255, 255)));
+}
+
+static void luminance_weighs_green_most_and_blue_least(void)
+{
+    CHECK_EQUAL(2126, color_luminance(COLOR_RGB(255, 0, 0)));
+    CHECK_EQUAL(7152, color_luminance(COLOR_RGB(0, 255, 0)));
+    CHECK_EQUAL(722, color_luminance(COLOR_RGB(0, 0, 255)));
+}
+
+static void luminance_follows_the_srgb_curve(void)
+{
+    CHECK_EQUAL(2253, color_luminance(COLOR_RGB(130, 130, 130)));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -76,6 +94,9 @@ int main(void)
         TEST_CASE(opaque_alpha_takes_the_foreground),
         TEST_CASE(partial_alpha_mixes_each_channel),
         TEST_CASE(the_constant_macro_matches_the_function),
+        TEST_CASE(luminance_runs_from_black_to_white),
+        TEST_CASE(luminance_weighs_green_most_and_blue_least),
+        TEST_CASE(luminance_follows_the_srgb_curve),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

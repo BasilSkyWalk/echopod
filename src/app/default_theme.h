@@ -20,6 +20,7 @@ bool default_theme_takes_highlight(const ThemePackage *package);
 int default_theme_accent(const ThemePackage *package, int accent);
 void default_theme_dress(Theme *theme, const ThemePackage *package, ThemeChoice choice,
                          ThemeColors *tinted);
+bool default_theme_stage_keeps_colors(const ThemePackage *package);
 void default_theme_stage(Theme *stage, const ThemePackage *package, ThemeChoice choice,
                          ThemeColors *tinted);
 void default_theme_enlarge_status(Theme *theme);

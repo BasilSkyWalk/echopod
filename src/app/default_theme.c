@@ -2,6 +2,7 @@
 
 #include "core/resident.h"
 #include "fonts/fonts.h"
+#include "gfx/color.h"
 #include "hal/display.h"
 #include "settings/settings.h"
 
@@ -122,10 +123,29 @@ void default_theme_dress(Theme *theme, const ThemePackage *package, ThemeChoice 
     flatten(theme, choice);
 }
 
+enum {
+    CONTRAST_TENTHS = 10,
+    STAGE_TEXT_CONTRAST_TENTHS = 70,
+    STAGE_SECONDARY_CONTRAST_TENTHS = 45
+};
+
+static bool reads_on_black(Color color, unsigned contrast_tenths)
+{
+    unsigned floor = (contrast_tenths - CONTRAST_TENTHS) * COLOR_LUMINANCE_FULL / (2 * 100);
+    return color_luminance(color) >= floor;
+}
+
+bool default_theme_stage_keeps_colors(const ThemePackage *package)
+{
+    return package != NULL && (package->flags & THEME_FLAG_DARK_COVER_FLOW) == 0 &&
+           reads_on_black(package->colors.text, STAGE_TEXT_CONTRAST_TENTHS) &&
+           reads_on_black(package->colors.text_secondary, STAGE_SECONDARY_CONTRAST_TENTHS);
+}
+
 void default_theme_stage(Theme *stage, const ThemePackage *package, ThemeChoice choice,
                          ThemeColors *tinted)
 {
-    if (package != NULL && (package->flags & THEME_FLAG_DARK_COVER_FLOW) != 0) {
+    if (package != NULL && !default_theme_stage_keeps_colors(package)) {
         stage->colors = &DEFAULT_THEME_DARK_COLORS;
         stage->boxes = &THEME_STANDARD_BOXES;
         stage->selection = THEME_SELECTION_GRADIENT;
