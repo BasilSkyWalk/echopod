@@ -443,19 +443,26 @@ static void aac_tracks_report_their_config(void)
     free(file.bytes);
 }
 
-static void explicit_he_aac_plays_as_its_lc_core(void)
+static bool probe_with_config(const uint8_t *config, Mp4Track *track)
 {
     static const uint8_t PLAIN[] = {0x05, 0x80, 0x80, 0x80, 0x05, 0x12, 0x10};
-    static const uint8_t EXPLICIT[] = {0x2B, 0x92, 0x08, 0x00, 0x00};
     Buffer file = load_fixture("aac.m4a");
     uint32_t at = 0;
     while (at + sizeof PLAIN <= file.size && memcmp(file.bytes + at, PLAIN, sizeof PLAIN) != 0) {
         at++;
     }
     CHECK(at + sizeof PLAIN <= file.size);
-    memcpy(file.bytes + at + 5, EXPLICIT, sizeof EXPLICIT);
+    memcpy(file.bytes + at + 5, config, 5);
+    bool probed = mp4_probe(input_of(&file), track);
+    free(file.bytes);
+    return probed;
+}
+
+static void explicit_he_aac_plays_as_its_lc_core(void)
+{
+    static const uint8_t EXPLICIT[] = {0x2B, 0x92, 0x08, 0x00, 0x00};
     Mp4Track track;
-    CHECK(mp4_probe(input_of(&file), &track));
+    CHECK(probe_with_config(EXPLICIT, &track));
     CHECK_EQUAL(MP4_CODEC_AAC, track.codec);
     CHECK_EQUAL(22050, track.sample_rate);
     CHECK_EQUAL(2, track.channels);
@@ -463,7 +470,29 @@ static void explicit_he_aac_plays_as_its_lc_core(void)
     CHECK_EQUAL(2, track.config_bytes);
     CHECK_EQUAL(0x13, track.config[0]);
     CHECK_EQUAL(0x90, track.config[1]);
-    free(file.bytes);
+}
+
+static void explicit_he_aac_v2_plays_its_mono_core(void)
+{
+    static const uint8_t EXPLICIT[] = {0xEB, 0x8A, 0x08, 0x00, 0x00};
+    Mp4Track track;
+    CHECK(probe_with_config(EXPLICIT, &track));
+    CHECK_EQUAL(22050, track.sample_rate);
+    CHECK_EQUAL(1, track.channels);
+    CHECK_EQUAL(2, track.object_type);
+    CHECK_EQUAL(2, track.config_bytes);
+    CHECK_EQUAL(0x13, track.config[0]);
+    CHECK_EQUAL(0x88, track.config[1]);
+}
+
+static void explicit_he_aac_over_another_core_is_refused(void)
+{
+    static const uint8_t MAIN_CORE[] = {0x2B, 0x92, 0x04, 0x00, 0x00};
+    Mp4Track track;
+    CHECK(probe_with_config(MAIN_CORE, &track));
+    CHECK_EQUAL(1, track.object_type);
+    CHECK_EQUAL(0x2B, track.config[0]);
+    CHECK(track.config_bytes > 2);
 }
 
 int main(void)
@@ -478,6 +507,8 @@ int main(void)
         TEST_CASE(a_file_without_sound_is_refused),
         TEST_CASE(aac_tracks_report_their_config),
         TEST_CASE(explicit_he_aac_plays_as_its_lc_core),
+        TEST_CASE(explicit_he_aac_v2_plays_its_mono_core),
+        TEST_CASE(explicit_he_aac_over_another_core_is_refused),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

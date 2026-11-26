@@ -64,6 +64,6 @@ Version 0.13.1 stops Bluetooth headphones crackling between tracks of different 
 | Lyrics (`.lrc`) | done |
 | ALAC playback | done |
 | AAC playback | done |
-| HE-AAC playback | todo |
+| HE-AAC playback | in progress (plays the AAC-LC core without the SBR high band; HE-AAC v2 plays in mono) |
 | Opus playback | done |
 | APE playback | todo |

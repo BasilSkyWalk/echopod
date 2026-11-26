@@ -68,8 +68,14 @@ enum {
     AOT_ESCAPE_BASE = 32,
     AOT_SBR = 5,
     AOT_PS = 29,
+    AOT_NONE = 0,
     RATE_ESCAPE = 15,
     RATE_INDEXES = 13,
+    LC_CONFIG_BYTES = 2,
+    LC_OBJECT_SHIFT = 11,
+    LC_RATE_SHIFT = 7,
+    LC_CHANNELS_SHIFT = 3,
+    LC_FRAME_SHIFT = 2,
     AAC_FRAME_SAMPLES = 1024,
     AAC_SHORT_FRAME_SAMPLES = 960,
     BYTE_BITS = 8,
@@ -219,44 +225,52 @@ static uint32_t config_read(ConfigBits *bits, uint32_t count)
     return value;
 }
 
-static uint32_t config_rate(ConfigBits *bits)
+static uint32_t config_object(ConfigBits *bits)
+{
+    uint32_t object = config_read(bits, 5);
+    return object == AOT_ESCAPE ? AOT_ESCAPE_BASE + config_read(bits, 6) : object;
+}
+
+static uint32_t config_rate(ConfigBits *bits, uint32_t *rate)
 {
     uint32_t index = config_read(bits, 4);
     if (index == RATE_ESCAPE) {
-        return config_read(bits, 24);
+        *rate = config_read(bits, 24);
+    } else {
+        *rate = index < RATE_INDEXES ? AAC_RATES[index] : 0;
     }
-    return index < RATE_INDEXES ? AAC_RATES[index] : 0;
+    return index;
+}
+
+static void write_lc_config(Mp4Track *track, uint32_t rate_index, uint32_t short_frames)
+{
+    uint32_t plain = (uint32_t)MP4_OBJECT_AAC_LC << LC_OBJECT_SHIFT | rate_index << LC_RATE_SHIFT |
+                     (uint32_t)track->channels << LC_CHANNELS_SHIFT |
+                     short_frames << LC_FRAME_SHIFT;
+    track->config[0] = (uint8_t)(plain >> BYTE_BITS);
+    track->config[1] = (uint8_t)plain;
+    track->config_bytes = LC_CONFIG_BYTES;
 }
 
 static bool read_audio_config(Mp4Track *track)
 {
     ConfigBits bits = {track->config, track->config_bytes, 0};
-    uint32_t object = config_read(&bits, 5);
-    if (object == AOT_ESCAPE) {
-        object = AOT_ESCAPE_BASE + config_read(&bits, 6);
-    }
-    uint32_t rate_index = config_read(&bits, 4);
-    bits.position -= 4;
-    track->sample_rate = config_rate(&bits);
+    uint32_t declared = config_object(&bits);
+    uint32_t rate_index = config_rate(&bits, &track->sample_rate);
     track->channels = (uint8_t)config_read(&bits, 4);
-    track->frame_samples = AAC_FRAME_SAMPLES;
-    if (object == AOT_SBR || object == AOT_PS) {
-        config_rate(&bits);
-        object = config_read(&bits, 5);
-        if (rate_index >= RATE_INDEXES) {
-            object = 0;
-        }
+    bool extended = declared == AOT_SBR || declared == AOT_PS;
+    uint32_t object = declared;
+    if (extended) {
+        uint32_t output_rate = 0;
+        config_rate(&bits, &output_rate);
+        object = config_object(&bits);
     }
-    if (config_read(&bits, 1) != 0) {
-        track->frame_samples = AAC_SHORT_FRAME_SAMPLES;
-    }
-    if (track->config[0] >> 3 == AOT_SBR || track->config[0] >> 3 == AOT_PS) {
-        uint32_t short_frames = track->frame_samples == AAC_SHORT_FRAME_SAMPLES ? 1 : 0;
-        uint32_t plain =
-            2u << 11 | rate_index << 7 | (uint32_t)track->channels << 3 | short_frames << 2;
-        track->config[0] = (uint8_t)(plain >> 8);
-        track->config[1] = (uint8_t)plain;
-        track->config_bytes = 2;
+    uint32_t short_frames = config_read(&bits, 1);
+    track->frame_samples = short_frames != 0 ? AAC_SHORT_FRAME_SAMPLES : AAC_FRAME_SAMPLES;
+    if (extended && rate_index >= RATE_INDEXES) {
+        object = AOT_NONE;
+    } else if (extended && object == MP4_OBJECT_AAC_LC) {
+        write_lc_config(track, rate_index, short_frames);
     }
     track->object_type = (uint8_t)object;
     track->bits_per_sample = 0;
