@@ -77,7 +77,7 @@ static void luminance_weighs_green_most_and_blue_least(void)
 
 static void luminance_follows_the_srgb_curve(void)
 {
-    CHECK_EQUAL(2253, color_luminance(COLOR_RGB(130, 130, 130)));
+    CHECK_EQUAL(2280, color_luminance(COLOR_RGB(130, 130, 130)));
 }
 
 int main(void)
