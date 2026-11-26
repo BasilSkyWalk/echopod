@@ -6,10 +6,15 @@ import {
   NUMBERS,
   TEXT_SOURCES,
   VALUES,
+  canMoveParts,
+  canStretch,
   colorOf,
   element,
   findElement,
+  fitStretched,
+  moveParts,
   newElement,
+  pathOf,
   walk,
 } from "./drawing.js";
 import { SHELF, SHELF_ART, SHELF_MORE, fitTiles, isTiles, tileRows, tilesFor } from "./drawings.js";
@@ -21,6 +26,10 @@ const GUIDE = "#ff4fd8";
 const PASTE_STEP = 6;
 const CLIPBOARD = "echopod-parts-clipboard";
 const DEGREES = 180 / Math.PI;
+const DRAG_START = 5;
+const LIST_EDGE = 28;
+const LIST_SCROLL = 10;
+const GRIP = "M8 5h.01M12 5h.01M8 10h.01M12 10h.01M8 15h.01M12 15h.01";
 const LOCK = "M6.5 9V7a3.5 3.5 0 0 1 7 0v2M5 9h10v7.5H5z";
 const UNLOCK = "M6.5 9V7a3.5 3.5 0 0 1 6.6-1.6M5 9h10v7.5H5z";
 const ALIGN = [
@@ -252,7 +261,7 @@ export function drawingEditor(ctx) {
         continue;
       }
       const isPicked = picks.has(place.item.id);
-      const chosen = isPicked && picks.size === 1 && !locked(place);
+      const chosen = isPicked && picks.size === 1 && !locked(place) && !stretched(place);
       pen.setLineDash(isPicked ? [] : [4, 3]);
       pen.lineWidth = isPicked ? 1.5 : 1;
       pen.strokeStyle = isPicked ? "#ffffff" : locked(place) ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.3)";
@@ -316,7 +325,8 @@ export function drawingEditor(ctx) {
 
   function startDrag(primary, resize, point) {
     const places = placements();
-    const moving = resize ? [primary] : chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place));
+    const picked = resize ? [primary] : chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place));
+    const moving = resize ? picked : [...new Set(picked.map((place) => carrier(place, places)).filter(Boolean))];
     const held = moving.map((place) => ({ place, start: { ...place.item.at[shape()] } }));
     drag = { primary, resize, from: point, moving: held, targets: snapTargets(held), guides: [] };
   }
@@ -325,7 +335,7 @@ export function drawingEditor(ctx) {
     const places = placements();
     const picks = chosen();
     const current = places.find((place) => place.item.id === ctx.state.picked);
-    if (!add && picks.length === 1 && current && !locked(current) && nearHandle(current, point)) {
+    if (!add && picks.length === 1 && current && !locked(current) && !stretched(current) && nearHandle(current, point)) {
       startDrag(current, true, point);
       return true;
     }
@@ -378,7 +388,7 @@ export function drawingEditor(ctx) {
     if (!drag) {
       const places = placements();
       const current = places.find((place) => place.item.id === ctx.state.picked);
-      if (current && !locked(current) && chosen().length === 1 && nearHandle(current, point)) {
+      if (current && !locked(current) && !stretched(current) && chosen().length === 1 && nearHandle(current, point)) {
         return current.item.kind === "line" ? "crosshair" : "nwse-resize";
       }
       return places.some((place) => !locked(place) && hit(place, point)) ? "move" : "default";
@@ -473,9 +483,18 @@ export function drawingEditor(ctx) {
   }
 
   function nudge(dx, dy) {
-    const items = chosen().filter((item) => item.at?.[shape()]);
-    if (!items.length) {
+    const places = placements();
+    const picks = chosen().filter((item) => item.at?.[shape()]);
+    if (!picks.length) {
       return false;
+    }
+    const items = [...new Set(picks.map((item) => {
+      const place = places.find((one) => one.item === item);
+      return place && stretched(place) ? carrier(place, places)?.item : item;
+    }))].filter(Boolean);
+    if (!items.length) {
+      ctx.say("It fills the screen, so it stays put.", true);
+      return true;
     }
     if (items.some((item) => item.locked)) {
       ctx.say("That part is locked. Unlock it in the list to move it.", true);
@@ -511,40 +530,37 @@ export function drawingEditor(ctx) {
     const index = list.indexOf(item);
     const host = list.slice(0, index).reverse().find((other) => other.kind === "group");
     if (!host) {
-      ctx.say("Put a group above it first, then move it in.", true);
+      ctx.say("Put a group above it first, then move it in, or drag it onto a group in the list.", true);
       return;
     }
-    list.splice(index, 1);
-    for (const shapeName of Object.keys(AREAS)) {
-      const own = item.at[shapeName];
-      const outer = host.at[shapeName];
-      if (own && outer) {
-        own.x -= outer.x;
-        own.y -= outer.y;
-      }
-    }
-    host.children.push(item);
-    ctx.changed({ rebuild: true });
+    moveInList([item.id], host.id, "inside");
   }
 
   function outOfGroup(item) {
-    const found = findElement(drawing(), item.id);
-    if (!found?.parent) {
-      return;
+    const host = findElement(drawing(), item.id)?.parent;
+    if (host) {
+      moveInList([item.id], host.id, "after");
     }
-    const host = found.parent;
-    host.children.splice(host.children.indexOf(item), 1);
-    for (const shapeName of Object.keys(AREAS)) {
-      const own = item.at[shapeName];
-      const outer = host.at[shapeName];
-      if (own && outer) {
-        own.x += outer.x;
-        own.y += outer.y;
-      }
+  }
+
+  function moveInList(ids, targetId, where) {
+    const before = JSON.stringify(drawing().elements);
+    if (!moveParts(drawing(), ids, targetId, where)) {
+      return false;
     }
-    const list = siblingsOf(host);
-    list.splice(list.indexOf(host) + 1, 0, item);
+    if (!ctx.fits()) {
+      drawing().elements = JSON.parse(before);
+      ctx.fits();
+      ctx.say("There's no room to move that on this screen.", true);
+      ctx.render();
+      return false;
+    }
+    if (where === "inside") {
+      expanded.add(targetId);
+    }
+    setChosen(ids);
     ctx.changed({ rebuild: true });
+    return true;
   }
 
   function remove(item) {
@@ -683,7 +699,7 @@ export function drawingEditor(ctx) {
 
   function lineUp(edge) {
     const places = placements();
-    const mine = chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place));
+    const mine = chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place) && !stretched(place));
     if (!mine.length) {
       return;
     }
@@ -707,7 +723,7 @@ export function drawingEditor(ctx) {
 
   function spread(axis) {
     const places = placements();
-    const mine = chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place));
+    const mine = chosen().map((item) => places.find((place) => place.item === item)).filter((place) => place && !locked(place) && !stretched(place));
     if (mine.length < 3) {
       return;
     }
@@ -944,13 +960,19 @@ export function drawingEditor(ctx) {
       });
       const row = el("li", {
         role: "option",
+        "data-part": String(item.id),
         "aria-selected": String(picks.has(item.id)),
         class: [item.hidden ? "hidden-layer" : "", item.at?.[shape()] ? "" : "elsewhere", item.locked ? "locked-layer" : ""].join(" ").trim(),
         style: `padding-left: ${10 + depth * 16}px`,
         onclick: (event) => {
+          if (listDrag?.dropped) {
+            listDrag = null;
+            return;
+          }
           choose(item.id, event.shiftKey || event.ctrlKey || event.metaKey);
           ctx.render();
         },
+        onpointerdown: (event) => grab(event, item),
       },
       label,
       el("span", { class: "tools" },
@@ -968,6 +990,8 @@ export function drawingEditor(ctx) {
         }),
         tool("Duplicate", "M7 7h9v9H7zM4 13V4h9", () => duplicate(item)),
         tool("Remove", "M5 6h10M8 6V4.5h4V6m-6 0 .7 9.5h6.6L14 6", () => remove(item))));
+      const grip = el("span", { class: "grip", title: "Drag to move it, or onto a group to put it inside", "aria-hidden": "true" }, icon(GRIP));
+      label.prepend(grip);
       if (item.kind !== "group") {
         return [row];
       }
@@ -981,8 +1005,98 @@ export function drawingEditor(ctx) {
         }
         ctx.render();
       } }, icon(open ? "m6 8 4 4 4-4" : "m8 6 4 4-4 4")));
+      label.prepend(grip);
       return open ? [row, ...tree(item.children ?? [], depth + 1)] : [row];
     });
+  }
+
+  let listDrag = null;
+
+  function grab(event, item) {
+    const fromGrip = Boolean(event.target.closest(".grip"));
+    if (event.button !== 0 || event.target.closest("button, input") || (event.pointerType === "touch" && !fromGrip)) {
+      return;
+    }
+    const picks = chosen().map((one) => one.id);
+    const ids = picks.includes(item.id) ? picks : [item.id];
+    listDrag = { ids, x: event.clientX, y: event.clientY, started: false, drop: null, list: event.currentTarget.closest(".layers"), dropped: false };
+    if (fromGrip) {
+      event.preventDefault();
+    }
+    window.addEventListener("pointermove", drift);
+    window.addEventListener("pointerup", release, { once: true });
+    window.addEventListener("pointercancel", release, { once: true });
+  }
+
+  function dropAt(event) {
+    const row = document.elementFromPoint(event.clientX, event.clientY)?.closest?.(".layers li[data-part]");
+    if (!row || !listDrag.list.contains(row)) {
+      return null;
+    }
+    const id = Number(row.dataset.part);
+    const target = findElement(drawing(), id)?.item;
+    if (!target) {
+      return null;
+    }
+    const box = row.getBoundingClientRect();
+    const share = (event.clientY - box.top) / Math.max(1, box.height);
+    const where = target.kind === "group"
+      ? share < 0.25 ? "before" : share > 0.75 ? "after" : "inside"
+      : share < 0.5 ? "before" : "after";
+    return canMoveParts(drawing(), listDrag.ids, id, where) ? { row, id, where } : null;
+  }
+
+  function showDrop(drop) {
+    for (const marked of listDrag.list.querySelectorAll(".drop-before, .drop-after, .drop-inside")) {
+      marked.classList.remove("drop-before", "drop-after", "drop-inside");
+    }
+    drop?.row.classList.add(`drop-${drop.where}`);
+  }
+
+  function drift(event) {
+    if (!listDrag) {
+      return;
+    }
+    if (!listDrag.started) {
+      if (Math.hypot(event.clientX - listDrag.x, event.clientY - listDrag.y) < DRAG_START) {
+        return;
+      }
+      listDrag.started = true;
+      listDrag.list.classList.add("dragging-parts");
+    }
+    event.preventDefault();
+    const box = listDrag.list.getBoundingClientRect();
+    if (event.clientY < box.top + LIST_EDGE) {
+      listDrag.list.scrollTop -= LIST_SCROLL;
+    } else if (event.clientY > box.bottom - LIST_EDGE) {
+      listDrag.list.scrollTop += LIST_SCROLL;
+    }
+    listDrag.drop = dropAt(event);
+    showDrop(listDrag.drop);
+  }
+
+  function release() {
+    window.removeEventListener("pointermove", drift);
+    window.removeEventListener("pointerup", release);
+    window.removeEventListener("pointercancel", release);
+    if (!listDrag) {
+      return;
+    }
+    const { started, drop, ids } = listDrag;
+    showDrop(null);
+    listDrag.list.classList.remove("dragging-parts");
+    if (!started) {
+      listDrag = null;
+      return;
+    }
+    listDrag.dropped = true;
+    setTimeout(() => {
+      listDrag = null;
+    });
+    if (drop) {
+      listScroll = listDrag.list.scrollTop;
+      moveInList(ids, drop.id, drop.where);
+    }
   }
 
   function isMenu(item) {
@@ -1173,9 +1287,40 @@ export function drawingEditor(ctx) {
       );
       return fields;
     }
+    const chain = pathOf(drawing(), item.id) ?? [];
+    if (canStretch(item, chain)) {
+      const outer = chain.at(-1);
+      fields.push(field(outer ? "Fill its group" : "Fill the screen", toggle(Boolean(item.stretch), (on) => {
+        if (on) {
+          item.stretch = true;
+          fitStretched(drawing());
+        } else {
+          delete item.stretch;
+        }
+        ctx.changed({ rebuild: true });
+      }, outer ? "Fill its group" : "Fill the screen"), outer
+        ? "Takes the group's place and size, and keeps them when the group moves or is resized"
+        : "Takes the whole screen"));
+    }
+    if (item.stretch && canStretch(item, chain)) {
+      return fields;
+    }
     fields.push(stacked("Place", pair("Left", numberInput(at.x, set("x")), "Top", numberInput(at.y, set("y")))));
     fields.push(stacked("Size", pair("Width", numberInput(at.w, set("w"), { least: 1, most: 400 }), "Height", numberInput(at.h, set("h"), { least: 1, most: 400 }))));
     return fields;
+  }
+
+  function stretched(place) {
+    return Boolean(place.item.stretch) && canStretch(place.item, place.chain);
+  }
+
+  function carrier(place, places) {
+    let current = place;
+    while (current && stretched(current)) {
+      const outer = current.chain.at(-1);
+      current = outer ? places.find((one) => one.item === outer) : null;
+    }
+    return current && !locked(current) ? current : null;
   }
 
   function colourField(item, key, label) {
@@ -1373,7 +1518,8 @@ export function drawingEditor(ctx) {
   }
 
   function movesFields(item) {
-    const props = BINDABLE[item.kind] ?? [];
+    const pinned = item.stretch && canStretch(item, pathOf(drawing(), item.id) ?? []);
+    const props = (BINDABLE[item.kind] ?? []).filter(([key]) => !pinned || (key !== "x" && key !== "y"));
     const copy = insideCopies(item);
     return props.map(([key, label]) => {
       const rule = item.bind?.[key];
@@ -1551,7 +1697,7 @@ export function drawingEditor(ctx) {
     const bound = Object.keys(item.bind ?? {}).length > 0;
     const sections = [
       el("h3", { class: "keep" }, nameOf(item)),
-      group(field("Name", name), ...kindFields(item, screen), ...copyColourFields(item), ...placeFields(item), ...(item.at[shape()] ? [lineUpRow(1)] : [])),
+      group(field("Name", name), ...kindFields(item, screen), ...copyColourFields(item), ...placeFields(item), ...(item.at[shape()] && !(item.stretch && canStretch(item, pathOf(drawing(), item.id) ?? [])) ? [lineUpRow(1)] : [])),
       el("div", { class: "actions" }, ...actions),
     ];
     const live = [...moves, ...colours, showField(item)];
@@ -1589,7 +1735,7 @@ export function drawingEditor(ctx) {
 
   function parts() {
     return [
-      el("p", { class: "hint" }, ctx.sideNote?.() ?? "Back to front."),
+      el("p", { class: "hint" }, `${ctx.sideNote?.() ?? "Back to front."} Drag a part by its dots to move it, or onto a group to put it inside.`),
       partList(),
       heldParts() ? el("div", { class: "actions" }, el("button", { type: "button", onclick: () => paste() }, "Paste")) : null,
     ];
