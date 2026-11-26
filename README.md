@@ -6,7 +6,7 @@ Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has 
   <a href="https://basilskywalk.github.io/echopod/"><img src="docs/images/theme-editor.gif" alt="The theme editor with the Aurora theme open: its colours change with one click, then Home, then the Capsule, Deck and Millennium themes on Now Playing"></a>
 </p>
 
-**[Make your own theme](https://basilskywalk.github.io/echopod/)** in the browser, with nothing to install, or take one from the **[gallery](https://basilskywalk.github.io/echopod/gallery.html)**. Theme files need EchoPod 0.13.0, which is experimental.
+**[Make your own theme](https://basilskywalk.github.io/echopod/)** in the browser, with nothing to install, or take one from the **[gallery](https://basilskywalk.github.io/echopod/gallery.html)**. Theme files need EchoPod 0.13.0 or later.
 
 <p align="center">
   <a href="https://basilskywalk.github.io/echopod/gallery.html"><img src="docs/images/themes/aurora.png" alt="Aurora" width="32%"></a>

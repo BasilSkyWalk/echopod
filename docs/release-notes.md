@@ -1,5 +1,42 @@
 # EchoPod release notes
 
+## 0.13.2
+
+Themes and the editor are no longer experimental, HE-AAC `.m4b` audiobooks play, Cover Flow titles stay readable on themes with dark text, and five faults found by reading the code are fixed. Tested on one Echo Mini 8 GB.
+
+**0.13 is now the recommended release.** Themes and the editor have been used on other people's players since 0.13.0, and fourteen themes have come into the gallery from them, so this release replaces 0.12.0 as the one to install. Theme files made for 0.13.0 and 0.13.1 work as they are.
+
+### Fixed
+
+- **HE-AAC audiobooks that name their high band outright** (by micdudk, pull request 98, issue 76). Some `.m4b` and `.m4a` files say in their header that they are HE-AAC instead of leaving the player to find out, and EchoPod refused them. They now play like other HE-AAC: without the high band, so a little duller than AAC-LC, and HE-AAC v2 in mono.
+- **Cover Flow titles on themes with dark text.** Cover Flow always draws its album wall on black, but a theme file's titles were drawn in the theme's own text colour, so Millennium, Glacier and Receipt put dark titles on black. When a theme's text can't be read on black, Cover Flow now uses the player's own light text. Themes already on your card are fixed without saving them again.
+
+Found by reading the code:
+
+- **The library after connecting to a computer.** With an update file that was already installed still on internal storage, connecting to a computer and ejecting without copying anything could leave the library unreadable, with empty lists and tracks that wouldn't start, until the player was restarted.
+- **A change in a track's last moment.** Changing repeat or shuffle, or adding a song to Up Next, in the last third of a second of a track could leave Now Playing on the track that had just ended while the next one played, and then play a track twice. The player now moves on to the track you hear, and the change applies from there.
+- **The position in very long files.** A single file played for about 12 hours without seeking (13.5 hours at 44.1 kHz, less at higher sample rates) showed its position back at the start, and an audiobook's saved place went with it.
+- **A damaged long file name on a FAT32 or FAT16 card** could make the player follow the wrong part of the card for the files read next. Such an entry is now ignored.
+- **A skip or seek at the wrong instant** could, very rarely, begin the new track with a piece of the old one or end it at once.
+
+### Changed
+
+- **In the editor, parts can be dragged into groups,** at any depth, and a part can be set to fill its group and follow it when the group moves or changes size (asked for in discussion 110).
+- **The Experimental tag is gone** from the editor and the gallery.
+
+### Known limits
+
+- **Some Bluetooth headphones connect but stay silent** (issue 127): reported with AirPods Pro 2 and a Sony WH-1000XM5. It hasn't been reproduced on the player and earbuds used for testing, and the cause isn't known yet.
+- **The five faults found by reading the code were not seen on a player first.** Their fixes are checked by tests on a computer, and the release was then run on one player.
+- The limits listed under 0.13.0 for themes and the editor still apply.
+
+### When you update
+
+- Your settings and library stay. Coming from 0.12.0, a player that showed Cassette, VU meters, Turntable or LCD deck now has it as its theme; 0.13.0 below says what else changed.
+- If you pick one of those four and later go back to 0.12.0 or earlier, that firmware resets all settings to their defaults. Choose Dark or Light before you go back.
+- After an update installs, restart the player before connecting it to a computer again.
+- Delete the update file from the player once it has installed, or it installs again.
+
 ## 0.13.1
 
 Bluetooth headphones no longer crackle between tracks of different sample rates, and the player does less work while the screen is off and when it draws. Tested on one Echo Mini 8 GB.
