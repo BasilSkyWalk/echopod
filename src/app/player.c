@@ -82,20 +82,24 @@ static bool upcoming_track(Player *player, PlayQueueCursor *cursor, uint16_t *tr
            play_queue_track_at(&player->queue, *cursor, track);
 }
 
-static void queue_upcoming(Player *player)
+static bool queue_upcoming(Player *player)
 {
     char path[PLAYER_PATH_CAPACITY];
     PlayQueueCursor upcoming = player->queue.cursor;
+    PlayerNextSource kept_source = player->next_source;
     uint16_t track = 0;
-    player->has_next =
+    bool found =
         upcoming_track(player, &upcoming, &track) && track_path(player, track, path, sizeof path);
-    if (!player->has_next) {
-        hal_audio_queue_next(NULL, 0);
-        return;
+    if (!hal_audio_queue_next(found ? path : NULL, player->token_counter + 1)) {
+        player->next_source = kept_source;
+        return false;
     }
-    player->next_cursor = upcoming;
-    player->next_token = new_token(player);
-    hal_audio_queue_next(path, player->next_token);
+    player->has_next = found;
+    if (found) {
+        player->next_cursor = upcoming;
+        player->next_token = new_token(player);
+    }
+    return true;
 }
 
 static bool read_book_file(void *context, uint32_t offset, void *buffer, uint32_t length)
@@ -392,13 +396,17 @@ void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed)
         return;
     }
     PlayQueuePlan plan = player->queue.plan;
-    if (!play_queue_current(&player->queue, &plan.anchor_track)) {
+    bool taken = player->has_next && player->next_source == PLAYER_NEXT_FROM_QUEUE &&
+                 !hal_audio_queue_next(NULL, 0);
+    PlayQueueCursor anchor = taken ? player->next_cursor : player->queue.cursor;
+    if (!play_queue_track_at(&player->queue, anchor, &plan.anchor_track)) {
         plan.anchor_track = player->track;
     }
     plan.shuffle = player->spoken ? SHUFFLE_OFF : shuffle;
     plan.seed = seed;
-    if (play_queue_build(&player->queue, player->library, plan) && player->loaded) {
-        queue_upcoming(player);
+    if (play_queue_build(&player->queue, player->library, plan) && player->loaded &&
+        !queue_upcoming(player) && taken) {
+        player->next_cursor = player->queue.cursor;
     }
     save_later(player);
 }
@@ -466,10 +474,13 @@ static PlayerUpNextResult enqueue(Player *player, uint16_t track, bool next)
     if (!added) {
         return PLAYER_UP_NEXT_FULL;
     }
-    save_up_next(player);
-    if (player->loaded) {
-        queue_upcoming(player);
+    if (player->loaded && !queue_upcoming(player) && next &&
+        player->next_source == PLAYER_NEXT_FROM_UP_NEXT) {
+        uint16_t *tracks = player->up_next.tracks;
+        tracks[0] = tracks[1];
+        tracks[1] = track;
     }
+    save_up_next(player);
     return PLAYER_UP_NEXT_ADDED;
 }
 

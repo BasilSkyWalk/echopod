@@ -204,9 +204,10 @@ Settings → Music folders (`screens/folders_screen`) leaves top-level folders o
 ## Playback
 
 - `hal/audio.h` is high level: `play(path, start, token)`, `queue_next(path, token)`, pause, resume, seek, volume and status. The backend decodes; on the device that's `board/audio.c` (see Device playback).
-- Gapless: when a track starts, the player queues the next one with a new token. The backend switches without a gap and reports the new token, and `player_update` then moves the queue on and queues the following track.
+- Gapless: when a track starts, the player queues the next one with a new token. The backend switches without a gap and reports the new token, and `player_update` then moves the queue on and queues the following track. `queue_next` answers false once the backend has already opened the queued track behind the playing one (on the device up to a ring's length before the change, 317 ms at 44.1 kHz, or while it waits for the next track's sample rate): the track is then committed, so the player keeps the token, cursor and source it has for it and queues what follows only after it has moved on. A shuffle change in that window rebuilds the queue around the committed track, and Play next puts its song behind a committed Up Next song.
 - Shuffle is seeded (`core/random`). The resume file (`/.echo/resume.bin`, `playback/resume_state`) stores the queue plan (source list, anchor track, shuffle mode, seed), the cursor, the track and the position, so the exact same queue is rebuilt after power-off. A library fingerprint rejects resume files from an older index. A folder's Shuffle all saves a `BROWSE_FOLDER_TRACKS` source, so it comes back the same way.
 - The player saves on start, on track change, on pause, every 15 s while playing, and in `app_stop()`.
+- Position: the device engine counts played frames from the start of the playing segment in 32 bits, so `audio_engine_observe` moves a whole second that has played into the segment's `base_ms` and start, one second a call (it runs many times a second). The count stays near one second and a single file plays for days without its position wrapping (before, it fell back to the start after 2^31 frames, 12.4 hours at 48 kHz).
 
 ## Cover Flow
 

@@ -266,7 +266,7 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
     return opened;
 }
 
-void hal_audio_queue_next(const char *path, uint32_t token)
+bool hal_audio_queue_next(const char *path, uint32_t token)
 {
     lock();
     close_track(next_track());
@@ -274,6 +274,7 @@ void hal_audio_queue_next(const char *path, uint32_t token)
         open_track(next_track(), path, token);
     }
     unlock();
+    return true;
 }
 
 void hal_audio_pause(void)

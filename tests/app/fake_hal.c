@@ -45,6 +45,7 @@ typedef struct FakeAudio {
     int play_count;
     char queued_path[PATH_CAPACITY];
     bool has_queued;
+    bool next_taken;
     uint32_t queued_token;
     int seek_count;
     uint32_t last_seek_ms;
@@ -518,8 +519,14 @@ const char *fake_hal_audio_queued_path(void)
     return fake.audio.has_queued ? fake.audio.queued_path : NULL;
 }
 
+void fake_hal_audio_take_next(void)
+{
+    fake.audio.next_taken = fake.audio.has_queued;
+}
+
 void fake_hal_audio_finish_track(void)
 {
+    fake.audio.next_taken = false;
     if (!fake.audio.has_queued) {
         fake.audio.status.state = HAL_AUDIO_STOPPED;
         return;
@@ -589,6 +596,7 @@ int fake_hal_write_count(void)
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
 {
     fake.audio.play_count++;
+    fake.audio.next_taken = false;
     if (fake.audio.refused_plays > 0) {
         fake.audio.refused_plays--;
         fake.audio.status = (HalAudioStatus){
@@ -605,13 +613,17 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
     return true;
 }
 
-void hal_audio_queue_next(const char *path, uint32_t token)
+bool hal_audio_queue_next(const char *path, uint32_t token)
 {
+    if (fake.audio.next_taken) {
+        return false;
+    }
     fake.audio.has_queued = path != NULL;
     if (path != NULL) {
         copy_path(fake.audio.queued_path, path);
         fake.audio.queued_token = token;
     }
+    return true;
 }
 
 void hal_audio_pause(void)

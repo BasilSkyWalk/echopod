@@ -678,6 +678,52 @@ static void a_frame_is_released_once_its_samples_are_in_the_ring(void)
     CHECK_EQUAL(1, scripted.closes);
 }
 
+static void a_next_track_that_has_already_opened_cannot_be_replaced(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    CHECK(audio_engine_queue_next(&engine, "lpc_24_96k_stereo", 9));
+    CHECK(audio_engine_queue_next(&engine, "lpc_16_44k_stereo", 4));
+    pump_until_full(0);
+    CHECK(!audio_engine_queue_next(&engine, "lpc_24_96k_stereo", 5));
+    CHECK(!audio_engine_queue_next(&engine, NULL, 0));
+    audio_engine_pump(&engine, 3001 + 441);
+    CHECK_EQUAL(4u, audio_engine_status(&engine).token);
+    CHECK(audio_engine_queue_next(&engine, "odd_blocks_16", 5));
+}
+
+static void a_next_track_waiting_for_its_rate_cannot_be_replaced(void)
+{
+    start_engine();
+    CHECK(audio_engine_play(&engine, "odd_blocks_16", 0, 3));
+    CHECK(audio_engine_queue_next(&engine, "lpc_24_96k_stereo", 4));
+    pump_until_full(0);
+    CHECK(!audio_engine_queue_next(&engine, "lpc_16_44k_stereo", 5));
+    audio_engine_pump(&engine, 3001);
+    audio_engine_restart(&engine);
+    pump_until_full(0);
+    CHECK(ring_holds("lpc_24_96k_stereo", 0, 0, 5000, 24));
+    CHECK_EQUAL(4u, audio_engine_status(&engine).token);
+}
+
+static void the_position_keeps_counting_past_two_to_the_31st_frames(void)
+{
+    enum {
+        RATE = 96000,
+        SECONDS = 23000,
+        MILLISECONDS = 1000
+    };
+    start_engine();
+    CHECK(audio_engine_play(&engine, "lpc_24_96k_stereo", 0, 1));
+    uint32_t consumed = 0;
+    for (int second = 0; second < SECONDS; second++) {
+        consumed += RATE;
+        audio_engine_observe(&engine, consumed);
+    }
+    CHECK(consumed > 0x80000000u);
+    CHECK_EQUAL(SECONDS * MILLISECONDS, audio_engine_status(&engine).position_ms);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -706,6 +752,9 @@ int main(void)
         TEST_CASE(seeking_restarts_the_ring_at_the_new_place),
         TEST_CASE(seeking_after_the_next_track_opened_queues_it_again),
         TEST_CASE(a_seek_while_a_new_rate_waits_keeps_the_next_track),
+        TEST_CASE(a_next_track_that_has_already_opened_cannot_be_replaced),
+        TEST_CASE(a_next_track_waiting_for_its_rate_cannot_be_replaced),
+        TEST_CASE(the_position_keeps_counting_past_two_to_the_31st_frames),
         TEST_CASE(closing_the_source_keeps_the_pause_and_the_position),
         TEST_CASE(volume_scales_the_samples),
         TEST_CASE(mono_plays_on_both_channels),

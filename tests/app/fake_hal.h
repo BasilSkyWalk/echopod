@@ -74,6 +74,7 @@ const char *fake_hal_audio_playing_path(void);
 uint32_t fake_hal_audio_play_start(void);
 int fake_hal_audio_play_count(void);
 const char *fake_hal_audio_queued_path(void);
+void fake_hal_audio_take_next(void);
 void fake_hal_audio_finish_track(void);
 void fake_hal_audio_fail_track(void);
 void fake_hal_audio_refuse_plays(int count);

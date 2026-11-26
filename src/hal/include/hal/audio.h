@@ -125,7 +125,7 @@ typedef struct HalJackPins {
 } HalJackPins;
 
 bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token);
-void hal_audio_queue_next(const char *path, uint32_t token);
+bool hal_audio_queue_next(const char *path, uint32_t token);
 void hal_audio_pause(void);
 void hal_audio_resume(void);
 void hal_audio_seek(uint32_t position_ms);

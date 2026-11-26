@@ -558,6 +558,38 @@ static void play_after_a_release_starts_the_output_again(void)
     CHECK_EQUAL(PLAYER_PLAYING, player_status(started).state);
 }
 
+static void a_repeat_change_after_the_next_track_was_taken_still_moves_on_to_it(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_take_next();
+    player_set_repeat(started, REPEAT_ONE);
+    finish_playing(started);
+    CHECK_EQUAL(SHOOT_TO_THRILL, player_status(started).track);
+    CHECK(path_is(fake_hal_audio_queued_path(), SHOOT_TO_THRILL_PATH));
+}
+
+static void a_shuffle_change_after_the_next_track_was_taken_still_moves_on_to_it(void)
+{
+    Player *started = playing(0);
+    fake_hal_audio_take_next();
+    player_set_shuffle(started, SHUFFLE_SONGS, SEED);
+    finish_playing(started);
+    CHECK_EQUAL(SHOOT_TO_THRILL, player_status(started).track);
+    CHECK_EQUAL(SHUFFLE_SONGS, player_status(started).shuffle);
+}
+
+static void play_next_after_an_added_song_was_taken_goes_behind_it(void)
+{
+    Player *started = playing(0);
+    player_add_to_up_next(started, HELP);
+    fake_hal_audio_take_next();
+    CHECK_EQUAL(PLAYER_UP_NEXT_ADDED, player_play_next(started, ARMY_OF_ME));
+    finish_playing(started);
+    CHECK_EQUAL(HELP, player_status(started).track);
+    CHECK(path_is(fake_hal_audio_queued_path(), ARMY_OF_ME_PATH));
+    CHECK_EQUAL(1, started->up_next.count);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -608,6 +640,9 @@ int main(void)
         TEST_CASE(a_session_resumes_inside_an_added_song),
         TEST_CASE(releasing_the_output_pauses_where_the_track_was),
         TEST_CASE(play_after_a_release_starts_the_output_again),
+        TEST_CASE(a_repeat_change_after_the_next_track_was_taken_still_moves_on_to_it),
+        TEST_CASE(a_shuffle_change_after_the_next_track_was_taken_still_moves_on_to_it),
+        TEST_CASE(play_next_after_an_added_song_was_taken_goes_behind_it),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

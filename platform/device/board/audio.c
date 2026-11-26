@@ -623,20 +623,23 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
     return true;
 }
 
-void hal_audio_queue_next(const char *path, uint32_t token)
+bool hal_audio_queue_next(const char *path, uint32_t token)
 {
     ensure_engine();
+    if (!audio_engine_queue_next(&engine, path, token)) {
+        return false;
+    }
     deferred = false;
     queued_path[0] = '\0';
-    audio_engine_queue_next(&engine, path, token);
     if (path == NULL) {
-        return;
+        return true;
     }
     queued_probe = probe_path(path);
     queued_light = board_saving(HAL_SAVING_SLOW_CLOCK) && light_probe(queued_probe);
     queued_token = token;
     remember(queued_path, path);
     follow_queue();
+    return true;
 }
 
 void hal_audio_allow_slow_clock(bool allowed)

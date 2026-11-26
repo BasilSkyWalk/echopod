@@ -122,8 +122,9 @@ static bool open_track(AudioEngine *engine, const char *path, uint32_t start_ms)
     return true;
 }
 
-static void push_segment(AudioEngine *engine, const char *path, uint32_t token, uint32_t start,
-                         uint32_t base_ms)
+__attribute__((cold, noinline)) static void push_segment(AudioEngine *engine, const char *path,
+                                                         uint32_t token, uint32_t start,
+                                                         uint32_t base_ms)
 {
     if (engine->segment_count == AUDIO_ENGINE_SEGMENTS) {
         for (int index = 1; index < AUDIO_ENGINE_SEGMENTS; index++) {
@@ -179,13 +180,23 @@ bool audio_engine_play(AudioEngine *engine, const char *path, uint32_t start_ms,
     return start_track(engine, path, start_ms, token);
 }
 
-void audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token)
+__attribute__((cold, noinline)) static void set_next(AudioEngine *engine, const char *path,
+                                                     uint32_t token)
 {
     engine->has_next = path != NULL;
     engine->next_token = token;
     if (path != NULL) {
         copy_path(engine->next_path, path);
     }
+}
+
+bool audio_engine_queue_next(AudioEngine *engine, const char *path, uint32_t token)
+{
+    if (engine->segment_count > 1 || engine->rate_pending) {
+        return false;
+    }
+    set_next(engine, path, token);
+    return true;
 }
 
 bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms)
@@ -196,7 +207,7 @@ bool audio_engine_seek(AudioEngine *engine, uint32_t position_ms)
     AudioSegment playing = engine->segments[0];
     AudioEngineState state = engine->state;
     if (engine->segment_count > 1) {
-        audio_engine_queue_next(engine, engine->segments[1].path, engine->segments[1].token);
+        set_next(engine, engine->segments[1].path, engine->segments[1].token);
     } else if (engine->rate_pending) {
         engine->has_next = true;
     }
@@ -465,6 +476,16 @@ static void drop_finished_segments(AudioEngine *engine)
     }
 }
 
+static void count_a_whole_second(AudioEngine *engine)
+{
+    AudioSegment *playing = &engine->segments[0];
+    if (engine->segment_count > 0 && playing->rate > 0 &&
+        (int32_t)(engine->consumed - playing->start) >= (int32_t)playing->rate) {
+        playing->start += playing->rate;
+        playing->base_ms += MILLISECONDS_PER_SECOND;
+    }
+}
+
 static void clear_played(AudioEngine *engine, uint32_t consumed)
 {
     uint32_t frames = ring_frames(engine);
@@ -492,6 +513,7 @@ void audio_engine_observe(AudioEngine *engine, uint32_t consumed)
         engine->produced = engine->consumed;
     }
     drop_finished_segments(engine);
+    count_a_whole_second(engine);
     if (engine->ended && (int32_t)(engine->consumed - engine->end_at) >= 0) {
         engine->state = AUDIO_ENGINE_STOPPED;
     }
