@@ -570,6 +570,9 @@ static AudioFrameResult next_frame(void *context, AudioFrame *frame)
             return AUDIO_FRAME_WAIT;
         }
         observe();
+        if (slot->generation != source->generation) {
+            return AUDIO_FRAME_WAIT;
+        }
         if (slot->result != AUDIO_FRAME_READY) {
             return slot->result == AUDIO_FRAME_END ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
         }

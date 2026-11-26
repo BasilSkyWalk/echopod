@@ -1203,6 +1203,37 @@ static void an_aac_track_describes_its_stream(void)
     interface.close(interface.context);
 }
 
+static uint32_t late_generation;
+
+static void finish_a_late_hand_over(void)
+{
+    if (late_generation != 0 && control.slots[1].state == STREAM_SLOT_EMPTY) {
+        control.slots[0] = (StreamSlot){
+            .state = STREAM_SLOT_FULL, .generation = late_generation, .result = AUDIO_FRAME_END};
+        late_generation = 0;
+    }
+}
+
+static void a_slot_the_old_stream_hands_over_late_is_not_played(void)
+{
+    start(BIG_RING_BYTES);
+    Fixture pcm = load("fixed_16_mono", "pcm");
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "fixed_16_mono", 0, &info));
+    late_generation = control.generation;
+    CHECK(interface.open(interface.context, "fixed_16_mono", 0, &info));
+    control.slots[1] = (StreamSlot){
+        .state = STREAM_SLOT_FULL, .generation = late_generation, .result = AUDIO_FRAME_END};
+    core1_source_set_wake(&source, finish_a_late_hand_over);
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_READY, next_frame(&frame));
+    CHECK_EQUAL(0u, late_generation);
+    CHECK_EQUAL(0u, frame.first_sample);
+    CHECK(frame_matches(&pcm, &frame, 1));
+    interface.close(interface.context);
+    free(pcm.bytes);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -1218,6 +1249,7 @@ int main(void)
         TEST_CASE(core_1_never_waits_unless_core_0_allows_it),
         TEST_CASE(a_sleeping_core_1_wakes_for_a_reopen_and_a_close),
         TEST_CASE(reopening_part_way_drops_the_old_frames),
+        TEST_CASE(a_slot_the_old_stream_hands_over_late_is_not_played),
         TEST_CASE(closing_idles_core_1_and_closes_the_file),
         TEST_CASE(a_missing_track_does_not_start_core_1),
         TEST_CASE(an_mp3_streams_through_core_1_like_its_decoder),
