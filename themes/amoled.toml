@@ -1,0 +1,77 @@
+name = "Amoled"
+author = "Junie"
+description = "Black Amoled"
+selection = "selection"
+
+[colors]
+background = "#000000"
+text = "#ffffff"
+text_secondary = "#b3b3b3"
+text_tertiary = "#808080"
+selection_background = "#4d4d4d"
+selection_top = "#686868"
+selection_shine = "#8b8b8b"
+selection_text = "#ffffff"
+header_background = "#141414"
+header_top = "#292929"
+header_text = "#ffffff"
+divider = "#2e2e2e"
+scrollbar_thumb = "#4d4d4d"
+danger = "#e5484d"
+success = "#30a46c"
+chevron = "#737373"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+shine = "selection_shine"
+shine_height = 1
+ink = "selection_text"
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.section]
+fill = "header_background"
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+
+[boxes.progress_fill]
+fill = "text"
+ink = "background"
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
