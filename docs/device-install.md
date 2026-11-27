@@ -40,7 +40,7 @@ If FiiO's updater won't take the file, maskrom can write the image straight into
 3. Eject both drives. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
 4. Unplug, hold Power to switch off, then switch on. The new build starts.
 
-The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's shape, rows, entry vector, header copy and CRC before writing, skips an image that is already installed, and writes slot 2 first, then slot 1, reading back every chunk. It also accepts FiiO's own 8 GB image (see "Going back to FiiO's firmware" in the user guide) and refuses the 512 MB model's.
+The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's shape, rows, entry vector, header copy and CRC before writing, skips an image that is already installed, and writes slot 2 first, then slot 1, reading back every chunk. It also accepts FiiO's own 8 GB image (see "Going back to FiiO's firmware" in the user guide) and refuses the 512 MB model's. On the 512 MB model it's the reverse: the updater takes the highest-numbered `MINIVnnn.IMG` (000 to 999), accepts FiiO's 512 MB image and refuses the 8 GB one. FiiO's 512 MB firmware only installs a `MINIVnnn.IMG`, so the image goes to that model as `MINIV898.IMG`, the name both 512 MB players that have run EchoPod installed it under (on one of them FiiO 3.7.0 ignored the same file as `MINIV900.IMG`).
 
 ## What to check after an install
 

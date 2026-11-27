@@ -19,6 +19,7 @@ Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has 
 
 - **Installing and using it:** `docs/user-guide.md`.
 - **Read first:** `docs/known-issues.md`. EchoPod is early, and has been tested on one player.
+- **Echo Mini 512 MB:** supported from 0.14.0, a pre-release. See "Which players" in the user guide.
 - **What's new:** `docs/release-notes.md`.
 - **How theme files work:** `docs/themes.md`.
 

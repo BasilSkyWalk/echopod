@@ -1,5 +1,31 @@
 # EchoPod release notes
 
+## 0.14.0
+
+The 512 MB Echo Mini is supported. Nothing else changes from 0.13.2. Tested on one Echo Mini 8 GB; the 512 MB changes ran on two 512 MB players, by their owners, before they were merged.
+
+**This is a pre-release.** Support for the 512 MB model is new, and the person who makes EchoPod has no such player, so 0.13.2 stays the recommended release until more owners have run this one. On an 8 GB player there's nothing to gain from it yet. If you have the 512 MB model, please say how it went in issue 19: https://github.com/BasilSkyWalk/echopod/issues/19.
+
+### Added
+
+- **The 512 MB Echo Mini** (by aaronbali, pull request 106, issue 19; tested on a second player by kc0ver, whose pull request 93 solved the same problem another way, with earlier testing of that one by diekampfwagen).
+  - **Internal storage.** On that model internal storage is a different kind of chip (SD NAND where the 8 GB model has eMMC), and EchoPod couldn't read it, so its menus came up with no text. The player now tries the 8 GB model's start-up first, exactly as before, and the other kind only when the chip doesn't answer.
+  - **Installing and updating.** The 512 MB model's firmware only installs a file called `MINIVnnn.IMG`, so the release has the same firmware under a second name, `MINIV898.IMG`. Copy that one to a 512 MB player, both to install EchoPod and to update it later. EchoPod on that model looks for `MINIVnnn.IMG` files, and takes FiiO's 512 MB firmware for the way back while refusing the 8 GB model's.
+  - **The power button after switching off.** After EchoPod switched a 512 MB player off, the power button couldn't switch it on again; only the RST hole or a USB cable did. EchoPod now switches that model off the way FiiO's firmware for it does.
+
+### Known limits
+
+- **Going back to FiiO's firmware from a file hasn't been tried on a 512 MB player.** It should work as on the 8 GB model, with FiiO's `MINIVnnn.IMG` (for example `MINIV400.IMG`) in place of `HIFIECnn.IMG`, but nobody has done it yet. The way back that has been used on that model is maskrom (`docs/device-recovery.md`).
+- **This image has run on an 8 GB player only.** Of the two 512 MB players, one ran the 512 MB changes on top of 0.13.0 and the other on top of 0.12.0, before 0.13.1 and 0.13.2 were added.
+- The limits listed under 0.13.2 still apply.
+
+### When you update
+
+- **8 GB model:** copy `HIFIEC90.IMG`, as always. **512 MB model:** copy `MINIV898.IMG`. Each model ignores the other's file.
+- Your settings and library stay.
+- After an update installs, restart the player before connecting it to a computer again.
+- Delete the update file from the player once it has installed, or it installs again.
+
 ## 0.13.2
 
 Themes and the editor are no longer experimental, HE-AAC `.m4b` audiobooks play, Cover Flow titles stay readable on themes with dark text, and five faults found by reading the code are fixed. Tested on one Echo Mini 8 GB.
