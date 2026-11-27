@@ -42,6 +42,7 @@ typedef struct UpdateStorage {
     uint32_t slot_2;
     uint32_t slot_sectors;
     uint32_t area_sectors;
+    bool small_model;
 } UpdateStorage;
 
 typedef struct UpdateProgress {

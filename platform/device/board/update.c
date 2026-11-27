@@ -18,6 +18,8 @@ enum {
     PERCENT_STEP = 5,
     PERCENT = 100,
     HIGHEST_NUMBER = 97,
+    SMALL_MODEL_HIGHEST_NUMBER = 999,
+    HUNDREDS_AT = 6,
     TENS_AT = 7,
     UNITS_AT = 8,
     SECTORS_PER_MIB = 2048,
@@ -25,6 +27,7 @@ enum {
 };
 
 static const char UPDATE_TEMPLATE[] = "/HIFIEC00.IMG";
+static const char SMALL_MODEL_TEMPLATE[] = "/MINIV000.IMG";
 static const char MODEL_UPDATE[] = "/ECHOMINI.IMG";
 static char update_path[sizeof UPDATE_TEMPLATE];
 static const char *install_title;
@@ -63,14 +66,34 @@ static void report(void *context, uint32_t done, uint32_t total)
     }
 }
 
-static bool open_highest_numbered(void)
+static bool open_highest_small_model(void)
+{
+    for (size_t index = 0; index < sizeof SMALL_MODEL_TEMPLATE; index++) {
+        update_path[index] = SMALL_MODEL_TEMPLATE[index];
+    }
+    for (int number = SMALL_MODEL_HIGHEST_NUMBER; number >= 0; number--) {
+        update_path[HUNDREDS_AT] = (char)('0' + number / 100);
+        update_path[TENS_AT] = (char)('0' + number / 10 % 10);
+        update_path[UNITS_AT] = (char)('0' + number % 10);
+        if (fat_open(&volume, update_path, &file)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool open_highest_numbered(bool small_model)
 {
     _Static_assert(sizeof MODEL_UPDATE == sizeof UPDATE_TEMPLATE, "same length");
+    _Static_assert(sizeof SMALL_MODEL_TEMPLATE == sizeof UPDATE_TEMPLATE, "same length");
     for (size_t index = 0; index < sizeof MODEL_UPDATE; index++) {
         update_path[index] = MODEL_UPDATE[index];
     }
     if (fat_open(&volume, update_path, &file)) {
         return true;
+    }
+    if (small_model) {
+        return open_highest_small_model();
     }
     for (size_t index = 0; index < sizeof UPDATE_TEMPLATE; index++) {
         update_path[index] = UPDATE_TEMPLATE[index];
@@ -89,7 +112,7 @@ static bool open_update(UpdateStorage *storage)
 {
     EmmcInfo info;
     BlockDevice device = {emmc_volume_read, NULL, NULL};
-    if (!emmc_start(&info) || !fat_mount(&volume, device) || !open_highest_numbered()) {
+    if (!emmc_start(&info) || !fat_mount(&volume, device) || !open_highest_numbered(info.sd_nand)) {
         return false;
     }
     *storage = (UpdateStorage){emmc_read,
@@ -98,7 +121,8 @@ static bool open_update(UpdateStorage *storage)
                                info.layout.slot_1,
                                info.layout.slot_2,
                                info.layout.slot_sectors,
-                               info.layout.firmware_end - info.layout.slot_1};
+                               info.layout.firmware_end - info.layout.slot_1,
+                               info.sd_nand};
 #ifdef ECHO_TEST_SLOT_1_RESTORE
     storage->slot_sectors = TEST_SLOT_MIB * SECTORS_PER_MIB;
 #endif
