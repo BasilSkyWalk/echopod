@@ -1,0 +1,391 @@
+name = "Vice Nights Square"
+author = "EchoPod"
+description = "Vice Nights with square album art: a fan tribute to GTA VI, with a radar-style frame and wanted stars."
+selection = "selection"
+
+[spacing]
+row_height = 26
+padding = 12
+
+[colors]
+background = "#170a26"
+text = "#fff0f6"
+text_secondary = "#f5a3c7"
+text_tertiary = "#c695c6"
+selection_background = "#c21a73"
+selection_top = "#ff4f9e"
+selection_shine = "#ffcf70"
+selection_text = "#ffffff"
+header_background = "#220c38"
+header_top = "#3b1552"
+header_text = "#fff0f6"
+divider = "#4b2a68"
+scrollbar_thumb = "#27e0d0"
+danger = "#ff6b6b"
+success = "#5ff2c4"
+chevron = "#27e0d0"
+
+[[accents]]
+name = "Pink"
+selection_background = "#c21a73"
+selection_top = "#ff4f9e"
+selection_shine = "#ffcf70"
+
+[[accents]]
+name = "Orange"
+selection_background = "#b23f14"
+selection_top = "#e8602a"
+selection_shine = "#ffd27a"
+
+[[accents]]
+name = "Teal"
+selection_background = "#0a6662"
+selection_top = "#14918a"
+selection_shine = "#8ffff1"
+
+[[accents]]
+name = "Purple"
+selection_background = "#6a22c9"
+selection_top = "#9b4dff"
+selection_shine = "#ff9be0"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+ink = "selection_text"
+shine = "selection_shine"
+shine_height = 1
+inset = [4, 2]
+radius = 5
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+inset = [4, 2]
+radius = 5
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [4, 2]
+radius = 5
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+ink = "header_text"
+border = "selection_top"
+border_width = 1
+border_edges = ["bottom"]
+
+[boxes.toast]
+fill = ["header_top", "header_background"]
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+radius = 8
+
+[boxes.section]
+fill = "header_background"
+border = "scrollbar_thumb"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+radius = 8
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+radius = 2
+
+[boxes.progress_track]
+fill = "divider"
+ink = "background"
+radius = 2
+
+[boxes.progress_fill]
+fill = ["selection_shine", "selection_top"]
+ink = "background"
+radius = 2
+
+[boxes.progress_active]
+fill = "scrollbar_thumb"
+ink = "background"
+radius = 2
+
+[now_playing_scene]
+script = '''
+const NIGHT = #1a0a30
+const DUSK = #5a1a66
+const ROSE = #c23a7a
+const PEACH = #ff8a5b
+const HALO = #ff9f86
+const SUN_TOP = #ffd76a
+const SUN_MID = #ffb35c
+const SUN_LOW = #ff8a5e
+const SUN_DEEP = #ff6a6a
+const SEA_TOP = #3a1458
+const SEA_LOW = #0e0520
+const PALM = #12061e
+const NEON = #ff4f9e
+const TEAL = #27e0d0
+const TRACK = #3d1d5a
+const CREAM = #fff3e6
+const BLUSH = #ffd3e6
+const GLOW = #ffc58a
+const INK = #0a0410
+const ROUTE = #3a2550
+const DIM = #4a3a5a
+
+let wide = width > height
+let horizon = y + (wide ? 98 : 206)
+let sky = horizon - y
+gradient(x, y, width, sky / 2, NIGHT, DUSK)
+gradient(x, y + sky / 2, width, sky * 8 / 10 - sky / 2, DUSK, ROSE)
+gradient(x, y + sky * 8 / 10, width, sky - sky * 8 / 10, ROSE, PEACH)
+
+let r = wide ? 34 : 26
+let sx = x + (wide ? 272 : 85)
+let sy = horizon - r / 3
+ring(sx * 16 + 8, sy * 16 + 8, (r + 4) * 16, (r + 3) * 16, HALO)
+clip(sx - r, sy - r, 2 * r + 1, r * 3 / 5)
+ring(sx * 16 + 8, sy * 16 + 8, r * 16, 0, SUN_TOP)
+unclip()
+let cursor = sy - r + r * 3 / 5 + 1
+repeat band from 0 to 7 {
+    let tall_band = max(1, 5 - band * 2 / 3)
+    if cursor < horizon {
+        clip(sx - r, cursor, 2 * r + 1, min(tall_band, horizon - cursor))
+        ring(sx * 16 + 8, sy * 16 + 8, r * 16, 0, band < 2 ? SUN_MID : (band < 4 ? SUN_LOW : SUN_DEEP))
+        unclip()
+    }
+    cursor = cursor + tall_band + 1 + band / 2
+}
+
+gradient(x, horizon, width, y + height - horizon, SEA_TOP, SEA_LOW)
+rect(x, horizon, width, 1, PEACH)
+repeat glint from 0 to 4 {
+    let span = 2 * r * (4 - glint) / 5
+    rect(sx - span / 2, horizon + 3 + glint * (wide ? 4 : 3), span, 1, glint < 2 ? PEACH : ROSE)
+}
+
+if wide {
+    rounded(x + 232, horizon - 2, 100, 6, 3, PALM)
+} else {
+    rounded(x - 6, horizon - 2, 46, 6, 3, PALM)
+    rounded(x + 134, horizon - 2, 44, 6, 3, PALM)
+}
+repeat palm from 0 to 2 {
+    let bx = x + (wide ? (palm == 0 ? 300 : 246) : (palm == 0 ? 16 : 156))
+    let rise = wide ? (palm == 0 ? 72 : 48) : (palm == 0 ? 46 : 38)
+    let lean = wide ? (palm == 0 ? -16 : 9) : (palm == 0 ? 9 : -7)
+    repeat seg from 0 to rise {
+        let bend = lean * seg * seg / (rise * rise)
+        rect(bx + bend - 1, horizon - seg, seg < rise / 2 ? 3 : 2, 1, PALM)
+    }
+    let tx = bx + lean
+    let ty = horizon - rise
+    let piece = rise / 6 + 2
+    repeat frond from 0 to 8 {
+        let base = 20 + frond % 4 * 24
+        let a = frond < 4 ? base : 256 - base
+        let turn = frond < 4 ? 20 : -20
+        let fx = tx
+        let fy = ty
+        repeat part from 0 to 3 {
+            let angle = (a + turn * part) & 255
+            spoke(fx, fy, angle, 56 - part * 14, 0, piece + 1, PALM)
+            fx = fx + sin(angle) * piece / 255
+            fy = fy - cos(angle) * piece / 255
+        }
+    }
+    ring(tx * 16 + 8, ty * 16 + 24, 48, 0, PALM)
+}
+
+let s = wide ? 80 : 86
+let cx = x + (wide ? 16 : 42)
+let cy = y + (wide ? 12 : 32)
+let side = s + 6
+let lit = volume_shown ? volume_width(64) : progress(64)
+rounded(cx - 6, cy - 6, s + 12, s + 12, 5, INK)
+repeat mark from 0 to 64 {
+    let u = (side / 2 + mark * side / 16) % (side * 4)
+    let mx = u < side ? u : (u < side * 2 ? side : (u < side * 3 ? side * 3 - u : 0))
+    let my = u < side ? 0 : (u < side * 2 ? u - side : (u < side * 3 ? side : side * 4 - u))
+    rect(cx - 4 + mx, cy - 4 + my, 3, 3, mark < lit ? (volume_shown ? TEAL : NEON) : ROUTE)
+}
+if has_cover {
+    cover(cx, cy, s)
+} else {
+    gradient(cx, cy, s, s, DUSK, PEACH)
+    ring((cx + s / 2) * 16 + 8, (cy + s * 2 / 3) * 16 + 8, s * 4, 0, SUN_TOP)
+    rect(cx, cy + s * 2 / 3, s, s / 3, SEA_TOP)
+}
+let bu = (side / 2 + lit * side / 16) % (side * 4)
+let bmx = bu < side ? bu : (bu < side * 2 ? side : (bu < side * 3 ? side * 3 - bu : 0))
+let bmy = bu < side ? 0 : (bu < side * 2 ? bu - side : (bu < side * 3 ? side : side * 4 - bu))
+ring((cx - 3 + bmx) * 16 + 8, (cy - 3 + bmy) * 16 + 8, 72, 0, INK)
+ring((cx - 3 + bmx) * 16 + 8, (cy - 3 + bmy) * 16 + 8, 44, 0, CREAM)
+ring((cx + s / 2) * 16 + 8, (cy - 3) * 16 + 8, 112, 0, INK)
+text("N", small, cx + s / 2 - 6, cy - 11, 13, 15, center, CREAM)
+if wide {
+    rect(cx - 6, horizon + 3, s + 12, 1, NEON)
+    rect(cx + 6, horizon + 7, s - 12, 1, ROSE)
+    rect(cx + 22, horizon + 11, s - 44, 1, ROSE)
+}
+if badge != none {
+    rounded(cx + s / 2 - 15, cy + s / 2 - 15, 31, 31, 6, INK)
+    icon(badge, cx + s / 2 - 9, cy + s / 2 - 9, 18, 18, NEON)
+}
+
+let wanted = min(5, progress(6))
+let stx = x + (wide ? 246 : 55)
+let sty = y + 13
+repeat star from 0 to 5 {
+    let spx = stx + star * 15
+    let hot = star < wanted
+    repeat arm from 0 to 5 {
+        spoke(spx, sty, arm * 51, 80, 0, 8, INK)
+    }
+    repeat arm from 0 to 5 {
+        spoke(spx, sty, arm * 51, 40, 0, 6, hot ? CREAM : DIM)
+    }
+    ring(spx * 16 + 8, sty * 16 + 8, 52, 0, hot ? CREAM : DIM)
+}
+
+let tx = x + (wide ? 108 : 10)
+let tw = wide ? 124 : width - 20
+let along = wide ? left : center
+let ty = y + (wide ? 12 : 126)
+repeat edge from 0 to 4 {
+    let ox = edge == 0 ? -1 : (edge == 1 ? 1 : 0)
+    let oy = edge == 2 ? -1 : (edge == 3 ? 1 : 0)
+    line(song, title, tx + ox, ty + oy, tw, 22, along, INK)
+}
+line(song, title, tx, ty, tw, 22, along, CREAM)
+line(artist, body, tx + 1, ty + 24, tw, 20, along, INK)
+line(artist, body, tx, ty + 23, tw, 20, along, BLUSH)
+let ly = wide ? ty + 45 : y + 218
+if present(feedback) {
+    text(feedback, small, tx, ly, tw, 16, along, TEAL)
+} else if present(lyric) {
+    line(lyric, small, tx, ly, tw, 16, along, GLOW)
+} else {
+    line(album, small, tx, ly, tw, 16, along, GLOW)
+}
+format(small, tx, wide ? ty + 64 : y + 262, tw, 16, along, CREAM)
+
+let bx = x + 12
+let bw = width - 24
+let by = wide ? y + 124 : y + 240
+rounded(bx, by, bw, 4, 2, TRACK)
+let fill = volume_shown ? volume_width(bw) : progress(bw)
+if fill > 0 {
+    rounded(bx, by, max(4, fill), 4, 2, volume_shown || scrubbing ? TEAL : NEON)
+    ring((bx + fill) * 16, (by + 2) * 16, 56, 0, CREAM)
+}
+times(small, bx, by + 6, bw, 15, CREAM, BLUSH)
+if present(modes) {
+    text(modes, small, bx, by + 6, bw, 15, center, TEAL)
+}
+'''
+
+[home_scene]
+script = '''
+const BG = #170a26
+const NIGHT = #1a0a30
+const ROSE = #c23a7a
+const PEACH = #ff8a5b
+const SUN_TOP = #ffd76a
+const SUN_LOW = #ff8a5e
+const SEA_TOP = #3a1458
+const SEA_LOW = #0e0520
+const NEON = #ff4f9e
+const CREAM = #fff3e6
+const BLUSH = #ffd3e6
+const TRACK = #3d1d5a
+const PALM = #12061e
+const INK = #0a0410
+
+rect(x, y, width, height, BG)
+let wide = width > height
+let px = x + 6
+let py = y + 6
+let pw = wide ? 104 : width - 12
+let ph = wide ? height - 12 : 150
+let hz = py + (wide ? 86 : 112)
+clip(px, py, pw, ph)
+gradient(px, py, pw, hz - py, NIGHT, ROSE)
+gradient(px, hz - 14, pw, 14, ROSE, PEACH)
+let sx = px + pw / 2
+let r = wide ? 20 : 26
+let sy = hz - r / 4
+clip(px, sy - r, pw, r * 2 / 3)
+ring(sx * 16 + 8, sy * 16 + 8, r * 16, 0, SUN_TOP)
+unclip()
+let cursor = sy - r + r * 2 / 3 + 1
+repeat band from 0 to 4 {
+    if cursor < hz {
+        clip(px, cursor, pw, min(3 - band / 2, hz - cursor))
+        ring(sx * 16 + 8, sy * 16 + 8, r * 16, 0, SUN_LOW)
+        unclip()
+    }
+    cursor = cursor + 4
+}
+gradient(px, hz, pw, py + ph - hz, SEA_TOP, SEA_LOW)
+rect(px, hz, pw, 1, PEACH)
+rounded(px - 4, hz - 2, 24, 5, 2, PALM)
+rounded(px + pw - 20, hz - 2, 24, 5, 2, PALM)
+repeat palm from 0 to 2 {
+    let bx = palm == 0 ? px + 8 : px + pw - 8
+    let rise = (wide ? 30 : 40) - palm * 6
+    let lean = palm == 0 ? 5 : -4
+    repeat seg from 0 to rise {
+        rect(bx + lean * seg * seg / (rise * rise) - 1, hz - seg, seg < rise / 2 ? 3 : 2, 1, PALM)
+    }
+    let tx = bx + lean
+    let ty = hz - rise
+    let piece = rise / 6 + 1
+    repeat frond from 0 to 8 {
+        let a = frond < 4 ? 20 + frond * 24 : 236 - (frond - 4) * 24
+        let turn = frond < 4 ? 20 : -20
+        let fx = tx
+        let fy = ty
+        repeat part from 0 to 3 {
+            let angle = (a + turn * part) & 255
+            spoke(fx, fy, angle, 48 - part * 12, 0, piece + 1, PALM)
+            fx = fx + sin(angle) * piece / 255
+            fy = fy - cos(angle) * piece / 255
+        }
+    }
+}
+let size = wide ? 60 : 84
+let ax = px + (pw - size) / 2
+let ay = py + 11
+if has_cover {
+    rounded(ax - 4, ay - 4, size + 8, size + 8, 4, INK)
+    rect(ax - 2, ay - 2, size + 4, size + 4, NEON)
+    cover(ax, ay, size)
+    ring((ax + size / 2) * 16 + 8, (ay - 3) * 16 + 8, 104, 0, INK)
+    text("N", small, ax + size / 2 - 6, ay - 11, 13, 15, center, CREAM)
+}
+let tw = pw - 10
+if present(song) {
+    line(song, small, px + 5, hz + 5, tw, 16, center, CREAM)
+    line(artist, small, px + 5, hz + (wide ? 21 : 19), tw, 15, center, BLUSH)
+    rect(px + 8, py + ph - 5, pw - 16, 2, TRACK)
+    rect(px + 8, py + ph - 5, volume_shown ? volume_width(pw - 16) : progress(pw - 16), 2, NEON)
+} else {
+    text("Vice Nights", small, px + 5, hz + 12, tw, 16, center, BLUSH)
+}
+unclip()
+outline(px, py, pw, ph, TRACK)
+
+if wide {
+    menu(x + 116, y + 2, width - 120, height - 4)
+} else {
+    menu(x, y + 160, width, height - 162)
+}
+'''
