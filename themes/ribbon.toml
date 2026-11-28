@@ -1,0 +1,382 @@
+name = "Ribbon"
+author = "EchoPod"
+description = "A deep blue sky with a ribbon of light across it, glassy highlights and a sideways row of icons on Home."
+selection = "selection"
+
+[spacing]
+row_height = 26
+padding = 14
+
+[colors]
+background = "#0f3374"
+text = "#ffffff"
+text_secondary = "#c2d8f8"
+text_tertiary = "#94b6e8"
+selection_background = "#2f68bf"
+selection_top = "#5a92de"
+selection_shine = "#d8e8ff"
+selection_text = "#ffffff"
+header_background = "#0a2160"
+header_top = "#0a2160"
+header_text = "#ffffff"
+divider = "#3a6cbd"
+scrollbar_thumb = "#c2d8f8"
+danger = "#ff8a80"
+success = "#8ff0c0"
+chevron = "#c2d8f8"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+ink = "selection_text"
+shine = "selection_shine"
+shine_height = 1
+border = "selection_shine"
+border_width = 1
+inset = [6, 1]
+radius = 4
+opacity = 55
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+inset = [6, 1]
+radius = 4
+opacity = 60
+
+[boxes.selection_outline]
+fill = "background"
+ink = "text"
+border = "selection_shine"
+border_width = 1
+inset = [6, 1]
+radius = 4
+opacity = 0
+
+[boxes.header]
+fill = "header_background"
+ink = "header_text"
+opacity = 0
+
+[boxes.toast]
+fill = "header_background"
+ink = "header_text"
+border = "divider"
+border_width = 1
+radius = 8
+opacity = 85
+
+[boxes.section]
+fill = "header_background"
+ink = "header_text"
+border = "divider"
+border_width = 1
+radius = 10
+opacity = 85
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+radius = 2
+
+[boxes.progress_track]
+fill = "header_background"
+border = "divider"
+border_width = 1
+radius = 2
+
+[boxes.progress_fill]
+fill = ["text", "selection_top"]
+radius = 2
+
+[boxes.progress_active]
+fill = ["text", "selection_shine"]
+radius = 2
+
+[wallpaper]
+image = "ribbon.png"
+
+[wallpaper_portrait]
+image = "ribbon-tall.png"
+
+[now_playing_scene]
+script = '''
+const WHITE = #ffffff
+const SHADOW = #04102e
+const SOFT = #c2d8f8
+const DIM = #94b6e8
+const EDGE = #cfe2ff
+const WELL = #0a2160
+const RIM = #4f7fcc
+const FILL = #a9cdff
+const HOT = #ffffff
+const EMPTY = #1b4a9a
+
+let wide = width > height
+let size = wide ? 96 : 116
+let cx = wide ? x + 18 : x + (width - size) / 2
+let cy = wide ? y + 10 : y + 14
+
+backdrop(x, y, width, height)
+rect(cx - 1, cy - 1, size + 2, size + 2, EDGE)
+if has_cover {
+    cover(cx, cy, size)
+} else {
+    gradient(cx, cy, size, size, #2c63b8, #12387e)
+    icon(play, cx + size / 2 - 9, cy + size / 2 - 9, 18, 18, SOFT)
+}
+if badge != none {
+    rounded(cx + size / 2 - 16, cy + size / 2 - 16, 32, 32, 8, WELL)
+    icon(badge, cx + size / 2 - 9, cy + size / 2 - 9, 18, 18, WHITE)
+}
+
+let tx = wide ? x + 130 : x + 10
+let tw = wide ? width - 144 : width - 20
+let ty = wide ? y + 12 : y + 150
+let along = wide ? left : center
+
+line(song, title, tx + 1, ty + 1, tw, 22, along, SHADOW)
+line(song, title, tx, ty, tw, 22, along, WHITE)
+if present(feedback) {
+    text(feedback, body, tx + 1, ty + 27, tw, 20, along, SHADOW)
+    text(feedback, body, tx, ty + 26, tw, 20, along, WHITE)
+} else {
+    line(artist, body, tx + 1, ty + 27, tw, 20, along, SHADOW)
+    line(artist, body, tx, ty + 26, tw, 20, along, SOFT)
+}
+if present(lyric) {
+    line(lyric, small, tx + 1, ty + 49, tw, 16, along, SHADOW)
+    line(lyric, small, tx, ty + 48, tw, 16, along, WHITE)
+} else {
+    line(album, small, tx + 1, ty + 49, tw, 16, along, SHADOW)
+    line(album, small, tx, ty + 48, tw, 16, along, DIM)
+}
+format(small, tx, ty + 68, tw, 16, along, SOFT)
+
+let py = ty + (wide ? 96 : 94)
+let filled = volume_shown ? volume_width(tw - 2) : progress(tw - 2)
+rounded(tx, py, tw, 7, 3, RIM)
+rounded(tx + 1, py + 1, tw - 2, 5, 2, WELL)
+if filled > 0 {
+    clip(tx + 1, py + 1, filled, 5)
+    gradient(tx + 1, py + 1, tw - 2, 5, HOT, FILL)
+    unclip()
+}
+times(small, tx + 1, py + 11, tw, 16, SHADOW, SHADOW)
+times(small, tx, py + 10, tw, 16, WHITE, SOFT)
+'''
+
+[home_scene]
+script = '''
+const WHITE = #ffffff
+const SHADOW = #04102e
+const SOFT = #c2d8f8
+const DIM = #6f95d2
+const EDGE = #cfe2ff
+const RULE = #5d8ad0
+
+let wide = width > height
+backdrop(x, y, width, height)
+
+let count = items()
+let at = selected()
+let size = wide ? 104 : 124
+let cx = wide ? x + width - size - 14 : x + (width - size) / 2
+let cy = wide ? y + 16 : y + 84
+let room = wide ? cx - x - 8 : width
+let ax = x + 26
+let iy = y + (wide ? (present(song) ? 14 : 36) : 12)
+let gap = wide ? 48 : 46
+
+clip(x, iy - 4, room, 32)
+repeat n from 0 to count {
+    let ix = ax + (n - at) * gap
+    if n == at {
+        item_icon(n, ix - 11, iy + 1, 24, 24, SHADOW)
+        item_icon(n, ix - 12, iy, 24, 24, WHITE)
+    } else {
+        item_icon(n, ix - 12, iy, 24, 24, DIM)
+    }
+}
+unclip()
+rect(x + 14, iy + 30, room - 28, 1, RULE)
+
+text(item(at), title, x + 15, iy + 39, room - 26, 22, left, SHADOW)
+text(item(at), title, x + 14, iy + 38, room - 26, 22, left, WHITE)
+
+rect(cx - 1, cy - 1, size + 2, size + 2, EDGE)
+if has_cover {
+    cover(cx, cy, size)
+} else {
+    gradient(cx, cy, size, size, #2c63b8, #12387e)
+}
+
+if present(song) {
+    let sx = wide ? x + 14 : x + 10
+    let sy = wide ? y + 82 : cy + size + 14
+    let sw = wide ? room - 26 : width - 20
+    let along = wide ? left : center
+    line(song, body, sx + 1, sy + 1, sw, 20, along, SHADOW)
+    line(song, body, sx, sy, sw, 20, along, WHITE)
+    line(artist, small, sx + 1, sy + 23, sw, 16, along, SHADOW)
+    line(artist, small, sx, sy + 22, sw, 16, along, SOFT)
+    line(album, small, sx + 1, sy + 41, sw, 16, along, SHADOW)
+    line(album, small, sx, sy + 40, sw, 16, along, DIM)
+}
+'''
+
+[icons]
+home_music = [
+    "........................",
+    "..................354...",
+    "............358acfff8...",
+    "........4acfffffffff8...",
+    "........8fffffffffff8...",
+    "........8fffffffffff8...",
+    "........8ffffffca8af8...",
+    "........8fc853....8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8.......8f8...",
+    "........8f8...19ffdf8...",
+    "........8f8...cfffff8...",
+    "....19ffdf8..6ffffff8...",
+    "....cfffff8..8ffffff8...",
+    "...6ffffff8..6ffffff6...",
+    "...8ffffff8...cffffc....",
+    "...6ffffff6...19ff91....",
+    "....cffffc..............",
+    "....19ff91..............",
+    "........................",
+    "........................",
+]
+home_audiobooks = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "..da74............47ad..",
+    "..fffffb852..258bfffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..fffffffff..fffffffff..",
+    "..258bfffff..fffffb852..",
+    ".......47ad..da74.......",
+    "........................",
+    "........................",
+    "........................",
+]
+home_podcasts = [
+    "........................",
+    "........................",
+    "..........8ee8..........",
+    ".........8ffff8.........",
+    ".........effffe.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    ".........ffffff.........",
+    "....8f4..ffffff..4f8....",
+    "....5f8..cffffc..8f5....",
+    "....1fd..3effe3..df1....",
+    ".....9f8..2772..8f9.....",
+    ".....1ef8......8fe1.....",
+    "......3efd8448dfe3......",
+    ".......19ffffff91.......",
+    ".........15ff51.........",
+    "...........ff...........",
+    ".......1888ff8881.......",
+    ".......8ffffffff8.......",
+    ".......1888888881.......",
+    "........................",
+]
+home_settings = [
+    "........................",
+    ".........288882.........",
+    ".........4ffff4.........",
+    ".....69..4ffff4..96.....",
+    "....6ff9.6ffff6.9ff6....",
+    "...6ffffdffffffdffff6...",
+    "...9ffffffffffffffff9...",
+    "....9ffffffffffffff9....",
+    ".....dfffffbbfffffd.....",
+    ".2446ffffc2..2cffff6442.",
+    ".8fffffff2....2fffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8ffffffb......bffffff8.",
+    ".8fffffff2....2fffffff8.",
+    ".2446ffffc2..2cffff6442.",
+    ".....dfffffbbfffffd.....",
+    "....9ffffffffffffff9....",
+    "...9ffffffffffffffff9...",
+    "...6ffffdffffffdffff6...",
+    "....6ff9.6ffff6.9ff6....",
+    ".....69..4ffff4..96.....",
+    ".........4ffff4.........",
+    ".........288882.........",
+    "........................",
+]
+home_diagnostics = [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    ".........3b3............",
+    ".........cfb............",
+    "........3fff1...........",
+    "........9fff5...........",
+    ".......1efff9...........",
+    ".......6ffcfd...........",
+    ".......cfc5ff3..........",
+    ".244446ff61ff7..2444442.",
+    "2effffffe1.bfb.2efffffe2",
+    "2effffff8..7ff17ffffffe2",
+    ".2444444...3ff5dfb44442.",
+    "............dfcff5......",
+    "............9fffe.......",
+    "............5fff8.......",
+    "............1fff2.......",
+    ".............bfc........",
+    ".............3b3........",
+    "........................",
+    "........................",
+    "........................",
+]
+home_now_playing = [
+    "........................",
+    ".........368863.........",
+    "......18dffffffd81......",
+    ".....4dffeb88beffd4.....",
+    "....6ffd6......6dff6....",
+    "...4ff91........19ff4...",
+    "..1df9............9fd1..",
+    "..8fd1...94.......1df8..",
+    "..df6....bfa1......6fd..",
+    ".3fe.....bffe7......ef3.",
+    ".6fb.....bffffc4....bf6.",
+    ".8f8.....bffffff91..8f8.",
+    ".8f8.....bffffff91..8f8.",
+    ".6fb.....bffffc4....bf6.",
+    ".3fe.....bffe7......ef3.",
+    "..df6....bfa1......6fd..",
+    "..8fd1...94.......1df8..",
+    "..1df9............9fd1..",
+    "...4ff91........19ff4...",
+    "....6ffd6......6dff6....",
+    ".....4dffeb88beffd4.....",
+    "......18dffffffd81......",
+    ".........368863.........",
+    "........................",
+]
