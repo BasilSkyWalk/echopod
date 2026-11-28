@@ -1,0 +1,355 @@
+name = "SilverIndex"
+author = "kc0ver"
+description = "Silver and blue LCD styling with compact menus, square album art, and a full-width playback ruler."
+selection = "selection"
+
+[spacing]
+row_height = 26
+padding = 13
+scrollbar_width = 3
+scrollbar_inset = 2
+detail_gap = 7
+
+[colors]
+background = "#f7f7ff"
+text = "#102431"
+text_secondary = "#395163"
+text_tertiary = "#52697b"
+selection_background = "#214984"
+selection_top = "#4279b5"
+selection_shine = "#add7f7"
+selection_text = "#ffffff"
+header_background = "#c6cfde"
+header_top = "#fffbff"
+header_text = "#102c42"
+divider = "#849aad"
+scrollbar_thumb = "#5a758c"
+danger = "#a53442"
+success = "#216542"
+chevron = "#42617b"
+
+[boxes.selection]
+fill = ["selection_top", "selection_background"]
+border = "selection_shine"
+border_width = 2
+border_edges = ["left"]
+ink = "selection_text"
+inset = [5, 1]
+radius = 2
+
+[boxes.selection_flat]
+fill = "selection_background"
+ink = "selection_text"
+
+[boxes.selection_outline]
+fill = "background"
+border = "selection_top"
+border_width = 1
+border_edges = "all"
+ink = "selection_top"
+inset = [6, 1]
+
+[boxes.header]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = ["bottom"]
+ink = "header_text"
+
+[boxes.toast]
+fill = ["header_top", "header_background"]
+border = "divider"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+radius = 3
+
+[boxes.section]
+fill = "header_background"
+border = "selection_background"
+border_width = 1
+border_edges = "all"
+ink = "header_text"
+radius = 3
+
+[boxes.scrollbar_thumb]
+fill = "scrollbar_thumb"
+ink = "background"
+
+[boxes.progress_track]
+fill = "header_background"
+ink = "background"
+radius = 2
+
+[boxes.progress_fill]
+fill = ["selection_top", "selection_background"]
+ink = "background"
+radius = 2
+
+[boxes.progress_active]
+fill = "selection_background"
+ink = "background"
+radius = 2
+
+[now_playing_scene]
+script = '''
+const WHITE = #fbfdff
+const PAPER = #e8eff6
+const METAL = #cbd9e6
+const LINE = #95aabe
+const INK = #132c43
+const SOFT = #405d77
+const BLUE = #244f8c
+const GLASS = #5c97cc
+const ICE = #b8e5fc
+
+gradient(x, y, width, height, WHITE, PAPER)
+let wide = width > height
+let size = wide ? 101 : 128
+let ax = wide ? x + width - size - 13 : x + (width - size) / 2
+let ay = y + (wide ? 7 : 10)
+rect(ax + 2, ay + 2, size, size, LINE)
+gradient(ax, ay, size, size, WHITE, METAL)
+outline(ax, ay, size, size, LINE)
+if has_cover {
+    cover(ax + 4, ay + 4, size - 8)
+} else {
+    rect(ax + 4, ay + 4, size - 8, size - 8, BLUE)
+    let cx = ax + size / 2
+    let cy = ay + size / 2
+    repeat band from 0 to 4 {
+        let radius = size / 2 - band * 7 - 9
+        ring(cx * 16 + 8, cy * 16 + 8, radius * 16, (radius - 1) * 16, GLASS)
+    }
+    rect(cx - 5, cy - 1, 11, 3, ICE)
+    rect(cx - 1, cy - 5, 3, 11, ICE)
+}
+if badge != none {
+    let cx = ax + size / 2
+    let cy = ay + size / 2
+    rounded(cx - 15, cy - 15, 31, 31, 4, BLUE)
+    icon(badge, cx - 8, cy - 8, 17, 17, WHITE)
+}
+if wide {
+    rect(ax - 14, y + 9, 1, 99, LINE)
+    rect(ax - 13, y + 9, 1, 99, WHITE)
+}
+
+let tx = x + (wide ? 13 : 10)
+let tw = wide ? ax - tx - 23 : width - 20
+let title_y = y + (wide ? 33 : 146)
+let format_y = y + (wide ? 10 : 210)
+let align = wide ? left : center
+format(small, tx, format_y, tw, 16, align, SOFT)
+line(song, title, tx, title_y, tw, 21, align, INK)
+line(artist, body, tx, title_y + 23, tw, 18, align, SOFT)
+if present(feedback) {
+    text(feedback, small, tx, title_y + 42, tw, 16, align, BLUE)
+} else if present(lyric) {
+    line(lyric, small, tx, title_y + 42, tw, 16, align, BLUE)
+} else {
+    line(album, small, tx, title_y + 42, tw, 16, align, SOFT)
+}
+if present(modes) {
+    text(modes, small, tx, y + (wide ? 94 : 228), tw, 13, align, BLUE)
+} else if wide {
+    text(detail, small, tx, y + 94, tw, 13, align, SOFT)
+}
+
+let bx = x + 10
+let bw = width - 20
+let by = y + (wide ? 117 : 247)
+rect(x, by - 5, width, 1, LINE)
+rect(x, by - 4, width, height - (by - y) + 4, METAL)
+rect(bx, by, bw, 8, WHITE)
+outline(bx, by, bw, 8, LINE)
+let fill = volume_shown ? volume_width(bw - 2) : progress(bw - 2)
+if fill > 0 {
+    gradient(bx + 1, by + 1, fill, 6, scrubbing || volume_shown ? ICE : GLASS, BLUE)
+    let mark = bx + min(bw - 3, fill)
+    rect(mark, by + 1, 1, 6, ICE)
+}
+repeat tickmark from 1 to 4 {
+    rect(bx + tickmark * bw / 4, by + 9, 1, 2, SOFT)
+}
+times(small, bx, by + 12, bw, 15, INK, SOFT)
+'''
+
+[home_scene]
+script = '''
+const WHITE = #f9fbfe
+const PAPER = #edf3f9
+const METAL = #d6e2ef
+const LINE = #a0b2c4
+const INK = #162d41
+const SOFT = #436079
+const BLUE = #244f8c
+const GLASS = #497ebc
+const ICE = #a9daf7
+
+rect(x, y, width, height, PAPER)
+let wide = width > height
+let dx = x + (wide ? 7 : 8)
+let dy = y + (wide ? 7 : 163)
+let dw = wide ? 102 : width - 16
+let dh = wide ? height - 14 : height - 170
+gradient(dx, dy, dw, dh, WHITE, METAL)
+outline(dx, dy, dw, dh, LINE)
+rect(dx + 1, dy + 1, dw - 2, 1, WHITE)
+let cover_size = wide ? 74 : 66
+let ax = dx + (wide ? (dw - cover_size) / 2 : 7)
+let ay = dy + (wide ? 14 : (dh - cover_size) / 2)
+rect(ax + 2, ay + 2, cover_size + 1, cover_size + 1, LINE)
+rect(ax - 2, ay - 2, cover_size + 4, cover_size + 4, WHITE)
+outline(ax - 2, ay - 2, cover_size + 4, cover_size + 4, LINE)
+if has_cover {
+    cover(ax, ay, cover_size)
+} else {
+    rect(ax, ay, cover_size, cover_size, BLUE)
+    let cx = ax + cover_size / 2
+    let cy = ay + cover_size / 2
+    repeat band from 0 to 3 {
+        let radius = cover_size / 2 - band * 7 - 5
+        ring(cx * 16 + 8, cy * 16 + 8, radius * 16, (radius - 1) * 16, ICE)
+    }
+    rect(cx - 4, cy - 4, 8, 8, WHITE)
+}
+if present(song) {
+    let tx = wide ? dx + 6 : ax + cover_size + 9
+    let ty = wide ? ay + cover_size + 8 : dy + 30
+    let tw = wide ? dw - 12 : dx + dw - tx - 5
+    line(song, small, tx, ty, tw, 16, wide ? center : left, INK)
+    line(artist, small, tx, ty + 15, tw, 16, wide ? center : left, SOFT)
+} else {
+    let tx = wide ? dx + 13 : ax + cover_size + 15
+    let ty = wide ? dy + dh - 19 : dy + dh / 2 + 8
+    let tw = wide ? dw - 26 : dx + dw - tx - 10
+    rect(tx, ty, tw, 1, LINE)
+    rect(tx, ty + 4, tw * 2 / 3, 1, LINE)
+}
+
+let mx = x + (wide ? 116 : 8)
+let mw = width - (mx - x) - 8
+let mh = wide ? height - 14 : 147
+let my = y + (wide ? 7 : 9)
+rect(mx, my, mw, mh, WHITE)
+outline(mx, my, mw, mh, LINE)
+let count = min(5, items())
+let chosen = selected()
+let start = max(0, chosen - count + 1)
+let step = wide ? 25 : 28
+let top = my + (mh - count * step) / 2
+repeat index from 0 to count {
+    let item_index = start + index
+    let ry = top + index * step
+    let active = item_index == chosen
+    rect(mx + 6, ry + step - 1, mw - 12, 1, METAL)
+    if active {
+        gradient(mx + 2, ry, mw - 4, step - 1, GLASS, BLUE)
+        rect(mx + 2, ry, 2, step - 1, ICE)
+    }
+    let ink = active ? WHITE : INK
+    item_icon(item_index, mx + 10, ry + 7, 11, 11, active ? WHITE : BLUE)
+    line(item(item_index), body, mx + 27, ry + 2, mw - 43, step - 4, left, ink)
+    rect(mx + mw - 11, ry + step / 2 - 2, 1, 5, active ? ICE : LINE)
+    rect(mx + mw - 10, ry + step / 2 - 1, 1, 3, active ? ICE : LINE)
+    rect(mx + mw - 9, ry + step / 2, 1, 1, active ? ICE : LINE)
+}
+'''
+
+[icons]
+battery = [
+    ".ffffffffffffff...",
+    "f..............f..",
+    "f..............fff",
+    "f................f",
+    "f................f",
+    "f..............fff",
+    "f..............f..",
+    ".ffffffffffffff...",
+]
+battery_level = [
+    "..................",
+    "..................",
+    "..fff.fff.fff.....",
+    "..fff.fff.fff.....",
+    "..fff.fff.fff.....",
+    "..fff.fff.fff.....",
+    "..................",
+    "..................",
+]
+chevron = [
+    "f....",
+    ".f...",
+    "..f..",
+    "...f.",
+    "..f..",
+    ".f...",
+    "f....",
+]
+home_music = [
+    ".........",
+    "....f....",
+    "....f.f..",
+    "..f.f.f..",
+    "f.f.f.f.f",
+    "f.f.f.f.f",
+    "..f.f.f..",
+    "....f....",
+    ".........",
+]
+home_audiobooks = [
+    ".........",
+    ".fff.fff.",
+    "f...f...f",
+    "f.f.f.f.f",
+    "f...f...f",
+    "f.f.f.f.f",
+    "f...f...f",
+    ".fff.fff.",
+    ".........",
+]
+home_podcasts = [
+    "..fffff..",
+    ".f.....f.",
+    "f..fff..f",
+    "f.f...f.f",
+    "f.f.f.f.f",
+    "..f...f..",
+    "....f....",
+    "...fff...",
+    ".........",
+]
+home_settings = [
+    ".........",
+    "...f.f...",
+    "..fffff..",
+    ".ff...ff.",
+    "..f...f..",
+    ".ff...ff.",
+    "..fffff..",
+    "...f.f...",
+    ".........",
+]
+home_diagnostics = [
+    "fffffffff",
+    "f.......f",
+    "f....f..f",
+    "f..f.f..f",
+    "f..f.f..f",
+    "ff.f.ffff",
+    "f.f.....f",
+    "f.......f",
+    "fffffffff",
+]
+home_now_playing = [
+    ".........",
+    ".fffffff.",
+    ".f.f...f.",
+    ".f.ff..f.",
+    ".f.fff.f.",
+    ".f.ff..f.",
+    ".f.f...f.",
+    ".fffffff.",
+    ".........",
+]
